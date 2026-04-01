@@ -1,5 +1,5 @@
-import type pg from "pg";
 import type { TreeNode } from "../../shared/types.js";
+import type { Queryable } from "../queryable.js";
 
 function rowToNode(row: Record<string, unknown>): TreeNode {
   return {
@@ -13,7 +13,7 @@ function rowToNode(row: Record<string, unknown>): TreeNode {
 }
 
 export async function insertNode(
-  db: pg.Pool,
+  db: Queryable,
   card_id: string,
   parent_node_id: string | null,
   position: number | undefined,
@@ -52,7 +52,7 @@ export async function insertNode(
 }
 
 async function renumberSiblings(
-  db: pg.Pool,
+  db: Queryable,
   parent_node_id: string | null
 ): Promise<void> {
   // Fetch all siblings ordered by current position, reassign 100, 200, 300...
@@ -72,7 +72,7 @@ async function renumberSiblings(
 }
 
 export async function selectNodeById(
-  db: pg.Pool,
+  db: Queryable,
   id: string
 ): Promise<TreeNode | null> {
   const result = await db.query(`SELECT * FROM tree_nodes WHERE id = $1`, [id]);
@@ -81,7 +81,7 @@ export async function selectNodeById(
 }
 
 export async function selectChildren(
-  db: pg.Pool,
+  db: Queryable,
   parent_node_id: string | null
 ): Promise<TreeNode[]> {
   const result = await db.query(
@@ -94,7 +94,7 @@ export async function selectChildren(
 }
 
 export async function selectCanonicalNodeByCardId(
-  db: pg.Pool,
+  db: Queryable,
   card_id: string
 ): Promise<TreeNode | null> {
   const result = await db.query(
@@ -106,7 +106,7 @@ export async function selectCanonicalNodeByCardId(
 }
 
 export async function selectNodesByCardId(
-  db: pg.Pool,
+  db: Queryable,
   card_id: string
 ): Promise<TreeNode[]> {
   const result = await db.query(
@@ -117,7 +117,7 @@ export async function selectNodesByCardId(
 }
 
 export async function deleteNodeById(
-  db: pg.Pool,
+  db: Queryable,
   id: string
 ): Promise<boolean> {
   const result = await db.query(`DELETE FROM tree_nodes WHERE id = $1`, [id]);
@@ -125,7 +125,7 @@ export async function deleteNodeById(
 }
 
 export async function moveNode(
-  db: pg.Pool,
+  db: Queryable,
   nodeId: string,
   new_parent_node_id: string | null,
   new_position: number | undefined

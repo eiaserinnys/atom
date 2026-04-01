@@ -7,7 +7,7 @@
  *  - SSE HTTP cases (2): GET /events responds with correct SSE headers;
  *    a mutation performed after connecting triggers an SSE message.
  *
- * Requires DATABASE_URL to point to a running PostgreSQL instance.
+ * Requires TEST_DATABASE_URL to point to a running PostgreSQL instance.
  */
 
 import pg from "pg";
@@ -49,12 +49,16 @@ async function buildTestApp(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 beforeAll(async () => {
-  const databaseUrl = process.env["DATABASE_URL"];
+  const databaseUrl = process.env["TEST_DATABASE_URL"];
   if (!databaseUrl) {
     throw new Error(
-      "DATABASE_URL is required for integration tests.\n" +
-        "Set it to the atom-postgres instance: postgresql://atom:atom@localhost:5434/atom_db"
+      "TEST_DATABASE_URL is required for integration tests.\n" +
+        "Set it to the atom-postgres instance: postgresql://atom:atom@localhost:5434/atom_test_db"
     );
+  }
+
+  if (databaseUrl.includes("atom_db") && !databaseUrl.includes("test")) {
+    throw new Error("TEST_DATABASE_URL must use a test database, not the production atom_db.\nUse: postgresql://atom:atom@localhost:5434/atom_test_db");
   }
 
   pool = new Pool({ connectionString: databaseUrl });
