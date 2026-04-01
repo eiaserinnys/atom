@@ -75,4 +75,8 @@ export const api = {
       body: JSON.stringify(data),
     });
   },
+
+  listChildren(nodeId: string): Promise<TreeNodeData[]> {
+    return request(`/tree/${nodeId}/children`);
+  },
 };

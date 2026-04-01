@@ -94,3 +94,10 @@
 .children {
   /* children indent is handled via paddingLeft in component */
 }
+
+.errorHint {
+  margin-left: 4px;
+  font-size: 12px;
+  cursor: help;
+  flex-shrink: 0;
+}

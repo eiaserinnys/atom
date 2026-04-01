@@ -16,7 +16,22 @@ export function TreeView({ selectedNodeId, onSelect }: TreeViewProps) {
   useEffect(() => {
     setLoading(true);
     api.getTree()
-      .then(setRoots)
+      .then(async (roots) => {
+        // 각 루트의 자식을 병렬로 fetch — { ...root, children }로 node.children을 주입하면
+        // TreeNode에서 node.children !== undefined → childrenLoaded = true로 초기화됨 (lazy fetch 불필요)
+        // 그 자식 노드들의 children은 undefined이므로 childrenLoaded = false → 첫 expand 시 lazy fetch 경로 사용
+        const rootsWithChildren = await Promise.all(
+          roots.map(async (root) => {
+            try {
+              const children = await api.listChildren(root.id);
+              return { ...root, children };  // then 내부, map 콜백 반환
+            } catch {
+              return { ...root, children: [] };  // fetch 실패 시 빈 배열로 fallback
+            }
+          })
+        );
+        setRoots(rootsWithChildren);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
