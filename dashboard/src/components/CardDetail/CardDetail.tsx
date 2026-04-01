@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type CardData, type TreeNodeData } from '../../api/client';
 import styles from './CardDetail.module.css';
 
@@ -7,10 +8,7 @@ interface CardDetailProps {
 }
 
 export function CardDetail({ nodeId }: CardDetailProps) {
-  const [node, setNode] = useState<TreeNodeData | null>(null);
-  const [card, setCard] = useState<CardData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Editing state
   const [editingTitle, setEditingTitle] = useState(false);
@@ -19,32 +17,42 @@ export function CardDetail({ nodeId }: CardDetailProps) {
   const [contentDraft, setContentDraft] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!nodeId) {
-      setNode(null);
-      setCard(null);
-      return;
-    }
-    setLoading(true);
-    setError(null);
+  const isDirty = editingTitle || editingContent;
+
+  const { data: node, isLoading, isError } = useQuery<TreeNodeData>({
+    queryKey: ['node', nodeId],
+    queryFn: () => api.getNode(nodeId!),
+    enabled: !!nodeId,
+    retry: false,
+  });
+
+  const card: CardData | undefined = node?.card;
+
+  // 삭제된 카드 처리 — api.getNode가 404 시 throw하므로 isError로 감지
+  if (isError && nodeId && !isLoading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>카드 상세</div>
+        <div className={styles.content}>
+          <div className={styles.cardDeletedNotice}>이 카드는 삭제되었습니다.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleRefresh = () => {
     setEditingTitle(false);
     setEditingContent(false);
-    api.getNode(nodeId)
-      .then((n) => {
-        setNode(n);
-        setCard(n.card);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [nodeId]);
+    queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
+  };
 
   const saveTitle = async () => {
     if (!card) return;
     setSaving(true);
     try {
-      const updated = await api.updateCard(card.id, { title: titleDraft });
-      setCard(updated);
+      await api.updateCard(card.id, { title: titleDraft });
       setEditingTitle(false);
+      queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
     } catch (e: unknown) {
       alert(`저장 실패: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -56,9 +64,9 @@ export function CardDetail({ nodeId }: CardDetailProps) {
     if (!card) return;
     setSaving(true);
     try {
-      const updated = await api.updateCard(card.id, { content: contentDraft });
-      setCard(updated);
+      await api.updateCard(card.id, { content: contentDraft });
       setEditingContent(false);
+      queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
     } catch (e: unknown) {
       alert(`저장 실패: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -73,10 +81,21 @@ export function CardDetail({ nodeId }: CardDetailProps) {
         {!nodeId && (
           <div className={styles.empty}>노드를 선택하면 카드 정보가 표시됩니다.</div>
         )}
-        {loading && <div className={styles.status}>로딩 중...</div>}
-        {error && <div className={styles.statusError}>오류: {error}</div>}
+        {isLoading && <div className={styles.status}>로딩 중...</div>}
 
-        {card && !loading && (
+        {/* Dirty State Guard — 편집 중 외부 변경 감지 배너 */}
+        {isDirty && card && (
+          <div className={styles.dirtyBanner}>
+            <span className={styles.dirtyBannerText}>
+              편집 중 외부에서 변경되었을 수 있습니다. 저장하지 않은 내용이 있습니다.
+            </span>
+            <button className={styles.btnRefresh} onClick={handleRefresh}>
+              새로고침
+            </button>
+          </div>
+        )}
+
+        {card && !isLoading && (
           <>
             {/* Title */}
             <div className={styles.field}>

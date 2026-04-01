@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api, type TreeNodeData } from '../../api/client';
 import { TreeNode } from './TreeNode';
 import styles from './TreeView.module.css';
@@ -8,37 +8,30 @@ interface TreeViewProps {
   onSelect: (nodeId: string) => void;
 }
 
+async function fetchRootsWithChildren(): Promise<TreeNodeData[]> {
+  const roots = await api.getTree();
+  const rootsWithChildren = await Promise.all(
+    roots.map(async (root) => {
+      try {
+        const children = await api.listChildren(root.id);
+        return { ...root, children };
+      } catch {
+        return { ...root, children: [] };
+      }
+    })
+  );
+  return rootsWithChildren;
+}
+
 export function TreeView({ selectedNodeId, onSelect }: TreeViewProps) {
-  const [roots, setRoots] = useState<TreeNodeData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: roots, isLoading, error } = useQuery({
+    queryKey: ['tree', null],
+    queryFn: fetchRootsWithChildren,
+  });
 
-  useEffect(() => {
-    setLoading(true);
-    api.getTree()
-      .then(async (roots) => {
-        // 각 루트의 자식을 병렬로 fetch — { ...root, children }로 node.children을 주입하면
-        // TreeNode에서 node.children !== undefined → childrenLoaded = true로 초기화됨 (lazy fetch 불필요)
-        // 그 자식 노드들의 children은 undefined이므로 childrenLoaded = false → 첫 expand 시 lazy fetch 경로 사용
-        const rootsWithChildren = await Promise.all(
-          roots.map(async (root) => {
-            try {
-              const children = await api.listChildren(root.id);
-              return { ...root, children };  // then 내부, map 콜백 반환
-            } catch {
-              return { ...root, children: [] };  // fetch 실패 시 빈 배열로 fallback
-            }
-          })
-        );
-        setRoots(rootsWithChildren);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <div className={styles.status}>트리 로딩 중...</div>;
-  if (error) return <div className={styles.statusError}>오류: {error}</div>;
-  if (roots.length === 0) return <div className={styles.status}>노드가 없습니다.</div>;
+  if (isLoading) return <div className={styles.status}>트리 로딩 중...</div>;
+  if (error) return <div className={styles.statusError}>오류: {error.message}</div>;
+  if (!roots || roots.length === 0) return <div className={styles.status}>노드가 없습니다.</div>;
 
   return (
     <div className={styles.treeContainer}>

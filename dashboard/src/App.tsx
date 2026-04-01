@@ -1,16 +1,29 @@
 import { useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
 import { TreeView } from './components/TreeView/TreeView';
 import { CompileView } from './components/CompileView/CompileView';
 import { CardDetail } from './components/CardDetail/CardDetail';
 import { SearchBar } from './components/SearchBar/SearchBar';
 import { useAuth } from './hooks/useAuth';
+import { useAtomEvents } from './hooks/useAtomEvents';
 import { LoginPage } from './pages/LoginPage';
 import styles from './App.module.css';
 
-function App() {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60,
+      retry: 1,
+    },
+  },
+});
+
+function AppInner() {
   const auth = useAuth();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  useAtomEvents();
 
   if (auth.loading) return null;
   if (!auth.authenticated) return <LoginPage />;
@@ -39,6 +52,14 @@ function App() {
         />
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppInner />
+    </QueryClientProvider>
   );
 }
 
