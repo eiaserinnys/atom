@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/api/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/db/migrations dist/db/migrations",
     "start": "node dist/api/index.js",
     "dev": "tsx watch src/api/index.ts",
     "mcp": "node dist/mcp/server.js",
