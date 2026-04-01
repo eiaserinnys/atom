@@ -8,11 +8,11 @@ import { registerSearchTools } from "./tools/search_tools.js";
 import { runMigrations } from "../db/client.js";
 import { config } from "dotenv";
 
-config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+config({ path: path.join(__dirname, "../../.env") });
 
 async function main(): Promise<void> {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
   await runMigrations(path.join(__dirname, "../db/migrations"));
 
   const server = new McpServer({
