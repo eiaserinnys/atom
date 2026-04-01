@@ -11,6 +11,7 @@ import type {
   CreateCardInput,
   UpdateCardInput,
 } from "../shared/types.js";
+import { eventBus } from "../events/eventBus.js";
 
 export async function createCard(input: CreateCardInput): Promise<{ card: Card; node_id: string }> {
   const db = getPool();
@@ -24,6 +25,14 @@ export async function createCard(input: CreateCardInput): Promise<{ card: Card; 
     false
   );
 
+  eventBus.emit("atom:event", {
+    type: "card:created",
+    cardId: card.id,
+    nodeId: node.id,
+    parentNodeId: input.parent_node_id ?? null,
+    data: card,
+  });
+
   return { card, node_id: node.id };
 }
 
@@ -36,12 +45,20 @@ export async function updateCard(
   input: UpdateCardInput
 ): Promise<Card | null> {
   const contentChanged = input.content !== undefined;
-  return updateCardById(getPool(), id, input, contentChanged);
+  const card = await updateCardById(getPool(), id, input, contentChanged);
+  if (card) {
+    eventBus.emit("atom:event", { type: "card:updated", cardId: id, data: card });
+  }
+  return card;
 }
 
 export async function deleteCard(id: string): Promise<boolean> {
   // Cascade deletes tree_nodes via FK
-  return deleteCardById(getPool(), id);
+  const deleted = await deleteCardById(getPool(), id);
+  if (deleted) {
+    eventBus.emit("atom:event", { type: "card:deleted", cardId: id });
+  }
+  return deleted;
 }
 
 export async function getBacklinks(cardId: string): Promise<Card[]> {
