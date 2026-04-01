@@ -6,6 +6,7 @@ import { treeRoutes } from "./routes/tree.js";
 import { searchRoutes } from "./routes/search.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { authRoutes } from "./routes/auth.js";
+import { eventsRoutes } from "./routes/events.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
 import { runMigrations } from "../db/client.js";
@@ -24,6 +25,7 @@ app.register(cardRoutes);
 app.register(treeRoutes);
 app.register(searchRoutes);
 app.register(mcpRoutes);
+app.register(eventsRoutes);
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {

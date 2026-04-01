@@ -10,6 +10,7 @@ import {
 import { selectCardById } from "../db/queries/cards.js";
 import { compileNode } from "../shared/bfs.js";
 import type { Card, TreeNode, TreeNodeWithCard } from "../shared/types.js";
+import { eventBus } from "../events/eventBus.js";
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
   const db = getPool();
@@ -121,11 +122,22 @@ export async function createSymlink(
   parent_node_id: string | null,
   position?: number
 ): Promise<TreeNode> {
-  return insertNode(getPool(), card_id, parent_node_id, position, true);
+  const node = await insertNode(getPool(), card_id, parent_node_id, position, true);
+  eventBus.emit("atom:event", {
+    type: "node:created",
+    nodeId: node.id,
+    cardId: card_id,
+    parentNodeId: parent_node_id,
+  });
+  return node;
 }
 
 export async function deleteNode(nodeId: string): Promise<boolean> {
-  return deleteNodeById(getPool(), nodeId);
+  const deleted = await deleteNodeById(getPool(), nodeId);
+  if (deleted) {
+    eventBus.emit("atom:event", { type: "node:deleted", nodeId });
+  }
+  return deleted;
 }
 
 export async function moveNode(
@@ -133,5 +145,13 @@ export async function moveNode(
   new_parent_node_id: string | null,
   new_position?: number
 ): Promise<TreeNode | null> {
-  return moveNodeQuery(getPool(), nodeId, new_parent_node_id, new_position);
+  const node = await moveNodeQuery(getPool(), nodeId, new_parent_node_id, new_position);
+  if (node) {
+    eventBus.emit("atom:event", {
+      type: "node:moved",
+      nodeId,
+      newParentNodeId: new_parent_node_id,
+    });
+  }
+  return node;
 }
