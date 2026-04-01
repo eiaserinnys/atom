@@ -4,6 +4,7 @@ import path from "path";
 import { cardRoutes } from "./routes/cards.js";
 import { treeRoutes } from "./routes/tree.js";
 import { searchRoutes } from "./routes/search.js";
+import { mcpRoutes } from "./routes/mcp.js";
 import { runMigrations } from "../db/client.js";
 import { config } from "dotenv";
 
@@ -16,6 +17,7 @@ const app = Fastify({ logger: true });
 app.register(cardRoutes);
 app.register(treeRoutes);
 app.register(searchRoutes);
+app.register(mcpRoutes);
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {

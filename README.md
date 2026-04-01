@@ -1,6 +1,6 @@
 # atom
 
-A Zettelkasten-inspired atomic knowledge card system. Cards live in a flexible tree (with symlinks and cycle-safe BFS compilation), exposed over both a REST API and an MCP stdio server so AI agents can read and write directly.
+A Zettelkasten-inspired atomic knowledge card system. Cards live in a flexible tree (with symlinks and cycle-safe BFS compilation), exposed over both a REST API and two MCP transports (HTTP and stdio) so AI agents can read and write directly.
 
 Live: **https://your-domain.example.com**
 
@@ -12,8 +12,9 @@ PostgreSQL (port 5434, Docker: atom-postgres)
     └── tree_nodes table — hierarchical placement (supports symlinks)
 
 Node.js server (pm2: atom-api, default port 3000)
-    ├── REST API  (Fastify, 13 endpoints)   — used by the dashboard
-    └── MCP server (stdio transport)         — used by AI agents
+    ├── REST API         (Fastify, 13 endpoints)   — used by the dashboard
+    ├── MCP HTTP         (POST /mcp, Streamable HTTP) — used by AI agents remotely
+    └── MCP stdio        (npm run mcp)              — used by AI agents locally
 
 React dashboard (built to dashboard/dist/, served by nginx)
     — 3-panel layout: TreeView | CompileView | CardDetail
@@ -31,7 +32,8 @@ atom/
 │   │   └── routes/
 │   │       ├── cards.ts        — CRUD + backlinks (5 endpoints)
 │   │       ├── tree.ts         — tree navigation + compile (7 endpoints)
-│   │       └── search.ts       — BM25 full-text search (1 endpoint)
+│   │       ├── search.ts       — BM25 full-text search (1 endpoint)
+│   │       └── mcp.ts          — POST /mcp (Streamable HTTP MCP)
 │   ├── mcp/
 │   │   ├── server.ts           — MCP stdio entry point
 │   │   └── tools/
@@ -121,7 +123,44 @@ CREATE TABLE tree_nodes (
 
 `SearchResult` shape: `{ card_id, node_id, title, card_type, is_symlink, snippet }`
 
-## MCP tools (13, stdio transport)
+## MCP (13 tools)
+
+### HTTP transport (recommended)
+
+`POST https://your-domain.example.com/mcp` — Streamable HTTP, stateless, Bearer token auth.
+
+**Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "atom": {
+      "url": "https://your-domain.example.com/mcp",
+      "headers": { "Authorization": "Bearer <MCP_SECRET>" }
+    }
+  }
+}
+```
+
+**Agent SDK / MCP client:**
+
+```json
+{
+  "url": "https://your-domain.example.com/mcp",
+  "headers": { "Authorization": "Bearer <secret>" }
+}
+```
+
+Wrong or missing `Authorization` header → `401 Unauthorized`.
+
+### stdio transport (local dev)
+
+```bash
+npm run mcp        # built version
+npm run mcp:dev    # tsx watch
+```
+
+### Tool list
 
 Card tools: `create_card`, `get_card`, `update_card`, `delete_card`, `get_backlinks`
 
@@ -135,7 +174,7 @@ Search tools: `search_cards`
 
 **Symlinks** share the same `card_id` as their canonical node. When compiling, `compileSubtree` follows the canonical node's children instead of the symlink's own children.
 
-**`GET /tree` returns flat root nodes** (no children embedded). The dashboard TreeView must lazy-load children via `GET /tree/:nodeId/children` when expanding a node. ← **known gap, not yet implemented**
+**HTTP MCP is stateless** — each `POST /mcp` request creates a fresh `McpServer` + `StreamableHTTPServerTransport` pair. DB pool is shared with the REST API (initialized at server startup).
 
 ## Development
 
@@ -145,10 +184,10 @@ docker start atom-postgres   # or: docker run -d --name atom-postgres -p 5434:54
 
 # Install & run API
 npm install
-npm run dev          # ts-node src/api/server.ts
+npm run dev          # tsx watch src/api/index.ts
 
 # Run MCP (stdio)
-npm run mcp          # ts-node src/mcp/server.ts
+npm run mcp:dev      # tsx src/mcp/server.ts
 
 # Tests
 npm test             # jest (unit + integration)
@@ -162,19 +201,15 @@ pnpm build           # output → dashboard/dist/
 
 Environment variables (`.env` in repo root):
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (default: `postgres://...@localhost:5434/atom`) |
-| `PORT` | API server port (default: `3000`) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `API_PORT` | ✅ | API server port |
+| `MCP_SECRET` | ✅ | Bearer token for `POST /mcp` |
 
 ## Deployment
 
 - **Process manager**: pm2 (`atom-api`). Managed by haniel.
-- **Nginx**: serves `dashboard/dist/` at `/`. Non-static paths (`/tree`, `/cards`, `/search`, `/backlinks`) are proxied to the API server.
+- **Nginx**: serves `dashboard/dist/` at `/`. Non-static paths (`/tree`, `/cards`, `/search`, `/backlinks`, `/mcp`) are proxied to the API server.
 - **Dashboard env**: `dashboard/.env.production` sets `VITE_API_BASE_URL=https://your-domain.example.com`. Build outputs to `dashboard/dist/` which nginx serves.
 - **DB**: Docker container `atom-postgres` on port 5434. Data persisted in a named volume.
-
-## Known issues / next work
-
-- **TreeView lazy loading**: `GET /tree` returns flat root nodes. `TreeNode.tsx` checks `node.children` for expand/collapse — currently children are never loaded, so the tree only shows root nodes. Fix: on expand, call `GET /tree/:nodeId/children` and hydrate `node.children`.
-- **Initial 2-level load**: On mount, `GET /tree` should ideally pre-load 2 levels deep so the tree isn't empty on first render.
