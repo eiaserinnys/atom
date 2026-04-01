@@ -1,0 +1,35 @@
+{
+  "name": "atom",
+  "version": "0.1.0",
+  "description": "Atom knowledge card system — MCP-first, PostgreSQL backend",
+  "type": "module",
+  "main": "dist/api/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/api/index.js",
+    "dev": "tsx watch src/api/index.ts",
+    "mcp": "node dist/mcp/server.js",
+    "mcp:dev": "tsx src/mcp/server.ts",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest tests/unit",
+    "test:integration": "node --experimental-vm-modules node_modules/.bin/jest tests/integration",
+    "migrate": "node dist/db/migrate.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.9.0",
+    "dotenv": "^17.3.1",
+    "fastify": "^5.2.1",
+    "pg": "^8.13.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.14.0",
+    "@types/pg": "^8.11.11",
+    "jest": "^29.7.0",
+    "testcontainers": "^10.24.0",
+    "ts-jest": "^29.3.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}
