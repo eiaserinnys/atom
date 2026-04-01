@@ -1,0 +1,51 @@
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 48px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+}
+
+.button {
+  margin-top: 8px;
+  padding: 10px 20px;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-family: var(--font-sans);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.button:hover {
+  background: var(--muted);
+}

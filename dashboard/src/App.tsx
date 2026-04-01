@@ -4,10 +4,16 @@ import { TreeView } from './components/TreeView/TreeView';
 import { CompileView } from './components/CompileView/CompileView';
 import { CardDetail } from './components/CardDetail/CardDetail';
 import { SearchBar } from './components/SearchBar/SearchBar';
+import { useAuth } from './hooks/useAuth';
+import { LoginPage } from './pages/LoginPage';
 import styles from './App.module.css';
 
 function App() {
+  const auth = useAuth();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  if (auth.loading) return null;
+  if (!auth.authenticated) return <LoginPage />;
 
   return (
     <div className={styles.appShell}>
