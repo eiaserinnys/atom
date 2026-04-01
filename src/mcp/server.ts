@@ -5,6 +5,7 @@ import path from "path";
 import { registerCardTools } from "./tools/card_tools.js";
 import { registerTreeTools } from "./tools/tree_tools.js";
 import { registerSearchTools } from "./tools/search_tools.js";
+import { registerBatchTools } from "./tools/batch_tools.js";
 import { runMigrations } from "../db/client.js";
 import { config } from "dotenv";
 
@@ -23,6 +24,7 @@ async function main(): Promise<void> {
   registerCardTools(server);
   registerTreeTools(server);
   registerSearchTools(server);
+  registerBatchTools(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

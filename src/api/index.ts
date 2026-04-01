@@ -7,6 +7,7 @@ import { searchRoutes } from "./routes/search.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { authRoutes } from "./routes/auth.js";
 import { eventsRoutes } from "./routes/events.js";
+import { batchRoutes } from "./routes/batch.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
 import { runMigrations } from "../db/client.js";
@@ -26,6 +27,7 @@ app.register(treeRoutes);
 app.register(searchRoutes);
 app.register(mcpRoutes);
 app.register(eventsRoutes);
+app.register(batchRoutes);
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {

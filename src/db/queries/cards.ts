@@ -1,5 +1,5 @@
-import type pg from "pg";
 import type { Card, CreateCardInput, UpdateCardInput } from "../../shared/types.js";
+import type { Queryable } from "../queryable.js";
 
 function rowToCard(row: Record<string, unknown>): Card {
   return {
@@ -23,7 +23,7 @@ function rowToCard(row: Record<string, unknown>): Card {
 }
 
 export async function insertCard(
-  db: pg.Pool,
+  db: Queryable,
   input: CreateCardInput
 ): Promise<Card> {
   const result = await db.query(
@@ -45,7 +45,7 @@ export async function insertCard(
 }
 
 export async function selectCardById(
-  db: pg.Pool,
+  db: Queryable,
   id: string
 ): Promise<Card | null> {
   const result = await db.query(`SELECT * FROM cards WHERE id = $1`, [id]);
@@ -54,7 +54,7 @@ export async function selectCardById(
 }
 
 export async function updateCardById(
-  db: pg.Pool,
+  db: Queryable,
   id: string,
   input: UpdateCardInput,
   contentChanged: boolean
@@ -123,7 +123,7 @@ export async function updateCardById(
 }
 
 export async function deleteCardById(
-  db: pg.Pool,
+  db: Queryable,
   id: string
 ): Promise<boolean> {
   const result = await db.query(`DELETE FROM cards WHERE id = $1`, [id]);
@@ -131,7 +131,7 @@ export async function deleteCardById(
 }
 
 export async function searchCards(
-  db: pg.Pool,
+  db: Queryable,
   query: string,
   limit: number = 20
 ): Promise<Array<{ card_id: string; title: string; card_type: string; snippet: string; rank: number }>> {

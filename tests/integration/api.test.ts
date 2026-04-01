@@ -1,9 +1,9 @@
 /**
  * Integration tests for atom API.
  *
- * Requires DATABASE_URL to point to a running PostgreSQL instance.
- * Set DATABASE_URL before running:
- *   DATABASE_URL=postgresql://atom:atom@localhost:5434/atom_db npx jest tests/integration
+ * Requires TEST_DATABASE_URL to point to a running PostgreSQL instance.
+ * Set TEST_DATABASE_URL before running:
+ *   TEST_DATABASE_URL=postgresql://atom:atom@localhost:5434/atom_db npx jest tests/integration
  *
  * The atom-postgres Docker container on the server (port 5434) is used for CI.
  * For local runs with Docker Desktop available, you can also use testcontainers
@@ -25,12 +25,16 @@ const MIGRATIONS_DIR = path.resolve(process.cwd(), "src/db/migrations");
 let pool: pg.Pool;
 
 beforeAll(async () => {
-  const databaseUrl = process.env["DATABASE_URL"];
+  const databaseUrl = process.env["TEST_DATABASE_URL"];
   if (!databaseUrl) {
     throw new Error(
-      "DATABASE_URL is required for integration tests.\n" +
-        "Set it to the atom-postgres instance: postgresql://atom:atom@localhost:5434/atom_db"
+      "TEST_DATABASE_URL is required for integration tests.\n" +
+        "Set it to the atom-postgres instance: postgresql://atom:atom@localhost:5434/atom_test_db"
     );
+  }
+
+  if (databaseUrl.includes("atom_db") && !databaseUrl.includes("test")) {
+    throw new Error("TEST_DATABASE_URL must use a test database, not the production atom_db.\nUse: postgresql://atom:atom@localhost:5434/atom_test_db");
   }
 
   pool = new Pool({ connectionString: databaseUrl });
