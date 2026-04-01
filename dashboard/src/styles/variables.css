@@ -1,0 +1,29 @@
+/* soul-ui 다크 테마 변수 — atom 다크 고정용 */
+/* 출처: .projects/soulstream/packages/soul-ui/src/styles/globals.css */
+
+:root {
+  /* Node accent palette (soul-ui .dark 블록 hsl 그대로) */
+  --node-user:          hsl(217, 70%, 68%);   /* #7ba3e6 — muted blue    */
+  --node-response:      hsl(160, 60%, 52%);   /* #4db894 — muted emerald */
+  --node-thinking:      hsl(258, 65%, 72%);   /* #a18ae0 — muted violet  */
+  --node-plan:          hsl(189, 65%, 52%);   /* #3db5c9 — muted cyan    */
+  --node-tool:          hsl(38,  75%, 58%);   /* #d9a83a — muted amber   */
+  --node-skill:         hsl(271, 60%, 72%);   /* #b08ad6 — muted purple  */
+  --node-intervention:  hsl(25,  70%, 60%);   /* #d0884a — muted orange  */
+  --node-error:         hsl(0,   65%, 66%);   /* #d47676 — muted red     */
+  --node-system:        hsl(220,  8%, 55%);   /* #868b94 — muted gray    */
+  --node-input-request: hsl(330, 65%, 65%);   /* #d470a0 — muted pink    */
+
+  /* Semantic tokens (dark) — Tailwind v4 참조를 hex/rgba로 환산 */
+  --background:       #161616;                /* neutral-950(#0a0a0a) 95% + white 5% */
+  --foreground:       #f5f5f5;                /* neutral-100 */
+  --card:             #191919;                /* background 98% + white 2% */
+  --border:           rgba(255, 255, 255, 0.06); /* --alpha(white / 6%) */
+  --muted:            rgba(255, 255, 255, 0.04); /* --alpha(white / 4%) */
+  --muted-foreground: #818181;                /* neutral-500 90% + white 10% */
+  --input:            rgba(255, 255, 255, 0.08); /* --alpha(white / 8%) */
+
+  /* Font */
+  --font-mono: 'Cascadia Code', 'Fira Code', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
