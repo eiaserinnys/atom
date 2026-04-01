@@ -25,8 +25,8 @@ export async function authMiddleware(
   req: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  // Auth routes are always accessible
-  if (req.url.startsWith('/api/auth/')) return;
+  // Auth routes and MCP endpoint are always accessible (MCP handles its own auth via Bearer token)
+  if (req.url.startsWith('/api/auth/') || req.url.startsWith('/mcp')) return;
 
   // Bypass mode: no GOOGLE_CLIENT_ID → allow all requests
   const clientId = process.env['GOOGLE_CLIENT_ID'];
