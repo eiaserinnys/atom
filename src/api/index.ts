@@ -7,7 +7,9 @@ import { searchRoutes } from "./routes/search.js";
 import { runMigrations } from "../db/client.js";
 import { config } from "dotenv";
 
-config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+config({ path: path.join(__dirname, "../../.env") });
 
 const app = Fastify({ logger: true });
 
@@ -21,8 +23,6 @@ if (isNaN(port)) {
 }
 
 const start = async (): Promise<void> => {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
   await runMigrations(path.join(__dirname, "../db/migrations"));
   await app.listen({ port, host: "0.0.0.0" });
 };
