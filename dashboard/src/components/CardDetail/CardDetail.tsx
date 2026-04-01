@@ -160,6 +160,18 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                   <span className={styles.metaValue}>↗ yes</span>
                 </div>
               )}
+              {card.source_type && (
+                <div className={styles.metaRow}>
+                  <span className={styles.metaLabel}>출처 유형</span>
+                  <span className={styles.metaValue}>{card.source_type}</span>
+                </div>
+              )}
+              {card.source_ref && (
+                <div className={styles.metaRow}>
+                  <span className={styles.metaLabel}>출처 참조</span>
+                  <span className={styles.metaValueBreak}>{card.source_ref}</span>
+                </div>
+              )}
               {card.tags.length > 0 && (
                 <div className={styles.metaRow}>
                   <span className={styles.metaLabel}>태그</span>
