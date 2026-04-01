@@ -16,9 +16,11 @@
     "migrate": "node dist/db/migrate.js"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.0.2",
     "@modelcontextprotocol/sdk": "^1.9.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.2.1",
+    "jose": "^6.2.2",
     "pg": "^8.13.3",
     "zod": "^3.24.2"
   },
