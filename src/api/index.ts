@@ -5,6 +5,9 @@ import { cardRoutes } from "./routes/cards.js";
 import { treeRoutes } from "./routes/tree.js";
 import { searchRoutes } from "./routes/search.js";
 import { mcpRoutes } from "./routes/mcp.js";
+import { authRoutes } from "./routes/auth.js";
+import { authMiddleware } from "./middleware/auth.js";
+import cookie from "@fastify/cookie";
 import { runMigrations } from "../db/client.js";
 import { config } from "dotenv";
 
@@ -14,6 +17,9 @@ config({ path: path.join(__dirname, "../../.env") });
 
 const app = Fastify({ logger: true });
 
+app.register(cookie);
+app.register(authRoutes);
+app.addHook('preHandler', authMiddleware);
 app.register(cardRoutes);
 app.register(treeRoutes);
 app.register(searchRoutes);
