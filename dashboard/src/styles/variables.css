@@ -1,5 +1,5 @@
 /* soul-ui 다크 테마 변수 — atom 다크 고정용 */
-/* 출처: .projects/soulstream/packages/soul-ui/src/styles/globals.css */
+/* Based on soul-ui dark theme variables */
 
 :root {
   /* Node accent palette (soul-ui .dark 블록 hsl 그대로) */

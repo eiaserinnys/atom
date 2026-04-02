@@ -16,8 +16,8 @@ Node.js server (pm2: atom-api, default port 3000)
 
 React dashboard (built to dashboard/dist/, served by nginx)
     — 3-panel layout: TreeView | CompileView | CardDetail
-    — served at https://your-domain.example.com/
-    — API calls go to https://your-domain.example.com/ (nginx proxies non-static paths to the API)
+    — served by nginx at your domain root
+    — API calls go to the same domain (nginx proxies non-static paths to the API)
 ```
 
 ## Project structure
@@ -207,7 +207,7 @@ Environment variables (`.env` in repo root):
 
 ## Deployment
 
-- **Process manager**: pm2 (`atom-api`). Managed by haniel.
+- **Process manager**: pm2 (`atom-api`).
 - **Nginx**: serves `dashboard/dist/` at `/`. Non-static paths (`/tree`, `/cards`, `/search`, `/backlinks`, `/mcp`) are proxied to the API server.
 - **Dashboard env**: `dashboard/.env.production` sets `VITE_API_BASE_URL=https://your-domain.example.com`. Build outputs to `dashboard/dist/` which nginx serves.
 - **DB**: Docker container `atom-postgres` on port 5434. Data persisted in a named volume.
