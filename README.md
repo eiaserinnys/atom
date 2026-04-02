@@ -2,8 +2,6 @@
 
 A Zettelkasten-inspired atomic knowledge card system. Cards live in a flexible tree (with symlinks and cycle-safe BFS compilation), exposed over both a REST API and two MCP transports (HTTP and stdio) so AI agents can read and write directly.
 
-Live: **https://your-domain.example.com**
-
 ## Architecture
 
 ```
