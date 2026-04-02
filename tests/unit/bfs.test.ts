@@ -19,6 +19,8 @@ function makeCard(overrides: Partial<Card> & { id: string; title: string }): Car
     staleness: overrides.staleness ?? "unverified",
     version: overrides.version ?? 1,
     updated_at: overrides.updated_at ?? "2026-01-01T00:00:00Z",
+    created_by: overrides.created_by ?? null,
+    updated_by: overrides.updated_by ?? null,
   };
 }
 

@@ -72,8 +72,20 @@ export function topologicalSortCreates(
 // ---------------------------------------------------------------------------
 
 export async function executeBatchWrite(
-  input: BatchWriteInput
+  agentIdOrInput: string | null | BatchWriteInput,
+  inputOrUndefined?: BatchWriteInput
 ): Promise<BatchWriteResult> {
+  // Overload resolution: support both executeBatchWrite(input) and executeBatchWrite(agentId, input)
+  let agentId: string | null;
+  let input: BatchWriteInput;
+  if (typeof agentIdOrInput === 'string' || agentIdOrInput === null) {
+    agentId = agentIdOrInput;
+    input = inputOrUndefined!;
+  } else {
+    agentId = null;
+    input = agentIdOrInput;
+  }
+
   const pool = getPool();
   const client = await pool.connect();
 
@@ -117,7 +129,7 @@ export async function executeBatchWrite(
           content_timestamp: item.content_timestamp ?? null,
           source_type: item.source_type ?? null,
           source_ref: item.source_ref ?? null,
-        });
+        }, agentId ?? undefined);
 
         const node = await insertNode(
           client,
@@ -139,9 +151,19 @@ export async function executeBatchWrite(
     // ── Updates ──────────────────────────────────────────────────────────────
     if (input.updates && input.updates.length > 0) {
       for (const item of input.updates) {
-        const { card_id, ...fields } = item;
+        const { card_id, expected_version, ...fields } = item;
         const contentChanged = fields.content !== undefined;
-        await updateCardById(client, card_id, fields, contentChanged);
+        const updateResult = await updateCardById(
+          client, card_id, fields, contentChanged, agentId ?? undefined, expected_version
+        );
+        if (updateResult === null) {
+          throw new Error(`Card not found: ${card_id}`);
+        }
+        if (updateResult.conflict) {
+          throw new Error(
+            `VersionConflict: card ${card_id} expected version ${expected_version}, actual ${updateResult.actualVersion}`
+          );
+        }
         result.updated.push(card_id);
       }
     }

@@ -19,6 +19,8 @@ export interface Card {
   staleness: Staleness;
   version: number;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 export interface TreeNode {
@@ -103,6 +105,8 @@ export interface BatchUpdateItem {
   source_snapshot?: string | null;
   source_checksum?: string | null;
   source_checked_at?: string | null;
+  /** Optimistic locking: if set, update will fail (409) when current version differs. */
+  expected_version?: number;
 }
 
 export interface BatchMoveItem {
@@ -136,4 +140,34 @@ export interface BatchWriteResult {
   updated: string[];
   moved: string[];
   deleted: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Event types
+// ---------------------------------------------------------------------------
+
+export type AtomEvent =
+  | { type: 'card:created'; cardId: string; nodeId: string; parentNodeId: string | null; data: Card; actor: string | null }
+  | { type: 'card:updated'; cardId: string; data: Card; actor: string | null }
+  | { type: 'card:deleted'; cardId: string; actor: string | null }
+  | { type: 'node:created'; nodeId: string; cardId: string; parentNodeId: string | null }
+  | { type: 'node:deleted'; nodeId: string }
+  | { type: 'node:moved'; nodeId: string; newParentNodeId: string | null }
+  | { type: 'batch:completed'; result: BatchWriteResult };
+
+// ---------------------------------------------------------------------------
+// Fastify request augmentation
+// ---------------------------------------------------------------------------
+
+export type UserRole = 'admin' | 'editor' | 'viewer';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    jwtUser?: {
+      id: string;
+      email: string;
+      name: string;
+      role: UserRole;
+    };
+  }
 }

@@ -1,6 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { SignJWT, jwtVerify } from 'jose';
 import crypto from 'crypto';
+import { findUserByEmail } from '../../db/queries/users.js';
+import { getPool } from '../../db/client.js';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -14,7 +16,6 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   const clientId = process.env['GOOGLE_CLIENT_ID'];
   const clientSecret = process.env['GOOGLE_CLIENT_SECRET']!;
   const callbackUrl = process.env['GOOGLE_CALLBACK_URL']!;
-  const allowedEmail = process.env['ALLOWED_EMAIL']!;
   const jwtSecret = new TextEncoder().encode(process.env['JWT_SECRET']!);
 
   // GET /api/auth/google — redirect to Google OAuth
@@ -89,12 +90,18 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
       const user = (await userRes.json()) as { email: string; name: string };
 
-      if (user.email !== allowedEmail) {
-        return reply.redirect('/?auth_error=unauthorized');
-      }
+      // Check users table
+      const dbUser = await findUserByEmail(getPool(), user.email);
+      if (!dbUser) return reply.redirect('/?auth_error=unauthorized');
+      if (!dbUser.is_active) return reply.redirect('/?auth_error=deactivated');
 
-      // Issue JWT
-      const token = await new SignJWT({ email: user.email, name: user.name })
+      // Issue JWT with id, email, name, role
+      const token = await new SignJWT({
+        id: dbUser.id,
+        email: user.email,
+        name: user.name,
+        role: dbUser.role,
+      })
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
         .setExpirationTime(`${JWT_EXPIRY_SECONDS}s`)
@@ -126,8 +133,10 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       const { payload } = await jwtVerify(token, jwtSecret);
       return reply.send({
         authenticated: true,
+        id: payload['id'],
         email: payload['email'],
         name: payload['name'],
+        role: payload['role'],
       });
     } catch {
       return reply.send({ authenticated: false });

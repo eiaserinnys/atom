@@ -9,7 +9,8 @@ import {
   moveNode,
 } from "../../services/tree.service.js";
 
-export function registerTreeTools(server: McpServer): void {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function registerTreeTools(server: McpServer, _agentId: string): void {
   // get_node
   server.tool(
     "get_node",

@@ -8,6 +8,7 @@ import { mcpRoutes } from "./routes/mcp.js";
 import { authRoutes } from "./routes/auth.js";
 import { eventsRoutes } from "./routes/events.js";
 import { batchRoutes } from "./routes/batch.js";
+import { configRoutes } from "./routes/config.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
 import { runMigrations, getPool } from "../db/client.js";
@@ -31,6 +32,7 @@ app.register(searchRoutes);
 app.register(mcpRoutes);
 app.register(eventsRoutes);
 app.register(batchRoutes);
+app.register(configRoutes);
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {

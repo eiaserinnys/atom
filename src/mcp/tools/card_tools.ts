@@ -8,7 +8,7 @@ import {
   getBacklinks,
 } from "../../services/card.service.js";
 
-export function registerCardTools(server: McpServer): void {
+export function registerCardTools(server: McpServer, agentId: string): void {
   // create_card
   server.tool(
     "create_card",
@@ -26,7 +26,7 @@ export function registerCardTools(server: McpServer): void {
       source_ref: z.string().optional(),
     },
     async (args) => {
-      const { card, node_id } = await createCard({
+      const { card, node_id } = await createCard(agentId, {
         card_type: args.card_type,
         title: args.title,
         content: args.content ?? null,
@@ -71,14 +71,21 @@ export function registerCardTools(server: McpServer): void {
       content_timestamp: z.string().optional(),
       source_type: z.string().nullable().optional(),
       source_ref: z.string().nullable().optional(),
+      expected_version: z.number().int().optional(),
     },
     async (args) => {
-      const { card_id, ...input } = args;
-      const updated = await updateCard(card_id, input);
-      if (!updated) {
+      const { card_id, expected_version, ...input } = args;
+      const result = await updateCard(agentId, card_id, input, expected_version);
+      if (!result) {
         return { content: [{ type: "text", text: `Card not found: ${card_id}` }], isError: true };
       }
-      return { content: [{ type: "text", text: JSON.stringify(updated) }] };
+      if (result.conflict) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: "VersionConflict", actualVersion: result.actualVersion }) }],
+          isError: true,
+        };
+      }
+      return { content: [{ type: "text", text: JSON.stringify(result.card) }] };
     }
   );
 
