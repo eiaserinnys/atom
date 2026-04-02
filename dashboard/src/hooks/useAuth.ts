@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { api } from '../api/client';
+import { api, type UserRole } from '../api/client';
+
+export type { UserRole };
 
 export interface AuthStatus {
   loading: boolean;
   authenticated: boolean;
+  id?: string;
   email?: string;
   name?: string;
+  role?: UserRole;
 }
 
 export function useAuth(): AuthStatus {
