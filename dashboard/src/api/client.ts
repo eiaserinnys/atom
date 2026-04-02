@@ -1,3 +1,22 @@
+export type UserRole = 'admin' | 'editor' | 'viewer';
+
+export interface User {
+  id: string;
+  email: string;
+  display_name: string | null;
+  role: UserRole;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Agent {
+  id: string;
+  agent_id: string;
+  display_name: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export interface TreeNodeData {
@@ -85,11 +104,37 @@ export const api = {
     return request(`/tree/${nodeId}/children`);
   },
 
-  getAuthStatus(): Promise<{ authenticated: boolean; email?: string; name?: string }> {
+  getAuthStatus(): Promise<{ authenticated: boolean; id?: string; email?: string; name?: string; role?: UserRole }> {
     return request('/api/auth/status');
   },
 
   logout(): Promise<{ ok: boolean }> {
     return request('/api/auth/logout', { method: 'POST' });
+  },
+};
+
+export const configApi = {
+  // 사용자 관리 (admin only)
+  listUsers(): Promise<User[]> {
+    return request('/api/config/users');
+  },
+  addUser(body: { email: string; display_name?: string; role: UserRole }): Promise<User> {
+    return request('/api/config/users', { method: 'POST', body: JSON.stringify(body) });
+  },
+  updateUser(id: string, body: { role?: UserRole; is_active?: boolean }): Promise<User> {
+    return request(`/api/config/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  },
+  // 에이전트 관리 (admin or editor)
+  listAgents(): Promise<Agent[]> {
+    return request('/api/config/agents');
+  },
+  createAgent(body: { agent_id: string; display_name?: string }): Promise<Agent & { secret?: string }> {
+    return request('/api/config/agents', { method: 'POST', body: JSON.stringify(body) });
+  },
+  reissueSecret(id: string): Promise<{ secret: string }> {
+    return request(`/api/config/agents/${id}/reissue`, { method: 'POST' });
+  },
+  updateAgent(id: string, body: { is_active: boolean }): Promise<Agent> {
+    return request(`/api/config/agents/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   },
 };

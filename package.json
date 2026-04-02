@@ -10,14 +10,15 @@
     "dev": "tsx watch src/api/index.ts",
     "mcp": "node dist/mcp/server.js",
     "mcp:dev": "tsx src/mcp/server.ts",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest --runInBand",
     "test:unit": "node --experimental-vm-modules node_modules/.bin/jest tests/unit",
-    "test:integration": "node --experimental-vm-modules node_modules/.bin/jest tests/integration",
+    "test:integration": "node --experimental-vm-modules node_modules/.bin/jest tests/integration --runInBand",
     "migrate": "node dist/db/migrate.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "@modelcontextprotocol/sdk": "^1.9.0",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
     "fastify": "^5.2.1",
     "jose": "^6.2.2",
@@ -25,6 +26,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.14.0",
     "@types/pg": "^8.11.11",

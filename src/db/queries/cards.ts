@@ -19,16 +19,19 @@ function rowToCard(row: Record<string, unknown>): Card {
     staleness: (row["staleness"] as Card["staleness"]) ?? "unverified",
     version: row["version"] as number,
     updated_at: row["updated_at"] as string,
+    created_by: (row["created_by"] as string | null) ?? null,
+    updated_by: (row["updated_by"] as string | null) ?? null,
   };
 }
 
 export async function insertCard(
   db: Queryable,
-  input: CreateCardInput
+  input: CreateCardInput,
+  agentId?: string
 ): Promise<Card> {
   const result = await db.query(
-    `INSERT INTO cards (card_type, title, content, tags, "references", content_timestamp, source_type, source_ref)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO cards (card_type, title, content, tags, "references", content_timestamp, source_type, source_ref, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
      RETURNING *`,
     [
       input.card_type,
@@ -39,6 +42,7 @@ export async function insertCard(
       input.content_timestamp ?? null,
       input.source_type ?? null,
       input.source_ref ?? null,
+      agentId ?? null,
     ]
   );
   return rowToCard(result.rows[0]);
@@ -53,12 +57,19 @@ export async function selectCardById(
   return rowToCard(result.rows[0]);
 }
 
+export type UpdateCardResult =
+  | { card: Card; conflict: false }
+  | { conflict: true; actualVersion: number }
+  | null;
+
 export async function updateCardById(
   db: Queryable,
   id: string,
   input: UpdateCardInput,
-  contentChanged: boolean
-): Promise<Card | null> {
+  contentChanged: boolean,
+  agentId?: string,
+  expectedVersion?: number
+): Promise<UpdateCardResult> {
   const sets: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -111,15 +122,44 @@ export async function updateCardById(
   // bump version
   sets.push(`version = version + 1`);
 
-  if (sets.length === 0) return selectCardById(db, id);
+  // update updated_by if agentId provided
+  if (agentId !== undefined) {
+    sets.push(`updated_by = $${idx++}`);
+    values.push(agentId);
+  }
 
+  if (sets.length === 0) {
+    const card = await selectCardById(db, id);
+    if (!card) return null;
+    return { card, conflict: false };
+  }
+
+  const idParamIdx = idx++;
   values.push(id);
+
+  let whereClause = `WHERE id = $${idParamIdx}`;
+  if (expectedVersion !== undefined) {
+    whereClause += ` AND version = $${idx++}`;
+    values.push(expectedVersion);
+  }
+
   const result = await db.query(
-    `UPDATE cards SET ${sets.join(", ")} WHERE id = $${idx} RETURNING *`,
+    `UPDATE cards SET ${sets.join(", ")} ${whereClause} RETURNING *`,
     values
   );
-  if (result.rows.length === 0) return null;
-  return rowToCard(result.rows[0]);
+
+  if (result.rows.length === 0) {
+    if (expectedVersion === undefined) {
+      // card doesn't exist
+      return null;
+    }
+    // Either card doesn't exist or version mismatch — check which
+    const existing = await selectCardById(db, id);
+    if (!existing) return null;
+    return { conflict: true, actualVersion: existing.version };
+  }
+
+  return { card: rowToCard(result.rows[0]), conflict: false };
 }
 
 export async function deleteCardById(

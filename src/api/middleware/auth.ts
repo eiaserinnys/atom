@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { jwtVerify } from 'jose';
+import type { UserRole } from '../../shared/types.js';
 
 // Module-level lazy init to avoid re-creating on every request
 let _jwtSecret: Uint8Array | null = null;
@@ -39,7 +40,13 @@ export async function authMiddleware(
   }
 
   try {
-    await jwtVerify(token, getJwtSecret());
+    const { payload } = await jwtVerify(token, getJwtSecret());
+    req.jwtUser = {
+      id: payload['id'] as string,
+      email: payload['email'] as string,
+      name: payload['name'] as string,
+      role: (payload['role'] as UserRole) ?? 'viewer',
+    };
   } catch {
     reply.code(401).send({ error: 'Invalid token' });
   }

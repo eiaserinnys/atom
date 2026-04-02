@@ -40,8 +40,11 @@ afterAll(async () => {
 }, 10000);
 
 afterEach(async () => {
+  // Delete in FK order: tree_nodes → cards → agents → users
   await pool.query("DELETE FROM tree_nodes");
   await pool.query("DELETE FROM cards");
+  await pool.query("DELETE FROM agents");
+  await pool.query("DELETE FROM users");
 });
 
 // ---------------------------------------------------------------------------

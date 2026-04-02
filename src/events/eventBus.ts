@@ -1,13 +1,7 @@
 import { EventEmitter } from "events";
-import type { Card } from "../shared/types.js";
+import type { AtomEvent } from "../shared/types.js";
 
-export type AtomEvent =
-  | { type: "card:created"; cardId: string; nodeId: string; parentNodeId: string | null; data: Card }
-  | { type: "card:updated"; cardId: string; data: Card }
-  | { type: "card:deleted"; cardId: string }
-  | { type: "node:created"; nodeId: string; cardId: string; parentNodeId: string | null }
-  | { type: "node:deleted"; nodeId: string }
-  | { type: "node:moved"; nodeId: string; newParentNodeId: string | null };
+export type { AtomEvent };
 
 class AtomEventBus extends EventEmitter {
   emitAtomEvent(payload: AtomEvent): boolean {

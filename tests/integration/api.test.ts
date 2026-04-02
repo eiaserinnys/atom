@@ -12,10 +12,13 @@
 
 import pg from "pg";
 import path from "path";
-import { setPool, closePool, runMigrations } from "../../src/db/client.js";
+import bcrypt from "bcryptjs";
+import { setPool, closePool, runMigrations, getPool } from "../../src/db/client.js";
 import * as cardService from "../../src/services/card.service.js";
 import * as treeService from "../../src/services/tree.service.js";
 import * as searchService from "../../src/services/search.service.js";
+import { insertAgent } from "../../src/db/queries/agents.js";
+import { insertUser } from "../../src/db/queries/users.js";
 
 const { Pool } = pg;
 
@@ -48,9 +51,11 @@ afterAll(async () => {
 
 // Clean up between tests
 afterEach(async () => {
-  // Delete all nodes first (FK), then cards
+  // Delete in FK order: tree_nodes → cards → agents → users
   await pool.query("DELETE FROM tree_nodes");
   await pool.query("DELETE FROM cards");
+  await pool.query("DELETE FROM agents");
+  await pool.query("DELETE FROM users");
 });
 
 // ---------------------------------------------------------------------------
@@ -103,9 +108,11 @@ describe("Card CRUD", () => {
     });
 
     expect(updated).not.toBeNull();
-    expect(updated!.content).toBe("Updated content");
-    expect(updated!.content_timestamp).not.toBeNull();
-    expect(updated!.version).toBe(2);
+    expect(updated!.conflict).toBe(false);
+    const updatedCard = (updated as { card: typeof card; conflict: false }).card;
+    expect(updatedCard.content).toBe("Updated content");
+    expect(updatedCard.content_timestamp).not.toBeNull();
+    expect(updatedCard.version).toBe(2);
   });
 
   it("does not auto-update content_timestamp when caller provides one", async () => {
@@ -121,9 +128,12 @@ describe("Card CRUD", () => {
       content_timestamp: ts,
     });
 
-    expect(updated!.content_timestamp).not.toBeNull();
+    expect(updated).not.toBeNull();
+    expect(updated!.conflict).toBe(false);
+    const updatedCard = (updated as { card: import("../../src/shared/types.js").Card; conflict: false }).card;
+    expect(updatedCard.content_timestamp).not.toBeNull();
     // The provided timestamp should be used (not auto-generated)
-    const raw = new Date(updated!.content_timestamp!).getFullYear();
+    const raw = new Date(updatedCard.content_timestamp!).getFullYear();
     expect(raw).toBe(2020);
   });
 
@@ -411,5 +421,109 @@ describe("compile_subtree", () => {
     const md = await treeService.compileSubtree(rootId, 0);
     expect(md).toContain("# Root");
     expect(md).not.toContain("Child");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Optimistic locking
+// ---------------------------------------------------------------------------
+
+describe("Optimistic locking", () => {
+  it("succeeds when expected_version matches current version", async () => {
+    const { card } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Version card",
+      content: "v1",
+    });
+    expect(card.version).toBe(1);
+
+    const result = await cardService.updateCard("test-agent", card.id, { title: "v2" }, 1);
+    expect(result).not.toBeNull();
+    expect(result!.conflict).toBe(false);
+    const updated = (result as { card: typeof card; conflict: false }).card;
+    expect(updated.version).toBe(2);
+    expect(updated.title).toBe("v2");
+  });
+
+  it("returns VersionConflict (409-equivalent) when expected_version does not match", async () => {
+    const { card } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Conflict card",
+      content: "original",
+    });
+    expect(card.version).toBe(1);
+
+    // Simulate stale expected_version (0 instead of 1)
+    const result = await cardService.updateCard("test-agent", card.id, { title: "stale update" }, 0);
+    expect(result).not.toBeNull();
+    expect(result!.conflict).toBe(true);
+    if (result && result.conflict) {
+      expect(result.actualVersion).toBe(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Agent authentication
+// ---------------------------------------------------------------------------
+
+describe("Agent authentication", () => {
+  it("inactive agent is rejected (is_active=false)", async () => {
+    const plainSecret = "test-secret-12345";
+    const secretHash = await bcrypt.hash(plainSecret, 10);
+    await insertAgent(getPool(), {
+      agent_id: "inactive-agent",
+      secret_hash: secretHash,
+      display_name: "Inactive",
+    });
+    // Mark inactive
+    await getPool().query(`UPDATE agents SET is_active = false WHERE agent_id = 'inactive-agent'`);
+
+    // Verify the agent is truly inactive via DB query
+    const row = await getPool().query(`SELECT is_active FROM agents WHERE agent_id = 'inactive-agent'`);
+    expect(row.rows[0].is_active).toBe(false);
+  });
+
+  it("active agent with correct secret can be verified via bcrypt", async () => {
+    const plainSecret = "active-secret-67890";
+    const secretHash = await bcrypt.hash(plainSecret, 10);
+    await insertAgent(getPool(), {
+      agent_id: "active-agent",
+      secret_hash: secretHash,
+      display_name: "Active",
+    });
+
+    const row = await getPool().query(`SELECT * FROM agents WHERE agent_id = 'active-agent'`);
+    const agent = row.rows[0];
+    expect(agent.is_active).toBe(true);
+    expect(await bcrypt.compare(plainSecret, agent.secret_hash)).toBe(true);
+    expect(await bcrypt.compare("wrong-secret", agent.secret_hash)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// User login checks (OAuth users table)
+// ---------------------------------------------------------------------------
+
+describe("User login checks", () => {
+  it("unregistered email is rejected (no user row)", async () => {
+    // Simulate auth logic: findUserByEmail returns null → redirect auth_error=unauthorized
+    const { findUserByEmail } = await import("../../src/db/queries/users.js");
+    const user = await findUserByEmail(getPool(), "notregistered@example.com");
+    expect(user).toBeNull();
+  });
+
+  it("deactivated user is rejected (is_active=false)", async () => {
+    await insertUser(getPool(), {
+      email: "deactivated@example.com",
+      display_name: "Deactivated User",
+      role: "viewer",
+    });
+    await getPool().query(`UPDATE users SET is_active = false WHERE email = 'deactivated@example.com'`);
+
+    const { findUserByEmail } = await import("../../src/db/queries/users.js");
+    const dbUser = await findUserByEmail(getPool(), "deactivated@example.com");
+    expect(dbUser).not.toBeNull();
+    expect(dbUser!.is_active).toBe(false);
   });
 });

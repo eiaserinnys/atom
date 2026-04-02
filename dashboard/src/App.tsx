@@ -6,6 +6,7 @@ import { CompileView } from './components/CompileView/CompileView';
 import { CardDetail } from './components/CardDetail/CardDetail';
 import { SearchBar } from './components/SearchBar/SearchBar';
 import { ThemeToggle } from './components/ThemeToggle';
+import { ConfigModal } from './components/Config/ConfigModal';
 import { useAuth } from './hooks/useAuth';
 import { useAtomEvents } from './hooks/useAtomEvents';
 import { LoginPage } from './pages/LoginPage';
@@ -22,11 +23,14 @@ const queryClient = new QueryClient({
 function AppInner() {
   const auth = useAuth();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   useAtomEvents();
 
   if (auth.loading) return null;
   if (!auth.authenticated) return <LoginPage />;
+
+  const showConfigButton = auth.role && auth.role !== 'viewer';
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -39,8 +43,27 @@ function AppInner() {
         <div className="w-full max-w-[400px]">
           <SearchBar onSelectNode={setSelectedNodeId} />
         </div>
+        {showConfigButton && (
+          <button
+            className="text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer text-lg leading-none px-1"
+            onClick={() => setIsConfigOpen(true)}
+            title="설정"
+            aria-label="설정"
+          >
+            ⚙️
+          </button>
+        )}
         <ThemeToggle />
       </div>
+
+      {showConfigButton && (
+        <ConfigModal
+          isOpen={isConfigOpen}
+          onClose={() => setIsConfigOpen(false)}
+          currentUserRole={auth.role!}
+          currentUserEmail={auth.email ?? ''}
+        />
+      )}
 
       {/* 3-panel layout */}
       <div className="flex-1 overflow-hidden">

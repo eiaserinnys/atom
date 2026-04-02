@@ -21,10 +21,11 @@ async function main(): Promise<void> {
     version: "0.1.0",
   });
 
-  registerCardTools(server);
-  registerTreeTools(server);
+  const agentId = process.env['MCP_AGENT_ID'] ?? 'stdio-agent';
+  registerCardTools(server, agentId);
+  registerTreeTools(server, agentId);
   registerSearchTools(server);
-  registerBatchTools(server);
+  registerBatchTools(server, agentId);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

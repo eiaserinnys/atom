@@ -29,6 +29,7 @@ const batchUpdateItemSchema = z.object({
   source_snapshot: z.string().nullable().optional(),
   source_checksum: z.string().nullable().optional(),
   source_checked_at: z.string().nullable().optional(),
+  expected_version: z.number().int().optional(),
 });
 
 const batchMoveItemSchema = z.object({
@@ -42,7 +43,7 @@ const batchDeleteItemSchema = z.object({
   card_id: z.string().uuid(),
 });
 
-export function registerBatchTools(server: McpServer): void {
+export function registerBatchTools(server: McpServer, agentId: string): void {
   server.tool(
     "batch_write",
     [
@@ -57,7 +58,7 @@ export function registerBatchTools(server: McpServer): void {
       deletes: z.array(batchDeleteItemSchema).optional(),
     },
     async (args) => {
-      const result = await executeBatchWrite({
+      const result = await executeBatchWrite(agentId, {
         creates: args.creates,
         updates: args.updates,
         moves: args.moves,

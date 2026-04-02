@@ -8,10 +8,14 @@ import { mcpRoutes } from "./routes/mcp.js";
 import { authRoutes } from "./routes/auth.js";
 import { eventsRoutes } from "./routes/events.js";
 import { batchRoutes } from "./routes/batch.js";
+import { configRoutes } from "./routes/config.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
-import { runMigrations } from "../db/client.js";
+import { runMigrations, getPool } from "../db/client.js";
 import { config } from "dotenv";
+import { userExists, insertUser } from "../db/queries/users.js";
+import { findAgentByAgentId, insertAgent } from "../db/queries/agents.js";
+import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,14 +32,39 @@ app.register(searchRoutes);
 app.register(mcpRoutes);
 app.register(eventsRoutes);
 app.register(batchRoutes);
+app.register(configRoutes);
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {
   throw new Error("API_PORT environment variable is required");
 }
 
+async function seedMigration(): Promise<void> {
+  const db = getPool();
+
+  // ALLOWED_EMAIL → users 테이블 admin 마이그레이션
+  const allowedEmail = process.env["ALLOWED_EMAIL"];
+  if (allowedEmail && !(await userExists(db))) {
+    await insertUser(db, { email: allowedEmail, display_name: "Admin", role: "admin" });
+    console.log(`[seed] Migrated ALLOWED_EMAIL=${allowedEmail} as admin user`);
+  }
+
+  // MCP_SECRET → agents.legacy 마이그레이션
+  const mcpSecret = process.env["MCP_SECRET"];
+  if (mcpSecret && (await findAgentByAgentId(db, "legacy")) === null) {
+    const secretHash = await bcrypt.hash(mcpSecret, 10);
+    await insertAgent(db, {
+      agent_id: "legacy",
+      secret_hash: secretHash,
+      display_name: "Legacy Agent (migrated from MCP_SECRET)",
+    });
+    console.log("[seed] Migrated MCP_SECRET as legacy agent");
+  }
+}
+
 const start = async (): Promise<void> => {
   await runMigrations(path.join(__dirname, "../db/migrations"));
+  await seedMigration();
   await app.listen({ port, host: "0.0.0.0" });
 };
 
