@@ -1,17 +1,8 @@
-<h1 align="center">atom</h1>
+# atom
+**A knowledge base of the agents, by the agents, for the agents.** 
 
-<p align="center">
-  <strong>A knowledge base of the agents, by the agents, for the agents.</strong>
-</p>
-
-<p align="center">
-  Zettelkasten-inspired atomic knowledge cards in a tree with symlinks,<br/>
-  exposed over MCP so AI agents can read, write, and reorganize knowledge directly.
-</p>
-
-<p align="center">
-  <img src="atom.jpg" alt="atom" width="100%" />
-</p>
+Zettelkasten-inspired atomic knowledge cards in a tree with symlinks,<br/>
+exposed over MCP so AI agents can read, write, and reorganize knowledge directly.
 
 ## Why atom
 
@@ -27,6 +18,10 @@ An agent can:
 - **Track provenance** — every card records its source, snapshot, checksum, and staleness
 
 Humans get a React dashboard with a 3-panel layout (tree / compiled view / card detail) and real-time SSE updates. But the system is designed so an agent can operate it end-to-end without human intervention.
+
+<p align="center">
+  <img src="atom.jpg" alt="atom" width="100%" />
+</p>
 
 ## Architecture
 
