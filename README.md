@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="atom.jpg" alt="atom" width="480" />
-</p>
-
 <h1 align="center">atom</h1>
 
 <p align="center">
@@ -11,6 +7,10 @@
 <p align="center">
   Zettelkasten-inspired atomic knowledge cards in a tree with symlinks,<br/>
   exposed over MCP so AI agents can read, write, and reorganize knowledge directly.
+</p>
+
+<p align="center">
+  <img src="atom.jpg" alt="atom" width="100%" />
 </p>
 
 ## Why atom
