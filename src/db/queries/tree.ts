@@ -12,6 +12,12 @@ function rowToNode(row: Record<string, unknown>): TreeNode {
   };
 }
 
+// Detects if db is a PoolClient (inside a transaction) by duck-typing.
+// PoolClient has release(); Pool does not.
+function isTransactionClient(db: Queryable): boolean {
+  return typeof (db as { release?: unknown }).release === "function";
+}
+
 export async function insertNode(
   db: Queryable,
   card_id: string,
@@ -19,36 +25,47 @@ export async function insertNode(
   position: number | undefined,
   is_symlink: boolean = false
 ): Promise<TreeNode> {
-  let resolvedPosition: number;
+  const MAX_RETRIES = 3;
+  const inTxn = isTransactionClient(db);
 
-  if (position !== undefined) {
-    // Check for conflict
-    const conflict = await db.query(
-      `SELECT id FROM tree_nodes WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position = $2`,
-      [parent_node_id, position]
-    );
-
-    if ((conflict.rowCount ?? 0) > 0) {
-      // Renumber siblings in a single transaction
-      await renumberSiblings(db, parent_node_id);
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    let resolvedPosition: number;
+    if (position !== undefined) {
+      resolvedPosition = position;
+    } else {
+      const maxResult = await db.query(
+        `SELECT COALESCE(MAX(position), 0) AS max_pos
+         FROM tree_nodes WHERE parent_node_id IS NOT DISTINCT FROM $1`,
+        [parent_node_id]
+      );
+      resolvedPosition = (maxResult.rows[0]["max_pos"] as number) + 100;
     }
-    resolvedPosition = position;
-  } else {
-    // Auto-assign: max sibling position + 100, or 100 if none
-    const maxResult = await db.query(
-      `SELECT COALESCE(MAX(position), 0) AS max_pos
-       FROM tree_nodes WHERE parent_node_id IS NOT DISTINCT FROM $1`,
-      [parent_node_id]
-    );
-    resolvedPosition = (maxResult.rows[0]["max_pos"] as number) + 100;
-  }
 
-  const result = await db.query(
-    `INSERT INTO tree_nodes (card_id, parent_node_id, position, is_symlink)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [card_id, parent_node_id, resolvedPosition, is_symlink]
+    const sp = `sp_insert_node_${attempt}`;
+    if (inTxn) await db.query(`SAVEPOINT ${sp}`);
+
+    try {
+      const result = await db.query(
+        `INSERT INTO tree_nodes (card_id, parent_node_id, position, is_symlink)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [card_id, parent_node_id, resolvedPosition, is_symlink]
+      );
+      if (inTxn) await db.query(`RELEASE SAVEPOINT ${sp}`);
+      return rowToNode(result.rows[0]);
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "23505") {
+        // PostgreSQL unique_violation: rollback to savepoint (if in txn) then renumber and retry
+        if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        await renumberSiblings(db, parent_node_id);
+      } else {
+        if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        throw err;
+      }
+    }
+  }
+  throw new Error(
+    `insertNode: position conflict persists after ${MAX_RETRIES} retries (parent_node_id=${parent_node_id})`
   );
-  return rowToNode(result.rows[0]);
 }
 
 async function renumberSiblings(
@@ -130,34 +147,48 @@ export async function moveNode(
   new_parent_node_id: string | null,
   new_position: number | undefined
 ): Promise<TreeNode | null> {
-  let resolvedPosition: number;
+  const MAX_RETRIES = 3;
+  const inTxn = isTransactionClient(db);
 
-  if (new_position !== undefined) {
-    const conflict = await db.query(
-      `SELECT id FROM tree_nodes
-       WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position = $2 AND id != $3`,
-      [new_parent_node_id, new_position, nodeId]
-    );
-    if ((conflict.rowCount ?? 0) > 0) {
-      await renumberSiblings(db, new_parent_node_id);
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    let resolvedPosition: number;
+    if (new_position !== undefined) {
+      resolvedPosition = new_position;
+    } else {
+      const maxResult = await db.query(
+        `SELECT COALESCE(MAX(position), 0) AS max_pos
+         FROM tree_nodes WHERE parent_node_id IS NOT DISTINCT FROM $1 AND id != $2`,
+        [new_parent_node_id, nodeId]
+      );
+      resolvedPosition = (maxResult.rows[0]["max_pos"] as number) + 100;
     }
-    resolvedPosition = new_position;
-  } else {
-    const maxResult = await db.query(
-      `SELECT COALESCE(MAX(position), 0) AS max_pos
-       FROM tree_nodes WHERE parent_node_id IS NOT DISTINCT FROM $1 AND id != $2`,
-      [new_parent_node_id, nodeId]
-    );
-    resolvedPosition = (maxResult.rows[0]["max_pos"] as number) + 100;
-  }
 
-  const result = await db.query(
-    `UPDATE tree_nodes
-     SET parent_node_id = $1, position = $2
-     WHERE id = $3
-     RETURNING *`,
-    [new_parent_node_id, resolvedPosition, nodeId]
+    const sp = `sp_move_node_${attempt}`;
+    if (inTxn) await db.query(`SAVEPOINT ${sp}`);
+
+    try {
+      const result = await db.query(
+        `UPDATE tree_nodes
+         SET parent_node_id = $1, position = $2
+         WHERE id = $3
+         RETURNING *`,
+        [new_parent_node_id, resolvedPosition, nodeId]
+      );
+      if (inTxn) await db.query(`RELEASE SAVEPOINT ${sp}`);
+      if (result.rows.length === 0) return null;
+      return rowToNode(result.rows[0]);
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "23505") {
+        // PostgreSQL unique_violation: rollback to savepoint (if in txn) then renumber and retry
+        if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        await renumberSiblings(db, new_parent_node_id);
+      } else {
+        if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        throw err;
+      }
+    }
+  }
+  throw new Error(
+    `moveNode: position conflict persists after ${MAX_RETRIES} retries (parent_node_id=${new_parent_node_id})`
   );
-  if (result.rows.length === 0) return null;
-  return rowToNode(result.rows[0]);
 }

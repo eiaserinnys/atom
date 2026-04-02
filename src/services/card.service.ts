@@ -1,4 +1,5 @@
 import { getPool } from "../db/client.js";
+import pg from "pg";
 import {
   insertCard,
   selectCardById,
@@ -14,26 +15,35 @@ import type {
 import { eventBus } from "../events/eventBus.js";
 
 export async function createCard(input: CreateCardInput): Promise<{ card: Card; node_id: string }> {
-  const db = getPool();
+  const pool = getPool();
+  const client = await (pool as pg.Pool).connect();
+  try {
+    await client.query("BEGIN");
+    const card = await insertCard(client, input);
+    const node = await insertNode(
+      client,
+      card.id,
+      input.parent_node_id ?? null,
+      input.position,
+      false
+    );
+    await client.query("COMMIT");
 
-  const card = await insertCard(db, input);
-  const node = await insertNode(
-    db,
-    card.id,
-    input.parent_node_id ?? null,
-    input.position,
-    false
-  );
+    eventBus.emit("atom:event", {
+      type: "card:created",
+      cardId: card.id,
+      nodeId: node.id,
+      parentNodeId: input.parent_node_id ?? null,
+      data: card,
+    });
 
-  eventBus.emit("atom:event", {
-    type: "card:created",
-    cardId: card.id,
-    nodeId: node.id,
-    parentNodeId: input.parent_node_id ?? null,
-    data: card,
-  });
-
-  return { card, node_id: node.id };
+    return { card, node_id: node.id };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getCard(id: string): Promise<Card | null> {

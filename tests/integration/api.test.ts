@@ -48,9 +48,11 @@ afterAll(async () => {
 
 // Clean up between tests
 afterEach(async () => {
-  // Delete all nodes first (FK), then cards
+  // Delete in FK order: tree_nodes → cards → agents → users
   await pool.query("DELETE FROM tree_nodes");
   await pool.query("DELETE FROM cards");
+  await pool.query("DELETE FROM agents");
+  await pool.query("DELETE FROM users");
 });
 
 // ---------------------------------------------------------------------------
