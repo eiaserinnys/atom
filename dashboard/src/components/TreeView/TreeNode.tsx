@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { api, type TreeNodeData } from '../../api/client';
-import styles from './TreeView.module.css';
 
 interface TreeNodeProps {
   node: TreeNodeData;
@@ -55,32 +54,38 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0 }: TreeNode
   };
 
   return (
-    <div className={styles.nodeWrapper}>
+    <div className="select-none">
       <div
-        className={`${styles.nodeRow} ${isSelected ? styles.selected : ''}`}
+        className={`flex items-center gap-1 py-0.5 pr-2 cursor-pointer rounded mx-1 transition-colors min-h-[26px] ${
+          isSelected
+            ? 'bg-node-user/15 text-node-user'
+            : 'hover:bg-muted'
+        }`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={handleClick}
       >
         {/* loading 중에는 재클릭 방지 */}
         <span
-          className={styles.toggle}
+          className="w-4 text-center text-[10px] text-muted-foreground cursor-pointer shrink-0"
           onClick={loading ? undefined : (hasChildren ? handleToggle : undefined)}
         >
           {loading ? '⏳' : hasChildren ? (expanded ? '▾' : '▸') : ' '}
         </span>
-        <span className={styles.typeIcon} title={isStructure ? 'structure' : 'knowledge'}>
+        <span className="text-xs shrink-0" title={isStructure ? 'structure' : 'knowledge'}>
           {isStructure ? '📁' : '📄'}
         </span>
         {node.is_symlink && (
-          <span className={styles.symlinkIcon} title="symlink">↗</span>
+          <span className="text-[10px] text-node-plan shrink-0" title="symlink">↗</span>
         )}
-        <span className={styles.nodeTitle}>{node.card.title}</span>
+        <span className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1">
+          {node.card.title}
+        </span>
         {fetchError && (
-          <span className={styles.errorHint} title={fetchError}>⚠️</span>
+          <span className="ml-1 text-xs cursor-help shrink-0" title={fetchError}>⚠️</span>
         )}
       </div>
       {hasChildren && expanded && !loading && (
-        <div className={styles.children}>
+        <div>
           {children.map((child) => (
             <TreeNode
               key={child.id}

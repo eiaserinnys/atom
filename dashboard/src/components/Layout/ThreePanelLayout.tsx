@@ -1,5 +1,4 @@
 import { Group, Panel, Separator } from 'react-resizable-panels';
-import styles from './ThreePanelLayout.module.css';
 
 interface ThreePanelLayoutProps {
   left: React.ReactNode;
@@ -9,16 +8,16 @@ interface ThreePanelLayoutProps {
 
 export function ThreePanelLayout({ left, center, right }: ThreePanelLayoutProps) {
   return (
-    <Group orientation="horizontal" className={styles.layout}>
-      <Panel defaultSize={30} minSize={15} className={styles.panel}>
+    <Group orientation="horizontal" className="h-full w-full">
+      <Panel defaultSize={30} minSize={15} className="overflow-hidden flex flex-col">
         {left}
       </Panel>
-      <Separator className={styles.resizeHandle} />
-      <Panel defaultSize={40} minSize={20} className={styles.panel}>
+      <Separator className="w-1 bg-border cursor-col-resize transition-colors hover:bg-white/20 data-[resize-handle-active]:bg-white/20 shrink-0" />
+      <Panel defaultSize={40} minSize={20} className="overflow-hidden flex flex-col">
         {center}
       </Panel>
-      <Separator className={styles.resizeHandle} />
-      <Panel defaultSize={30} minSize={15} className={styles.panel}>
+      <Separator className="w-1 bg-border cursor-col-resize transition-colors hover:bg-white/20 data-[resize-handle-active]:bg-white/20 shrink-0" />
+      <Panel defaultSize={30} minSize={15} className="overflow-hidden flex flex-col">
         {right}
       </Panel>
     </Group>

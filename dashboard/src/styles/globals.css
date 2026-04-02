@@ -1,0 +1,105 @@
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-mono: 'Cascadia Code', 'Fira Code', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Playfair Display', serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-node-user: var(--node-user);
+  --color-node-response: var(--node-response);
+  --color-node-thinking: var(--node-thinking);
+  --color-node-plan: var(--node-plan);
+  --color-node-tool: var(--node-tool);
+  --color-node-skill: var(--node-skill);
+  --color-node-intervention: var(--node-intervention);
+  --color-node-error: var(--node-error);
+  --color-node-system: var(--node-system);
+  --color-node-input-request: var(--node-input-request);
+}
+
+/* Light mode (default) */
+:root {
+  --node-user: #3b82f6;
+  --node-response: #10b981;
+  --node-thinking: #8b5cf6;
+  --node-plan: #06b6d4;
+  --node-tool: #f59e0b;
+  --node-skill: #a855f7;
+  --node-intervention: #f97316;
+  --node-error: #ef4444;
+  --node-system: #6b7280;
+  --node-input-request: #ec4899;
+
+  --accent: rgba(0, 0, 0, 0.04);
+  --accent-foreground: #262626;
+  --background: #ffffff;
+  --border: rgba(0, 0, 0, 0.08);
+  --card: #ffffff;
+  --card-foreground: #262626;
+  --foreground: #262626;
+  --input: rgba(0, 0, 0, 0.10);
+  --muted: rgba(0, 0, 0, 0.04);
+  --muted-foreground: #6b7280;
+  --primary: #262626;
+  --primary-foreground: #fafafa;
+  --ring: #9ca3af;
+}
+
+/* Dark mode */
+.dark {
+  --node-user: hsl(217, 70%, 68%);
+  --node-response: hsl(160, 60%, 52%);
+  --node-thinking: hsl(258, 65%, 72%);
+  --node-plan: hsl(189, 65%, 52%);
+  --node-tool: hsl(38, 75%, 58%);
+  --node-skill: hsl(271, 60%, 72%);
+  --node-intervention: hsl(25, 70%, 60%);
+  --node-error: hsl(0, 65%, 66%);
+  --node-system: hsl(220, 8%, 55%);
+  --node-input-request: hsl(330, 65%, 65%);
+
+  --accent: rgba(255, 255, 255, 0.04);
+  --accent-foreground: #f5f5f5;
+  --background: #161616;
+  --border: rgba(255, 255, 255, 0.06);
+  --card: #191919;
+  --card-foreground: #f5f5f5;
+  --foreground: #f5f5f5;
+  --input: rgba(255, 255, 255, 0.08);
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #818181;
+  --primary: #f5f5f5;
+  --primary-foreground: #262626;
+  --ring: #6b7280;
+}
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+}

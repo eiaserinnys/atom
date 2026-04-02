@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { api, type SearchResult } from '../../api/client';
-import styles from './SearchBar.module.css';
 
 interface SearchBarProps {
   onSelectNode: (nodeId: string) => void;
@@ -55,36 +54,40 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
   };
 
   return (
-    <div className={styles.wrapper} ref={containerRef}>
-      <div className={styles.inputRow}>
-        <span className={styles.searchIcon}>⌕</span>
+    <div className="relative w-full" ref={containerRef}>
+      <div className="flex items-center bg-card border border-border rounded-md px-2.5 gap-1.5">
+        <span className="text-muted-foreground text-base shrink-0">⌕</span>
         <input
-          className={styles.input}
+          className="flex-1 bg-transparent border-none outline-none text-foreground text-[15px] font-sans py-2 placeholder:text-muted-foreground"
           type="text"
           placeholder="검색..."
           value={query}
           onChange={handleChange}
           onFocus={() => results.length > 0 && setOpen(true)}
         />
-        {loading && <span className={styles.spinner}>⋯</span>}
+        {loading && <span className="text-muted-foreground text-base">⋯</span>}
       </div>
 
       {open && results.length > 0 && (
-        <div className={styles.dropdown}>
+        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-[100] max-h-80 overflow-y-auto">
           {results.map((r) => (
             <div
               key={r.node_id}
-              className={styles.resultItem}
+              className="flex items-start gap-2 px-3 py-2 cursor-pointer transition-colors hover:bg-muted"
               onMouseDown={() => handleSelect(r)}
             >
-              <span className={styles.resultType}>
+              <span className="text-xs shrink-0 mt-px">
                 {r.card_type === 'structure' ? '📁' : '📄'}
               </span>
-              {r.is_symlink && <span className={styles.symlinkIcon}>↗</span>}
-              <div className={styles.resultText}>
-                <div className={styles.resultTitle}>{r.title}</div>
+              {r.is_symlink && <span className="text-[10px] text-node-plan shrink-0 mt-[3px]">↗</span>}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-foreground font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+                  {r.title}
+                </div>
                 {r.snippet && (
-                  <div className={styles.resultSnippet}>{r.snippet}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {r.snippet}
+                  </div>
                 )}
               </div>
             </div>
@@ -93,8 +96,8 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
       )}
 
       {open && results.length === 0 && !loading && query && (
-        <div className={styles.dropdown}>
-          <div className={styles.noResults}>결과 없음</div>
+        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-[100]">
+          <div className="p-3 text-sm text-muted-foreground text-center">결과 없음</div>
         </div>
       )}
     </div>
