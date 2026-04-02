@@ -1,5 +1,23 @@
 import type { Card, TreeNode } from "./types.js";
 
+export interface CompileOptions {
+  includeIds?: boolean;
+}
+
+function buildMetaComment(nodeId: string, card: Card): string {
+  const parts = [`node:${nodeId}`, `card:${card.id}`];
+  if (card.card_timestamp) {
+    parts.push(`created:${card.card_timestamp.slice(0, 10)}`);
+  }
+  if (card.staleness === "stale" || card.staleness === "outdated") {
+    parts.push(`stale:${card.staleness}`);
+  }
+  if (card.source_type) {
+    parts.push(`source:${card.source_type}`);
+  }
+  return `<!-- ${parts.join(" ")} -->`;
+}
+
 /**
  * BFS+N subtree compiler.
  *
@@ -40,6 +58,7 @@ export function compile(
  * @param depth        Expansion depth (0 = node only, Infinity = full tree)
  * @param visited      Visited card_ids (for cycle detection in symlink expansion)
  * @param headingLevel Markdown heading level for this node
+ * @param options      Compile options (includeIds: add HTML comments with metadata)
  */
 export function compileNode(
   nodeId: string,
@@ -48,11 +67,12 @@ export function compileNode(
   getCard: (cardId: string) => Card,
   depth: number,
   visited: Set<string> = new Set(),
-  headingLevel: number = 1
+  headingLevel: number = 1,
+  options: CompileOptions = {}
 ): string {
   const { card_id, is_symlink } = getNodeCard(nodeId);
 
-  // Cycle detection
+  // Cycle detection — no metadata comment on cycle nodes
   if (visited.has(card_id)) {
     const card = getCard(card_id);
     const heading = "#".repeat(Math.min(headingLevel, 6));
@@ -64,7 +84,11 @@ export function compileNode(
 
   // Build this node's markdown
   const lines: string[] = [];
-  lines.push(`${heading} ${card.title}`);
+  if (options.includeIds) {
+    lines.push(`${heading} ${card.title} ${buildMetaComment(nodeId, card)}`);
+  } else {
+    lines.push(`${heading} ${card.title}`);
+  }
   if (card.content) {
     lines.push(card.content);
   }
@@ -92,7 +116,8 @@ export function compileNode(
       getCard,
       depth - 1,
       newVisited,
-      headingLevel + 1
+      headingLevel + 1,
+      options
     );
     lines.push(childMarkdown);
   }

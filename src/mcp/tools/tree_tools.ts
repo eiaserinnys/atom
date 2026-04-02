@@ -49,13 +49,16 @@ export function registerTreeTools(server: McpServer): void {
   // compile_subtree
   server.tool(
     "compile_subtree",
-    "Compile a subtree as Markdown via BFS. depth=2 by default.",
+    "Compile a subtree as Markdown via BFS. depth=2 by default. include_ids=true adds <!-- node:uuid card:uuid --> HTML comments to each heading.",
     {
       node_id: z.string().uuid(),
       depth: z.number().int().optional(),
+      include_ids: z.boolean().optional(),
     },
-    async ({ node_id, depth }) => {
-      const markdown = await compileSubtree(node_id, depth ?? 2);
+    async ({ node_id, depth, include_ids }) => {
+      const markdown = await compileSubtree(node_id, depth ?? 2, {
+        includeIds: include_ids,
+      });
       return { content: [{ type: "text", text: markdown }] };
     }
   );

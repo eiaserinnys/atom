@@ -8,7 +8,7 @@ import {
   moveNode as moveNodeQuery,
 } from "../db/queries/tree.js";
 import { selectCardById } from "../db/queries/cards.js";
-import { compileNode } from "../shared/bfs.js";
+import { compileNode, type CompileOptions } from "../shared/bfs.js";
 import type { Card, TreeNode, TreeNodeWithCard } from "../shared/types.js";
 import { eventBus } from "../events/eventBus.js";
 
@@ -36,7 +36,8 @@ export async function listChildren(
 
 export async function compileSubtree(
   nodeId: string,
-  depth: number = 2
+  depth: number = 2,
+  options: CompileOptions = {}
 ): Promise<string> {
   const db = getPool();
 
@@ -114,7 +115,7 @@ export async function compileSubtree(
     return card;
   }
 
-  return compileNode(nodeId, getNodeCard, getChildrenSync, getCardSync, depth);
+  return compileNode(nodeId, getNodeCard, getChildrenSync, getCardSync, depth, new Set(), 1, options);
 }
 
 export async function createSymlink(
