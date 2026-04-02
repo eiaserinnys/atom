@@ -7,7 +7,10 @@ export interface CompileOptions {
 function buildMetaComment(nodeId: string, card: Card): string {
   const parts = [`node:${nodeId}`, `card:${card.id}`];
   if (card.card_timestamp) {
-    parts.push(`created:${card.card_timestamp.slice(0, 10)}`);
+    const ts = typeof card.card_timestamp === "string"
+      ? card.card_timestamp
+      : new Date(card.card_timestamp).toISOString();
+    parts.push(`created:${ts.slice(0, 10)}`);
   }
   if (card.staleness === "stale" || card.staleness === "outdated") {
     parts.push(`stale:${card.staleness}`);
