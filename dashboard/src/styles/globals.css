@@ -103,3 +103,85 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 }
+
+@layer components {
+  .prose-atom {
+    color: var(--foreground);
+    line-height: 1.7;
+  }
+  .prose-atom h1, .prose-atom h2, .prose-atom h3, .prose-atom h4 {
+    color: var(--foreground);
+    font-weight: 600;
+    margin-top: 1.25em;
+    margin-bottom: 0.5em;
+  }
+  .prose-atom h1 { font-size: 1.5em; }
+  .prose-atom h2 { font-size: 1.25em; }
+  .prose-atom h3 { font-size: 1.1em; }
+  .prose-atom p {
+    margin-bottom: 0.75em;
+  }
+  .prose-atom p:last-child { margin-bottom: 0; }
+  .prose-atom ul, .prose-atom ol {
+    padding-left: 1.5em;
+    margin-bottom: 0.75em;
+  }
+  .prose-atom li { margin-bottom: 0.25em; }
+  .prose-atom code {
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.35em;
+    font-size: 0.875em;
+    font-family: var(--font-mono);
+    color: var(--foreground);
+  }
+  .prose-atom pre {
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75em 1em;
+    overflow-x: auto;
+    margin-bottom: 0.75em;
+  }
+  .prose-atom pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.875em;
+  }
+  .prose-atom blockquote {
+    border-left: 3px solid var(--border);
+    padding-left: 1em;
+    color: var(--muted-foreground);
+    margin: 0.75em 0;
+  }
+  .prose-atom hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1em 0;
+  }
+  .prose-atom a {
+    color: var(--node-user);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose-atom table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0.75em;
+    font-size: 0.9em;
+  }
+  .prose-atom th, .prose-atom td {
+    border: 1px solid var(--border);
+    padding: 0.4em 0.75em;
+    text-align: left;
+  }
+  .prose-atom th {
+    background: var(--muted);
+    font-weight: 600;
+  }
+  .prose-atom input[type="checkbox"] {
+    margin-right: 0.4em;
+  }
+}

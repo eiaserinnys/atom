@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api, type CardData, type TreeNodeData } from '../../api/client';
 
 interface CardDetailProps {
@@ -176,7 +178,9 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                   title="클릭하여 편집"
                 >
                   {card.content ? (
-                    <pre className="font-sans whitespace-pre-wrap break-words text-[15px] leading-[1.6]">{card.content}</pre>
+                    <div className="prose prose-atom text-[15px] leading-relaxed">
+                      <Markdown remarkPlugins={[remarkGfm]}>{card.content}</Markdown>
+                    </div>
                   ) : (
                     <span className="text-muted-foreground text-sm">내용 없음</span>
                   )}

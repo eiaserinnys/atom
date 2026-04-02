@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api } from '../../api/client';
 
 interface CompileViewProps {
@@ -18,8 +19,16 @@ export function CompileView({ nodeId }: CompileViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
-      <div className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground border-b border-border shrink-0">
+      <div className="flex items-center px-4 py-3 border-b border-border text-xs text-muted-foreground font-medium shrink-0">
         컴파일 문서 (BFS+2)
+        {nodeId && (
+          <span
+            className="ml-2 px-2 py-0.5 text-xs font-mono bg-muted border border-border rounded-md text-muted-foreground select-all"
+            title="클릭하여 선택 (UUID 앞 8자리)"
+          >
+            {nodeId.slice(0, 8)}
+          </span>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         {!nodeId && (
@@ -45,7 +54,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
             [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_hr]:my-4
             [&_a]:text-node-user [&_a]:no-underline hover:[&_a]:underline
           ">
-            <Markdown>{markdown}</Markdown>
+            <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
           </div>
         )}
       </div>
