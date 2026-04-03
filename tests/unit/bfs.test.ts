@@ -1,4 +1,4 @@
-import { compileNode, type CompileOptions } from "../../src/shared/bfs.js";
+import { compileNode, type CompileOptions, type ResolvedRef } from "../../src/shared/bfs.js";
 import type { Card, TreeNode } from "../../src/shared/types.js";
 
 function makeCard(overrides: Partial<Card> & { id: string; title: string }): Card {
@@ -731,6 +731,99 @@ describe("BFS compileNode", () => {
 
       expect(result).toBe("# Regular Node");
       expect(result).not.toContain("~");
+    });
+  });
+
+  describe("resolvedRefs option", () => {
+    function makeSetup() {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root", content: "Root content" })],
+        ["card-b", makeCard({ id: "card-b", title: "Child", content: "Child content" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+        ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a" })],
+      ]);
+      const getNodeCard = (nid: string) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink });
+      const getChildren = (nid: string): TreeNode[] =>
+        Array.from(nodes.values()).filter((n) => n.parent_node_id === nid).sort((a, b) => a.position - b.position);
+      const getCard = (cid: string): Card => cards.get(cid)!;
+      return { cards, nodes, getNodeCard, getChildren, getCard };
+    }
+
+    it("appends unfurl text when ok=true for a card", () => {
+      const { getNodeCard, getChildren, getCard } = makeSetup();
+      const resolvedRefs = new Map<string, ResolvedRef>([
+        ["card-a", {
+          ok: true,
+          result: { text: "Unfurled content", snapshot: "{}", unfurlData: null },
+          sourceType: "trello",
+        }],
+      ]);
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard, 0, new Set(), 1, { resolvedRefs }
+      );
+      expect(result).toContain("Root content");
+      expect(result).toContain("Unfurled content");
+    });
+
+    it("appends unfurl failed comment when ok=false for a card", () => {
+      const { getNodeCard, getChildren, getCard } = makeSetup();
+      const resolvedRefs = new Map<string, ResolvedRef>([
+        ["card-a", {
+          ok: false,
+          error: "Network error",
+          sourceType: "trello",
+        }],
+      ]);
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard, 0, new Set(), 1, { resolvedRefs }
+      );
+      expect(result).toContain("<!-- unfurl failed: trello -->");
+    });
+
+    it("does not append anything when card not in resolvedRefs", () => {
+      const { getNodeCard, getChildren, getCard } = makeSetup();
+      const resolvedRefs = new Map<string, ResolvedRef>(); // empty
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard, 0, new Set(), 1, { resolvedRefs }
+      );
+      expect(result).toBe("# Root\nRoot content");
+      expect(result).not.toContain("unfurl");
+    });
+
+    it("applies resolvedRefs only to matched cards in a multi-node tree", () => {
+      const { getNodeCard, getChildren, getCard } = makeSetup();
+      const resolvedRefs = new Map<string, ResolvedRef>([
+        ["card-b", {
+          ok: true,
+          result: { text: "Child unfurl", snapshot: "{}", unfurlData: null },
+          sourceType: "trello",
+        }],
+      ]);
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard, 1, new Set(), 1, { resolvedRefs }
+      );
+      // card-a (Root) should NOT have unfurl appended directly after its own content
+      // The output order: "# Root\nRoot content\n## Child\nChild content\nChild unfurl"
+      // Root content should appear but NOT followed immediately by "Child unfurl"
+      const rootContentIdx = result.indexOf("Root content");
+      const childHeaderIdx = result.indexOf("## Child");
+      const childUnfurlIdx = result.indexOf("Child unfurl");
+      // Root content comes before child header
+      expect(rootContentIdx).toBeLessThan(childHeaderIdx);
+      // Child unfurl comes after child header
+      expect(childUnfurlIdx).toBeGreaterThan(childHeaderIdx);
+      // No "Root unfurl" anywhere
+      expect(result).not.toContain("Root unfurl");
+    });
+
+    it("does not append unfurl when resolvedRefs is undefined (default behavior)", () => {
+      const { getNodeCard, getChildren, getCard } = makeSetup();
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard, 0, new Set(), 1, {}
+      );
+      expect(result).toBe("# Root\nRoot content");
     });
   });
 });

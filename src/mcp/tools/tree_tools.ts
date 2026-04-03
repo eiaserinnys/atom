@@ -72,15 +72,17 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       numbering: z.boolean().optional().describe("Prepend hierarchical numbering (1, 1.1, 1.1.1, …) to headings."),
       max_chars: z.number().int().optional().describe("Max output chars. 0 or negative = unlimited."),
       exclude_nodes: z.array(z.string().uuid()).optional().describe("Node IDs whose subtrees to skip entirely."),
+      resolve_refs: z.enum(["cached", "fresh"]).optional().describe("Resolve external references (unfurl). 'cached': use snapshot if available; 'fresh': always fetch."),
+      credentials: z.record(z.string(), z.record(z.string(), z.string())).optional().describe("Credentials per source_type, e.g. { trello: { apiKey: '...', token: '...' } }."),
     },
-    async ({ node_id, depth, include_ids, titles_only, numbering, max_chars, exclude_nodes }) => {
+    async ({ node_id, depth, include_ids, titles_only, numbering, max_chars, exclude_nodes, resolve_refs, credentials }) => {
       const markdown = await compileSubtree(node_id, depth ?? 2, {
         includeIds: include_ids,
         titlesOnly: titles_only,
         numbering,
         maxChars: max_chars,
         excludeNodes: exclude_nodes ? new Set(exclude_nodes) : undefined,
-      });
+      }, resolve_refs, credentials);
       return { content: [{ type: "text", text: markdown }] };
     }
   );

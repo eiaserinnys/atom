@@ -62,6 +62,25 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // POST /tree/:nodeId/compile — compile with credentials (for unfurl)
+  app.post<{ Params: { nodeId: string } }>(
+    "/tree/:nodeId/compile",
+    async (req, reply) => {
+      const body = req.body as Record<string, unknown> | null ?? {};
+      const depth = typeof body["depth"] === "number" ? body["depth"] : 2;
+      const resolveRefs = (body["resolveRefs"] as "cached" | "fresh" | undefined) ?? undefined;
+      const credentials = (body["credentials"] as Record<string, Record<string, string>> | undefined) ?? undefined;
+      const markdown = await compileSubtree(
+        req.params.nodeId,
+        depth,
+        {},
+        resolveRefs,
+        credentials
+      );
+      return { markdown };
+    }
+  );
+
   // POST /tree/symlink
   app.post("/tree/symlink", async (req, reply) => {
     const body = req.body as Record<string, unknown>;

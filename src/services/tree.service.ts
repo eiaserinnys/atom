@@ -8,8 +8,10 @@ import {
   moveNode as moveNodeQuery,
 } from "../db/queries/tree.js";
 import { selectCardById } from "../db/queries/cards.js";
-import { compileNode, type CompileOptions } from "../shared/bfs.js";
+import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
 import type { Card, TreeNode, TreeNodeWithCard } from "../shared/types.js";
+import type { UnfurlCredentials } from "../unfurl/interface.js";
+import { adapterRegistry } from "../unfurl/registry.js";
 import { eventBus } from "../events/eventBus.js";
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
@@ -34,10 +36,36 @@ export async function listChildren(
   return results;
 }
 
+async function resolveRefs(
+  cardCache: Map<string, Card>,
+  mode: "cached" | "fresh",
+  credentials: Record<string, UnfurlCredentials>
+): Promise<Map<string, ResolvedRef>> {
+  const resolved = new Map<string, ResolvedRef>();
+  await Promise.allSettled(
+    Array.from(cardCache.entries()).map(async ([cardId, card]) => {
+      if (!card.source_ref || !card.source_type) return;
+      // 'cached' 모드: snapshot 있으면 그대로 사용 (Phase 2에서 구체화)
+      const adapter = adapterRegistry.find(card.source_type);
+      if (!adapter) return; // 어댑터 없으면 skip
+      const creds = credentials[card.source_type] ?? {};
+      try {
+        const result = await adapter.resolve(card.source_ref, creds);
+        resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
+      } catch (e) {
+        resolved.set(cardId, { ok: false, error: String(e), sourceType: card.source_type });
+      }
+    })
+  );
+  return resolved;
+}
+
 export async function compileSubtree(
   nodeId: string,
   depth: number = 2,
-  options: CompileOptions = {}
+  options: CompileOptions = {},
+  resolveRefsMode?: false | "cached" | "fresh",
+  credentials?: Record<string, UnfurlCredentials>
 ): Promise<string> {
   const db = getPool();
 
@@ -81,6 +109,16 @@ export async function compileSubtree(
   }
 
   await preloadSubtree(nodeId, depth);
+
+  if (resolveRefsMode !== undefined && resolveRefsMode !== false) {
+    const resolvedRefs = await resolveRefs(
+      cardCache,
+      resolveRefsMode,
+      credentials ?? {}
+    );
+    options = { ...options, resolvedRefs };
+    // snapshot write-back은 Phase 2에서 구현
+  }
 
   function getNodeCard(nid: string): { card_id: string; is_symlink: boolean } {
     const node = nodeCache.get(nid);
