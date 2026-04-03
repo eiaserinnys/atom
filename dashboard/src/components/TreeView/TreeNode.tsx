@@ -1,19 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api, type TreeNodeData } from '../../api/client';
 
 interface TreeNodeProps {
   node: TreeNodeData;
   selectedNodeId: string | null;
-  onSelect: (nodeId: string) => void;
+  onSelect: (nodeId: string | null) => void;
   depth?: number;
+  isExpanded: boolean;
+  expandedNodes: Set<string>;
+  onToggle: (nodeId: string) => void;
 }
 
-export function TreeNode({ node, selectedNodeId, onSelect, depth = 0 }: TreeNodeProps) {
+export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded, expandedNodes, onToggle }: TreeNodeProps) {
   // node.children이 있으면 TreeView가 미리 로드한 상태 → childrenLoaded = true
   // node.children이 undefined이면 첫 expand 시 lazy fetch
   const [children, setChildren] = useState<TreeNodeData[]>(node.children ?? []);
   const [childrenLoaded, setChildrenLoaded] = useState(node.children !== undefined);
-  const [expanded, setExpanded] = useState(depth === 0); // 루트(depth 0)만 초기 펼침
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -23,34 +25,37 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0 }: TreeNode
   const isSelected = node.id === selectedNodeId;
   const isStructure = node.card.card_type === 'structure';
 
+  // isExpanded가 true로 바뀔 때 미로드 상태면 lazy fetch
+  useEffect(() => {
+    if (isExpanded && !childrenLoaded) {
+      fetchChildren();
+    }
+  // fetchChildren은 렌더마다 새로 생성될 수 있으므로 의존성에서 제외
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExpanded]);
+
+  const fetchChildren = async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const fetched = await api.listChildren(node.id);
+      setChildren(fetched);
+      setChildrenLoaded(true);
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : '오류 발생');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelect(node.id);
   };
 
-  const handleToggle = async (e: React.MouseEvent) => {
+  const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!expanded && !childrenLoaded) {
-      // 첫 expand: lazy fetch
-      setLoading(true);
-      setFetchError(null);
-      try {
-        const fetched = await api.listChildren(node.id);
-        setChildren(fetched);  // try 블록 내부
-        setChildrenLoaded(true);
-        // 빈 배열이면 setExpanded 호출하지 않음 → hasChildren = false, 화살표 숨김 (요구사항 7)
-        if (fetched.length > 0) {
-          setExpanded(true);
-        }
-      } catch (err) {
-        // 오류 시 확장 취소 (setExpanded 호출하지 않음)
-        setFetchError(err instanceof Error ? err.message : '오류 발생');
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setExpanded((v) => !v);
-    }
+    onToggle(node.id);
   };
 
   return (
@@ -69,7 +74,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0 }: TreeNode
           className="w-4 text-center text-[10px] text-muted-foreground cursor-pointer shrink-0"
           onClick={loading ? undefined : (hasChildren ? handleToggle : undefined)}
         >
-          {loading ? '⏳' : hasChildren ? (expanded ? '▾' : '▸') : ' '}
+          {loading ? '⏳' : hasChildren ? (isExpanded ? '▾' : '▸') : ' '}
         </span>
         <span className="text-xs shrink-0" title={isStructure ? 'structure' : 'knowledge'}>
           {isStructure ? '📁' : '📄'}
@@ -84,7 +89,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0 }: TreeNode
           <span className="ml-1 text-xs cursor-help shrink-0" title={fetchError}>⚠️</span>
         )}
       </div>
-      {hasChildren && expanded && !loading && (
+      {hasChildren && isExpanded && !loading && (
         <div>
           {children.map((child) => (
             <TreeNode
@@ -93,6 +98,9 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0 }: TreeNode
               selectedNodeId={selectedNodeId}
               onSelect={onSelect}
               depth={depth + 1}
+              isExpanded={expandedNodes.has(child.id)}
+              expandedNodes={expandedNodes}
+              onToggle={onToggle}
             />
           ))}
         </div>

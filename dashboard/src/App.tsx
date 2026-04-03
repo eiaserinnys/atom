@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
 import { TreeView } from './components/TreeView/TreeView';
@@ -22,8 +22,20 @@ const queryClient = new QueryClient({
 
 function AppInner() {
   const auth = useAuth();
+  const initialSelectedNodeId = useRef<string | null>(
+    window.location.hash.length > 1 ? window.location.hash.slice(1) : null
+  );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+
+  const handleSelectNode = useCallback((nodeId: string | null) => {
+    setSelectedNodeId(nodeId);
+    if (nodeId) {
+      window.history.replaceState(null, '', '#' + nodeId);
+    } else {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
 
   useAtomEvents();
 
@@ -41,7 +53,7 @@ function AppInner() {
         </span>
         <div className="flex-1" />
         <div className="w-full max-w-[400px]">
-          <SearchBar onSelectNode={setSelectedNodeId} />
+          <SearchBar onSelectNode={(id) => handleSelectNode(id)} />
         </div>
         {showConfigButton && (
           <button
@@ -71,7 +83,8 @@ function AppInner() {
           left={
             <TreeView
               selectedNodeId={selectedNodeId}
-              onSelect={setSelectedNodeId}
+              onSelect={handleSelectNode}
+              initialSelectedNodeId={initialSelectedNodeId.current ?? undefined}
             />
           }
           center={<CompileView nodeId={selectedNodeId} />}
