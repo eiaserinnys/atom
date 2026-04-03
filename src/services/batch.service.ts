@@ -13,6 +13,12 @@ import type {
 } from "../shared/types.js";
 import { eventBus } from "../events/eventBus.js";
 
+// Temporary position bases for the park-and-assign strategy in batch moves.
+// These must be within PostgreSQL INTEGER range (-2,147,483,648 to 2,147,483,647)
+// and far enough apart to avoid collisions between group and non-group parking.
+const GROUP_PARK_BASE = -2_000_000_000;
+const NONGROUP_PARK_BASE = -1_000_000_000;
+
 // ---------------------------------------------------------------------------
 // Topological sort for creates
 // ---------------------------------------------------------------------------
@@ -190,6 +196,13 @@ export async function executeBatchOp(
         result.created.map((c) => [c.temp_id, c.node_id])
       );
 
+      // Resolve parent_temp_id references and group by target parent
+      const resolvedMoves: Array<{
+        node_id: string;
+        parent_node_id: string | null;
+        new_position: number | undefined;
+      }> = [];
+
       for (const item of input.moves) {
         let newParentNodeId: string | null | undefined = item.new_parent_node_id;
         if (item.parent_temp_id !== undefined) {
@@ -201,14 +214,113 @@ export async function executeBatchOp(
           }
           newParentNodeId = resolved;
         }
+        resolvedMoves.push({
+          node_id: item.node_id,
+          parent_node_id: newParentNodeId ?? null,
+          new_position: item.new_position,
+        });
+      }
 
-        await moveNode(
-          client,
-          item.node_id,
-          newParentNodeId ?? null,
-          item.new_position
-        );
-        result.moved.push(item.node_id);
+      // Group moves by target parent to detect same-parent multi-moves
+      const movesByParent = new Map<string | null, typeof resolvedMoves>();
+      for (const m of resolvedMoves) {
+        const key = m.parent_node_id;
+        if (!movesByParent.has(key)) movesByParent.set(key, []);
+        movesByParent.get(key)!.push(m);
+      }
+
+      for (const [parentId, group] of movesByParent) {
+        if (group.length <= 1) {
+          // Single move — use existing moveNode (handles retry/renumber)
+          await moveNode(
+            client,
+            group[0].node_id,
+            parentId,
+            group[0].new_position
+          );
+        } else {
+          // Multi-move to same parent: park-and-assign strategy.
+          // Phase 1: Park all group nodes at unique negative positions
+          // to clear them from the positive position space.
+          for (let i = 0; i < group.length; i++) {
+            await client.query(
+              `UPDATE tree_nodes SET parent_node_id = $1, position = $2 WHERE id = $3`,
+              [parentId, GROUP_PARK_BASE + i, group[i].node_id]
+            );
+          }
+
+          // Phase 2: Resolve undefined positions (append-to-end semantics)
+          // Track the running max so multiple undefined positions don't collide.
+          const maxResult = await client.query(
+            `SELECT COALESCE(MAX(position), 0) AS max_pos FROM tree_nodes
+             WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position >= 0`,
+            [parentId]
+          );
+          let runningMax = maxResult.rows[0]["max_pos"] as number;
+          // Also consider explicitly provided positions
+          for (const item of group) {
+            if (
+              item.new_position !== undefined &&
+              item.new_position > runningMax
+            ) {
+              runningMax = item.new_position;
+            }
+          }
+          for (const item of group) {
+            if (item.new_position === undefined) {
+              runningMax += 100;
+              item.new_position = runningMax;
+            }
+          }
+
+          // Phase 3: Relocate non-group siblings if any requested positions
+          // conflict with them. Without this, a UNIQUE violation would occur
+          // when assigning final positions to group nodes.
+          const requestedPositionSet = new Set(
+            group.map((g) => g.new_position!)
+          );
+          const nonGroupSiblings = await client.query(
+            `SELECT id FROM tree_nodes
+             WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position >= 0
+             ORDER BY position ASC`,
+            [parentId]
+          );
+          if (nonGroupSiblings.rows.length > 0) {
+            // Park non-group siblings at temporary positions, then
+            // reassign them to positions that don't collide with
+            // the group's requested positions.
+            for (let i = 0; i < nonGroupSiblings.rows.length; i++) {
+              await client.query(
+                `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
+                [NONGROUP_PARK_BASE + i, nonGroupSiblings.rows[i]["id"]]
+              );
+            }
+            let pos = 100;
+            for (const row of nonGroupSiblings.rows) {
+              while (requestedPositionSet.has(pos)) pos += 100;
+              await client.query(
+                `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
+                [pos, row["id"]]
+              );
+              pos += 100;
+            }
+          }
+
+          // Phase 4: Assign final positions to group nodes in ascending order.
+          // Both group nodes (parked at large negatives) and non-group siblings
+          // (relocated to avoid conflicts) are now safe from collisions.
+          group.sort((a, b) => a.new_position! - b.new_position!);
+          for (const item of group) {
+            await client.query(
+              `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
+              [item.new_position, item.node_id]
+            );
+          }
+        }
+
+        for (const item of group) {
+          result.moved.push(item.node_id);
+        }
       }
     }
 

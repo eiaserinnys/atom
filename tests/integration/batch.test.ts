@@ -221,6 +221,309 @@ describe("executeBatchOp — moves", () => {
   });
 });
 
+describe("executeBatchOp — same-parent reorder moves", () => {
+  it("reorders children under the same parent without position conflict", async () => {
+    // Create parent + 3 children
+    const createResult = await executeBatchOp({
+      creates: [
+        { temp_id: "parent", card_type: "structure", title: "Parent" },
+        {
+          temp_id: "a",
+          card_type: "knowledge",
+          title: "Child A",
+          parent_temp_id: "parent",
+          position: 100,
+        },
+        {
+          temp_id: "b",
+          card_type: "knowledge",
+          title: "Child B",
+          parent_temp_id: "parent",
+          position: 200,
+        },
+        {
+          temp_id: "c",
+          card_type: "knowledge",
+          title: "Child C",
+          parent_temp_id: "parent",
+          position: 300,
+        },
+      ],
+    });
+
+    const parentNodeId = createResult.created.find(
+      (c) => c.temp_id === "parent"
+    )!.node_id;
+    const aNodeId = createResult.created.find(
+      (c) => c.temp_id === "a"
+    )!.node_id;
+    const bNodeId = createResult.created.find(
+      (c) => c.temp_id === "b"
+    )!.node_id;
+    const cNodeId = createResult.created.find(
+      (c) => c.temp_id === "c"
+    )!.node_id;
+
+    // Reorder: B(100), C(200), A(300) — positions overlap with originals
+    await executeBatchOp({
+      moves: [
+        { node_id: bNodeId, new_parent_node_id: parentNodeId, new_position: 100 },
+        { node_id: cNodeId, new_parent_node_id: parentNodeId, new_position: 200 },
+        { node_id: aNodeId, new_parent_node_id: parentNodeId, new_position: 300 },
+      ],
+    });
+
+    // Verify final order
+    const rows = await pool.query(
+      "SELECT id, position FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
+      [parentNodeId]
+    );
+    expect(rows.rows.map((r: Record<string, unknown>) => r["id"])).toEqual([
+      bNodeId,
+      cNodeId,
+      aNodeId,
+    ]);
+  });
+
+  it("reorders 10+ children under the same parent", async () => {
+    // Create parent
+    const parentResult = await executeBatchOp({
+      creates: [
+        { temp_id: "parent", card_type: "structure", title: "Big Parent" },
+      ],
+    });
+    const parentNodeId = parentResult.created[0].node_id;
+
+    // Create 12 children
+    const childCreates = Array.from({ length: 12 }, (_, i) => ({
+      temp_id: `child${i}`,
+      card_type: "knowledge" as const,
+      title: `Child ${i}`,
+      parent_node_id: parentNodeId,
+      position: (i + 1) * 100,
+    }));
+    const childResult = await executeBatchOp({ creates: childCreates });
+    const childNodeIds = childResult.created.map((c) => c.node_id);
+
+    // Reverse the order: child11 first, child0 last
+    const reversedMoves = childNodeIds.map((nodeId, i) => ({
+      node_id: nodeId,
+      new_parent_node_id: parentNodeId,
+      new_position: (childNodeIds.length - i) * 100,
+    }));
+
+    await executeBatchOp({ moves: reversedMoves });
+
+    // Verify reversed order
+    const rows = await pool.query(
+      "SELECT id FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
+      [parentNodeId]
+    );
+    const actualOrder = rows.rows.map((r: Record<string, unknown>) => r["id"]);
+    expect(actualOrder).toEqual([...childNodeIds].reverse());
+  });
+
+  it("handles mixed same-parent and cross-parent moves", async () => {
+    const createResult = await executeBatchOp({
+      creates: [
+        { temp_id: "p1", card_type: "structure", title: "Parent 1" },
+        { temp_id: "p2", card_type: "structure", title: "Parent 2" },
+        {
+          temp_id: "a",
+          card_type: "knowledge",
+          title: "A",
+          parent_temp_id: "p1",
+          position: 100,
+        },
+        {
+          temp_id: "b",
+          card_type: "knowledge",
+          title: "B",
+          parent_temp_id: "p1",
+          position: 200,
+        },
+        {
+          temp_id: "c",
+          card_type: "knowledge",
+          title: "C",
+          parent_temp_id: "p2",
+          position: 100,
+        },
+      ],
+    });
+
+    const p1NodeId = createResult.created.find(
+      (c) => c.temp_id === "p1"
+    )!.node_id;
+    const aNodeId = createResult.created.find(
+      (c) => c.temp_id === "a"
+    )!.node_id;
+    const bNodeId = createResult.created.find(
+      (c) => c.temp_id === "b"
+    )!.node_id;
+    const cNodeId = createResult.created.find(
+      (c) => c.temp_id === "c"
+    )!.node_id;
+
+    // Swap A and B under p1, move C to p1
+    await executeBatchOp({
+      moves: [
+        { node_id: bNodeId, new_parent_node_id: p1NodeId, new_position: 100 },
+        { node_id: aNodeId, new_parent_node_id: p1NodeId, new_position: 200 },
+        { node_id: cNodeId, new_parent_node_id: p1NodeId, new_position: 300 },
+      ],
+    });
+
+    const rows = await pool.query(
+      "SELECT id FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
+      [p1NodeId]
+    );
+    expect(rows.rows.map((r: Record<string, unknown>) => r["id"])).toEqual([
+      bNodeId,
+      aNodeId,
+      cNodeId,
+    ]);
+  });
+
+  it("handles position conflicts with non-group siblings", async () => {
+    // A(100), B(200), C(300), D(400) under parent.
+    // Reorder only A and B to positions that overlap with C and D.
+    const createResult = await executeBatchOp({
+      creates: [
+        { temp_id: "parent", card_type: "structure", title: "Parent" },
+        {
+          temp_id: "a",
+          card_type: "knowledge",
+          title: "A",
+          parent_temp_id: "parent",
+          position: 100,
+        },
+        {
+          temp_id: "b",
+          card_type: "knowledge",
+          title: "B",
+          parent_temp_id: "parent",
+          position: 200,
+        },
+        {
+          temp_id: "c",
+          card_type: "knowledge",
+          title: "C",
+          parent_temp_id: "parent",
+          position: 300,
+        },
+        {
+          temp_id: "d",
+          card_type: "knowledge",
+          title: "D",
+          parent_temp_id: "parent",
+          position: 400,
+        },
+      ],
+    });
+
+    const parentNodeId = createResult.created.find(
+      (c) => c.temp_id === "parent"
+    )!.node_id;
+    const aNodeId = createResult.created.find(
+      (c) => c.temp_id === "a"
+    )!.node_id;
+    const bNodeId = createResult.created.find(
+      (c) => c.temp_id === "b"
+    )!.node_id;
+    const cNodeId = createResult.created.find(
+      (c) => c.temp_id === "c"
+    )!.node_id;
+    const dNodeId = createResult.created.find(
+      (c) => c.temp_id === "d"
+    )!.node_id;
+
+    // Move A to 300 and B to 400 — overlaps with C(300) and D(400)
+    await executeBatchOp({
+      moves: [
+        { node_id: aNodeId, new_parent_node_id: parentNodeId, new_position: 300 },
+        { node_id: bNodeId, new_parent_node_id: parentNodeId, new_position: 400 },
+      ],
+    });
+
+    // Verify: C and D should have been relocated, A and B at requested positions
+    const rows = await pool.query(
+      "SELECT id, position FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
+      [parentNodeId]
+    );
+    const positions = rows.rows.map(
+      (r: Record<string, unknown>) => r["position"]
+    );
+    const ids = rows.rows.map((r: Record<string, unknown>) => r["id"]);
+
+    // All positions should be unique
+    expect(new Set(positions).size).toBe(4);
+    // A and B should be at their requested positions
+    const aPos = rows.rows.find(
+      (r: Record<string, unknown>) => r["id"] === aNodeId
+    )!["position"];
+    const bPos = rows.rows.find(
+      (r: Record<string, unknown>) => r["id"] === bNodeId
+    )!["position"];
+    expect(aPos).toBe(300);
+    expect(bPos).toBe(400);
+    // C and D should still be present (relocated to non-conflicting positions)
+    expect(ids).toContain(cNodeId);
+    expect(ids).toContain(dNodeId);
+  });
+
+  it("reorders with undefined positions (append-to-end)", async () => {
+    const createResult = await executeBatchOp({
+      creates: [
+        { temp_id: "parent", card_type: "structure", title: "Parent" },
+        {
+          temp_id: "a",
+          card_type: "knowledge",
+          title: "A",
+          parent_temp_id: "parent",
+          position: 100,
+        },
+        {
+          temp_id: "b",
+          card_type: "knowledge",
+          title: "B",
+          parent_temp_id: "parent",
+          position: 200,
+        },
+      ],
+    });
+
+    const parentNodeId = createResult.created.find(
+      (c) => c.temp_id === "parent"
+    )!.node_id;
+    const aNodeId = createResult.created.find(
+      (c) => c.temp_id === "a"
+    )!.node_id;
+    const bNodeId = createResult.created.find(
+      (c) => c.temp_id === "b"
+    )!.node_id;
+
+    // Move both without specifying position — both append to end
+    await executeBatchOp({
+      moves: [
+        { node_id: aNodeId, new_parent_node_id: parentNodeId },
+        { node_id: bNodeId, new_parent_node_id: parentNodeId },
+      ],
+    });
+
+    // Both should still be under parent, positions should be distinct
+    const rows = await pool.query(
+      "SELECT id, position FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
+      [parentNodeId]
+    );
+    expect(rows.rows).toHaveLength(2);
+    const positions = rows.rows.map(
+      (r: Record<string, unknown>) => r["position"]
+    );
+    expect(new Set(positions).size).toBe(2); // distinct positions
+  });
+});
+
 describe("executeBatchOp — deletes", () => {
   it("deletes an existing card", async () => {
     const { card } = await cardService.createCard({
