@@ -59,6 +59,13 @@ export async function updateAgentSecret(
   return result.rows[0] ?? null;
 }
 
+export async function findActiveAgents(db: Queryable): Promise<Agent[]> {
+  const result = await db.query(
+    `SELECT * FROM agents WHERE is_active = true`
+  );
+  return result.rows;
+}
+
 export async function agentExists(db: Queryable): Promise<boolean> {
   const result = await db.query(`SELECT 1 FROM agents LIMIT 1`);
   return (result.rowCount ?? 0) > 0;
