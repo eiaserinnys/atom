@@ -25,7 +25,25 @@ ALTER TABLE cards
   ADD COLUMN IF NOT EXISTS updated_by VARCHAR(100);
 -- 참고: agent_id 문자열 저장, 에이전트 삭제 후에도 audit trail 보존을 위해 FK 미적용
 
--- 4) position UNIQUE 부분 인덱스 (NULL 처리)
+-- 4) position 중복 데이터 정리 (유니크 인덱스 생성 전)
+-- 같은 parent_node_id 내에서 position이 중복된 행의 position을 +1씩 밀어냄
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    WITH dups AS (
+      SELECT id, parent_node_id, position,
+             ROW_NUMBER() OVER (PARTITION BY parent_node_id, position ORDER BY created_at) AS rn
+      FROM tree_nodes
+    )
+    SELECT id, position FROM dups WHERE rn > 1
+  LOOP
+    UPDATE tree_nodes SET position = r.position + 1 WHERE id = r.id;
+  END LOOP;
+END $$;
+
+-- 5) position UNIQUE 부분 인덱스 (NULL 처리)
 -- PostgreSQL에서 UNIQUE 제약은 NULL을 distinct로 처리하므로 부분 인덱스 2개 사용
 CREATE UNIQUE INDEX IF NOT EXISTS uidx_tree_nodes_root_pos
   ON tree_nodes(position)
