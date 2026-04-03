@@ -61,6 +61,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       "  • numbering=true: prepends hierarchical numbering (1, 1.1, 1.1.1, …) to each heading. Root node is unnumbered; children start at 1.",
       "  • max_chars: truncates output to at most N characters (on a line boundary) and appends <!-- truncated: M chars omitted -->. 0 or negative = no limit.",
       "  • exclude_nodes: array of node_id UUIDs whose subtrees are entirely skipped. Unknown IDs are silently ignored. If the root node itself is excluded, returns an empty string.",
+      "  • Symlink nodes are prefixed with ~ in the title to distinguish them from canonical nodes.",
       "Common combinations: titles_only + include_ids gives an ID-annotated outline; titles_only + max_chars caps large tree overviews.",
     ].join("\n"),
     {
