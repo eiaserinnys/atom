@@ -1,4 +1,9 @@
 import type { Card, TreeNode } from "./types.js";
+import type { UnfurlResult } from "../unfurl/interface.js";
+
+export type ResolvedRef =
+  | { ok: true; result: UnfurlResult; sourceType: string }
+  | { ok: false; error: string; sourceType: string };
 
 export interface CompileOptions {
   includeIds?: boolean;
@@ -6,6 +11,7 @@ export interface CompileOptions {
   numbering?: boolean;
   maxChars?: number;
   excludeNodes?: Set<string>; // node_id Set
+  resolvedRefs?: Map<string, ResolvedRef>; // cardId → resolved
 }
 
 function buildMetaComment(
@@ -134,6 +140,17 @@ export function compileNode(
     }
     if (card.content) {
       lines.push(card.content);
+    }
+    // Append unfurl result if available
+    if (options.resolvedRefs) {
+      const resolved = options.resolvedRefs.get(card_id);
+      if (resolved) {
+        if (resolved.ok) {
+          lines.push(resolved.result.text);
+        } else {
+          lines.push(`<!-- unfurl failed: ${resolved.sourceType} -->`);
+        }
+      }
     }
   }
 

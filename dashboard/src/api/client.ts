@@ -46,6 +46,25 @@ export interface CardData {
   updated_at: string;
 }
 
+export interface CredentialField {
+  key: string;
+  label: string;
+  hint?: string;
+  secret: boolean;
+}
+
+export interface AdapterInfo {
+  sourceType: string;
+  credentialFields: CredentialField[];
+}
+
+export interface UnfurlEntry {
+  ok: boolean;
+  data?: Record<string, unknown> | null;
+  error?: string;
+  sourceType: string;
+}
+
 export interface SearchResult {
   card_id: string;
   node_id: string;
@@ -98,6 +117,22 @@ export const api = {
     if (options?.exclude_nodes?.length) params.set("exclude_nodes", options.exclude_nodes.join(","));
     const qs = params.toString();
     return request(`/tree/${nodeId}/compile${qs ? `?${qs}` : ""}`);
+  },
+
+  getAdapters(): Promise<{ adapters: AdapterInfo[] }> {
+    return request('/api/unfurl/adapters');
+  },
+
+  compileWithRefs(
+    nodeId: string,
+    depth: number,
+    resolveRefs: 'cached' | 'fresh',
+    credentials: Record<string, Record<string, string>>
+  ): Promise<{ markdown: string; unfurls?: Record<string, UnfurlEntry> }> {
+    return request(`/tree/${nodeId}/compile`, {
+      method: 'POST',
+      body: JSON.stringify({ depth, resolveRefs, credentials }),
+    });
   },
 
   search(q: string): Promise<SearchResult[]> {

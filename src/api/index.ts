@@ -9,11 +9,14 @@ import { authRoutes } from "./routes/auth.js";
 import { eventsRoutes } from "./routes/events.js";
 import { batchRoutes } from "./routes/batch.js";
 import { configRoutes } from "./routes/config.js";
+import { unfurlRoutes } from "./routes/unfurl.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { runMigrations, getPool } from "../db/client.js";
 import { config } from "dotenv";
+import { loadAdapters } from "../unfurl/loader.js";
+import { adapterRegistry } from "../unfurl/registry.js";
 import { userExists, insertUser } from "../db/queries/users.js";
 import { findAgentByAgentId, insertAgent } from "../db/queries/agents.js";
 import bcrypt from "bcryptjs";
@@ -39,6 +42,7 @@ app.register(mcpRoutes);
 app.register(eventsRoutes);
 app.register(batchRoutes);
 app.register(configRoutes);
+app.register(unfurlRoutes);
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {
@@ -71,6 +75,7 @@ async function seedMigration(): Promise<void> {
 const start = async (): Promise<void> => {
   await runMigrations(path.join(__dirname, "../db/migrations"));
   await seedMigration();
+  await loadAdapters(adapterRegistry);
   await app.listen({ port, host: "0.0.0.0" });
 };
 

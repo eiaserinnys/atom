@@ -7,9 +7,12 @@ import {
   insertNode,
   moveNode as moveNodeQuery,
 } from "../db/queries/tree.js";
-import { selectCardById } from "../db/queries/cards.js";
-import { compileNode, type CompileOptions } from "../shared/bfs.js";
+import { selectCardById, updateCardSnapshot } from "../db/queries/cards.js";
+import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
 import type { Card, TreeNode, TreeNodeWithCard } from "../shared/types.js";
+import type { UnfurlCredentials } from "../unfurl/interface.js";
+import { adapterRegistry } from "../unfurl/registry.js";
+import { parseSnapshot } from "../unfurl/utils.js";
 import { eventBus } from "../events/eventBus.js";
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
@@ -34,11 +37,59 @@ export async function listChildren(
   return results;
 }
 
+async function resolveRefs(
+  cardCache: Map<string, Card>,
+  mode: "cached" | "fresh",
+  credentials: Record<string, UnfurlCredentials>
+): Promise<Map<string, ResolvedRef>> {
+  const db = getPool();
+  const resolved = new Map<string, ResolvedRef>();
+  await Promise.allSettled(
+    Array.from(cardCache.entries()).map(async ([cardId, card]) => {
+      if (!card.source_ref || !card.source_type) return;
+      const adapter = adapterRegistry.find(card.source_type);
+      if (!adapter) return; // 어댑터 없으면 skip
+      const creds = credentials[card.source_type] ?? {};
+
+      if (mode === "cached" && card.source_snapshot) {
+        // 캐시 히트: snapshot을 파싱하여 재사용
+        try {
+          const result = parseSnapshot(card.source_snapshot);
+          resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
+        } catch (e) {
+          resolved.set(cardId, { ok: false, error: String(e), sourceType: card.source_type });
+        }
+        return;
+      }
+
+      // 캐시 미스 또는 'fresh' 모드: adapter.resolve() 호출
+      try {
+        const result = await adapter.resolve(card.source_ref, creds);
+        resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
+        // fire-and-forget: snapshot write-back
+        updateCardSnapshot(db, cardId, result.snapshot).catch((e) =>
+          console.error("[unfurl] snapshot write failed", e)
+        );
+      } catch (e) {
+        resolved.set(cardId, { ok: false, error: String(e), sourceType: card.source_type });
+      }
+    })
+  );
+  return resolved;
+}
+
+export interface CompileResult {
+  markdown: string;
+  unfurls?: Record<string, { ok: boolean; data?: Record<string, unknown> | null; error?: string; sourceType: string }>;
+}
+
 export async function compileSubtree(
   nodeId: string,
   depth: number = 2,
-  options: CompileOptions = {}
-): Promise<string> {
+  options: CompileOptions = {},
+  resolveRefsMode?: false | "cached" | "fresh",
+  credentials?: Record<string, UnfurlCredentials>
+): Promise<CompileResult> {
   const db = getPool();
 
   // Cache nodes and cards fetched during this compile to avoid repeated DB calls
@@ -82,6 +133,16 @@ export async function compileSubtree(
 
   await preloadSubtree(nodeId, depth);
 
+  let resolvedRefsMap: Map<string, ResolvedRef> | undefined;
+  if (resolveRefsMode !== undefined && resolveRefsMode !== false) {
+    resolvedRefsMap = await resolveRefs(
+      cardCache,
+      resolveRefsMode,
+      credentials ?? {}
+    );
+    options = { ...options, resolvedRefs: resolvedRefsMap };
+  }
+
   function getNodeCard(nid: string): { card_id: string; is_symlink: boolean } {
     const node = nodeCache.get(nid);
     if (!node) throw new Error(`Node not found: ${nid}`);
@@ -115,18 +176,39 @@ export async function compileSubtree(
     return card;
   }
 
-  let result = compileNode(nodeId, getNodeCard, getChildrenSync, getCardSync, depth, new Set(), 1, options);
+  let markdown = compileNode(nodeId, getNodeCard, getChildrenSync, getCardSync, depth, new Set(), 1, options);
 
   // max_chars post-processing
-  if (options.maxChars && options.maxChars > 0 && result.length > options.maxChars) {
-    const truncated = result.slice(0, options.maxChars);
+  if (options.maxChars && options.maxChars > 0 && markdown.length > options.maxChars) {
+    const truncated = markdown.slice(0, options.maxChars);
     const lastNewline = truncated.lastIndexOf("\n");
     const cleanCut = lastNewline > 0 ? truncated.slice(0, lastNewline) : truncated;
-    const omittedChars = result.length - cleanCut.length;
-    result = cleanCut + `\n<!-- truncated: ${omittedChars} chars omitted -->`;
+    const omittedChars = markdown.length - cleanCut.length;
+    markdown = cleanCut + `\n<!-- truncated: ${omittedChars} chars omitted -->`;
   }
 
-  return result;
+  // Build unfurls map: cardId → {ok, data, error, sourceType}
+  let unfurls: CompileResult["unfurls"] | undefined;
+  if (resolvedRefsMap && resolvedRefsMap.size > 0) {
+    unfurls = {};
+    for (const [cardId, resolved] of resolvedRefsMap.entries()) {
+      if (resolved.ok) {
+        unfurls[cardId] = {
+          ok: true,
+          data: resolved.result.unfurlData,
+          sourceType: resolved.sourceType,
+        };
+      } else {
+        unfurls[cardId] = {
+          ok: false,
+          error: resolved.error,
+          sourceType: resolved.sourceType,
+        };
+      }
+    }
+  }
+
+  return { markdown, ...(unfurls ? { unfurls } : {}) };
 }
 
 export async function createSymlink(

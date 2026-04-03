@@ -4,6 +4,10 @@
   "description": "Atom knowledge card system — MCP-first, PostgreSQL backend",
   "type": "module",
   "main": "dist/api/index.js",
+  "exports": {
+    ".": "./dist/api/index.js",
+    "./unfurl": "./dist/unfurl/interface.js"
+  },
   "scripts": {
     "build": "tsc && cp -r src/db/migrations dist/db/migrations",
     "start": "node dist/api/index.js",

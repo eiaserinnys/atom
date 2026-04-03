@@ -8,6 +8,8 @@ import { registerSearchTools } from "./tools/search_tools.js";
 import { registerBatchTools } from "./tools/batch_tools.js";
 import { runMigrations } from "../db/client.js";
 import { config } from "dotenv";
+import { loadAdapters } from "../unfurl/loader.js";
+import { adapterRegistry } from "../unfurl/registry.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,6 +17,7 @@ config({ path: path.join(__dirname, "../../.env") });
 
 async function main(): Promise<void> {
   await runMigrations(path.join(__dirname, "../db/migrations"));
+  await loadAdapters(adapterRegistry);
 
   const server = new McpServer({
     name: "atom",
