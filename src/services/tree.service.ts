@@ -78,13 +78,18 @@ async function resolveRefs(
   return resolved;
 }
 
+export interface CompileResult {
+  markdown: string;
+  unfurls?: Record<string, { ok: boolean; data?: Record<string, unknown> | null; error?: string; sourceType: string }>;
+}
+
 export async function compileSubtree(
   nodeId: string,
   depth: number = 2,
   options: CompileOptions = {},
   resolveRefsMode?: false | "cached" | "fresh",
   credentials?: Record<string, UnfurlCredentials>
-): Promise<string> {
+): Promise<CompileResult> {
   const db = getPool();
 
   // Cache nodes and cards fetched during this compile to avoid repeated DB calls
@@ -128,14 +133,14 @@ export async function compileSubtree(
 
   await preloadSubtree(nodeId, depth);
 
+  let resolvedRefsMap: Map<string, ResolvedRef> | undefined;
   if (resolveRefsMode !== undefined && resolveRefsMode !== false) {
-    const resolvedRefs = await resolveRefs(
+    resolvedRefsMap = await resolveRefs(
       cardCache,
       resolveRefsMode,
       credentials ?? {}
     );
-    options = { ...options, resolvedRefs };
-    // snapshot write-back은 Phase 2에서 구현
+    options = { ...options, resolvedRefs: resolvedRefsMap };
   }
 
   function getNodeCard(nid: string): { card_id: string; is_symlink: boolean } {
@@ -171,18 +176,39 @@ export async function compileSubtree(
     return card;
   }
 
-  let result = compileNode(nodeId, getNodeCard, getChildrenSync, getCardSync, depth, new Set(), 1, options);
+  let markdown = compileNode(nodeId, getNodeCard, getChildrenSync, getCardSync, depth, new Set(), 1, options);
 
   // max_chars post-processing
-  if (options.maxChars && options.maxChars > 0 && result.length > options.maxChars) {
-    const truncated = result.slice(0, options.maxChars);
+  if (options.maxChars && options.maxChars > 0 && markdown.length > options.maxChars) {
+    const truncated = markdown.slice(0, options.maxChars);
     const lastNewline = truncated.lastIndexOf("\n");
     const cleanCut = lastNewline > 0 ? truncated.slice(0, lastNewline) : truncated;
-    const omittedChars = result.length - cleanCut.length;
-    result = cleanCut + `\n<!-- truncated: ${omittedChars} chars omitted -->`;
+    const omittedChars = markdown.length - cleanCut.length;
+    markdown = cleanCut + `\n<!-- truncated: ${omittedChars} chars omitted -->`;
   }
 
-  return result;
+  // Build unfurls map: cardId → {ok, data, error, sourceType}
+  let unfurls: CompileResult["unfurls"] | undefined;
+  if (resolvedRefsMap && resolvedRefsMap.size > 0) {
+    unfurls = {};
+    for (const [cardId, resolved] of resolvedRefsMap.entries()) {
+      if (resolved.ok) {
+        unfurls[cardId] = {
+          ok: true,
+          data: resolved.result.unfurlData,
+          sourceType: resolved.sourceType,
+        };
+      } else {
+        unfurls[cardId] = {
+          ok: false,
+          error: resolved.error,
+          sourceType: resolved.sourceType,
+        };
+      }
+    }
+  }
+
+  return { markdown, ...(unfurls ? { unfurls } : {}) };
 }
 
 export async function createSymlink(

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy } from 'lucide-react';
-import { api } from '../../api/client';
+import { Copy, Link2 } from 'lucide-react';
+import { api, type UnfurlEntry } from '../../api/client';
+import { useAdapters } from '../../hooks/useAdapters';
+import { UnfurlSectionList } from '../UnfurlSection';
 
 interface CompileViewProps {
   nodeId: string | null;
@@ -18,14 +20,34 @@ interface TocEntry {
 const TOC_WIDTH = 200;
 
 export function CompileView({ nodeId }: CompileViewProps) {
-  const { data: markdown, isLoading, error } = useQuery({
+  const [unfurlEnabled, setUnfurlEnabled] = useState(false);
+  const [credentials, setCredentials] = useState<Record<string, Record<string, string>>>({});
+  const { adapters } = useAdapters();
+
+  // Standard compile (GET) — used when unfurl is disabled
+  const standardQuery = useQuery({
     queryKey: ['compile', nodeId],
     queryFn: async () => {
       const result = await api.compile(nodeId!, { numbering: true });
-      return result.markdown;
+      return { markdown: result.markdown };
     },
-    enabled: !!nodeId,
+    enabled: !!nodeId && !unfurlEnabled,
   });
+
+  // Unfurl compile (POST) — used when unfurl is enabled
+  const unfurlQuery = useQuery({
+    queryKey: ['compile-unfurl', nodeId, credentials],
+    queryFn: async () => {
+      return api.compileWithRefs(nodeId!, 2, 'cached', credentials);
+    },
+    enabled: !!nodeId && unfurlEnabled,
+  });
+
+  const activeQuery = unfurlEnabled ? unfurlQuery : standardQuery;
+  const markdown = activeQuery.data?.markdown;
+  const isLoading = activeQuery.isLoading;
+  const error = activeQuery.error;
+  const unfurls = unfurlEnabled ? (unfurlQuery.data?.unfurls ?? null) : null;
 
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -37,7 +59,6 @@ export function CompileView({ nodeId }: CompileViewProps) {
   useEffect(() => {
     if (!contentRef.current || !markdown) return;
 
-    // Wait for react-markdown to render
     const timer = setTimeout(() => {
       const el = contentRef.current;
       if (!el) return;
@@ -100,11 +121,17 @@ export function CompileView({ nodeId }: CompileViewProps) {
     }
   }, []);
 
-  // Min heading level for indent calculation
   const minLevel = useMemo(
     () => Math.min(...tocEntries.map((e) => e.level), 1),
     [tocEntries]
   );
+
+  const handleCredentialChange = (sourceType: string, key: string, value: string) => {
+    setCredentials((prev) => ({
+      ...prev,
+      [sourceType]: { ...(prev[sourceType] ?? {}), [key]: value },
+    }));
+  };
 
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
@@ -122,9 +149,49 @@ export function CompileView({ nodeId }: CompileViewProps) {
             >
               <Copy className="w-3 h-3" />
             </button>
+            <button
+              onClick={() => setUnfurlEnabled((v) => !v)}
+              className={`p-1 rounded text-muted-foreground transition-colors ${
+                unfurlEnabled ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
+              }`}
+              title={unfurlEnabled ? '외부 참조 조회 끄기' : '외부 참조 조회 켜기'}
+            >
+              <Link2 className="w-3 h-3" />
+            </button>
           </div>
         )}
       </div>
+
+      {/* Credentials panel — shown when unfurl is enabled and adapters exist */}
+      {unfurlEnabled && adapters.length > 0 && (
+        <div className="px-4 py-3 border-b border-border bg-muted/30 space-y-2">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            외부 참조 인증
+          </div>
+          {adapters.map((adapter) => (
+            <div key={adapter.sourceType} className="space-y-1">
+              <div className="text-xs font-medium text-foreground capitalize">{adapter.sourceType}</div>
+              {adapter.credentialFields.map((field) => (
+                <div key={field.key} className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground w-24 shrink-0">
+                    {field.label}
+                  </label>
+                  <input
+                    type={field.secret ? 'password' : 'text'}
+                    placeholder={field.hint ?? ''}
+                    value={credentials[adapter.sourceType]?.[field.key] ?? ''}
+                    onChange={(e) =>
+                      handleCredentialChange(adapter.sourceType, field.key, e.target.value)
+                    }
+                    className="flex-1 text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden relative">
         {/* TOC hover zone — right edge */}
         {tocEntries.length > 0 && (
@@ -176,34 +243,38 @@ export function CompileView({ nodeId }: CompileViewProps) {
         )}
 
         <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
-        <div className="p-4" ref={contentRef}>
-          {!nodeId && (
-            <div className="text-muted-foreground text-sm">노드를 선택하면 컴파일된 문서가 표시됩니다.</div>
-          )}
-          {isLoading && <div className="text-muted-foreground text-sm">컴파일 중...</div>}
-          {error && <div className="text-node-error text-sm">오류: {error.message}</div>}
-          {markdown && !isLoading && (
-            <div className="
-              text-foreground text-base leading-[1.7]
-              [&_h1]:mt-4 [&_h1]:mb-[0.4em] [&_h1]:font-semibold [&_h1]:text-[1.4em]
-              [&_h2]:mt-[1.4em] [&_h2]:mb-[0.4em] [&_h2]:font-semibold [&_h2]:text-[1.2em]
-              [&_h3]:mt-[1.4em] [&_h3]:mb-[0.4em] [&_h3]:font-semibold [&_h3]:text-[1.05em]
-              [&_h4]:mt-[1.4em] [&_h4]:mb-[0.4em] [&_h4]:font-semibold
-              [&_p]:mb-[0.8em]
-              [&_ul]:mb-[0.8em] [&_ul]:pl-6
-              [&_ol]:mb-[0.8em] [&_ol]:pl-6
-              [&_li]:mb-[0.2em]
-              [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:bg-muted [&_code]:border [&_code]:border-border [&_code]:rounded [&_code]:px-[0.35em] [&_code]:py-[0.1em]
-              [&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:mb-[1em]
-              [&_pre_code]:bg-transparent [&_pre_code]:border-0 [&_pre_code]:p-0 [&_pre_code]:text-[0.88em]
-              [&_blockquote]:border-l-[3px] [&_blockquote]:border-border [&_blockquote]:ml-0 [&_blockquote]:mb-[0.8em] [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground
-              [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_hr]:my-4
-              [&_a]:text-node-user [&_a]:no-underline hover:[&_a]:underline
-            ">
-              <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
-            </div>
-          )}
-        </div>
+          <div className="p-4" ref={contentRef}>
+            {!nodeId && (
+              <div className="text-muted-foreground text-sm">노드를 선택하면 컴파일된 문서가 표시됩니다.</div>
+            )}
+            {isLoading && <div className="text-muted-foreground text-sm">컴파일 중...</div>}
+            {error && <div className="text-node-error text-sm">오류: {(error as Error).message}</div>}
+            {markdown && !isLoading && (
+              <div className="
+                text-foreground text-base leading-[1.7]
+                [&_h1]:mt-4 [&_h1]:mb-[0.4em] [&_h1]:font-semibold [&_h1]:text-[1.4em]
+                [&_h2]:mt-[1.4em] [&_h2]:mb-[0.4em] [&_h2]:font-semibold [&_h2]:text-[1.2em]
+                [&_h3]:mt-[1.4em] [&_h3]:mb-[0.4em] [&_h3]:font-semibold [&_h3]:text-[1.05em]
+                [&_h4]:mt-[1.4em] [&_h4]:mb-[0.4em] [&_h4]:font-semibold
+                [&_p]:mb-[0.8em]
+                [&_ul]:mb-[0.8em] [&_ul]:pl-6
+                [&_ol]:mb-[0.8em] [&_ol]:pl-6
+                [&_li]:mb-[0.2em]
+                [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:bg-muted [&_code]:border [&_code]:border-border [&_code]:rounded [&_code]:px-[0.35em] [&_code]:py-[0.1em]
+                [&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:mb-[1em]
+                [&_pre_code]:bg-transparent [&_pre_code]:border-0 [&_pre_code]:p-0 [&_pre_code]:text-[0.88em]
+                [&_blockquote]:border-l-[3px] [&_blockquote]:border-border [&_blockquote]:ml-0 [&_blockquote]:mb-[0.8em] [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground
+                [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_hr]:my-4
+                [&_a]:text-node-user [&_a]:no-underline hover:[&_a]:underline
+              ">
+                <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+              </div>
+            )}
+
+            {unfurls && Object.keys(unfurls).length > 0 && (
+              <UnfurlSectionList unfurls={unfurls as Record<string, UnfurlEntry>} />
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -51,14 +51,14 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       const excludeNodes = excludeNodesRaw
         ? new Set(excludeNodesRaw.split(",").map((s) => s.trim()))
         : undefined;
-      const markdown = await compileSubtree(req.params.nodeId, depth, {
+      const result = await compileSubtree(req.params.nodeId, depth, {
         includeIds: includeIds || undefined,
         titlesOnly: titlesOnly || undefined,
         numbering: numbering || undefined,
         maxChars: maxChars,
         excludeNodes: excludeNodes,
       });
-      return { markdown };
+      return { markdown: result.markdown };
     }
   );
 
@@ -70,14 +70,14 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       const depth = typeof body["depth"] === "number" ? body["depth"] : 2;
       const resolveRefs = (body["resolveRefs"] as "cached" | "fresh" | undefined) ?? undefined;
       const credentials = (body["credentials"] as Record<string, Record<string, string>> | undefined) ?? undefined;
-      const markdown = await compileSubtree(
+      const result = await compileSubtree(
         req.params.nodeId,
         depth,
         {},
         resolveRefs,
         credentials
       );
-      return { markdown };
+      return result;
     }
   );
 

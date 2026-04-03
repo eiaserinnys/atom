@@ -76,14 +76,14 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       credentials: z.record(z.string(), z.record(z.string(), z.string())).optional().describe("Credentials per source_type, e.g. { trello: { apiKey: '...', token: '...' } }."),
     },
     async ({ node_id, depth, include_ids, titles_only, numbering, max_chars, exclude_nodes, resolve_refs, credentials }) => {
-      const markdown = await compileSubtree(node_id, depth ?? 2, {
+      const result = await compileSubtree(node_id, depth ?? 2, {
         includeIds: include_ids,
         titlesOnly: titles_only,
         numbering,
         maxChars: max_chars,
         excludeNodes: exclude_nodes ? new Set(exclude_nodes) : undefined,
       }, resolve_refs, credentials);
-      return { content: [{ type: "text", text: markdown }] };
+      return { content: [{ type: "text", text: result.markdown }] };
     }
   );
 
