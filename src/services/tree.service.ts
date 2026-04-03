@@ -7,11 +7,12 @@ import {
   insertNode,
   moveNode as moveNodeQuery,
 } from "../db/queries/tree.js";
-import { selectCardById } from "../db/queries/cards.js";
+import { selectCardById, updateCardSnapshot } from "../db/queries/cards.js";
 import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
 import type { Card, TreeNode, TreeNodeWithCard } from "../shared/types.js";
 import type { UnfurlCredentials } from "../unfurl/interface.js";
 import { adapterRegistry } from "../unfurl/registry.js";
+import { parseSnapshot } from "../unfurl/utils.js";
 import { eventBus } from "../events/eventBus.js";
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
@@ -41,17 +42,34 @@ async function resolveRefs(
   mode: "cached" | "fresh",
   credentials: Record<string, UnfurlCredentials>
 ): Promise<Map<string, ResolvedRef>> {
+  const db = getPool();
   const resolved = new Map<string, ResolvedRef>();
   await Promise.allSettled(
     Array.from(cardCache.entries()).map(async ([cardId, card]) => {
       if (!card.source_ref || !card.source_type) return;
-      // 'cached' 모드: snapshot 있으면 그대로 사용 (Phase 2에서 구체화)
       const adapter = adapterRegistry.find(card.source_type);
       if (!adapter) return; // 어댑터 없으면 skip
       const creds = credentials[card.source_type] ?? {};
+
+      if (mode === "cached" && card.source_snapshot) {
+        // 캐시 히트: snapshot을 파싱하여 재사용
+        try {
+          const result = parseSnapshot(card.source_snapshot);
+          resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
+        } catch (e) {
+          resolved.set(cardId, { ok: false, error: String(e), sourceType: card.source_type });
+        }
+        return;
+      }
+
+      // 캐시 미스 또는 'fresh' 모드: adapter.resolve() 호출
       try {
         const result = await adapter.resolve(card.source_ref, creds);
         resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
+        // fire-and-forget: snapshot write-back
+        updateCardSnapshot(db, cardId, result.snapshot).catch((e) =>
+          console.error("[unfurl] snapshot write failed", e)
+        );
       } catch (e) {
         resolved.set(cardId, { ok: false, error: String(e), sourceType: card.source_type });
       }

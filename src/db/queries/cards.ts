@@ -170,6 +170,21 @@ export async function deleteCardById(
   return (result.rowCount ?? 0) > 0;
 }
 
+export async function updateCardSnapshot(
+  db: Queryable,
+  cardId: string,
+  snapshot: string
+): Promise<void> {
+  await db.query(
+    `UPDATE cards
+     SET source_snapshot = $1,
+         source_checked_at = NOW(),
+         staleness = 'fresh'
+     WHERE id = $2`,
+    [snapshot, cardId]
+  );
+}
+
 export async function searchCards(
   db: Queryable,
   query: string,

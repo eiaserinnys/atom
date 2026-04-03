@@ -1,6 +1,11 @@
 import type { AdapterRegistry } from "./registry.js";
+import { trelloAdapter } from "./adapters/trello/index.js";
 
 export async function loadAdapters(registry: AdapterRegistry): Promise<void> {
+  // Register built-in adapters
+  registry.register(trelloAdapter);
+
+  // Load external adapter packages from environment
   const packages = process.env["ADAPTER_PACKAGES"]?.split(",").map((p) => p.trim()) ?? [];
   for (const pkg of packages) {
     try {
