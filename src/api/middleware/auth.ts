@@ -29,7 +29,7 @@ export async function authMiddleware(
   // Auth routes, MCP endpoint, and well-known discovery are always accessible
   // (MCP handles its own auth via Bearer token; well-known must be publicly reachable
   //  so MCP clients don't fall back to OAuth discovery)
-  if (req.url.startsWith('/api/auth/') || req.url.startsWith('/mcp') || req.url.startsWith('/.well-known/')) return;
+  if (req.url.startsWith('/api/auth/') || req.url.startsWith('/mcp') || req.url.startsWith('/.well-known/') || req.url === '/register') return;
 
   // Bypass mode: no GOOGLE_CLIENT_ID → allow all requests
   const clientId = process.env['GOOGLE_CLIENT_ID'];
