@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Copy } from 'lucide-react';
 import { api } from '../../api/client';
 
 interface CompileViewProps {
@@ -27,6 +28,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
   });
 
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [tocEntries, setTocEntries] = useState<TocEntry[]>([]);
   const [tocVisible, setTocVisible] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
   // Track active heading on scroll (RAF-throttled)
   const rafRef = useRef(0);
   useEffect(() => {
-    const container = contentRef.current?.parentElement;
+    const container = scrollContainerRef.current;
     if (!container || tocEntries.length === 0) return;
 
     const handleScroll = () => {
@@ -106,18 +108,24 @@ export function CompileView({ nodeId }: CompileViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
-      <div className="flex items-center px-4 py-3 border-b border-border text-xs text-muted-foreground font-medium shrink-0">
+      <div className="flex items-center px-4 py-3 border-b border-border text-xs font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
         컴파일 문서 (BFS+2)
         {nodeId && (
-          <span
-            className="ml-2 px-2 py-0.5 text-xs font-mono bg-muted border border-border rounded-md text-muted-foreground select-all"
-            title="클릭하여 선택 (UUID 앞 8자리)"
-          >
-            {nodeId.slice(0, 8)}
-          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <span className="px-2 py-0.5 text-xs font-mono bg-muted border border-border rounded-md text-muted-foreground">
+              {nodeId.slice(0, 8)}
+            </span>
+            <button
+              onClick={() => navigator.clipboard.writeText(nodeId)}
+              className="p-1 rounded hover:bg-muted text-muted-foreground"
+              title="ID 복사"
+            >
+              <Copy className="w-3 h-3" />
+            </button>
+          </div>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto relative">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* TOC hover zone — right edge */}
         {tocEntries.length > 0 && (
           <div
@@ -167,6 +175,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
           </div>
         )}
 
+        <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
         <div className="p-4" ref={contentRef}>
           {!nodeId && (
             <div className="text-muted-foreground text-sm">노드를 선택하면 컴파일된 문서가 표시됩니다.</div>
@@ -176,7 +185,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
           {markdown && !isLoading && (
             <div className="
               text-foreground text-base leading-[1.7]
-              [&_h1]:mt-[1.4em] [&_h1]:mb-[0.4em] [&_h1]:font-semibold [&_h1]:text-[1.4em]
+              [&_h1]:mt-4 [&_h1]:mb-[0.4em] [&_h1]:font-semibold [&_h1]:text-[1.4em]
               [&_h2]:mt-[1.4em] [&_h2]:mb-[0.4em] [&_h2]:font-semibold [&_h2]:text-[1.2em]
               [&_h3]:mt-[1.4em] [&_h3]:mb-[0.4em] [&_h3]:font-semibold [&_h3]:text-[1.05em]
               [&_h4]:mt-[1.4em] [&_h4]:mb-[0.4em] [&_h4]:font-semibold
@@ -194,6 +203,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
               <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
