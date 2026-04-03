@@ -5,10 +5,12 @@ import type { AtomEvent } from "../../events/eventBus.js";
 export async function eventsRoutes(app: FastifyInstance): Promise<void> {
   // GET /events — SSE endpoint for real-time atom events
   app.get("/events", async (req, reply) => {
+    const frontendUrl = process.env["FRONTEND_URL"];
     reply.raw.setHeader("Content-Type", "text/event-stream");
     reply.raw.setHeader("Cache-Control", "no-cache");
     reply.raw.setHeader("Connection", "keep-alive");
-    reply.raw.setHeader("Access-Control-Allow-Origin", "*");
+    reply.raw.setHeader("Access-Control-Allow-Origin", frontendUrl || "*");
+    reply.raw.setHeader("Access-Control-Allow-Credentials", "true");
     reply.raw.flushHeaders();
 
     const listener = (event: AtomEvent) => {
