@@ -11,11 +11,10 @@ import type { FastifyInstance } from "fastify";
 
 export async function mcpRoutes(app: FastifyInstance): Promise<void> {
   app.post("/mcp", async (request, reply) => {
-    const authHeader = request.headers['authorization'];
-    if (!authHeader?.startsWith('Bearer ')) {
-      return reply.status(401).send({ error: 'Unauthorized' });
+    const secret = request.headers['x-api-key'] as string | undefined;
+    if (!secret) {
+      return reply.status(401).send({ error: 'Unauthorized: x-api-key header required' });
     }
-    const secret = authHeader.slice(7);
 
     const agents = await findActiveAgents(getPool());
     const agent = (await Promise.all(
