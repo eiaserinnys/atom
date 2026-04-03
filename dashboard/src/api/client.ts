@@ -62,7 +62,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   if (res.status === 401) {
-    window.location.href = `${BASE_URL}/api/auth/google`;
+    window.location.href = '/';
     throw new Error('Unauthorized');
   }
   if (!res.ok) {
