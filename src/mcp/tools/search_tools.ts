@@ -6,10 +6,10 @@ export function registerSearchTools(server: McpServer): void {
   // search_cards
   server.tool(
     "search_cards",
-    "BM25 full-text search on title, content, and tags. Sorted by ts_rank.",
+    "Full-text search across card titles, content, and tags using PostgreSQL BM25 ranking (ts_rank). Returns cards sorted by relevance. Supports natural language queries and PostgreSQL tsquery operators (& for AND, | for OR).",
     {
-      query: z.string(),
-      limit: z.number().int().optional(),
+      query: z.string().describe("Search query. Natural language or tsquery syntax (e.g. 'design & principles')."),
+      limit: z.number().int().optional().describe("Max results to return (default 20)."),
     },
     async ({ query, limit }) => {
       const results = await searchCards(query, limit ?? 20);

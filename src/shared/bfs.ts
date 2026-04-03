@@ -2,10 +2,18 @@ import type { Card, TreeNode } from "./types.js";
 
 export interface CompileOptions {
   includeIds?: boolean;
+  titlesOnly?: boolean;
+  maxChars?: number;
+  excludeNodes?: Set<string>; // node_id Set
 }
 
-function buildMetaComment(nodeId: string, card: Card): string {
-  const parts = [`node:${nodeId}`, `card:${card.id}`];
+function buildMetaComment(
+  nodeId: string,
+  card: Card,
+  depth: number,
+  chars?: number
+): string {
+  const parts = [`node:${nodeId}`, `card:${card.id}`, `depth:${depth}`];
   if (card.card_timestamp) {
     const ts = typeof card.card_timestamp === "string"
       ? card.card_timestamp
@@ -17,6 +25,9 @@ function buildMetaComment(nodeId: string, card: Card): string {
   }
   if (card.source_type) {
     parts.push(`source:${card.source_type}`);
+  }
+  if (chars !== undefined) {
+    parts.push(`chars:${chars}`);
   }
   return `<!-- ${parts.join(" ")} -->`;
 }
@@ -73,27 +84,48 @@ export function compileNode(
   headingLevel: number = 1,
   options: CompileOptions = {}
 ): string {
+  // exclude_nodes — skip this node and all descendants
+  if (options.excludeNodes?.has(nodeId)) {
+    return "";
+  }
+
   const { card_id, is_symlink } = getNodeCard(nodeId);
+  const currentDepth = headingLevel - 1; // root is depth 0
 
   // Cycle detection — no metadata comment on cycle nodes
   if (visited.has(card_id)) {
     const card = getCard(card_id);
+    if (options.titlesOnly) {
+      const indent = "  ".repeat(currentDepth);
+      const prefix = currentDepth === 0 ? "" : "├── ";
+      return `${indent}${prefix}${card.title} *(cycle)*`;
+    }
     const heading = "#".repeat(Math.min(headingLevel, 6));
     return `${heading} ${card.title} *(cycle)*`;
   }
 
   const card = getCard(card_id);
-  const heading = "#".repeat(Math.min(headingLevel, 6));
+  const contentChars = card.content?.length ?? 0;
 
-  // Build this node's markdown
+  // Build this node's output line
   const lines: string[] = [];
-  if (options.includeIds) {
-    lines.push(`${heading} ${card.title} ${buildMetaComment(nodeId, card)}`);
+  if (options.titlesOnly) {
+    const indent = "  ".repeat(currentDepth);
+    const prefix = currentDepth === 0 ? "" : "├── ";
+    const metaComment = options.includeIds
+      ? " " + buildMetaComment(nodeId, card, currentDepth, contentChars)
+      : ` (${contentChars} chars)`;
+    lines.push(`${indent}${prefix}${card.title}${metaComment}`);
   } else {
-    lines.push(`${heading} ${card.title}`);
-  }
-  if (card.content) {
-    lines.push(card.content);
+    const heading = "#".repeat(Math.min(headingLevel, 6));
+    if (options.includeIds) {
+      lines.push(`${heading} ${card.title} ${buildMetaComment(nodeId, card, currentDepth)}`);
+    } else {
+      lines.push(`${heading} ${card.title}`);
+    }
+    if (card.content) {
+      lines.push(card.content);
+    }
   }
 
   // No children if depth exhausted

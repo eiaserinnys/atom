@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { executeBatchWrite } from "../../services/batch.service.js";
+import { executeBatchOp } from "../../services/batch.service.js";
 
 const batchCreateItemSchema = z.object({
   temp_id: z.string(),
@@ -14,6 +14,12 @@ const batchCreateItemSchema = z.object({
   source_ref: z.string().nullable().optional(),
   parent_node_id: z.string().uuid().nullable().optional(),
   parent_temp_id: z.string().optional(),
+  position: z.number().int().optional(),
+});
+
+const batchSymlinkItemSchema = z.object({
+  card_id: z.string().uuid(),
+  parent_node_id: z.string().uuid().nullable(),
   position: z.number().int().optional(),
 });
 
@@ -45,21 +51,35 @@ const batchDeleteItemSchema = z.object({
 
 export function registerBatchTools(server: McpServer, agentId: string): void {
   server.tool(
-    "batch_write",
+    "batch_op",
     [
-      "Execute multiple card operations (creates/updates/moves/deletes) in a single atomic transaction.",
-      "Use temp_id to reference newly-created nodes within the same batch as parent_temp_id.",
-      "All operations succeed or all are rolled back.",
-    ].join(" "),
+      "Execute multiple card/tree operations in a single atomic transaction. All succeed or all are rolled back.",
+      "Execution order: creates → symlinks → updates → moves → deletes.",
+      "",
+      "temp_id referencing:",
+      "  • Each create item has a temp_id (any string, e.g. 't1').",
+      "  • Other creates, symlinks, and moves can reference it via parent_temp_id to place nodes under the newly created card.",
+      "  • temp_id is resolved to the real node_id after the create step.",
+      "",
+      "symlinks: create symlink nodes pointing to existing cards at new tree positions.",
+      "  • card_id must reference an existing card (FK constraint — rolls back on invalid ID).",
+      "  • Useful for placing a card under multiple parents without duplicating content.",
+      "",
+      "moves: node_id is the node to relocate; new_parent_node_id is the destination parent (null = root).",
+      "",
+      "deletes: removes the card and all its tree nodes.",
+    ].join("\n"),
     {
-      creates: z.array(batchCreateItemSchema).optional(),
-      updates: z.array(batchUpdateItemSchema).optional(),
-      moves: z.array(batchMoveItemSchema).optional(),
-      deletes: z.array(batchDeleteItemSchema).optional(),
+      creates: z.array(batchCreateItemSchema).optional().describe("Cards to create. Processed first."),
+      symlinks: z.array(batchSymlinkItemSchema).optional().describe("Symlinks to existing cards. Processed after creates."),
+      updates: z.array(batchUpdateItemSchema).optional().describe("Card field updates. Processed after symlinks."),
+      moves: z.array(batchMoveItemSchema).optional().describe("Node relocations. Processed after updates."),
+      deletes: z.array(batchDeleteItemSchema).optional().describe("Cards to delete (with all tree nodes). Processed last."),
     },
     async (args) => {
-      const result = await executeBatchWrite(agentId, {
+      const result = await executeBatchOp(agentId, {
         creates: args.creates,
+        symlinks: args.symlinks,
         updates: args.updates,
         moves: args.moves,
         deletes: args.deletes,

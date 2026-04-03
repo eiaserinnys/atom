@@ -422,6 +422,65 @@ describe("compile_subtree", () => {
     expect(md).toContain("# Root");
     expect(md).not.toContain("Child");
   });
+
+  it("titles_only returns indented tree without content", async () => {
+    const { node_id: rootId } = await cardService.createCard({
+      card_type: "structure",
+      title: "TitlesRoot",
+      content: "Should not appear",
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "TitlesChild",
+      content: "Also hidden",
+      parent_node_id: rootId,
+    });
+
+    const md = await treeService.compileSubtree(rootId, 2, { titlesOnly: true });
+    expect(md).toContain("TitlesRoot");
+    expect(md).toContain("├── TitlesChild");
+    expect(md).not.toContain("Should not appear");
+    expect(md).not.toContain("Also hidden");
+    expect(md).toContain("chars)");
+  });
+
+  it("max_chars truncates output and adds marker", async () => {
+    const { node_id: rootId } = await cardService.createCard({
+      card_type: "structure",
+      title: "MaxRoot",
+      content: "A".repeat(200),
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "MaxChild",
+      content: "B".repeat(200),
+      parent_node_id: rootId,
+    });
+
+    const md = await treeService.compileSubtree(rootId, 2, { maxChars: 50 });
+    expect(md.length).toBeLessThan(300); // significantly less than full output
+    expect(md).toContain("<!-- truncated:");
+    expect(md).toContain("chars omitted -->");
+  });
+
+  it("exclude_nodes skips subtree in integration", async () => {
+    const { node_id: rootId } = await cardService.createCard({
+      card_type: "structure",
+      title: "ExRoot",
+    });
+    const { node_id: childId } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "ExChild",
+      content: "Should be excluded",
+      parent_node_id: rootId,
+    });
+
+    const md = await treeService.compileSubtree(rootId, 2, {
+      excludeNodes: new Set([childId]),
+    });
+    expect(md).toContain("# ExRoot");
+    expect(md).not.toContain("ExChild");
+  });
 });
 
 // ---------------------------------------------------------------------------

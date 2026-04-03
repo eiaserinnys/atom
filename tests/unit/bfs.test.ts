@@ -239,10 +239,10 @@ describe("BFS compileNode", () => {
         { includeIds: true }
       );
 
-      // Root heading has full metadata
-      expect(result).toContain("# Root <!-- node:node-a card:card-a created:2026-01-01 stale:stale source:url -->");
-      // Child heading has node/card IDs and created (no stale, no source)
-      expect(result).toContain("## Child <!-- node:node-b card:card-b created:2026-01-01 -->");
+      // Root heading has full metadata (depth:0 for root)
+      expect(result).toContain("# Root <!-- node:node-a card:card-a depth:0 created:2026-01-01 stale:stale source:url -->");
+      // Child heading has node/card IDs and created (depth:1, no stale, no source)
+      expect(result).toContain("## Child <!-- node:node-b card:card-b depth:1 created:2026-01-01 -->");
     });
 
     it("omits HTML comment when includeIds is false", () => {
@@ -321,8 +321,8 @@ describe("BFS compileNode", () => {
       expect(cycleLineMatch![0]).not.toContain("<!--");
 
       // But non-cycle headings should have comments
-      expect(result).toContain("# Node A <!-- node:node-a card:card-a");
-      expect(result).toContain("## Node B <!-- node:node-b card:card-b");
+      expect(result).toContain("# Node A <!-- node:node-a card:card-a depth:0");
+      expect(result).toContain("## Node B <!-- node:node-b card:card-b depth:1");
     });
 
     it("omits stale field when staleness is fresh or unverified", () => {
@@ -344,8 +344,200 @@ describe("BFS compileNode", () => {
         { includeIds: true }
       );
 
-      expect(result).toContain("<!-- node:node-a card:card-a created:2026-01-01 -->");
+      expect(result).toContain("<!-- node:node-a card:card-a depth:0 created:2026-01-01 -->");
       expect(result).not.toContain("stale:");
+    });
+  });
+
+  describe("titlesOnly option", () => {
+    const cards = new Map<string, Card>([
+      ["card-a", makeCard({ id: "card-a", title: "Root", content: "Root content here" })],
+      ["card-b", makeCard({ id: "card-b", title: "Child", content: "Child content" })],
+      ["card-c", makeCard({ id: "card-c", title: "Grandchild", content: null })],
+    ]);
+    const nodes = new Map<string, TreeNode>([
+      ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+      ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a", position: 100 })],
+      ["node-c", makeNode({ id: "node-c", card_id: "card-c", parent_node_id: "node-b", position: 100 })],
+    ]);
+    const getChildren = (nid: string): TreeNode[] =>
+      Array.from(nodes.values())
+        .filter((n) => n.parent_node_id === nid)
+        .sort((a, b) => a.position - b.position);
+    const getNodeCard = (nid: string) => ({
+      card_id: nodes.get(nid)!.card_id,
+      is_symlink: nodes.get(nid)!.is_symlink,
+    });
+    const getCard = (cid: string) => cards.get(cid)!;
+
+    it("omits content and outputs indented tree", () => {
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard,
+        2, new Set(), 1, { titlesOnly: true }
+      );
+
+      expect(result).not.toContain("Root content here");
+      expect(result).not.toContain("Child content");
+      expect(result).not.toContain("#"); // no markdown headings
+      expect(result).toContain("Root");
+      expect(result).toContain("├── Child");
+      expect(result).toContain("├── Grandchild");
+    });
+
+    it("includes chars metadata by default", () => {
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard,
+        1, new Set(), 1, { titlesOnly: true }
+      );
+
+      expect(result).toContain("(17 chars)"); // "Root content here".length = 17
+      expect(result).toContain("(13 chars)"); // "Child content".length = 13
+    });
+
+    it("includes full metadata when combined with includeIds", () => {
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard,
+        1, new Set(), 1, { titlesOnly: true, includeIds: true }
+      );
+
+      expect(result).toContain("node:node-a");
+      expect(result).toContain("depth:0");
+      expect(result).toContain("chars:17");
+      expect(result).toContain("node:node-b");
+      expect(result).toContain("depth:1");
+      expect(result).toContain("chars:13");
+    });
+  });
+
+  describe("excludeNodes option", () => {
+    const cards = new Map<string, Card>([
+      ["card-a", makeCard({ id: "card-a", title: "Root" })],
+      ["card-b", makeCard({ id: "card-b", title: "Child B" })],
+      ["card-c", makeCard({ id: "card-c", title: "Grandchild C" })],
+    ]);
+    const nodes = new Map<string, TreeNode>([
+      ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+      ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a", position: 100 })],
+      ["node-c", makeNode({ id: "node-c", card_id: "card-c", parent_node_id: "node-b", position: 100 })],
+    ]);
+    const getChildren = (nid: string): TreeNode[] =>
+      Array.from(nodes.values())
+        .filter((n) => n.parent_node_id === nid)
+        .sort((a, b) => a.position - b.position);
+    const getNodeCard = (nid: string) => ({
+      card_id: nodes.get(nid)!.card_id,
+      is_symlink: nodes.get(nid)!.is_symlink,
+    });
+    const getCard = (cid: string) => cards.get(cid)!;
+
+    it("excludes node and all descendants", () => {
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard,
+        Infinity, new Set(), 1, { excludeNodes: new Set(["node-b"]) }
+      );
+
+      expect(result).toContain("# Root");
+      expect(result).not.toContain("Child B");
+      expect(result).not.toContain("Grandchild C");
+    });
+
+    it("ignores non-existent node_ids", () => {
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard,
+        1, new Set(), 1, { excludeNodes: new Set(["non-existent-id"]) }
+      );
+
+      expect(result).toContain("# Root");
+      expect(result).toContain("## Child B");
+    });
+
+    it("returns empty string when root node is excluded", () => {
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard,
+        1, new Set(), 1, { excludeNodes: new Set(["node-a"]) }
+      );
+
+      expect(result).toBe("");
+    });
+  });
+
+  describe("depth in metadata", () => {
+    it("includes depth:N in includeIds metadata", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root" })],
+        ["card-b", makeCard({ id: "card-b", title: "Child" })],
+        ["card-c", makeCard({ id: "card-c", title: "Grandchild" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+        ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a" })],
+        ["node-c", makeNode({ id: "node-c", card_id: "card-c", parent_node_id: "node-b" })],
+      ]);
+      const getChildren = (nid: string): TreeNode[] =>
+        Array.from(nodes.values()).filter((n) => n.parent_node_id === nid);
+
+      const result = compileNode(
+        "node-a",
+        (nid) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink }),
+        getChildren,
+        (cid) => cards.get(cid)!,
+        2, new Set(), 1, { includeIds: true }
+      );
+
+      expect(result).toContain("depth:0"); // root
+      expect(result).toContain("depth:1"); // child
+      expect(result).toContain("depth:2"); // grandchild
+    });
+
+    it("h6-capped nodes still report correct depth in metadata", () => {
+      // 8 levels deep
+      const levels = 8;
+      const cardIds = Array.from({ length: levels }, (_, i) => `card-${i}`);
+      const nodeIds = Array.from({ length: levels }, (_, i) => `node-${i}`);
+      const cards = new Map<string, Card>(
+        cardIds.map((cid, i) => [cid, makeCard({ id: cid, title: `L${i}` })])
+      );
+      const nodes = new Map<string, TreeNode>(
+        nodeIds.map((nid, i) =>
+          [nid, makeNode({ id: nid, card_id: cardIds[i]!, parent_node_id: i > 0 ? nodeIds[i - 1]! : null })]
+        )
+      );
+      const getChildren = (nid: string): TreeNode[] =>
+        Array.from(nodes.values()).filter((n) => n.parent_node_id === nid);
+
+      const result = compileNode(
+        "node-0",
+        (nid) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink }),
+        getChildren,
+        (cid) => cards.get(cid)!,
+        levels, new Set(), 1, { includeIds: true }
+      );
+
+      // Heading capped at h6 but depth metadata shows 7
+      expect(result).toContain("depth:7");
+      expect(result).not.toMatch(/#######/); // no h7
+    });
+  });
+
+  describe("maxChars option (unit level — via compileNode output length)", () => {
+    it("maxChars=0 is ignored (no limit)", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root", content: "Long content here" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+      ]);
+
+      // maxChars is applied at service layer, but the option should pass through cleanly
+      const result = compileNode(
+        "node-a",
+        (nid) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink }),
+        () => [],
+        (cid) => cards.get(cid)!,
+        0, new Set(), 1, { maxChars: 0 }
+      );
+
+      expect(result).toContain("Long content here"); // not truncated
     });
   });
 });
