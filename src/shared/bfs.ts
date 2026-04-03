@@ -12,7 +12,8 @@ function buildMetaComment(
   nodeId: string,
   card: Card,
   depth: number,
-  chars?: number
+  chars?: number,
+  isSymlink?: boolean
 ): string {
   const parts = [`node:${nodeId}`, `card:${card.id}`, `depth:${depth}`];
   if (card.card_timestamp) {
@@ -29,6 +30,9 @@ function buildMetaComment(
   }
   if (chars !== undefined) {
     parts.push(`chars:${chars}`);
+  }
+  if (isSymlink) {
+    parts.push("symlink:true");
   }
   return `<!-- ${parts.join(" ")} -->`;
 }
@@ -115,16 +119,18 @@ export function compileNode(
   if (options.titlesOnly) {
     const indent = "  ".repeat(currentDepth);
     const prefix = currentDepth === 0 ? "" : "├── ";
+    const symlinkMark = is_symlink ? "~ " : "";
     const metaComment = options.includeIds
-      ? " " + buildMetaComment(nodeId, card, currentDepth, contentChars)
+      ? " " + buildMetaComment(nodeId, card, currentDepth, contentChars, is_symlink)
       : ` (${contentChars} chars)`;
-    lines.push(`${indent}${prefix}${numberLabel}${card.title}${metaComment}`);
+    lines.push(`${indent}${prefix}${numberLabel}${symlinkMark}${card.title}${metaComment}`);
   } else {
     const heading = "#".repeat(Math.min(headingLevel, 6));
+    const symlinkMark = is_symlink ? "~ " : "";
     if (options.includeIds) {
-      lines.push(`${heading} ${numberLabel}${card.title} ${buildMetaComment(nodeId, card, currentDepth)}`);
+      lines.push(`${heading} ${numberLabel}${symlinkMark}${card.title} ${buildMetaComment(nodeId, card, currentDepth, undefined, is_symlink)}`);
     } else {
-      lines.push(`${heading} ${numberLabel}${card.title}`);
+      lines.push(`${heading} ${numberLabel}${symlinkMark}${card.title}`);
     }
     if (card.content) {
       lines.push(card.content);

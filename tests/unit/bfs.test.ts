@@ -645,4 +645,92 @@ describe("BFS compileNode", () => {
       expect(result).toContain("### 1.1 X *(cycle)*");
     });
   });
+
+  describe("symlink marker", () => {
+    it("symlink marker in titles_only mode", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root", content: "Root content" })],
+        ["card-b", makeCard({ id: "card-b", title: "Symlink Child", content: "Child content" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+        ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a", is_symlink: true })],
+      ]);
+      const getChildren = (nid: string): TreeNode[] =>
+        Array.from(nodes.values()).filter((n) => n.parent_node_id === nid);
+      const getNodeCard = (nid: string) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink });
+
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, (cid) => cards.get(cid)!,
+        1, new Set(), 1, { titlesOnly: true }
+      );
+
+      expect(result).toContain("├── ~ Symlink Child");
+      expect(result).not.toContain("├── Symlink Child (");
+    });
+
+    it("symlink marker in full markdown mode", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root" })],
+        ["card-b", makeCard({ id: "card-b", title: "Symlink Child" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+        ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a", is_symlink: true })],
+      ]);
+      const getChildren = (nid: string): TreeNode[] =>
+        Array.from(nodes.values()).filter((n) => n.parent_node_id === nid);
+      const getNodeCard = (nid: string) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink });
+
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, (cid) => cards.get(cid)!,
+        1, new Set(), 1, {}
+      );
+
+      expect(result).toContain("## ~ Symlink Child");
+      expect(result).not.toContain("## Symlink Child");
+    });
+
+    it("symlink:true in include_ids HTML comment", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root" })],
+        ["card-b", makeCard({ id: "card-b", title: "Symlink Child" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+        ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a", is_symlink: true })],
+      ]);
+      const getChildren = (nid: string): TreeNode[] =>
+        Array.from(nodes.values()).filter((n) => n.parent_node_id === nid);
+      const getNodeCard = (nid: string) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink });
+
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, (cid) => cards.get(cid)!,
+        1, new Set(), 1, { includeIds: true }
+      );
+
+      expect(result).toContain("## ~ Symlink Child <!-- node:node-b card:card-b depth:1 created:2026-01-01 symlink:true -->");
+      // Root is not a symlink — comment present but no symlink:true
+      expect(result).toContain("# Root <!-- node:node-a card:card-a depth:0 created:2026-01-01 -->");
+      expect(result).not.toMatch(/node:node-a.*symlink:true/);
+    });
+
+    it("non-symlink has no marker", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Regular Node" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a", is_symlink: false })],
+      ]);
+      const getNodeCard = (nid: string) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink });
+
+      const result = compileNode(
+        "node-a", getNodeCard, () => [], (cid) => cards.get(cid)!,
+        0, new Set(), 1, {}
+      );
+
+      expect(result).toBe("# Regular Node");
+      expect(result).not.toContain("~");
+    });
+  });
 });
