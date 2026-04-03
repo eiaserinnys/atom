@@ -43,6 +43,7 @@ async function issueJwtAndRedirect(
 
   reply.setCookie(JWT_COOKIE_NAME, token, {
     httpOnly: true,
+    secure: process.env['NODE_ENV'] === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: JWT_EXPIRY_SECONDS,
