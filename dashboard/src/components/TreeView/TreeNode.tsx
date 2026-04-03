@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api, type TreeNodeData } from '../../api/client';
 
 interface TreeNodeProps {
@@ -12,41 +12,28 @@ interface TreeNodeProps {
 }
 
 export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded, expandedNodes, onToggle }: TreeNodeProps) {
-  // node.children이 있으면 TreeView가 미리 로드한 상태 → childrenLoaded = true
+  // node.children이 있으면 TreeView가 미리 로드한 상태 → initialData로 사용
   // node.children이 undefined이면 첫 expand 시 lazy fetch
-  const [children, setChildren] = useState<TreeNodeData[]>(node.children ?? []);
-  const [childrenLoaded, setChildrenLoaded] = useState(node.children !== undefined);
-  const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const propsChildren = node.children; // undefined or TreeNodeData[]
+  const { data: children = [], isFetched, isFetching, isError, error } = useQuery<TreeNodeData[]>({
+    queryKey: ['children', node.id],
+    queryFn: () => api.listChildren(node.id),
+    enabled: isExpanded,
+    ...(propsChildren !== undefined && {
+      initialData: propsChildren,
+      initialDataUpdatedAt: Date.now(),
+    }),
+    staleTime: 30_000,
+    gcTime: 0, // collapse 시 캐시 즉시 제거 → 재expand 시 항상 fresh fetch, 접힌 빈 노드도 hasChildren=true 복원
+  });
 
   // 미로드 상태에서는 화살표 항상 표시 (서버에 child_count 힌트 없음)
   // 로드 후 빈 배열이면 화살표 숨김 (요구사항 7)
+  const childrenLoaded = isFetched || propsChildren !== undefined;
   const hasChildren = childrenLoaded ? children.length > 0 : true;
+  const loading = isFetching;
   const isSelected = node.id === selectedNodeId;
   const isStructure = node.card.card_type === 'structure';
-
-  // isExpanded가 true로 바뀔 때 미로드 상태면 lazy fetch
-  useEffect(() => {
-    if (isExpanded && !childrenLoaded) {
-      fetchChildren();
-    }
-  // fetchChildren은 렌더마다 새로 생성될 수 있으므로 의존성에서 제외
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isExpanded]);
-
-  const fetchChildren = async () => {
-    setLoading(true);
-    setFetchError(null);
-    try {
-      const fetched = await api.listChildren(node.id);
-      setChildren(fetched);
-      setChildrenLoaded(true);
-    } catch (err) {
-      setFetchError(err instanceof Error ? err.message : '오류 발생');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -85,8 +72,8 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
         <span className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1">
           {node.card.title}
         </span>
-        {fetchError && (
-          <span className="ml-1 text-xs cursor-help shrink-0" title={fetchError}>⚠️</span>
+        {isError && (
+          <span className="ml-1 text-xs cursor-help shrink-0" title={error?.message ?? '오류 발생'}>⚠️</span>
         )}
       </div>
       {hasChildren && isExpanded && !loading && (

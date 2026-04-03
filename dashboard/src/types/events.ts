@@ -5,4 +5,5 @@ export type AtomEvent =
   | { type: 'card:deleted'; cardId: string }
   | { type: 'node:created'; nodeId: string; parentNodeId: string | null }
   | { type: 'node:deleted'; nodeId: string }
-  | { type: 'node:moved'; nodeId: string; newParentNodeId: string | null };
+  | { type: 'node:moved'; nodeId: string; newParentNodeId: string | null }
+  | { type: 'batch:completed' };

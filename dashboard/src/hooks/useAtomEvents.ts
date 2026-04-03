@@ -40,6 +40,7 @@ export function useAtomEvents() {
         case 'card:deleted':
           queryClient.invalidateQueries({ queryKey: ['tree'] });
           queryClient.invalidateQueries({ queryKey: ['node'] });
+          queryClient.invalidateQueries({ queryKey: ['children'] });
           break;
 
         case 'node:created':
@@ -52,10 +53,17 @@ export function useAtomEvents() {
         case 'node:deleted':
           queryClient.invalidateQueries({ queryKey: ['tree'] });
           queryClient.invalidateQueries({ queryKey: ['node'] });
+          queryClient.invalidateQueries({ queryKey: ['children'] });
           break;
 
         case 'node:moved':
           queryClient.invalidateQueries({ queryKey: ['tree'] });
+          break;
+
+        case 'batch:completed':
+          queryClient.invalidateQueries({ queryKey: ['tree', null] });
+          queryClient.invalidateQueries({ queryKey: ['children'] });
+          queryClient.invalidateQueries({ queryKey: ['node'] });
           break;
       }
     }
