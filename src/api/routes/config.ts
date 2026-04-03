@@ -127,7 +127,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       });
       return reply.code(201).send({
         ...agentToPublic(agent),
-        secret: `${agent_id}:${plainSecret}`,
+        secret: plainSecret,
       });
     }
   );
@@ -146,7 +146,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
 
       return reply.send({
         ...agentToPublic(agent),
-        secret: `${agent.agent_id}:${plainSecret}`,
+        secret: plainSecret,
       });
     }
   );
