@@ -1,5 +1,5 @@
 /**
- * Integration tests for batch_write service.
+ * Integration tests for batch_op service.
  *
  * Requires TEST_DATABASE_URL to point to a running PostgreSQL instance.
  *   TEST_DATABASE_URL=postgresql://atom:atom@localhost:5434/atom_test_db npx jest tests/integration/batch.test.ts
@@ -8,7 +8,7 @@
 import pg from "pg";
 import path from "path";
 import { setPool, closePool, runMigrations } from "../../src/db/client.js";
-import { executeBatchWrite, topologicalSortCreates } from "../../src/services/batch.service.js";
+import { executeBatchOp, topologicalSortCreates } from "../../src/services/batch.service.js";
 import * as cardService from "../../src/services/card.service.js";
 
 const { Pool } = pg;
@@ -81,12 +81,12 @@ describe("topologicalSortCreates", () => {
 });
 
 // ---------------------------------------------------------------------------
-// executeBatchWrite — normal path
+// executeBatchOp — normal path
 // ---------------------------------------------------------------------------
 
-describe("executeBatchWrite — creates", () => {
+describe("executeBatchOp — creates", () => {
   it("creates a structure card with a child knowledge card", async () => {
-    const result = await executeBatchWrite({
+    const result = await executeBatchOp({
       creates: [
         { temp_id: "root", card_type: "structure", title: "Root Section" },
         {
@@ -119,7 +119,7 @@ describe("executeBatchWrite — creates", () => {
   });
 
   it("returns correct temp_id mapping", async () => {
-    const result = await executeBatchWrite({
+    const result = await executeBatchOp({
       creates: [
         { temp_id: "t1", card_type: "knowledge", title: "Card 1" },
         { temp_id: "t2", card_type: "knowledge", title: "Card 2" },
@@ -137,7 +137,7 @@ describe("executeBatchWrite — creates", () => {
   });
 });
 
-describe("executeBatchWrite — updates", () => {
+describe("executeBatchOp — updates", () => {
   it("updates an existing card's title and content", async () => {
     const { card } = await cardService.createCard({
       card_type: "knowledge",
@@ -145,7 +145,7 @@ describe("executeBatchWrite — updates", () => {
       content: "Old content",
     });
 
-    await executeBatchWrite({
+    await executeBatchOp({
       updates: [
         { card_id: card.id, title: "Updated Title", content: "New content" },
       ],
@@ -158,7 +158,7 @@ describe("executeBatchWrite — updates", () => {
   });
 });
 
-describe("executeBatchWrite — moves", () => {
+describe("executeBatchOp — moves", () => {
   it("moves a node to a new parent", async () => {
     const { card: parentCard, node_id: parentNodeId } = await cardService.createCard({
       card_type: "structure",
@@ -169,7 +169,7 @@ describe("executeBatchWrite — moves", () => {
       title: "Child",
     });
 
-    await executeBatchWrite({
+    await executeBatchOp({
       moves: [
         {
           node_id: childNodeId,
@@ -196,7 +196,7 @@ describe("executeBatchWrite — moves", () => {
         title: "Node to move",
       });
 
-    const result = await executeBatchWrite({
+    const result = await executeBatchOp({
       creates: [
         { temp_id: "newParent", card_type: "structure", title: "New Parent" },
       ],
@@ -221,14 +221,14 @@ describe("executeBatchWrite — moves", () => {
   });
 });
 
-describe("executeBatchWrite — deletes", () => {
+describe("executeBatchOp — deletes", () => {
   it("deletes an existing card", async () => {
     const { card } = await cardService.createCard({
       card_type: "knowledge",
       title: "To delete",
     });
 
-    const result = await executeBatchWrite({
+    const result = await executeBatchOp({
       deletes: [{ card_id: card.id }],
     });
 
@@ -239,7 +239,98 @@ describe("executeBatchWrite — deletes", () => {
   });
 });
 
-describe("executeBatchWrite — mixed operations", () => {
+// ---------------------------------------------------------------------------
+// executeBatchOp — symlinks
+// ---------------------------------------------------------------------------
+
+describe("executeBatchOp — symlinks", () => {
+  it("creates a symlink node for an existing card", async () => {
+    const { card, node_id: originalNodeId } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Symlink target",
+      content: "Some content",
+    });
+
+    const result = await executeBatchOp({
+      symlinks: [
+        { card_id: card.id, parent_node_id: null },
+      ],
+    });
+
+    expect(result.symlinked).toHaveLength(1);
+    const symlinkNodeId = result.symlinked[0];
+    expect(symlinkNodeId).toBeTruthy();
+    expect(symlinkNodeId).not.toBe(originalNodeId);
+
+    // Verify node is a symlink in DB
+    const nodeRow = await pool.query(
+      "SELECT is_symlink, card_id FROM tree_nodes WHERE id = $1",
+      [symlinkNodeId]
+    );
+    expect(nodeRow.rows[0]["is_symlink"]).toBe(true);
+    expect(nodeRow.rows[0]["card_id"]).toBe(card.id);
+  });
+
+  it("rolls back when symlink references non-existent card_id", async () => {
+    const before = await pool.query("SELECT COUNT(*) FROM tree_nodes");
+    const countBefore = parseInt(before.rows[0]["count"], 10);
+
+    await expect(
+      executeBatchOp({
+        creates: [
+          { temp_id: "ok", card_type: "structure", title: "Should roll back" },
+        ],
+        symlinks: [
+          {
+            card_id: "00000000-0000-0000-0000-000000000000",
+            parent_node_id: null,
+          },
+        ],
+      })
+    ).rejects.toThrow();
+
+    const after = await pool.query("SELECT COUNT(*) FROM tree_nodes");
+    const countAfter = parseInt(after.rows[0]["count"], 10);
+    expect(countAfter).toBe(countBefore);
+  });
+
+  it("symlinks a card created earlier in the same batch", async () => {
+    // First batch: create a card
+    const createResult = await executeBatchOp({
+      creates: [
+        { temp_id: "src", card_type: "knowledge", title: "Source Card" },
+        { temp_id: "dest", card_type: "structure", title: "Dest Folder" },
+      ],
+    });
+
+    const srcCardId = createResult.created.find((c) => c.temp_id === "src")!.card_id;
+    const destNodeId = createResult.created.find((c) => c.temp_id === "dest")!.node_id;
+
+    // Second batch: symlink the card under the dest folder
+    const symlinkResult = await executeBatchOp({
+      symlinks: [
+        { card_id: srcCardId, parent_node_id: destNodeId },
+      ],
+    });
+
+    expect(symlinkResult.symlinked).toHaveLength(1);
+
+    // Verify both the original node and the symlink exist for the same card
+    const nodes = await pool.query(
+      "SELECT id, is_symlink FROM tree_nodes WHERE card_id = $1 ORDER BY is_symlink",
+      [srcCardId]
+    );
+    expect(nodes.rows).toHaveLength(2);
+    expect(nodes.rows[0]["is_symlink"]).toBe(false);
+    expect(nodes.rows[1]["is_symlink"]).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// executeBatchOp — mixed operations
+// ---------------------------------------------------------------------------
+
+describe("executeBatchOp — mixed operations", () => {
   it("runs creates + updates + moves + deletes in one transaction", async () => {
     const { card: updateTarget } = await cardService.createCard({
       card_type: "knowledge",
@@ -255,7 +346,7 @@ describe("executeBatchWrite — mixed operations", () => {
         title: "To move",
       });
 
-    const result = await executeBatchWrite({
+    const result = await executeBatchOp({
       creates: [
         { temp_id: "newRoot", card_type: "structure", title: "New Root" },
       ],
@@ -273,18 +364,20 @@ describe("executeBatchWrite — mixed operations", () => {
   });
 });
 
-describe("executeBatchWrite — empty input", () => {
+describe("executeBatchOp — empty input", () => {
   it("handles empty batch gracefully", async () => {
-    const result = await executeBatchWrite({});
+    const result = await executeBatchOp({});
     expect(result.created).toHaveLength(0);
+    expect(result.symlinked).toHaveLength(0);
     expect(result.updated).toHaveLength(0);
     expect(result.moved).toHaveLength(0);
     expect(result.deleted).toHaveLength(0);
   });
 
   it("handles all-empty arrays", async () => {
-    const result = await executeBatchWrite({
+    const result = await executeBatchOp({
       creates: [],
+      symlinks: [],
       updates: [],
       moves: [],
       deletes: [],
@@ -293,14 +386,14 @@ describe("executeBatchWrite — empty input", () => {
   });
 });
 
-describe("executeBatchWrite — rollback on error", () => {
+describe("executeBatchOp — rollback on error", () => {
   it("rolls back all operations when one fails", async () => {
     // Count cards before
     const before = await pool.query("SELECT COUNT(*) FROM cards");
     const countBefore = parseInt(before.rows[0]["count"], 10);
 
     await expect(
-      executeBatchWrite({
+      executeBatchOp({
         creates: [
           { temp_id: "ok", card_type: "structure", title: "Should roll back" },
         ],

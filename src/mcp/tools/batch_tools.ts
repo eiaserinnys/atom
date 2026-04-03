@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { executeBatchWrite } from "../../services/batch.service.js";
+import { executeBatchOp } from "../../services/batch.service.js";
 
 const batchCreateItemSchema = z.object({
   temp_id: z.string(),
@@ -14,6 +14,12 @@ const batchCreateItemSchema = z.object({
   source_ref: z.string().nullable().optional(),
   parent_node_id: z.string().uuid().nullable().optional(),
   parent_temp_id: z.string().optional(),
+  position: z.number().int().optional(),
+});
+
+const batchSymlinkItemSchema = z.object({
+  card_id: z.string().uuid(),
+  parent_node_id: z.string().uuid().nullable(),
   position: z.number().int().optional(),
 });
 
@@ -45,21 +51,24 @@ const batchDeleteItemSchema = z.object({
 
 export function registerBatchTools(server: McpServer, agentId: string): void {
   server.tool(
-    "batch_write",
+    "batch_op",
     [
-      "Execute multiple card operations (creates/updates/moves/deletes) in a single atomic transaction.",
+      "Execute multiple card operations (creates/symlinks/updates/moves/deletes) in a single atomic transaction.",
+      "Execution order: creates → symlinks → updates → moves → deletes.",
       "Use temp_id to reference newly-created nodes within the same batch as parent_temp_id.",
       "All operations succeed or all are rolled back.",
     ].join(" "),
     {
       creates: z.array(batchCreateItemSchema).optional(),
+      symlinks: z.array(batchSymlinkItemSchema).optional(),
       updates: z.array(batchUpdateItemSchema).optional(),
       moves: z.array(batchMoveItemSchema).optional(),
       deletes: z.array(batchDeleteItemSchema).optional(),
     },
     async (args) => {
-      const result = await executeBatchWrite(agentId, {
+      const result = await executeBatchOp(agentId, {
         creates: args.creates,
+        symlinks: args.symlinks,
         updates: args.updates,
         moves: args.moves,
         deletes: args.deletes,

@@ -72,7 +72,7 @@ export interface SearchResult {
 }
 
 // ---------------------------------------------------------------------------
-// Batch write types
+// Batch operation types
 // ---------------------------------------------------------------------------
 
 export interface BatchCreateItem {
@@ -122,8 +122,18 @@ export interface BatchDeleteItem {
   card_id: string;
 }
 
-export interface BatchWriteInput {
+export interface BatchSymlinkItem {
+  /** Card ID to create a symlink for. */
+  card_id: string;
+  /** Parent node to place the symlink under. */
+  parent_node_id: string | null;
+  /** Position among siblings. */
+  position?: number;
+}
+
+export interface BatchOpInput {
   creates?: BatchCreateItem[];
+  symlinks?: BatchSymlinkItem[];
   updates?: BatchUpdateItem[];
   moves?: BatchMoveItem[];
   deletes?: BatchDeleteItem[];
@@ -135,8 +145,9 @@ export interface BatchCreatedItem {
   node_id: string;
 }
 
-export interface BatchWriteResult {
+export interface BatchOpResult {
   created: BatchCreatedItem[];
+  symlinked: string[];
   updated: string[];
   moved: string[];
   deleted: string[];
@@ -153,7 +164,7 @@ export type AtomEvent =
   | { type: 'node:created'; nodeId: string; cardId: string; parentNodeId: string | null }
   | { type: 'node:deleted'; nodeId: string }
   | { type: 'node:moved'; nodeId: string; newParentNodeId: string | null }
-  | { type: 'batch:completed'; result: BatchWriteResult };
+  | { type: 'batch:completed'; result: BatchOpResult };
 
 // ---------------------------------------------------------------------------
 // Fastify request augmentation

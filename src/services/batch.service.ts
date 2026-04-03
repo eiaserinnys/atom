@@ -6,8 +6,8 @@ import {
 } from "../db/queries/cards.js";
 import { insertNode, moveNode } from "../db/queries/tree.js";
 import type {
-  BatchWriteInput,
-  BatchWriteResult,
+  BatchOpInput,
+  BatchOpResult,
   BatchCreatedItem,
   BatchCreateItem,
 } from "../shared/types.js";
@@ -68,16 +68,16 @@ export function topologicalSortCreates(
 }
 
 // ---------------------------------------------------------------------------
-// executeBatchWrite
+// executeBatchOp
 // ---------------------------------------------------------------------------
 
-export async function executeBatchWrite(
-  agentIdOrInput: string | null | BatchWriteInput,
-  inputOrUndefined?: BatchWriteInput
-): Promise<BatchWriteResult> {
-  // Overload resolution: support both executeBatchWrite(input) and executeBatchWrite(agentId, input)
+export async function executeBatchOp(
+  agentIdOrInput: string | null | BatchOpInput,
+  inputOrUndefined?: BatchOpInput
+): Promise<BatchOpResult> {
+  // Overload resolution: support both executeBatchOp(input) and executeBatchOp(agentId, input)
   let agentId: string | null;
-  let input: BatchWriteInput;
+  let input: BatchOpInput;
   if (typeof agentIdOrInput === 'string' || agentIdOrInput === null) {
     agentId = agentIdOrInput;
     input = inputOrUndefined!;
@@ -89,8 +89,9 @@ export async function executeBatchWrite(
   const pool = getPool();
   const client = await pool.connect();
 
-  const result: BatchWriteResult = {
+  const result: BatchOpResult = {
     created: [],
+    symlinked: [],
     updated: [],
     moved: [],
     deleted: [],
@@ -145,6 +146,20 @@ export async function executeBatchWrite(
           card_id: card.id,
           node_id: node.id,
         });
+      }
+    }
+
+    // ── Symlinks ─────────────────────────────────────────────────────────────
+    if (input.symlinks && input.symlinks.length > 0) {
+      for (const item of input.symlinks) {
+        const node = await insertNode(
+          client,
+          item.card_id,
+          item.parent_node_id,
+          item.position,
+          true
+        );
+        result.symlinked.push(node.id);
       }
     }
 
