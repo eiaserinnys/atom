@@ -81,8 +81,23 @@ export const api = {
     return request(`/tree/${nodeId}`);
   },
 
-  compile(nodeId: string): Promise<{ markdown: string }> {
-    return request(`/tree/${nodeId}/compile`);
+  compile(nodeId: string, options?: {
+    depth?: number;
+    include_ids?: boolean;
+    titles_only?: boolean;
+    numbering?: boolean;
+    max_chars?: number;
+    exclude_nodes?: string[];
+  }): Promise<{ markdown: string }> {
+    const params = new URLSearchParams();
+    if (options?.depth !== undefined) params.set("depth", String(options.depth));
+    if (options?.include_ids) params.set("include_ids", "true");
+    if (options?.titles_only) params.set("titles_only", "true");
+    if (options?.numbering) params.set("numbering", "true");
+    if (options?.max_chars !== undefined) params.set("max_chars", String(options.max_chars));
+    if (options?.exclude_nodes?.length) params.set("exclude_nodes", options.exclude_nodes.join(","));
+    const qs = params.toString();
+    return request(`/tree/${nodeId}/compile${qs ? `?${qs}` : ""}`);
   },
 
   search(q: string): Promise<SearchResult[]> {

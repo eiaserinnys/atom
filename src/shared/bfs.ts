@@ -3,6 +3,7 @@ import type { Card, TreeNode } from "./types.js";
 export interface CompileOptions {
   includeIds?: boolean;
   titlesOnly?: boolean;
+  numbering?: boolean;
   maxChars?: number;
   excludeNodes?: Set<string>; // node_id Set
 }
@@ -82,7 +83,8 @@ export function compileNode(
   depth: number,
   visited: Set<string> = new Set(),
   headingLevel: number = 1,
-  options: CompileOptions = {}
+  options: CompileOptions = {},
+  numberPrefix: string = ""
 ): string {
   // exclude_nodes — skip this node and all descendants
   if (options.excludeNodes?.has(nodeId)) {
@@ -91,6 +93,7 @@ export function compileNode(
 
   const { card_id, is_symlink } = getNodeCard(nodeId);
   const currentDepth = headingLevel - 1; // root is depth 0
+  const numberLabel = options.numbering && numberPrefix ? `${numberPrefix} ` : "";
 
   // Cycle detection — no metadata comment on cycle nodes
   if (visited.has(card_id)) {
@@ -98,10 +101,10 @@ export function compileNode(
     if (options.titlesOnly) {
       const indent = "  ".repeat(currentDepth);
       const prefix = currentDepth === 0 ? "" : "├── ";
-      return `${indent}${prefix}${card.title} *(cycle)*`;
+      return `${indent}${prefix}${numberLabel}${card.title} *(cycle)*`;
     }
     const heading = "#".repeat(Math.min(headingLevel, 6));
-    return `${heading} ${card.title} *(cycle)*`;
+    return `${heading} ${numberLabel}${card.title} *(cycle)*`;
   }
 
   const card = getCard(card_id);
@@ -115,13 +118,13 @@ export function compileNode(
     const metaComment = options.includeIds
       ? " " + buildMetaComment(nodeId, card, currentDepth, contentChars)
       : ` (${contentChars} chars)`;
-    lines.push(`${indent}${prefix}${card.title}${metaComment}`);
+    lines.push(`${indent}${prefix}${numberLabel}${card.title}${metaComment}`);
   } else {
     const heading = "#".repeat(Math.min(headingLevel, 6));
     if (options.includeIds) {
-      lines.push(`${heading} ${card.title} ${buildMetaComment(nodeId, card, currentDepth)}`);
+      lines.push(`${heading} ${numberLabel}${card.title} ${buildMetaComment(nodeId, card, currentDepth)}`);
     } else {
-      lines.push(`${heading} ${card.title}`);
+      lines.push(`${heading} ${numberLabel}${card.title}`);
     }
     if (card.content) {
       lines.push(card.content);
@@ -143,7 +146,12 @@ export function compileNode(
 
   const children = getChildren(nodeId);
 
-  for (const child of children) {
+  children.forEach((child, idx) => {
+    const childNumber = options.numbering
+      ? numberPrefix
+        ? `${numberPrefix}.${idx + 1}`
+        : `${idx + 1}`
+      : "";
     const childMarkdown = compileNode(
       child.id,
       getNodeCard,
@@ -152,10 +160,11 @@ export function compileNode(
       depth - 1,
       newVisited,
       headingLevel + 1,
-      options
+      options,
+      childNumber
     );
     lines.push(childMarkdown);
-  }
+  });
 
   return lines.join("\n");
 }

@@ -58,6 +58,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       "Options:",
       "  • depth (default 2): how many levels deep to expand.",
       "  • include_ids=true: appends <!-- node:<uuid> card:<uuid> depth:<N> --> HTML comments to each heading for programmatic reference.",
+      "  • numbering=true: prepends hierarchical numbering (1, 1.1, 1.1.1, …) to each heading. Root node is unnumbered; children start at 1.",
       "  • max_chars: truncates output to at most N characters (on a line boundary) and appends <!-- truncated: M chars omitted -->. 0 or negative = no limit.",
       "  • exclude_nodes: array of node_id UUIDs whose subtrees are entirely skipped. Unknown IDs are silently ignored. If the root node itself is excluded, returns an empty string.",
       "Common combinations: titles_only + include_ids gives an ID-annotated outline; titles_only + max_chars caps large tree overviews.",
@@ -67,13 +68,15 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       depth: z.number().int().optional().describe("Max depth to expand (default 2)."),
       include_ids: z.boolean().optional().describe("Add <!-- node/card/depth --> HTML comments to headings."),
       titles_only: z.boolean().optional().describe("Output indented title tree instead of full markdown."),
+      numbering: z.boolean().optional().describe("Prepend hierarchical numbering (1, 1.1, 1.1.1, …) to headings."),
       max_chars: z.number().int().optional().describe("Max output chars. 0 or negative = unlimited."),
       exclude_nodes: z.array(z.string().uuid()).optional().describe("Node IDs whose subtrees to skip entirely."),
     },
-    async ({ node_id, depth, include_ids, titles_only, max_chars, exclude_nodes }) => {
+    async ({ node_id, depth, include_ids, titles_only, numbering, max_chars, exclude_nodes }) => {
       const markdown = await compileSubtree(node_id, depth ?? 2, {
         includeIds: include_ids,
         titlesOnly: titles_only,
+        numbering,
         maxChars: max_chars,
         excludeNodes: exclude_nodes ? new Set(exclude_nodes) : undefined,
       });

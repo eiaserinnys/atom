@@ -44,6 +44,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       const depth = qs["depth"] !== undefined ? parseInt(qs["depth"]) : 2;
       const includeIds = qs["include_ids"] === "true";
       const titlesOnly = qs["titles_only"] === "true";
+      const numbering = qs["numbering"] === "true";
       const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
       const maxChars = maxCharsRaw !== undefined && !isNaN(maxCharsRaw) ? maxCharsRaw : undefined;
       const excludeNodesRaw = qs["exclude_nodes"];
@@ -53,6 +54,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       const markdown = await compileSubtree(req.params.nodeId, depth, {
         includeIds: includeIds || undefined,
         titlesOnly: titlesOnly || undefined,
+        numbering: numbering || undefined,
         maxChars: maxChars,
         excludeNodes: excludeNodes,
       });

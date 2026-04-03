@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -7,15 +8,101 @@ interface CompileViewProps {
   nodeId: string | null;
 }
 
+interface TocEntry {
+  id: string;
+  text: string;
+  level: number;
+}
+
+const TOC_WIDTH = 200;
+
 export function CompileView({ nodeId }: CompileViewProps) {
   const { data: markdown, isLoading, error } = useQuery({
     queryKey: ['compile', nodeId],
     queryFn: async () => {
-      const result = await api.compile(nodeId!);
+      const result = await api.compile(nodeId!, { numbering: true });
       return result.markdown;
     },
     enabled: !!nodeId,
   });
+
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [tocEntries, setTocEntries] = useState<TocEntry[]>([]);
+  const [tocVisible, setTocVisible] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Build TOC from rendered headings
+  useEffect(() => {
+    if (!contentRef.current || !markdown) return;
+
+    // Wait for react-markdown to render
+    const timer = setTimeout(() => {
+      const el = contentRef.current;
+      if (!el) return;
+
+      const headings = el.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      const entries: TocEntry[] = [];
+
+      headings.forEach((heading, idx) => {
+        const id = `compile-heading-${idx}`;
+        heading.id = id;
+        entries.push({
+          id,
+          text: heading.textContent ?? '',
+          level: parseInt(heading.tagName[1]!),
+        });
+      });
+
+      setTocEntries(entries);
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [markdown]);
+
+  // Track active heading on scroll (RAF-throttled)
+  const rafRef = useRef(0);
+  useEffect(() => {
+    const container = contentRef.current?.parentElement;
+    if (!container || tocEntries.length === 0) return;
+
+    const handleScroll = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const scrollTop = container.scrollTop;
+        let current: string | null = null;
+
+        for (const entry of tocEntries) {
+          const el = document.getElementById(entry.id);
+          if (el && el.offsetTop <= scrollTop + 60) {
+            current = entry.id;
+          }
+        }
+
+        setActiveId(current);
+      });
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [tocEntries]);
+
+  const scrollTo = useCallback((id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  // Min heading level for indent calculation
+  const minLevel = useMemo(
+    () => Math.min(...tocEntries.map((e) => e.level), 1),
+    [tocEntries]
+  );
 
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
@@ -30,33 +117,84 @@ export function CompileView({ nodeId }: CompileViewProps) {
           </span>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
-        {!nodeId && (
-          <div className="text-muted-foreground text-sm">노드를 선택하면 컴파일된 문서가 표시됩니다.</div>
-        )}
-        {isLoading && <div className="text-muted-foreground text-sm">컴파일 중...</div>}
-        {error && <div className="text-node-error text-sm">오류: {error.message}</div>}
-        {markdown && !isLoading && (
-          <div className="
-            text-foreground text-base leading-[1.7]
-            [&_h1]:mt-[1.4em] [&_h1]:mb-[0.4em] [&_h1]:font-semibold [&_h1]:text-[1.4em]
-            [&_h2]:mt-[1.4em] [&_h2]:mb-[0.4em] [&_h2]:font-semibold [&_h2]:text-[1.2em]
-            [&_h3]:mt-[1.4em] [&_h3]:mb-[0.4em] [&_h3]:font-semibold [&_h3]:text-[1.05em]
-            [&_h4]:mt-[1.4em] [&_h4]:mb-[0.4em] [&_h4]:font-semibold
-            [&_p]:mb-[0.8em]
-            [&_ul]:mb-[0.8em] [&_ul]:pl-6
-            [&_ol]:mb-[0.8em] [&_ol]:pl-6
-            [&_li]:mb-[0.2em]
-            [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:bg-muted [&_code]:border [&_code]:border-border [&_code]:rounded [&_code]:px-[0.35em] [&_code]:py-[0.1em]
-            [&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:mb-[1em]
-            [&_pre_code]:bg-transparent [&_pre_code]:border-0 [&_pre_code]:p-0 [&_pre_code]:text-[0.88em]
-            [&_blockquote]:border-l-[3px] [&_blockquote]:border-border [&_blockquote]:ml-0 [&_blockquote]:mb-[0.8em] [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground
-            [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_hr]:my-4
-            [&_a]:text-node-user [&_a]:no-underline hover:[&_a]:underline
-          ">
-            <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+      <div className="flex-1 overflow-y-auto relative">
+        {/* TOC hover zone — right edge */}
+        {tocEntries.length > 0 && (
+          <div
+            className="absolute top-0 right-0 bottom-0 z-10"
+            style={{ width: tocVisible ? TOC_WIDTH + 16 : 16 }}
+            onMouseEnter={() => setTocVisible(true)}
+            onMouseLeave={() => setTocVisible(false)}
+          >
+            {/* TOC panel */}
+            <div
+              className={`
+                absolute top-0 right-0 bottom-0 overflow-y-auto
+                bg-background/95 backdrop-blur-sm border-l border-border
+                transition-all duration-200 ease-out
+                ${tocVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2 pointer-events-none'}
+              `}
+              style={{ width: TOC_WIDTH }}
+            >
+              <div className="px-3 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                문서 개요
+              </div>
+              <nav className="px-1 pb-3">
+                {tocEntries.map((entry) => (
+                  <button
+                    key={entry.id}
+                    onClick={() => scrollTo(entry.id)}
+                    className={`
+                      block w-full text-left px-2 py-1 rounded text-xs leading-snug truncate
+                      transition-colors duration-100
+                      ${activeId === entry.id
+                        ? 'text-foreground bg-muted font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}
+                    `}
+                    style={{ paddingLeft: `${(entry.level - minLevel) * 12 + 8}px` }}
+                    title={entry.text}
+                  >
+                    {entry.text}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* Hover indicator bar — visible when TOC is hidden */}
+            {!tocVisible && (
+              <div className="absolute top-1/3 right-1 w-1 h-1/3 rounded-full bg-muted-foreground/20" />
+            )}
           </div>
         )}
+
+        <div className="p-4" ref={contentRef}>
+          {!nodeId && (
+            <div className="text-muted-foreground text-sm">노드를 선택하면 컴파일된 문서가 표시됩니다.</div>
+          )}
+          {isLoading && <div className="text-muted-foreground text-sm">컴파일 중...</div>}
+          {error && <div className="text-node-error text-sm">오류: {error.message}</div>}
+          {markdown && !isLoading && (
+            <div className="
+              text-foreground text-base leading-[1.7]
+              [&_h1]:mt-[1.4em] [&_h1]:mb-[0.4em] [&_h1]:font-semibold [&_h1]:text-[1.4em]
+              [&_h2]:mt-[1.4em] [&_h2]:mb-[0.4em] [&_h2]:font-semibold [&_h2]:text-[1.2em]
+              [&_h3]:mt-[1.4em] [&_h3]:mb-[0.4em] [&_h3]:font-semibold [&_h3]:text-[1.05em]
+              [&_h4]:mt-[1.4em] [&_h4]:mb-[0.4em] [&_h4]:font-semibold
+              [&_p]:mb-[0.8em]
+              [&_ul]:mb-[0.8em] [&_ul]:pl-6
+              [&_ol]:mb-[0.8em] [&_ol]:pl-6
+              [&_li]:mb-[0.2em]
+              [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:bg-muted [&_code]:border [&_code]:border-border [&_code]:rounded [&_code]:px-[0.35em] [&_code]:py-[0.1em]
+              [&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:mb-[1em]
+              [&_pre_code]:bg-transparent [&_pre_code]:border-0 [&_pre_code]:p-0 [&_pre_code]:text-[0.88em]
+              [&_blockquote]:border-l-[3px] [&_blockquote]:border-border [&_blockquote]:ml-0 [&_blockquote]:mb-[0.8em] [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground
+              [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_hr]:my-4
+              [&_a]:text-node-user [&_a]:no-underline hover:[&_a]:underline
+            ">
+              <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
