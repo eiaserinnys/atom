@@ -21,6 +21,18 @@ export async function findUserByEmail(
   return result.rows[0] ?? null;
 }
 
+/**
+ * Check if an email matches the ALLOWED_EMAIL pattern.
+ * Supports exact match ("user@example.com") or domain match ("@example.com").
+ */
+export function isEmailAllowed(email: string, allowedEmail: string | undefined): boolean {
+  if (!allowedEmail) return false;
+  if (allowedEmail.startsWith('@')) {
+    return email.endsWith(allowedEmail);
+  }
+  return email === allowedEmail;
+}
+
 export async function findUserById(
   db: Queryable, id: string
 ): Promise<User | null> {

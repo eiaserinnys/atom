@@ -19,8 +19,8 @@ function getJwtSecret(): Uint8Array {
  * It applies to ALL Fastify routes regardless of how nginx routes requests.
  * Auth routes (/api/auth/*) are explicitly exempted below.
  *
- * Bypass mode: if GOOGLE_CLIENT_ID is empty/unset, all requests are allowed
- * (enables development without OAuth credentials).
+ * Bypass mode: if no OAuth provider is configured (neither GOOGLE_CLIENT_ID
+ * nor SLACK_CLIENT_ID), all requests are allowed (dev mode).
  */
 export async function authMiddleware(
   req: FastifyRequest,
@@ -31,9 +31,10 @@ export async function authMiddleware(
   //  so MCP clients don't fall back to OAuth discovery)
   if (req.url.startsWith('/api/auth/') || req.url.startsWith('/mcp') || req.url.startsWith('/.well-known/') || req.url === '/register') return;
 
-  // Bypass mode: no GOOGLE_CLIENT_ID → allow all requests
-  const clientId = process.env['GOOGLE_CLIENT_ID'];
-  if (!clientId) return;
+  // Bypass mode: no OAuth configured → allow all requests
+  const googleClientId = process.env['GOOGLE_CLIENT_ID'];
+  const slackClientId = process.env['SLACK_CLIENT_ID'];
+  if (!googleClientId && !slackClientId) return;
 
   const token = req.cookies['atom_auth'];
   if (!token) {

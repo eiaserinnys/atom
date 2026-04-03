@@ -11,6 +11,7 @@ import { batchRoutes } from "./routes/batch.js";
 import { configRoutes } from "./routes/config.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
+import cors from "@fastify/cors";
 import { runMigrations, getPool } from "../db/client.js";
 import { config } from "dotenv";
 import { userExists, insertUser } from "../db/queries/users.js";
@@ -23,6 +24,11 @@ config({ path: path.join(__dirname, "../../.env"), override: true });
 
 const app = Fastify({ logger: true });
 
+const frontendUrl = process.env["FRONTEND_URL"];
+app.register(cors, {
+  origin: frontendUrl ? [frontendUrl] : true,
+  credentials: true,
+});
 app.register(cookie);
 app.register(authRoutes);
 app.addHook('preHandler', authMiddleware);
