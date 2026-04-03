@@ -50,15 +50,21 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
   // compile_subtree
   server.tool(
     "compile_subtree",
-    "Compile a subtree as Markdown via BFS. depth=2 by default. include_ids=true adds <!-- node:uuid card:uuid --> HTML comments to each heading.",
+    "Compile a subtree as Markdown via BFS. depth=2 by default. include_ids=true adds <!-- node:uuid card:uuid depth:N --> HTML comments to each heading. titles_only=true outputs an indented tree with card titles and content size (chars) instead of full markdown. max_chars limits the total output length and appends a <!-- truncated --> marker. exclude_nodes skips the given node_ids and their entire subtrees.",
     {
       node_id: z.string().uuid(),
       depth: z.number().int().optional(),
       include_ids: z.boolean().optional(),
+      titles_only: z.boolean().optional(),
+      max_chars: z.number().int().optional(),
+      exclude_nodes: z.array(z.string().uuid()).optional(),
     },
-    async ({ node_id, depth, include_ids }) => {
+    async ({ node_id, depth, include_ids, titles_only, max_chars, exclude_nodes }) => {
       const markdown = await compileSubtree(node_id, depth ?? 2, {
         includeIds: include_ids,
+        titlesOnly: titles_only,
+        maxChars: max_chars,
+        excludeNodes: exclude_nodes ? new Set(exclude_nodes) : undefined,
       });
       return { content: [{ type: "text", text: markdown }] };
     }

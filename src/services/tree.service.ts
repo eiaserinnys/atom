@@ -115,7 +115,18 @@ export async function compileSubtree(
     return card;
   }
 
-  return compileNode(nodeId, getNodeCard, getChildrenSync, getCardSync, depth, new Set(), 1, options);
+  let result = compileNode(nodeId, getNodeCard, getChildrenSync, getCardSync, depth, new Set(), 1, options);
+
+  // max_chars post-processing
+  if (options.maxChars && options.maxChars > 0 && result.length > options.maxChars) {
+    const truncated = result.slice(0, options.maxChars);
+    const lastNewline = truncated.lastIndexOf("\n");
+    const cleanCut = lastNewline > 0 ? truncated.slice(0, lastNewline) : truncated;
+    const omittedChars = result.length - cleanCut.length;
+    result = cleanCut + `\n<!-- truncated: ${omittedChars} chars omitted -->`;
+  }
+
+  return result;
 }
 
 export async function createSymlink(

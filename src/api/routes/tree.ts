@@ -42,7 +42,20 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const qs = req.query as Record<string, string>;
       const depth = qs["depth"] !== undefined ? parseInt(qs["depth"]) : 2;
-      const markdown = await compileSubtree(req.params.nodeId, depth);
+      const includeIds = qs["include_ids"] === "true";
+      const titlesOnly = qs["titles_only"] === "true";
+      const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
+      const maxChars = maxCharsRaw !== undefined && !isNaN(maxCharsRaw) ? maxCharsRaw : undefined;
+      const excludeNodesRaw = qs["exclude_nodes"];
+      const excludeNodes = excludeNodesRaw
+        ? new Set(excludeNodesRaw.split(",").map((s) => s.trim()))
+        : undefined;
+      const markdown = await compileSubtree(req.params.nodeId, depth, {
+        includeIds: includeIds || undefined,
+        titlesOnly: titlesOnly || undefined,
+        maxChars: maxChars,
+        excludeNodes: excludeNodes,
+      });
       return { markdown };
     }
   );
