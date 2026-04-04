@@ -2,6 +2,7 @@ import type { Card } from "../../src/shared/types.js";
 import type { UnfurlAdapter, UnfurlCredentials, UnfurlResult } from "../../src/unfurl/interface.js";
 import { parseSnapshot } from "../../src/unfurl/utils.js";
 import { TrelloAdapter } from "../../src/unfurl/adapters/trello/index.js";
+import { AdapterRegistry } from "../../src/unfurl/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -70,16 +71,26 @@ async function resolveRefsTestable(
   mode: "cached" | "fresh",
   credentials: Record<string, UnfurlCredentials>,
   findAdapter: (sourceType: string) => UnfurlAdapter | undefined,
-  onSnapshotWrite: (cardId: string, snapshot: string) => void
+  onSnapshotWrite: (cardId: string, snapshot: string) => void,
+  findByRef?: (ref: string) => UnfurlAdapter | undefined,
+  onSourceTypeRepair?: (cardId: string, sourceType: string) => void
 ): Promise<Map<string, { ok: boolean; result?: UnfurlResult; error?: string; sourceType: string }>> {
   const resolved = new Map<string, { ok: boolean; result?: UnfurlResult; error?: string; sourceType: string }>();
 
   await Promise.allSettled(
     Array.from(cardCache.entries()).map(async ([cardId, card]) => {
       if (!card.source_ref || !card.source_type) return;
-      const adapter = findAdapter(card.source_type);
+      const adapter =
+        findAdapter(card.source_type) ??
+        findByRef?.(card.source_ref);
       if (!adapter) return;
-      const creds = credentials[card.source_type] ?? {};
+
+      // source_type 미스매치: fallback으로 찾은 경우 자동 수복 (fire-and-forget)
+      if (!findAdapter(card.source_type)) {
+        Promise.resolve().then(() => onSourceTypeRepair?.(cardId, adapter.sourceType)).catch(() => {});
+      }
+
+      const creds = credentials[adapter.sourceType] ?? {};
 
       if (mode === "cached" && card.source_snapshot) {
         try {
@@ -332,5 +343,127 @@ describe("TrelloAdapter", () => {
     await expect(
       adapter.resolve("ABC123", { token: "tok" })
     ).rejects.toThrow("apiKey and token are required");
+  });
+
+  it("canHandle: trello.com/c/ URL에 대해 true 반환", () => {
+    expect(adapter.canHandle("https://trello.com/c/ABC123")).toBe(true);
+    expect(adapter.canHandle("https://trello.com/c/ABC123/my-card-title")).toBe(true);
+  });
+
+  it("canHandle: trello.com/c/ 포함하지 않는 ref에 대해 false 반환", () => {
+    expect(adapter.canHandle("ABC123")).toBe(false);
+    expect(adapter.canHandle("https://github.com/org/repo")).toBe(false);
+    expect(adapter.canHandle("")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AdapterRegistry.findByRef
+// ---------------------------------------------------------------------------
+
+describe("AdapterRegistry.findByRef", () => {
+  it("canHandle이 true인 어댑터를 반환한다", () => {
+    const registry = new AdapterRegistry();
+    const trello = new TrelloAdapter();
+    registry.register(trello);
+
+    const found = registry.findByRef("https://trello.com/c/SHORTLINK");
+    expect(found).toBe(trello);
+  });
+
+  it("매칭되는 어댑터가 없으면 undefined 반환", () => {
+    const registry = new AdapterRegistry();
+    registry.register(new TrelloAdapter());
+
+    const found = registry.findByRef("https://github.com/org/repo");
+    expect(found).toBeUndefined();
+  });
+
+  it("canHandle이 없는 어댑터는 findByRef에서 무시된다", () => {
+    const registry = new AdapterRegistry();
+    const noCanHandle: UnfurlAdapter = {
+      sourceType: "web",
+      credentialFields: [],
+      async resolve() {
+        return { text: "", snapshot: "{}", unfurlData: null };
+      },
+      // canHandle 미구현
+    };
+    registry.register(noCanHandle);
+
+    const found = registry.findByRef("https://trello.com/c/SHORTLINK");
+    expect(found).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveRefs fallback: source_type="web", source_ref="https://trello.com/c/..."
+// ---------------------------------------------------------------------------
+
+describe("resolveRefs — canHandle fallback", () => {
+  const mockResult = makeUnfurlResult("trello via fallback");
+
+  const trelloAdapter: UnfurlAdapter = {
+    sourceType: "trello",
+    credentialFields: [],
+    canHandle: (ref: string) => ref.includes("trello.com/c/"),
+    async resolve(ref: string, creds: UnfurlCredentials): Promise<UnfurlResult> {
+      void ref; void creds;
+      return mockResult;
+    },
+  };
+
+  it("source_type='web'이어도 source_ref가 trello URL이면 TrelloAdapter로 unfurl된다", async () => {
+    const card = makeCard({
+      id: "card-fallback-1",
+      title: "Trello card via web type",
+      source_type: "web",
+      source_ref: "https://trello.com/c/SHORTLINK",
+      source_snapshot: null,
+    });
+
+    const cardCache = new Map([["card-fallback-1", card]]);
+    const snapshotWrites: string[] = [];
+    const sourceTypeRepairs: Array<{ cardId: string; sourceType: string }> = [];
+
+    const result = await resolveRefsTestable(
+      cardCache,
+      "fresh",
+      { trello: { apiKey: "k", token: "t" } },
+      (_t) => undefined, // "web" 어댑터 없음
+      (id) => snapshotWrites.push(id),
+      (ref) => (ref.includes("trello.com/c/") ? trelloAdapter : undefined),
+      (cardId, sourceType) => sourceTypeRepairs.push({ cardId, sourceType })
+    );
+
+    expect(result.get("card-fallback-1")?.ok).toBe(true);
+    expect(result.get("card-fallback-1")?.result?.text).toBe("trello via fallback");
+
+    // flush microtasks for fire-and-forget
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sourceTypeRepairs).toContainEqual({ cardId: "card-fallback-1", sourceType: "trello" });
+  });
+
+  it("source_type='web'이고 ref도 trello URL이 아니면 skip된다", async () => {
+    const card = makeCard({
+      id: "card-fallback-2",
+      title: "Unknown web",
+      source_type: "web",
+      source_ref: "https://example.com/article",
+      source_snapshot: null,
+    });
+
+    const cardCache = new Map([["card-fallback-2", card]]);
+
+    const result = await resolveRefsTestable(
+      cardCache,
+      "fresh",
+      {},
+      (_t) => undefined,
+      () => {},
+      (ref) => (ref.includes("trello.com/c/") ? trelloAdapter : undefined)
+    );
+
+    expect(result.has("card-fallback-2")).toBe(false);
   });
 });

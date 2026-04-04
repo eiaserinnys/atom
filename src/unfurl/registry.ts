@@ -11,6 +11,13 @@ export class AdapterRegistry {
     return this.adapters.get(sourceType);
   }
 
+  findByRef(ref: string): UnfurlAdapter | undefined {
+    for (const adapter of this.adapters.values()) {
+      if (adapter.canHandle?.(ref)) return adapter;
+    }
+    return undefined;
+  }
+
   list(): { sourceType: string; credentialFields: CredentialField[] }[] {
     return Array.from(this.adapters.values()).map((adapter) => ({
       sourceType: adapter.sourceType,

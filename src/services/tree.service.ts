@@ -7,7 +7,7 @@ import {
   insertNode,
   moveNode as moveNodeQuery,
 } from "../db/queries/tree.js";
-import { selectCardById, updateCardSnapshot } from "../db/queries/cards.js";
+import { selectCardById, updateCardSnapshot, updateCardSourceType } from "../db/queries/cards.js";
 import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
 import type { Card, TreeNode, TreeNodeWithCard } from "../shared/types.js";
 import type { UnfurlCredentials } from "../unfurl/interface.js";
@@ -47,9 +47,19 @@ async function resolveRefs(
   await Promise.allSettled(
     Array.from(cardCache.entries()).map(async ([cardId, card]) => {
       if (!card.source_ref || !card.source_type) return;
-      const adapter = adapterRegistry.find(card.source_type);
+      const adapter =
+        adapterRegistry.find(card.source_type) ??
+        adapterRegistry.findByRef(card.source_ref);
       if (!adapter) return; // 어댑터 없으면 skip
-      const creds = credentials[card.source_type] ?? {};
+
+      // source_type 미스매치: fallback으로 찾은 경우 자동 수복 (fire-and-forget)
+      if (!adapterRegistry.find(card.source_type)) {
+        updateCardSourceType(db, cardId, adapter.sourceType).catch((e) =>
+          console.error("[unfurl] source_type repair failed", e)
+        );
+      }
+
+      const creds = credentials[adapter.sourceType] ?? {};
 
       if (mode === "cached" && card.source_snapshot) {
         // 캐시 히트: snapshot을 파싱하여 재사용
