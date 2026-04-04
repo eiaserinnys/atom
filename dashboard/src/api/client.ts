@@ -44,6 +44,8 @@ export interface CardData {
   staleness: string;
   version: number;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 export interface CredentialField {

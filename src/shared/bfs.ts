@@ -37,6 +37,9 @@ function buildMetaComment(
   if (card.source_type) {
     parts.push(`source:${card.source_type}`);
   }
+  if (card.created_by) {
+    parts.push(`by:${card.created_by}`);
+  }
   if (chars !== undefined) {
     parts.push(`chars:${chars}`);
   }
