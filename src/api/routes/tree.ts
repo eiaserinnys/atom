@@ -51,12 +51,14 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       const excludeNodes = excludeNodesRaw
         ? new Set(excludeNodesRaw.split(",").map((s) => s.trim()))
         : undefined;
+      const limit = qs["limit"] !== undefined ? parseInt(qs["limit"]) : undefined;
       const result = await compileSubtree(req.params.nodeId, depth, {
         includeIds: includeIds || undefined,
         titlesOnly: titlesOnly || undefined,
         numbering: numbering || undefined,
         maxChars: maxChars,
         excludeNodes: excludeNodes,
+        limit,
       });
       return { markdown: result.markdown };
     }
