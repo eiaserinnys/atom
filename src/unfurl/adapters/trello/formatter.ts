@@ -48,9 +48,10 @@ export function formatTrelloCard(card: TrelloCardRaw): UnfurlResult {
     }
   }
 
+  const text = lines.join("\n");
   return {
-    text: lines.join("\n"),
-    snapshot: JSON.stringify(unfurlData),
+    text,
+    snapshot: JSON.stringify({ text, unfurlData }),
     unfurlData,
   };
 }

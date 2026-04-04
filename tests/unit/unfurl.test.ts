@@ -32,10 +32,11 @@ function makeCard(overrides: Partial<Card> & { id: string; title: string }): Car
 }
 
 function makeUnfurlResult(text: string = "resolved"): UnfurlResult {
+  const unfurlData = { text };
   return {
     text,
-    snapshot: JSON.stringify({ text }),
-    unfurlData: { text },
+    snapshot: JSON.stringify({ text, unfurlData }),
+    unfurlData,
   };
 }
 
@@ -47,9 +48,15 @@ describe("parseSnapshot", () => {
   it("parses valid JSON snapshot into UnfurlResult", () => {
     const result = makeUnfurlResult("hello");
     const parsed = parseSnapshot(result.snapshot);
-    // snapshot JSON contains the serialized UnfurlResult fields
-    // parsed.text comes from the stored JSON
     expect(parsed.text).toBe("hello");
+    expect(parsed.unfurlData).toEqual({ text: "hello" });
+  });
+
+  it("parses legacy format (raw unfurlData) with backward compat", () => {
+    const legacy = JSON.stringify({ id: "abc", name: "Test Card" });
+    const parsed = parseSnapshot(legacy);
+    expect(parsed.unfurlData).toEqual({ id: "abc", name: "Test Card" });
+    expect(parsed.text).toBe("");
   });
 
   it("throws on invalid JSON", () => {
@@ -315,9 +322,9 @@ describe("TrelloAdapter", () => {
     expect(result.text).toContain("[ ] Step 2");
 
     const data = JSON.parse(result.snapshot);
-    expect(data.id).toBe("card-id-abc");
-    expect(data.name).toBe("Test Card");
-    expect(data.checklists[0].items).toHaveLength(2);
+    expect(data.unfurlData.id).toBe("card-id-abc");
+    expect(data.unfurlData.name).toBe("Test Card");
+    expect(data.unfurlData.checklists[0].items).toHaveLength(2);
   });
 
   it("resolve: trello.com URL에서 shortLink 추출", async () => {
