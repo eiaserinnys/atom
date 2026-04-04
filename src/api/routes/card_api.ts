@@ -1,24 +1,29 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
+import { findActiveAgents } from "../../db/queries/agents.js";
+import { getPool } from "../../db/client.js";
+import bcrypt from "bcryptjs";
 import type { Staleness, UpdateCardInput } from "../../shared/types.js";
 
-const CHAT_WRITE_API_KEY = process.env["CHAT_WRITE_API_KEY"];
-
-async function apiKeyPreHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
-  if (!CHAT_WRITE_API_KEY) {
-    return reply.code(503).send({ error: "CHAT_WRITE_API_KEY not configured" });
+async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const secret = req.headers["x-api-key"] as string | undefined;
+  if (!secret) {
+    return reply.code(401).send({ error: "x-api-key header required" });
   }
-  const provided = req.headers["x-api-key"];
-  if (!provided || provided !== CHAT_WRITE_API_KEY) {
+  const agents = await findActiveAgents(getPool());
+  const agent = (await Promise.all(
+    agents.map(async (a) => (await bcrypt.compare(secret, a.secret_hash)) ? a : null)
+  )).find(Boolean) ?? null;
+  if (!agent) {
     return reply.code(401).send({ error: "Unauthorized" });
   }
 }
 
-export async function chatWriteRoutes(app: FastifyInstance): Promise<void> {
-  // POST /api/chat/cards — create a chat log card
+export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
+  // POST /api/cards — create a card (agent key auth)
   app.post(
-    "/api/chat/cards",
-    { preHandler: apiKeyPreHandler },
+    "/api/cards",
+    { preHandler: agentKeyPreHandler },
     async (req, reply) => {
       const body = req.body as Record<string, unknown>;
       if (!body["title"] || typeof body["title"] !== "string") {
@@ -40,10 +45,10 @@ export async function chatWriteRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  // PATCH /api/chat/cards/:cardId — update a chat log card
+  // PATCH /api/cards/:cardId — update a card (agent key auth)
   app.patch<{ Params: { cardId: string } }>(
-    "/api/chat/cards/:cardId",
-    { preHandler: apiKeyPreHandler },
+    "/api/cards/:cardId",
+    { preHandler: agentKeyPreHandler },
     async (req, reply) => {
       const body = req.body as Record<string, unknown>;
       const input: UpdateCardInput = {};

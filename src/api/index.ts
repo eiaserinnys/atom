@@ -10,7 +10,7 @@ import { eventsRoutes } from "./routes/events.js";
 import { batchRoutes } from "./routes/batch.js";
 import { configRoutes } from "./routes/config.js";
 import { unfurlRoutes } from "./routes/unfurl.js";
-import { chatWriteRoutes } from "./routes/chat_write.js";
+import { cardApiRoutes } from "./routes/card_api.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -44,7 +44,7 @@ app.register(eventsRoutes);
 app.register(batchRoutes);
 app.register(configRoutes);
 app.register(unfurlRoutes);
-app.register(chatWriteRoutes);
+app.register(cardApiRoutes);
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {
