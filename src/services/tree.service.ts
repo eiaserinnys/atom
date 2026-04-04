@@ -91,7 +91,7 @@ async function resolveRefs(
           console.error("[unfurl] snapshot write failed", e)
         );
       } catch (e) {
-        resolved.set(cardId, { ok: false, error: String(e), sourceType: card.source_type });
+        resolved.set(cardId, { ok: false, error: serializeError(e), sourceType: card.source_type });
       }
     })
   );
