@@ -38,7 +38,20 @@ export async function listChildren(
   parentNodeId: string | null
 ): Promise<TreeNodeWithCard[]> {
   const db = getPool();
-  const nodes = await selectChildren(db, parentNodeId);
+
+  // symlink 해석: 부모가 symlink이면 canonical node의 자식을 반환
+  let effectiveParentId = parentNodeId;
+  if (parentNodeId !== null) {
+    const parentNode = await selectNodeById(db, parentNodeId);
+    if (parentNode?.is_symlink) {
+      const canonicalNode = await selectCanonicalNodeByCardId(db, parentNode.card_id);
+      if (canonicalNode) {
+        effectiveParentId = canonicalNode.id;
+      }
+    }
+  }
+
+  const nodes = await selectChildren(db, effectiveParentId);
   const results: TreeNodeWithCard[] = [];
   for (const node of nodes) {
     const card = await selectCardById(db, node.card_id);
@@ -134,9 +147,19 @@ export async function compileSubtree(
     visitedCardIds.add(node.card_id);
 
     // For symlinks, also load canonical node's children
-    const childParentId = node.is_symlink
-      ? (await selectCanonicalNodeByCardId(db, node.card_id))?.id ?? nid
-      : nid;
+    let childParentId = nid;
+    if (node.is_symlink) {
+      const canonicalNode = await selectCanonicalNodeByCardId(db, node.card_id);
+      if (canonicalNode) {
+        // canonical node 자체도 캐시에 추가 — findCanonicalNodeId가 찾을 수 있도록
+        nodeCache.set(canonicalNode.id, canonicalNode);
+        if (!cardCache.has(canonicalNode.card_id)) {
+          const canonicalCard = await selectCardById(db, canonicalNode.card_id);
+          if (canonicalCard) cardCache.set(canonicalNode.card_id, canonicalCard);
+        }
+        childParentId = canonicalNode.id;
+      }
+    }
 
     const children = await selectChildren(db, childParentId);
     for (const child of children) {
