@@ -6,6 +6,7 @@ import {
   deleteNodeById,
   insertNode,
   moveNode as moveNodeQuery,
+  getNodeBreadcrumb,
 } from "../db/queries/tree.js";
 import { selectCardById, updateCardSnapshot, updateCardSourceType } from "../db/queries/cards.js";
 import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
@@ -55,7 +56,19 @@ export async function listChildren(
   const results: TreeNodeWithCard[] = [];
   for (const node of nodes) {
     const card = await selectCardById(db, node.card_id);
-    if (card) results.push({ ...node, card });
+    if (!card) continue;
+    if (!node.is_symlink) {
+      results.push({ ...node, card });
+      continue;
+    }
+    // symlink: canonical 노드의 breadcrumb을 canonical_path로 첨부
+    const canonical = await selectCanonicalNodeByCardId(db, node.card_id);
+    if (!canonical) {
+      results.push({ ...node, card }); // orphan symlink
+      continue;
+    }
+    const parts = await getNodeBreadcrumb(db, canonical.id);
+    results.push({ ...node, card, canonical_path: parts.join(' / ') });
   }
   return results;
 }

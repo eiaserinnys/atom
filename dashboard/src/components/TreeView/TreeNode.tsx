@@ -69,9 +69,17 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
         {node.is_symlink && (
           <span className="text-[10px] text-node-plan shrink-0" title="symlink">↗</span>
         )}
-        <span className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1">
+        <span className="flex-1 min-w-0 text-sm truncate">
           {node.card.title}
         </span>
+        {node.is_symlink && node.canonical_path && (
+          <span
+            className="ml-2 shrink-0 text-[10px] text-node-plan bg-node-plan/10 border border-node-plan/20 rounded px-1.5 py-0.5 max-w-[180px] truncate leading-none"
+            title={node.canonical_path}
+          >
+            {node.canonical_path}
+          </span>
+        )}
         {isError && (
           <span className="ml-1 text-xs cursor-help shrink-0" title={error?.message ?? '오류 발생'}>⚠️</span>
         )}

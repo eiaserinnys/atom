@@ -316,6 +316,61 @@ describe("Tree operations", () => {
     expect(symlinkMd).toContain("Symlink-Compile-B");
   });
 
+  it("symlink canonical_path: listChildren on parent returns symlink with canonical_path", async () => {
+    // 구조: Root → Child(A). Root2 아래에 A의 symlink 생성.
+    // listChildren(Root2)에서 symlink의 canonical_path가 "Root / A" 형태로 포함되어야 한다.
+    const { card: cardRoot, node_id: nodeRoot } = await cardService.createCard({
+      card_type: "structure",
+      title: "CanonPath-Root",
+    });
+    const { card: cardA } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "CanonPath-A",
+      parent_node_id: nodeRoot,
+    });
+    const { node_id: nodeRoot2 } = await cardService.createCard({
+      card_type: "structure",
+      title: "CanonPath-Root2",
+    });
+
+    // Root2 아래에 A의 symlink 생성
+    await treeService.createSymlink(cardA.id, nodeRoot2, undefined);
+
+    const children = await treeService.listChildren(nodeRoot2);
+    expect(children.length).toBe(1);
+    const symlinkChild = children[0]!;
+    expect(symlinkChild.is_symlink).toBe(true);
+    expect(symlinkChild.canonical_path).toBeTruthy();
+    // breadcrumb은 "루트 제목 / 카드 제목" 형태여야 한다
+    expect(symlinkChild.canonical_path).toContain("CanonPath-Root");
+    expect(symlinkChild.canonical_path).toContain("CanonPath-A");
+  });
+
+  it("orphan symlink: canonical 노드 없을 때 canonical_path 미포함", async () => {
+    // canonical 노드 없이 직접 symlink 노드만 삽입 (orphan 시뮬레이션)
+    // card는 있지만 non-symlink 노드가 없으면 orphan
+    const { card: cardX, node_id: nodeX } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "OrphanCard",
+    });
+    const { node_id: nodeParent } = await cardService.createCard({
+      card_type: "structure",
+      title: "OrphanParent",
+    });
+
+    // non-symlink 노드(nodeX)를 삭제하여 orphan 상태 만들기
+    await treeService.deleteNode(nodeX);
+
+    // cardX의 symlink를 nodeParent 아래에 생성 (orphan: canonical 없음)
+    await treeService.createSymlink(cardX.id, nodeParent, undefined);
+
+    const children = await treeService.listChildren(nodeParent);
+    expect(children.length).toBe(1);
+    const orphanChild = children[0]!;
+    expect(orphanChild.is_symlink).toBe(true);
+    expect(orphanChild.canonical_path).toBeUndefined();
+  });
+
   it("moves a node to a new parent", async () => {
     const { node_id: rootA } = await cardService.createCard({
       card_type: "structure",
