@@ -1,204 +1,203 @@
 ---
 name: atom-zettelkasten
 description: |
-  atom MCP 시스템에 지식 카드를 제텔카스텐 방식으로 작성하는 범용 방법론 가이드.
-  atom에 카드를 기록하거나, 기존 카드를 갱신하거나, 지식 구조를 구성할 때 반드시 참조한다.
-  "atom에 기록해줘", "카드 만들어줘", "atom에 저장해줘", "지식 정리해줘" 같은 요청 시 사용.
-  atom 카드를 작성하는 모든 스킬이 이 스킬의 원칙을 따른다.
+  A Zettelkasten methodology guide for writing knowledge cards in the atom MCP system.
+  Reference this whenever creating, updating, or structuring cards in atom.
+  Use for requests like: "add this to atom", "create a card", "save to atom", "organize my knowledge".
+  All skills that write atom cards follow the principles defined here.
 ---
 
-# atom 제텔카스텐 카드 작성 가이드
+# atom Zettelkasten Card Writing Guide
 
-## 세 가지 원칙
+## Three Core Principles
 
-### 1. 원자성 (Atomicity) — 가장 중요
+### 1. Atomicity — Most Important
 
-카드 하나에는 아이디어 하나만. **1문장이 이상적이고, 최대 3문장**이다.
+One card, one idea. **One sentence is ideal; three sentences maximum.**
 
-기준은 하나다: *"이 카드를 다른 맥락의 트리로 옮겨도 혼자 이해되는가?"*
+The test: *"If I move this card to a completely different tree, does it still make sense on its own?"*
 
-카드가 원자적이어야 재배치가 가능하다. 너무 많은 것을 담은 카드는 특정 맥락에 묶여버려 다른 곳에 연결할 수 없게 된다. 원자성이 곧 이동성이다.
+Atomic cards can be relocated and relinked. Overloaded cards get stuck in one context and can't connect to anything else. Atomicity is portability.
 
-### 2. 출처 필수 (Source Attribution)
+### 2. Source Attribution
 
-모든 knowledge 카드의 `source_ref`에 **출처를 반드시 기록한다**.
+Every knowledge card **must** have a `source_ref`.
 
-출처가 없으면 나중에 재검증이 불가능하다. 출처 미기재 카드는 미완성 카드다.
+Without a source, the information can never be verified again. A card without a source is an incomplete card.
 
-| 상황 | source_ref 형태 |
-|------|----------------|
-| 웹 URL이 있음 | `https://example.com/path` |
-| 로컬 문서 | `file://{절대경로}` 또는 파일명 |
-| URL 없는 내부 소스 | `{소스이름}:{식별자}` (예: `internal:meeting-2024-03`) |
+| Situation | source_ref format |
+|-----------|-------------------|
+| Web URL | `https://example.com/path` |
+| Local document | `file://{absolute-path}` or filename |
+| No URL (internal source) | `{source-name}:{identifier}` (e.g. `internal:meeting-2024-03`) |
 
-### 3. 나의 언어로 (Own Words)
+### 3. In Your Own Words
 
-원문을 복사하지 않는다. 내가 이해한 방식으로 다시 쓴다.
-맥락 없이 읽어도 의미가 살아있어야 한다. 그래야 나중에 꺼냈을 때 다시 원문을 찾아볼 필요가 없다.
+Never copy-paste from the source. Rewrite it the way you understood it.
+It should be readable without any surrounding context — so you never have to dig up the original again.
 
-## 좋은 카드 vs 나쁜 카드
+## Good Cards vs. Bad Cards
 
-### 원자성
+### Atomicity
 
 ```
-❌ 나쁜 카드: "프로젝트 현황"
-  content: "A팀은 일정 지연 중. B팀은 정상 진행.
-            C팀은 이번 주 릴리즈 예정. 전체 진행률 42%.
-            주요 블로커는 QA 인력 부족과 외주 납기 지연.
-            이 외에도 3개 미완료 항목이 있다."
-→ 5개 이상의 아이디어가 섞여 있다. 어디에도 연결하기 어렵다.
+❌ Bad: "Project Status"
+  content: "Team A is behind schedule. Team B is on track.
+            Team C ships this week. Overall progress 42%.
+            Main blockers are QA staffing and contractor delays.
+            3 more items are incomplete."
+→ 5+ ideas mixed together. Can't be linked to anything specifically.
 
-✅ 좋은 카드: "QA 인력 부족이 현재 릴리즈 일정의 주요 블로커다."
-  content: "QA 인력 부족이 현재 릴리즈 일정의 주요 블로커다."
+✅ Good: "QA understaffing is the primary blocker for the current release."
+  content: "QA understaffing is the primary blocker for the current release."
   source_ref: "https://..."
-→ 하나의 사실. 다른 '블로커' 카드들과 연결 가능하다.
+→ One fact. Linkable to other "blocker" cards.
 ```
 
-### 출처
+### Source Attribution
 
 ```
-❌ 나쁜 카드: source_ref 없음
-  content: "신규 기능 A 구현 완료율 40%"
-→ 언제 측정한 값인지, 어디서 확인할 수 있는지 알 수 없다.
+❌ Bad: (no source_ref)
+  content: "Feature A implementation is 40% complete"
+→ When was this measured? Where can it be verified?
 
-✅ 좋은 카드: source_ref: "https://github.com/myorg/myrepo/issues/42"
-  content: "신규 기능 A 구현 완료율 40% (2024-03-01 기준)"
-→ 원본에서 언제든 재검증 가능하다.
+✅ Good: source_ref: "https://github.com/myorg/myrepo/issues/42"
+  content: "Feature A implementation is 40% complete (as of 2024-03-01)"
+→ Verifiable at any time.
 ```
 
-### 나의 언어로
+### In Your Own Words
 
 ```
-❌ 나쁜 카드: content: "PRD v2 마감: 프론트엔드+백엔드 코드 조립완료 + 1차 QA 외주 적용"
-→ 원문 복사. 맥락 없이는 의미 파악이 어렵다.
+❌ Bad: content: "PRD v2 deadline: frontend+backend assembly complete + first QA outsourcing applied"
+→ Copy-pasted. Meaningless without context.
 
-✅ 좋은 카드: content: "4월 말 v2 마감은 '플레이 가능한 전체 흐름'을 목표로 한다.
-              외주 QA가 처음 들어가는 마일스톤이기도 하다."
-→ 내 이해가 담겼다. 다른 '마일스톤' 카드와 연결될 맥락이 생겼다.
+✅ Good: content: "The v2 deadline at end of April targets a 'fully playable flow'.
+              It's also the first milestone where external QA is involved."
+→ Your understanding is captured. Creates context to link with other "milestone" cards.
 ```
 
-## 카드 유형
+## Card Types
 
-### structure 카드 (`card_type: "structure"`)
+### structure card (`card_type: "structure"`)
 
-목차, 섹션, 폴더 역할. 트리에서 다른 카드들의 컨테이너다.
-내용이 없거나 레이블 수준의 짧은 텍스트만 갖는다. `source_ref` 불필요.
-
-```
-예: "릴리즈 로드맵", "팀원", "알 수 없는 것들"
-```
-
-### knowledge 카드 (`card_type: "knowledge"`)
-
-실제 지식을 담는 단위. 원자성 원칙이 적용된다. `source_ref` 필수.
+Acts as a table of contents, section, or folder. A container for other cards.
+Has no content or just a short label. `source_ref` is not required.
 
 ```
-예: "v2 마감 D-28 기준 전체 진행률 16% (19/117 항목)"
-    source_ref: "https://github.com/myorg/roadmap/issues/10"
+Examples: "Release Roadmap", "Team Members", "Open Questions"
 ```
 
-## atom MCP 도구 사용법
+### knowledge card (`card_type: "knowledge"`)
 
-### 카드 작성
+Holds actual knowledge. The atomicity principle applies. `source_ref` is required.
+
+```
+Example: "Feature v2 overall progress: 16% (19/117 items) as of D-28"
+         source_ref: "https://github.com/myorg/roadmap/issues/10"
+```
+
+## atom MCP Tool Reference
+
+### Create a card
 
 ```python
 mcp__atom__create_card(
-    title="제목 (≤50자, 필수)",
-    content="내용 (1~3문장)",
-    card_type="knowledge",          # 또는 "structure"
-    source_ref="https://...",       # knowledge 카드는 필수
-    parent_node_id="<node-uuid>",   # 트리 위치 지정
-    references=["<card-uuid>", ...] # 연결할 카드들
+    title="Title (≤50 chars, required)",
+    content="Content (1–3 sentences)",
+    card_type="knowledge",          # or "structure"
+    source_ref="https://...",       # required for knowledge cards
+    parent_node_id="<node-uuid>",   # where to place it in the tree
+    references=["<card-uuid>", ...] # cards to link to
 )
 ```
 
-### 카드 갱신
+### Update a card
 
 ```python
 mcp__atom__update_card(
     card_id="<card-uuid>",
-    content="갱신된 내용",
+    content="Updated content",
     source_ref="https://...",
-    content_timestamp="2024-03-01T10:00:00+00:00"
+    content_timestamp="2024-03-01T10:00:00+00:00"  # ISO format
 )
 ```
 
-### 트리 탐색
+### Navigate the tree
 
 ```python
-# 서브트리 전체를 마크다운으로 읽기 (목차 파악에 유용)
+# Read an entire subtree as markdown (useful for orientation)
 mcp__atom__compile_subtree(node_id="<node-uuid>", depth=3)
 
-# 특정 노드의 자식 목록
+# List direct children of a node
 mcp__atom__list_children(parent_node_id="<node-uuid>")
 ```
 
-### 카드 검색 (기존 카드 확인용)
+### Search cards (before creating, to avoid duplicates)
 
 ```python
-# 생성 전에 먼저 검색해서 중복 방지
-mcp__atom__search_cards(query="검색어", limit=10)
+mcp__atom__search_cards(query="search term", limit=10)
 ```
 
-## 카드 연결 방법
+## Linking Cards
 
-### references — 의미적 연결
+### references — semantic links
 
-"이 카드를 이해하려면 저 카드도 알아야 한다"는 관계.
-`create_card`의 `references` 필드에 UUID를 넣으면 양방향 백링크가 자동 생성된다.
+"To understand this card, you also need to know that card."
+Add UUIDs to the `references` field in `create_card` — bidirectional backlinks are created automatically.
 
 ```python
-# "QA 인력 부족" 카드가 "v2 마감 위험" 카드와 연결
+# Link "QA understaffing" card to "v2 release risk" card
 mcp__atom__create_card(
-    title="QA 인력 부족이 릴리즈 블로커",
+    title="QA understaffing is a release blocker",
     content="...",
-    references=["<v2 마감 위험 카드 UUID>"]
+    references=["<v2 release risk card UUID>"]
 )
 ```
 
-### symlink — 같은 카드를 여러 맥락에
+### symlink — same card, multiple contexts
 
-카드를 복사하지 않고 여러 트리 위치에 배치한다.
-내용은 하나지만 위치는 여럿 — 한 곳에서 갱신하면 모든 위치에 반영된다.
+Place a card in multiple tree locations without duplicating it.
+One source of truth, many placements — update in one place, reflected everywhere.
 
 ```python
 mcp__atom__create_symlink(
-    card_id="<카드 UUID>",
-    parent_node_id="<새로운 위치 노드 UUID>"
+    card_id="<card UUID>",
+    parent_node_id="<target location node UUID>"
 )
 ```
 
-### structure 카드로 묶기 — 목차 구성
+### structure cards — building a table of contents
 
-관련 카드들을 structure 카드 아래에 모으면 트리 자체가 목차가 된다.
+Group related cards under a structure card and the tree itself becomes a navigable outline.
 
-## 목차 구성 패턴
+## Tree Layout Pattern
 
 ```
-[루트 structure]
-├── [섹션 A structure]    ← 레이블만, 내용 없음
-│   ├── [knowledge 카드]  ← 원자적 지식 1개 + source_ref
-│   └── [knowledge 카드]
-└── [섹션 B structure]
-    ├── [knowledge 카드]
-    └── [하위 섹션 structure]
-        └── [knowledge 카드]
+[root structure]
+├── [section A structure]    ← label only, no content
+│   ├── [knowledge card]     ← one atomic idea + source_ref
+│   └── [knowledge card]
+└── [section B structure]
+    ├── [knowledge card]
+    └── [subsection structure]
+        └── [knowledge card]
 ```
 
-`mcp__atom__compile_subtree(node_id, depth=3)` 으로 목차 전체를 한 번에 읽는다.
-루트 노드는 `mcp__atom__get_tree()`로 조회한다.
+Use `mcp__atom__compile_subtree(node_id, depth=3)` to read the full outline at once.
+Use `mcp__atom__get_tree()` to find root nodes.
 
-## 갱신 원칙
+## Update Principles
 
-- 내용이 달라지면 **갱신**하되, `source_ref`도 함께 최신으로 확인한다
-- `content_timestamp`를 갱신 시점 ISO 문자열로 설정한다
-- 카드를 삭제하기보다 내용을 갱신하거나 첫 줄에 `[무효화됨 YYYY-MM-DD]` 표시를 남긴다
-  - 백링크가 있는 카드를 삭제하면 연결이 끊어진다
+- When content changes, **update** the card and verify `source_ref` is still current
+- Set `content_timestamp` to the current ISO datetime
+- Prefer updating over deleting — add `[invalidated YYYY-MM-DD]` to the first line if needed
+  - Deleting a card with backlinks breaks the connections
 
-## 작업 순서 요약
+## Workflow Summary
 
-1. `mcp__atom__search_cards`로 기존 카드 확인 (중복 방지)
-2. 없으면 `mcp__atom__create_card`로 생성
-3. 있으면 `mcp__atom__update_card`로 갱신
-4. 연결이 필요하면 `references`에 UUID 추가 또는 `create_symlink`
-5. `mcp__atom__compile_subtree`로 결과 확인
+1. `mcp__atom__search_cards` — check for existing cards (avoid duplicates)
+2. If none → `mcp__atom__create_card`
+3. If found → `mcp__atom__update_card`
+4. Link if relevant → add to `references` or call `create_symlink`
+5. `mcp__atom__compile_subtree` — verify the result
