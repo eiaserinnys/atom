@@ -12,6 +12,9 @@ export interface CompileOptions {
   maxChars?: number;
   excludeNodes?: Set<string>; // node_id Set
   resolvedRefs?: Map<string, ResolvedRef>; // cardId → resolved
+  /** Limit depth-1 children (direct children of the root node) to the latest n items.
+   *  Sorted by card_timestamp descending. Does not affect deeper levels. */
+  limit?: number;
 }
 
 function buildMetaComment(
@@ -167,7 +170,22 @@ export function compileNode(
   const newVisited = new Set(visited);
   newVisited.add(card_id);
 
-  const children = getChildren(nodeId);
+  let children = getChildren(nodeId);
+
+  // Apply limit only to depth-1 children (direct children of the root node)
+  // headingLevel === 1 means we are at the root, so its direct children are at headingLevel === 2
+  if (headingLevel === 1 && options.limit !== undefined) {
+    // Sort by card_timestamp descending (most recent first), then take top n
+    children = [...children]
+      .sort((a, b) => {
+        const cardA = getCard(getNodeCard(a.id).card_id);
+        const cardB = getCard(getNodeCard(b.id).card_id);
+        const tsA = cardA.card_timestamp ?? "";
+        const tsB = cardB.card_timestamp ?? "";
+        return tsB.localeCompare(tsA);
+      })
+      .slice(0, options.limit);
+  }
 
   children.forEach((child, idx) => {
     const childNumber = options.numbering

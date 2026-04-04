@@ -10,9 +10,10 @@ export function registerSearchTools(server: McpServer): void {
     {
       query: z.string().describe("Search query. Natural language or tsquery syntax (e.g. 'design & principles')."),
       limit: z.number().int().optional().describe("Max results to return (default 20)."),
+      root_node_id: z.string().uuid().optional().describe("Restrict search to this node's subtree."),
     },
-    async ({ query, limit }) => {
-      const results = await searchCards(query, limit ?? 20);
+    async ({ query, limit, root_node_id }) => {
+      const results = await searchCards(query, limit ?? 20, root_node_id);
       return { content: [{ type: "text", text: JSON.stringify(results) }] };
     }
   );

@@ -60,6 +60,7 @@ export interface UpdateCardInput {
   source_snapshot?: string | null;
   source_checksum?: string | null;
   source_checked_at?: string | null;
+  staleness?: Staleness;
 }
 
 export interface SearchResult {
