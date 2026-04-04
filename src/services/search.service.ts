@@ -4,7 +4,8 @@ import type { SearchResult } from "../shared/types.js";
 
 export async function searchCards(
   query: string,
-  limit: number = 20
+  limit: number = 20,
+  rootNodeId?: string
 ): Promise<SearchResult[]> {
-  return searchByBm25(getPool(), query, limit);
+  return searchByBm25(getPool(), query, limit, rootNodeId);
 }

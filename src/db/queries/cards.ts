@@ -118,6 +118,10 @@ export async function updateCardById(
     sets.push(`source_checked_at = $${idx++}`);
     values.push(input.source_checked_at);
   }
+  if (input.staleness !== undefined) {
+    sets.push(`staleness = $${idx++}`);
+    values.push(input.staleness);
+  }
 
   // bump version
   sets.push(`version = version + 1`);
