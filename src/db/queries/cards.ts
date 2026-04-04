@@ -185,6 +185,17 @@ export async function updateCardSnapshot(
   );
 }
 
+export async function updateCardSourceType(
+  db: Queryable,
+  cardId: string,
+  sourceType: string
+): Promise<void> {
+  await db.query(
+    `UPDATE cards SET source_type = $1 WHERE id = $2`,
+    [sourceType, cardId]
+  );
+}
+
 export async function searchCards(
   db: Queryable,
   query: string,

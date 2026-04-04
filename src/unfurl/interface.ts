@@ -19,4 +19,5 @@ export interface UnfurlAdapter {
   readonly sourceType: string;
   readonly credentialFields: CredentialField[];
   resolve(ref: string, credentials: UnfurlCredentials): Promise<UnfurlResult>;
+  canHandle?(ref: string): boolean;
 }

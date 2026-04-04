@@ -11,6 +11,10 @@ export class TrelloAdapter implements UnfurlAdapter {
     { key: "token", label: "Token", secret: true },
   ];
 
+  canHandle(ref: string): boolean {
+    return ref.includes("trello.com/c/");
+  }
+
   async resolve(ref: string, credentials: UnfurlCredentials): Promise<UnfurlResult> {
     const { apiKey, token } = credentials;
     if (!apiKey || !token) {
