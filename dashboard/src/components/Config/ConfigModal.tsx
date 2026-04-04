@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { UserRole } from '../../hooks/useAuth';
 import { UserManagementTab } from './UserManagementTab';
 import { AgentManagementTab } from './AgentManagementTab';
+import { CredentialsTab } from './CredentialsTab';
 
 interface Props {
   isOpen: boolean;
@@ -11,7 +12,7 @@ interface Props {
 }
 
 export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail }: Props) {
-  const [activeTab, setActiveTab] = useState<'users' | 'agents'>(
+  const [activeTab, setActiveTab] = useState<'users' | 'agents' | 'credentials'>(
     currentUserRole === 'admin' ? 'users' : 'agents'
   );
 
@@ -68,6 +69,16 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           >
             API 키 관리
           </button>
+          <button
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              activeTab === 'credentials'
+                ? 'border-node-user text-node-user'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('credentials')}
+          >
+            외부 참조 인증
+          </button>
         </div>
 
         {/* 탭 컨텐츠 */}
@@ -76,6 +87,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             <UserManagementTab currentUserEmail={currentUserEmail} />
           )}
           {activeTab === 'agents' && <AgentManagementTab />}
+          {activeTab === 'credentials' && <CredentialsTab />}
         </div>
       </div>
     </div>

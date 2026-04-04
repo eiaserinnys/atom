@@ -4,7 +4,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Link2 } from 'lucide-react';
 import { api, type UnfurlEntry } from '../../api/client';
-import { useAdapters } from '../../hooks/useAdapters';
+import { useLocalStorageCredentials } from '../../hooks/useLocalStorageCredentials';
 import { UnfurlSectionList } from '../UnfurlSection';
 
 interface CompileViewProps {
@@ -21,8 +21,7 @@ const TOC_WIDTH = 200;
 
 export function CompileView({ nodeId }: CompileViewProps) {
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
-  const [credentials, setCredentials] = useState<Record<string, Record<string, string>>>({});
-  const { adapters } = useAdapters();
+  const { credentials } = useLocalStorageCredentials();
 
   // Standard compile (GET) — used when unfurl is disabled
   const standardQuery = useQuery({
@@ -126,13 +125,6 @@ export function CompileView({ nodeId }: CompileViewProps) {
     [tocEntries]
   );
 
-  const handleCredentialChange = (sourceType: string, key: string, value: string) => {
-    setCredentials((prev) => ({
-      ...prev,
-      [sourceType]: { ...(prev[sourceType] ?? {}), [key]: value },
-    }));
-  };
-
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
       <div className="flex items-center px-4 py-3 border-b border-border text-xs font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
@@ -161,36 +153,6 @@ export function CompileView({ nodeId }: CompileViewProps) {
           </div>
         )}
       </div>
-
-      {/* Credentials panel — shown when unfurl is enabled and adapters exist */}
-      {unfurlEnabled && adapters.length > 0 && (
-        <div className="px-4 py-3 border-b border-border bg-muted/30 space-y-2">
-          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            외부 참조 인증
-          </div>
-          {adapters.map((adapter) => (
-            <div key={adapter.sourceType} className="space-y-1">
-              <div className="text-xs font-medium text-foreground capitalize">{adapter.sourceType}</div>
-              {adapter.credentialFields.map((field) => (
-                <div key={field.key} className="flex items-center gap-2">
-                  <label className="text-xs text-muted-foreground w-24 shrink-0">
-                    {field.label}
-                  </label>
-                  <input
-                    type={field.secret ? 'password' : 'text'}
-                    placeholder={field.hint ?? ''}
-                    value={credentials[adapter.sourceType]?.[field.key] ?? ''}
-                    onChange={(e) =>
-                      handleCredentialChange(adapter.sourceType, field.key, e.target.value)
-                    }
-                    className="flex-1 text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* TOC hover zone — right edge */}
