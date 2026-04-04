@@ -4,7 +4,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Link2 } from 'lucide-react';
 import { api, type UnfurlEntry } from '../../api/client';
-import { useLocalStorageCredentials } from '../../hooks/useLocalStorageCredentials';
+import { readStoredCredentials } from '../../hooks/useLocalStorageCredentials';
 import { UnfurlSectionList } from '../UnfurlSection';
 
 interface CompileViewProps {
@@ -21,7 +21,6 @@ const TOC_WIDTH = 200;
 
 export function CompileView({ nodeId }: CompileViewProps) {
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
-  const { credentials } = useLocalStorageCredentials();
 
   // Standard compile (GET) — used when unfurl is disabled
   const standardQuery = useQuery({
@@ -33,11 +32,11 @@ export function CompileView({ nodeId }: CompileViewProps) {
     enabled: !!nodeId && !unfurlEnabled,
   });
 
-  // Unfurl compile (POST) — used when unfurl is enabled
+  // Unfurl compile (POST) — credentials는 설정 탭에서 관리, 실행 시점에 localStorage에서 직접 읽음
   const unfurlQuery = useQuery({
-    queryKey: ['compile-unfurl', nodeId, credentials],
+    queryKey: ['compile-unfurl', nodeId],
     queryFn: async () => {
-      return api.compileWithRefs(nodeId!, 2, 'cached', credentials);
+      return api.compileWithRefs(nodeId!, 2, 'cached', readStoredCredentials());
     },
     enabled: !!nodeId && unfurlEnabled,
   });
