@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
+import { listChildren } from "../../services/tree.service.js";
 import { findActiveAgents } from "../../db/queries/agents.js";
 import { getPool } from "../../db/client.js";
 import bcrypt from "bcryptjs";
@@ -65,6 +66,16 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(409).send({ error: "Version conflict", actualVersion: result.actualVersion });
       }
       return result.card;
+    }
+  );
+
+  // GET /api/tree/:nodeId/children — list children of a node (agent key auth)
+  app.get<{ Params: { nodeId: string } }>(
+    "/api/tree/:nodeId/children",
+    { preHandler: agentKeyPreHandler },
+    async (req, reply) => {
+      const children = await listChildren(req.params.nodeId);
+      return children;
     }
   );
 }
