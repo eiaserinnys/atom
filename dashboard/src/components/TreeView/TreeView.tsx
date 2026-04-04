@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { LogOut } from 'lucide-react';
 import { api, type TreeNodeData } from '../../api/client';
 import { TreeNode } from './TreeNode';
 
@@ -108,6 +109,16 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
             onToggle={toggleExpand}
           />
         ))}
+      </div>
+      <div className="shrink-0 border-t border-border px-2 py-2">
+        <button
+          onClick={() => api.logout().then(() => { window.location.href = '/'; })}
+          className="flex items-center gap-2 w-full px-3 py-2 text-xs text-muted-foreground rounded hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+          title="로그아웃"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          로그아웃
+        </button>
       </div>
     </div>
   );

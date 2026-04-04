@@ -15,6 +15,16 @@ import { adapterRegistry } from "../unfurl/registry.js";
 import { parseSnapshot } from "../unfurl/utils.js";
 import { eventBus } from "../events/eventBus.js";
 
+function serializeError(e: unknown): string {
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  try {
+    const json = JSON.stringify(e);
+    return json !== '{}' ? json : String(e);
+  } catch {
+    return String(e);
+  }
+}
+
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
   const db = getPool();
   const node = await selectNodeById(db, nodeId);
@@ -67,7 +77,7 @@ async function resolveRefs(
           const result = parseSnapshot(card.source_snapshot);
           resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
         } catch (e) {
-          resolved.set(cardId, { ok: false, error: String(e), sourceType: card.source_type });
+          resolved.set(cardId, { ok: false, error: serializeError(e), sourceType: card.source_type });
         }
         return;
       }
