@@ -28,6 +28,7 @@ export interface TreeNodeData {
   created_at: string;
   card: CardData;
   children?: TreeNodeData[];
+  canonical_path?: string;
 }
 
 export interface CardData {

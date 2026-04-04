@@ -34,6 +34,7 @@ export interface TreeNode {
 
 export interface TreeNodeWithCard extends TreeNode {
   card: Card;
+  canonical_path?: string;
 }
 
 export interface CreateCardInput {

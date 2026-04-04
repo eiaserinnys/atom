@@ -122,6 +122,28 @@ export async function selectCanonicalNodeByCardId(
   return rowToNode(result.rows[0]);
 }
 
+export async function getNodeBreadcrumb(
+  db: Queryable,
+  nodeId: string
+): Promise<string[]> {
+  const result = await db.query(
+    `WITH RECURSIVE ancestors AS (
+       SELECT tn.id, tn.parent_node_id, c.title, 0 AS depth
+       FROM tree_nodes tn
+       JOIN cards c ON c.id = tn.card_id
+       WHERE tn.id = $1
+       UNION ALL
+       SELECT tn.id, tn.parent_node_id, c.title, a.depth + 1
+       FROM tree_nodes tn
+       JOIN cards c ON c.id = tn.card_id
+       JOIN ancestors a ON tn.id = a.parent_node_id
+     )
+     SELECT title FROM ancestors ORDER BY depth DESC`,
+    [nodeId]
+  );
+  return result.rows.map((r: any) => r.title as string);
+}
+
 export async function selectNodesByCardId(
   db: Queryable,
   card_id: string
