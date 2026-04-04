@@ -76,9 +76,12 @@ export interface SearchResult {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     ...options,
+    headers: {
+      ...(options?.body != null ? { 'Content-Type': 'application/json' } : {}),
+      ...options?.headers,
+    },
   });
   if (res.status === 401) {
     window.location.href = '/';
