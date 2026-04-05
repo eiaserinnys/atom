@@ -97,6 +97,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function requestVoid(path: string, options?: RequestInit): Promise<void> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    ...options,
+  });
+  if (res.status === 401) {
+    window.location.href = '/';
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API ${res.status}: ${text}`);
+  }
+}
+
 export const api = {
   getTree(): Promise<TreeNodeData[]> {
     return request('/tree');
@@ -151,6 +167,33 @@ export const api = {
 
   updateCard(cardId: string, data: { title?: string; content?: string }): Promise<CardData> {
     return request(`/cards/${cardId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 서버 응답: { ...card, node_id } — uuid 필드명은 `id` (card_id 아님)
+  createCard(data: {
+    card_type: 'structure' | 'knowledge';
+    title: string;
+    content?: string;
+    parent_node_id?: string | null;
+    position?: number;
+  }): Promise<CardData & { node_id: string }> {
+    return request('/cards', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // DELETE /tree/:nodeId → 204 No Content
+  deleteNode(nodeId: string): Promise<void> {
+    return requestVoid(`/tree/${nodeId}`, { method: 'DELETE' });
+  },
+
+  // PUT /tree/:nodeId/move → 204 No Content
+  moveNode(nodeId: string, data: { parent_node_id: string | null; position?: number }): Promise<void> {
+    return requestVoid(`/tree/${nodeId}/move`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });

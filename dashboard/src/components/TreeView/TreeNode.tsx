@@ -9,9 +9,10 @@ interface TreeNodeProps {
   isExpanded: boolean;
   expandedNodes: Set<string>;
   onToggle: (nodeId: string) => void;
+  onContextMenu?: (x: number, y: number, node: TreeNodeData) => void;
 }
 
-export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded, expandedNodes, onToggle }: TreeNodeProps) {
+export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded, expandedNodes, onToggle, onContextMenu }: TreeNodeProps) {
   // node.children이 있으면 TreeView가 미리 로드한 상태 → initialData로 사용
   // node.children이 undefined이면 첫 expand 시 lazy fetch
   const propsChildren = node.children; // undefined or TreeNodeData[]
@@ -40,6 +41,12 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
     onSelect(node.id);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu?.(e.clientX, e.clientY, node);
+  };
+
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     onToggle(node.id);
@@ -55,6 +62,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
         }`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
       >
         {/* loading 중에는 재클릭 방지 */}
         <span
@@ -96,6 +104,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
               isExpanded={expandedNodes.has(child.id)}
               expandedNodes={expandedNodes}
               onToggle={onToggle}
+              onContextMenu={onContextMenu}
             />
           ))}
         </div>
