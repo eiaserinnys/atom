@@ -75,7 +75,11 @@ async function seedMigration(): Promise<void> {
 }
 
 const start = async (): Promise<void> => {
-  await runMigrations(path.join(__dirname, "../db/migrations"));
+  const db = getDb();
+  const migrationsDir = db.dbType === 'sqlite'
+    ? path.join(__dirname, "../db/migrations-sqlite")
+    : path.join(__dirname, "../db/migrations");
+  await runMigrations(migrationsDir);
   await seedMigration();
   await loadAdapters(adapterRegistry);
   await app.listen({ port, host: "0.0.0.0" });

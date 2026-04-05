@@ -1,5 +1,6 @@
 import type { Card, CreateCardInput, UpdateCardInput } from "../../shared/types.js";
 import type { Queryable } from "../queryable.js";
+import { serializeArray, deserializeArray } from "../utils.js";
 
 function rowToCard(row: Record<string, unknown>): Card {
   return {
@@ -7,8 +8,8 @@ function rowToCard(row: Record<string, unknown>): Card {
     card_type: row["card_type"] as Card["card_type"],
     title: row["title"] as string,
     content: (row["content"] as string | null) ?? null,
-    references: (row["references"] as string[]) ?? [],
-    tags: (row["tags"] as string[]) ?? [],
+    references: deserializeArray(row["references"]),
+    tags: deserializeArray(row["tags"]),
     card_timestamp: row["card_timestamp"] as string,
     content_timestamp: (row["content_timestamp"] as string | null) ?? null,
     source_type: (row["source_type"] as string | null) ?? null,
@@ -29,16 +30,18 @@ export async function insertCard(
   input: CreateCardInput,
   agentId?: string
 ): Promise<Card> {
+  const id = crypto.randomUUID();
   const result = await db.query(
-    `INSERT INTO cards (card_type, title, content, tags, "references", content_timestamp, source_type, source_ref, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+    `INSERT INTO cards (id, card_type, title, content, tags, "references", content_timestamp, source_type, source_ref, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
      RETURNING *`,
     [
+      id,
       input.card_type,
       input.title,
       input.content ?? null,
-      input.tags ?? [],
-      input.references ?? [],
+      serializeArray(input.tags ?? []),
+      serializeArray(input.references ?? []),
       input.content_timestamp ?? null,
       input.source_type ?? null,
       input.source_ref ?? null,
@@ -92,11 +95,11 @@ export async function updateCardById(
   }
   if (input.tags !== undefined) {
     sets.push(`tags = $${idx++}`);
-    values.push(input.tags);
+    values.push(serializeArray(input.tags));
   }
   if (input.references !== undefined) {
     sets.push(`"references" = $${idx++}`);
-    values.push(input.references);
+    values.push(serializeArray(input.references));
   }
   if (input.source_type !== undefined) {
     sets.push(`source_type = $${idx++}`);
@@ -205,6 +208,27 @@ export async function searchCards(
   query: string,
   limit: number = 20
 ): Promise<Array<{ card_id: string; title: string; card_type: string; snippet: string; rank: number }>> {
+  const { getDb } = await import("../client.js");
+  const dbType = getDb().dbType;
+
+  if (dbType === "sqlite") {
+    const result = await db.query(
+      `SELECT
+         c.id AS card_id,
+         c.title,
+         c.card_type,
+         snippet(cards_fts, -1, '<b>', '</b>', '...', 20) AS snippet,
+         cards_fts.rank AS rank
+       FROM cards_fts
+       JOIN cards c ON c.rowid = cards_fts.rowid
+       WHERE cards_fts MATCH $1
+       ORDER BY rank
+       LIMIT $2`,
+      [query, limit]
+    );
+    return result.rows;
+  }
+
   const result = await db.query(
     `SELECT
        id AS card_id,

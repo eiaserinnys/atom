@@ -12,6 +12,7 @@ import type {
   UpdateCardInput,
 } from "../shared/types.js";
 import { eventBus } from "../events/eventBus.js";
+import { deserializeArray, deserializeBoolean } from "../db/utils.js";
 
 export async function createCard(
   agentIdOrInput: string | null | CreateCardInput,
@@ -115,11 +116,39 @@ export async function deleteCard(id: string): Promise<boolean> {
 
 export async function getBacklinks(cardId: string): Promise<Card[]> {
   const db = getDb();
-  const result = await db.query(
-    `SELECT * FROM cards WHERE $1 = ANY("references")`,
-    [cardId]
-  );
-  return result.rows;
+  let result;
+  if (db.dbType === 'sqlite') {
+    result = await db.query(
+      `SELECT c.* FROM cards c, json_each(c."references") je
+       WHERE je.value = $1`,
+      [cardId]
+    );
+  } else {
+    result = await db.query(
+      `SELECT * FROM cards WHERE $1 = ANY("references")`,
+      [cardId]
+    );
+  }
+  return result.rows.map((row: Record<string, unknown>) => ({
+    id: row["id"] as string,
+    card_type: row["card_type"] as Card["card_type"],
+    title: row["title"] as string,
+    content: (row["content"] as string | null) ?? null,
+    references: deserializeArray(row["references"]),
+    tags: deserializeArray(row["tags"]),
+    card_timestamp: row["card_timestamp"] as string,
+    content_timestamp: (row["content_timestamp"] as string | null) ?? null,
+    source_type: (row["source_type"] as string | null) ?? null,
+    source_ref: (row["source_ref"] as string | null) ?? null,
+    source_snapshot: (row["source_snapshot"] as string | null) ?? null,
+    source_checksum: (row["source_checksum"] as string | null) ?? null,
+    source_checked_at: (row["source_checked_at"] as string | null) ?? null,
+    staleness: (row["staleness"] as Card["staleness"]) ?? "unverified",
+    version: row["version"] as number,
+    updated_at: row["updated_at"] as string,
+    created_by: (row["created_by"] as string | null) ?? null,
+    updated_by: (row["updated_by"] as string | null) ?? null,
+  }));
 }
 
 export async function getCardNodes(cardId: string) {

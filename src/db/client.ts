@@ -1,5 +1,7 @@
+import path from "path";
 import type { DatabaseAdapter } from "./adapter.js";
 import { PostgresAdapter } from "./adapters/postgres.js";
+import { SqliteAdapter } from "./adapters/sqlite.js";
 
 let db: DatabaseAdapter | null = null;
 
@@ -9,8 +11,9 @@ export function getDb(): DatabaseAdapter {
     if (databaseUrl) {
       db = new PostgresAdapter(databaseUrl);
     } else {
-      // Phase 2에서 SqliteAdapter 추가 예정
-      throw new Error("DATABASE_URL environment variable is required (SQLite mode not yet implemented)");
+      const sqlitePath =
+        process.env["SQLITE_PATH"] ?? path.join(process.cwd(), "atom.db");
+      db = new SqliteAdapter(sqlitePath);
     }
   }
   return db;
