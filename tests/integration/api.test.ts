@@ -260,8 +260,115 @@ describe("Tree operations", () => {
     expect(symlinkNode.card_id).toBe(cardA.id);
 
     // compile_subtree from A should not infinitely loop and should include cycle marker
-    const markdown = await treeService.compileSubtree(nodeA, Number.MAX_SAFE_INTEGER);
+    const { markdown } = await treeService.compileSubtree(nodeA, Number.MAX_SAFE_INTEGER);
     expect(markdown).toContain("*(cycle)*");
+  });
+
+  it("symlink expand: listChildren on symlink returns canonical children", async () => {
+    // 구조: A(root) → B(child). A를 C(root2) 아래에 symlink(S)로 생성.
+    // listChildren(S) → B가 포함되어야 한다.
+    const { card: cardA, node_id: nodeA } = await cardService.createCard({
+      card_type: "structure",
+      title: "Symlink-Expand-A",
+    });
+    const { card: cardB } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Symlink-Expand-B",
+      parent_node_id: nodeA,
+    });
+    const { node_id: nodeC } = await cardService.createCard({
+      card_type: "structure",
+      title: "Symlink-Expand-C",
+    });
+
+    // C 아래에 A의 symlink 노드 S 생성
+    const symlinkS = await treeService.createSymlink(cardA.id, nodeC, undefined);
+    expect(symlinkS.is_symlink).toBe(true);
+
+    // listChildren(S) → canonical node A의 자식인 B가 포함되어야 한다
+    const children = await treeService.listChildren(symlinkS.id);
+    expect(children.some((n) => n.card_id === cardB.id)).toBe(true);
+  });
+
+  it("symlink compile: compile_subtree expands symlink children", async () => {
+    // 구조: A(root) → B(child). C(root2) 아래에 A를 symlink로 생성.
+    // compileSubtree(symlink node) 결과에 B의 title이 포함되어야 한다.
+    const { card: cardA, node_id: nodeA } = await cardService.createCard({
+      card_type: "structure",
+      title: "Symlink-Compile-A",
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "Symlink-Compile-B",
+      parent_node_id: nodeA,
+    });
+    const { node_id: nodeC } = await cardService.createCard({
+      card_type: "structure",
+      title: "Symlink-Compile-C",
+    });
+
+    // C 아래에 A의 symlink 노드 생성
+    const symlinkNode = await treeService.createSymlink(cardA.id, nodeC, undefined);
+    expect(symlinkNode.is_symlink).toBe(true);
+
+    // compile from symlink node → B가 전개되어야 한다
+    const { markdown: symlinkMd } = await treeService.compileSubtree(symlinkNode.id, 2);
+    expect(symlinkMd).toContain("Symlink-Compile-B");
+  });
+
+  it("symlink canonical_path: listChildren on parent returns symlink with canonical_path", async () => {
+    // 구조: Root → Child(A). Root2 아래에 A의 symlink 생성.
+    // listChildren(Root2)에서 symlink의 canonical_path가 "Root / A" 형태로 포함되어야 한다.
+    const { card: cardRoot, node_id: nodeRoot } = await cardService.createCard({
+      card_type: "structure",
+      title: "CanonPath-Root",
+    });
+    const { card: cardA } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "CanonPath-A",
+      parent_node_id: nodeRoot,
+    });
+    const { node_id: nodeRoot2 } = await cardService.createCard({
+      card_type: "structure",
+      title: "CanonPath-Root2",
+    });
+
+    // Root2 아래에 A의 symlink 생성
+    await treeService.createSymlink(cardA.id, nodeRoot2, undefined);
+
+    const children = await treeService.listChildren(nodeRoot2);
+    expect(children.length).toBe(1);
+    const symlinkChild = children[0]!;
+    expect(symlinkChild.is_symlink).toBe(true);
+    expect(symlinkChild.canonical_path).toBeTruthy();
+    // breadcrumb은 "루트 제목 / 카드 제목" 형태여야 한다
+    expect(symlinkChild.canonical_path).toContain("CanonPath-Root");
+    expect(symlinkChild.canonical_path).toContain("CanonPath-A");
+  });
+
+  it("orphan symlink: canonical 노드 없을 때 canonical_path 미포함", async () => {
+    // canonical 노드 없이 직접 symlink 노드만 삽입 (orphan 시뮬레이션)
+    // card는 있지만 non-symlink 노드가 없으면 orphan
+    const { card: cardX, node_id: nodeX } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "OrphanCard",
+    });
+    const { node_id: nodeParent } = await cardService.createCard({
+      card_type: "structure",
+      title: "OrphanParent",
+    });
+
+    // non-symlink 노드(nodeX)를 삭제하여 orphan 상태 만들기
+    await treeService.deleteNode(nodeX);
+
+    // cardX의 symlink를 nodeParent 아래에 생성 (orphan: canonical 없음)
+    await treeService.createSymlink(cardX.id, nodeParent, undefined);
+
+    const children = await treeService.listChildren(nodeParent);
+    expect(children.length).toBe(1);
+    const orphanChild = children[0]!;
+    expect(orphanChild.is_symlink).toBe(true);
+    expect(orphanChild.canonical_path).toBeUndefined();
   });
 
   it("moves a node to a new parent", async () => {
@@ -400,7 +507,7 @@ describe("compile_subtree", () => {
       parent_node_id: rootId,
     });
 
-    const md = await treeService.compileSubtree(rootId, 2);
+    const { markdown: md } = await treeService.compileSubtree(rootId, 2);
     expect(md).toContain("# Root");
     expect(md).toContain("Root content");
     expect(md).toContain("## Child");
@@ -418,7 +525,7 @@ describe("compile_subtree", () => {
       parent_node_id: rootId,
     });
 
-    const md = await treeService.compileSubtree(rootId, 0);
+    const { markdown: md } = await treeService.compileSubtree(rootId, 0);
     expect(md).toContain("# Root");
     expect(md).not.toContain("Child");
   });
@@ -436,7 +543,7 @@ describe("compile_subtree", () => {
       parent_node_id: rootId,
     });
 
-    const md = await treeService.compileSubtree(rootId, 2, { titlesOnly: true });
+    const { markdown: md } = await treeService.compileSubtree(rootId, 2, { titlesOnly: true });
     expect(md).toContain("TitlesRoot");
     expect(md).toContain("├── TitlesChild");
     expect(md).not.toContain("Should not appear");
@@ -457,7 +564,7 @@ describe("compile_subtree", () => {
       parent_node_id: rootId,
     });
 
-    const md = await treeService.compileSubtree(rootId, 2, { maxChars: 50 });
+    const { markdown: md } = await treeService.compileSubtree(rootId, 2, { maxChars: 50 });
     expect(md.length).toBeLessThan(300); // significantly less than full output
     expect(md).toContain("<!-- truncated:");
     expect(md).toContain("chars omitted -->");
@@ -475,7 +582,7 @@ describe("compile_subtree", () => {
       parent_node_id: rootId,
     });
 
-    const md = await treeService.compileSubtree(rootId, 2, {
+    const { markdown: md } = await treeService.compileSubtree(rootId, 2, {
       excludeNodes: new Set([childId]),
     });
     expect(md).toContain("# ExRoot");

@@ -245,6 +245,18 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                   {new Date(card.updated_at).toLocaleString('ko-KR')}
                 </span>
               </div>
+              {card.created_by && (
+                <div className="flex gap-2.5 items-baseline">
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">작성자</span>
+                  <span className="text-[13px] text-foreground">{card.created_by}</span>
+                </div>
+              )}
+              {card.updated_by && card.updated_by !== card.created_by && (
+                <div className="flex gap-2.5 items-baseline">
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">수정자</span>
+                  <span className="text-[13px] text-foreground">{card.updated_by}</span>
+                </div>
+              )}
             </div>
           </>
         )}

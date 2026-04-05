@@ -1,8 +1,8 @@
 # atom
 **A knowledge base of the agents, by the agents, for the agents.** 
 
-Zettelkasten-inspired atomic knowledge cards in a tree with symlinks,<br/>
-exposed over MCP so AI agents can read, write, and reorganize knowledge directly.
+Atomic knowledge cards in a tree with symlinks — think Zettelkasten, but for agents.<br/>
+Exposed over MCP so AI agents can read, write, and reorganize knowledge directly.
 
 ## Why atom
 
@@ -11,10 +11,11 @@ atom is the opposite — **MCP is the primary interface**. The dashboard exists 
 
 An agent can:
 - **Create** a knowledge card and place it in a tree hierarchy — in one call
-- **Compile** any subtree into depth-controlled markdown — perfect for context windows
+- **Compile** any subtree into depth-controlled markdown — feed a 200-node knowledge tree into a single prompt
 - **Symlink** a card into multiple locations without duplication
-- **Batch-write** dozens of creates, updates, moves, and deletes in a single atomic transaction
-- **Search** by BM25 full-text across titles, content, and tags
+- **Batch** dozens of creates, updates, moves, deletes, and symlinks in a single atomic transaction
+- **Search** by BM25 full-text across titles, content, and tags — scoped to any subtree
+- **Unfurl** external references inline during compilation — Trello cards, and more
 - **Track provenance** — every card records its source, snapshot, checksum, and staleness
 
 Humans get a React dashboard with a 3-panel layout (tree / compiled view / card detail) and real-time SSE updates. But the system is designed so an agent can operate it end-to-end without human intervention.
@@ -28,19 +29,23 @@ Humans get a React dashboard with a 3-panel layout (tree / compiled view / card 
 ```
 PostgreSQL 16
     ├── cards           — atomic knowledge units
-    └── tree_nodes      — hierarchical placement (symlinks, BFS-safe)
+    ├── tree_nodes      — hierarchical placement (symlinks, BFS-safe)
+    ├── unfurl_snapshots — cached external resource snapshots
+    └── agents          — API key credentials for agent access
 
 Fastify server
-    ├── REST API        — 16 endpoints, used by the dashboard
+    ├── REST API        — 17 endpoints, used by the dashboard
     ├── MCP HTTP        — POST /mcp, Streamable HTTP, stateless
     ├── MCP stdio       — local agent transport
     ├── Batch API       — POST /batch, atomic multi-op transactions
+    ├── Unfurl service  — external URL/card expansion pipeline
     └── SSE             — GET /events, real-time change stream
 
 React dashboard
     — tree / compile / card detail panels
     — live updates via SSE (useAtomEvents hook)
-    — Google OAuth authentication
+    — Google + Slack OAuth authentication
+    — unfurl toggle with credentials management
 ```
 
 ## Data model
@@ -87,25 +92,35 @@ Deleting a card cascades all its nodes. Deleting a node preserves the card.
 | `get_tree` | List root-level nodes |
 | `get_node` | Single node with embedded card data |
 | `list_children` | Direct children of a node |
-| `compile_subtree` | BFS markdown compilation with depth control |
+| `compile_subtree` | BFS markdown compilation with depth/filter options |
 | `create_symlink` | Place a card at another tree location |
 | `move_node` | Relocate a node to a new parent/position |
 | `delete_node` | Remove node only (card preserved, children cascade) |
-| `search_cards` | BM25 full-text search with snippets |
-| `batch_write` | Atomic multi-operation transaction |
+| `search_cards` | BM25 full-text search with snippets; scope by `rootNodeId` |
+| `batch_op` | Atomic multi-operation transaction (creates/updates/moves/deletes/symlinks) |
 
-### batch_write
+### batch_op
 
-The most powerful tool. Executes creates, updates, moves, and deletes in a single PostgreSQL transaction.
+The most powerful tool. Executes creates, updates, moves, deletes, and symlink operations in a single PostgreSQL transaction.
 
 - **temp_id references** — new cards can reference each other within the same batch via `temp_id` / `parent_temp_id`
 - **Topological sort** — parent nodes are created before children, with cycle detection
+- **Symlinks operation** — create multiple symlinks in one atomic batch
 - **Atomic** — everything succeeds or everything rolls back
 
 ### compile_subtree
 
-Renders a subtree as markdown via BFS traversal, with configurable depth.
-Symlinks follow the canonical node's children. Cycles are detected by `card_id` and marked with `*(cycle)*`.
+Renders a subtree as markdown via BFS traversal. Options:
+
+| Option | Description |
+|--------|-------------|
+| `depth` | Max traversal depth (default: 2) |
+| `titles_only` | Extract headings only, skip card bodies |
+| `max_chars` | Truncate output at N characters |
+| `exclude_nodes` | Skip specific node IDs |
+| `numbering` | Auto-assign hierarchical numbers (1.2.3) |
+
+Symlink nodes are marked with `~`. Cycles are detected by `card_id` and marked with `*(cycle)*`.
 
 Ideal for feeding structured knowledge into an agent's context window.
 
@@ -118,7 +133,7 @@ Ideal for feeding structured knowledge into an agent's context window.
   "mcpServers": {
     "atom": {
       "url": "https://your-domain.example.com/mcp",
-      "headers": { "Authorization": "Bearer <MCP_SECRET>" }
+      "headers": { "x-api-key": "<MCP_SECRET>" }
     }
   }
 }
@@ -131,7 +146,7 @@ npm run mcp        # built
 npm run mcp:dev    # tsx watch
 ```
 
-## REST API (16 endpoints)
+## REST API (17 endpoints)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -142,17 +157,35 @@ npm run mcp:dev    # tsx watch
 | GET | `/backlinks/:cardId` | Reverse references |
 | GET | `/tree` | Root-level nodes |
 | GET | `/tree/:nodeId` | Single node with card |
-| GET | `/tree/:nodeId/children` | Direct children |
+| GET | `/tree/:nodeId/children` | Direct children (agent key auth supported) |
 | GET | `/tree/:nodeId/compile` | BFS markdown (`?depth=N`, default 2) |
 | POST | `/tree/symlink` | Create symlink |
 | PUT | `/tree/:nodeId/move` | Move node |
 | DELETE | `/tree/:nodeId` | Delete node (card preserved) |
-| GET | `/search?q=` | BM25 full-text search |
+| GET | `/search?q=` | BM25 full-text search (`?rootNodeId=` for scoped search) |
+| POST | `/api/cards` | Create card via agent key auth |
 | POST | `/mcp` | Streamable HTTP MCP endpoint |
-| POST | `/batch` | Batch write (atomic transaction) |
+| POST | `/batch` | Batch operation (atomic transaction) |
 | GET | `/events` | SSE real-time event stream |
 
-Auth endpoints: `GET /api/auth/google`, `GET /api/auth/google/callback`, `GET /api/auth/status`, `POST /api/auth/logout`
+Auth endpoints: `GET /api/auth/google`, `GET /api/auth/google/callback`, `GET /api/auth/slack`, `GET /api/auth/slack/callback`, `GET /api/auth/status`, `POST /api/auth/logout`
+
+## Getting started
+
+```bash
+docker run -d --name atom-postgres -p 5434:5432 -e POSTGRES_PASSWORD=atom postgres:16
+cp .env.example .env   # DATABASE_URL=postgresql://atom:atom@localhost:5434/atom_db, MCP_SECRET, etc.
+npm install
+npm run dev            # API on localhost:3000
+```
+
+Dashboard (optional):
+
+```bash
+cd dashboard && pnpm install && pnpm dev   # localhost:5173
+```
+
+Run tests with `npm test` (requires Docker for integration tests).
 
 ## Design decisions
 
@@ -166,19 +199,6 @@ Auth endpoints: `GET /api/auth/google`, `GET /api/auth/google/callback`, `GET /a
 
 **Provenance tracking.** Every card can record `source_type`, `source_ref`, `source_snapshot`, `source_checksum`, and `source_checked_at`. Combined with 4-level `staleness`, agents can audit where knowledge came from and whether it's still current.
 
-## Getting started
+**Unfurl pipeline.** When `source_ref` contains an external URL (e.g. a Trello card), `compile_subtree` can expand it inline. Adapters fetch and cache snapshots in `unfurl_snapshots`; cached mode reuses DB data, fresh mode always hits the source. The dashboard exposes a toggle with per-provider credentials input.
 
-```bash
-docker run -d --name atom-postgres -p 5434:5432 -e POSTGRES_PASSWORD=atom postgres:16
-cp .env.example .env   # fill in DATABASE_URL, API_PORT, MCP_SECRET, auth variables
-npm install
-npm run dev            # API on localhost:3000
-```
-
-Dashboard (optional):
-
-```bash
-cd dashboard && pnpm install && pnpm dev   # localhost:5173
-```
-
-Run tests with `npm test` (requires Docker for integration tests).
+**Multi-agent auth.** Named agents register with bcrypt-hashed API keys in the `agents` table. Each request carries `x-api-key`; the audit log records `agent_id` alongside every mutation. The dashboard shows `agent_id` in card detail and compile metadata.
