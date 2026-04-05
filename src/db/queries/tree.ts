@@ -1,5 +1,6 @@
 import type { TreeNode } from "../../shared/types.js";
 import type { Queryable } from "../queryable.js";
+import { deserializeBoolean } from "../utils.js";
 
 function rowToNode(row: Record<string, unknown>): TreeNode {
   return {
@@ -7,15 +8,13 @@ function rowToNode(row: Record<string, unknown>): TreeNode {
     card_id: row["card_id"] as string,
     parent_node_id: (row["parent_node_id"] as string | null) ?? null,
     position: row["position"] as number,
-    is_symlink: row["is_symlink"] as boolean,
+    is_symlink: deserializeBoolean(row["is_symlink"]),
     created_at: row["created_at"] as string,
   };
 }
 
-// Detects if db is a PoolClient (inside a transaction) by duck-typing.
-// PoolClient has release(); Pool does not.
-function isTransactionClient(db: Queryable): boolean {
-  return typeof (db as { release?: unknown }).release === "function";
+function isInTransaction(db: Queryable): boolean {
+  return db.inTransaction === true;
 }
 
 export async function insertNode(
@@ -26,7 +25,7 @@ export async function insertNode(
   is_symlink: boolean = false
 ): Promise<TreeNode> {
   const MAX_RETRIES = 3;
-  const inTxn = isTransactionClient(db);
+  const inTxn = isInTransaction(db);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let resolvedPosition: number;
@@ -44,17 +43,19 @@ export async function insertNode(
     const sp = `sp_insert_node_${attempt}`;
     if (inTxn) await db.query(`SAVEPOINT ${sp}`);
 
+    const id = crypto.randomUUID();
     try {
       const result = await db.query(
-        `INSERT INTO tree_nodes (card_id, parent_node_id, position, is_symlink)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        [card_id, parent_node_id, resolvedPosition, is_symlink]
+        `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [id, card_id, parent_node_id, resolvedPosition, is_symlink]
       );
       if (inTxn) await db.query(`RELEASE SAVEPOINT ${sp}`);
       return rowToNode(result.rows[0]);
     } catch (err: unknown) {
-      if ((err as { code?: string }).code === "23505") {
-        // PostgreSQL unique_violation: rollback to savepoint (if in txn) then renumber and retry
+      const code = (err as { code?: string }).code;
+      if (code === "23505" || code === "SQLITE_CONSTRAINT_UNIQUE") {
+        // unique_violation: rollback to savepoint (if in txn) then renumber and retry
         if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
         await renumberSiblings(db, parent_node_id);
       } else {
@@ -170,7 +171,7 @@ export async function moveNode(
   new_position: number | undefined
 ): Promise<TreeNode | null> {
   const MAX_RETRIES = 3;
-  const inTxn = isTransactionClient(db);
+  const inTxn = isInTransaction(db);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let resolvedPosition: number;
@@ -200,8 +201,9 @@ export async function moveNode(
       if (result.rows.length === 0) return null;
       return rowToNode(result.rows[0]);
     } catch (err: unknown) {
-      if ((err as { code?: string }).code === "23505") {
-        // PostgreSQL unique_violation: rollback to savepoint (if in txn) then renumber and retry
+      const code = (err as { code?: string }).code;
+      if (code === "23505" || code === "SQLITE_CONSTRAINT_UNIQUE") {
+        // unique_violation: rollback to savepoint (if in txn) then renumber and retry
         if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
         await renumberSiblings(db, new_parent_node_id);
       } else {

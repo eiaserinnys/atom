@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
 import { listChildren } from "../../services/tree.service.js";
 import { findActiveAgents } from "../../db/queries/agents.js";
-import { getPool } from "../../db/client.js";
+import { getDb } from "../../db/client.js";
 import bcrypt from "bcryptjs";
 import type { Staleness, UpdateCardInput } from "../../shared/types.js";
 
@@ -11,7 +11,7 @@ async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyReply): Pro
   if (!secret) {
     return reply.code(401).send({ error: "x-api-key header required" });
   }
-  const agents = await findActiveAgents(getPool());
+  const agents = await findActiveAgents(getDb());
   const agent = (await Promise.all(
     agents.map(async (a) => (await bcrypt.compare(secret, a.secret_hash)) ? a : null)
   )).find(Boolean) ?? null;

@@ -5,7 +5,7 @@ import { registerTreeTools } from "../../mcp/tools/tree_tools.js";
 import { registerSearchTools } from "../../mcp/tools/search_tools.js";
 import { registerBatchTools } from "../../mcp/tools/batch_tools.js";
 import { findActiveAgents } from "../../db/queries/agents.js";
-import { getPool } from "../../db/client.js";
+import { getDb } from "../../db/client.js";
 import bcrypt from "bcryptjs";
 import type { FastifyInstance } from "fastify";
 
@@ -16,7 +16,7 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: 'Unauthorized: x-api-key header required' });
     }
 
-    const agents = await findActiveAgents(getPool());
+    const agents = await findActiveAgents(getDb());
     const agent = (await Promise.all(
       agents.map(async (a) => (await bcrypt.compare(secret, a.secret_hash)) ? a : null)
     )).find(Boolean) ?? null;

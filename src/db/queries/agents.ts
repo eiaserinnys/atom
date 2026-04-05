@@ -1,4 +1,5 @@
 import type { Queryable } from '../queryable.js';
+import { deserializeBoolean } from '../utils.js';
 
 export interface Agent {
   id: string;
@@ -10,6 +11,18 @@ export interface Agent {
   created_at: string;
 }
 
+function rowToAgent(row: Record<string, unknown>): Agent {
+  return {
+    id: row["id"] as string,
+    agent_id: row["agent_id"] as string,
+    secret_hash: row["secret_hash"] as string,
+    display_name: (row["display_name"] as string | null) ?? null,
+    is_active: deserializeBoolean(row["is_active"]),
+    created_by: (row["created_by"] as string | null) ?? null,
+    created_at: row["created_at"] as string,
+  };
+}
+
 export async function findAgentByAgentId(
   db: Queryable, agentId: string
 ): Promise<Agent | null> {
@@ -17,26 +30,28 @@ export async function findAgentByAgentId(
     `SELECT * FROM agents WHERE agent_id = $1`,
     [agentId]
   );
-  return result.rows[0] ?? null;
+  if (result.rows.length === 0) return null;
+  return rowToAgent(result.rows[0]);
 }
 
 export async function insertAgent(
   db: Queryable,
   input: { agent_id: string; secret_hash: string; display_name?: string; created_by?: string; }
 ): Promise<Agent> {
+  const id = crypto.randomUUID();
   const result = await db.query(
-    `INSERT INTO agents (agent_id, secret_hash, display_name, created_by)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [input.agent_id, input.secret_hash, input.display_name ?? null, input.created_by ?? null]
+    `INSERT INTO agents (id, agent_id, secret_hash, display_name, created_by)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [id, input.agent_id, input.secret_hash, input.display_name ?? null, input.created_by ?? null]
   );
-  return result.rows[0];
+  return rowToAgent(result.rows[0]);
 }
 
 export async function listAgents(db: Queryable): Promise<Agent[]> {
   const result = await db.query(
     `SELECT * FROM agents ORDER BY created_at ASC`
   );
-  return result.rows;
+  return result.rows.map(rowToAgent);
 }
 
 export async function updateAgentActive(
@@ -46,7 +61,8 @@ export async function updateAgentActive(
     `UPDATE agents SET is_active = $1 WHERE id = $2 RETURNING *`,
     [isActive, id]
   );
-  return result.rows[0] ?? null;
+  if (result.rows.length === 0) return null;
+  return rowToAgent(result.rows[0]);
 }
 
 export async function updateAgentSecret(
@@ -56,14 +72,15 @@ export async function updateAgentSecret(
     `UPDATE agents SET secret_hash = $1 WHERE id = $2 RETURNING *`,
     [secretHash, id]
   );
-  return result.rows[0] ?? null;
+  if (result.rows.length === 0) return null;
+  return rowToAgent(result.rows[0]);
 }
 
 export async function findActiveAgents(db: Queryable): Promise<Agent[]> {
   const result = await db.query(
     `SELECT * FROM agents WHERE is_active = true`
   );
-  return result.rows;
+  return result.rows.map(rowToAgent);
 }
 
 export async function agentExists(db: Queryable): Promise<boolean> {

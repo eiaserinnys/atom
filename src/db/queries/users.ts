@@ -1,4 +1,5 @@
 import type { Queryable } from '../queryable.js';
+import { deserializeBoolean } from '../utils.js';
 
 export type UserRole = 'admin' | 'editor' | 'viewer';
 
@@ -11,6 +12,17 @@ export interface User {
   created_at: string;
 }
 
+function rowToUser(row: Record<string, unknown>): User {
+  return {
+    id: row["id"] as string,
+    email: row["email"] as string,
+    display_name: (row["display_name"] as string | null) ?? null,
+    role: row["role"] as UserRole,
+    is_active: deserializeBoolean(row["is_active"]),
+    created_at: row["created_at"] as string,
+  };
+}
+
 export async function findUserByEmail(
   db: Queryable, email: string
 ): Promise<User | null> {
@@ -18,7 +30,8 @@ export async function findUserByEmail(
     `SELECT * FROM users WHERE email = $1`,
     [email]
   );
-  return result.rows[0] ?? null;
+  if (result.rows.length === 0) return null;
+  return rowToUser(result.rows[0]);
 }
 
 /**
@@ -40,26 +53,28 @@ export async function findUserById(
     `SELECT * FROM users WHERE id = $1`,
     [id]
   );
-  return result.rows[0] ?? null;
+  if (result.rows.length === 0) return null;
+  return rowToUser(result.rows[0]);
 }
 
 export async function insertUser(
   db: Queryable,
   input: { email: string; display_name?: string; role: UserRole; }
 ): Promise<User> {
+  const id = crypto.randomUUID();
   const result = await db.query(
-    `INSERT INTO users (email, display_name, role)
-     VALUES ($1, $2, $3) RETURNING *`,
-    [input.email, input.display_name ?? null, input.role]
+    `INSERT INTO users (id, email, display_name, role)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [id, input.email, input.display_name ?? null, input.role]
   );
-  return result.rows[0];
+  return rowToUser(result.rows[0]);
 }
 
 export async function listUsers(db: Queryable): Promise<User[]> {
   const result = await db.query(
     `SELECT * FROM users ORDER BY created_at ASC`
   );
-  return result.rows;
+  return result.rows.map(rowToUser);
 }
 
 export async function updateUserRole(
@@ -69,7 +84,8 @@ export async function updateUserRole(
     `UPDATE users SET role = $1 WHERE id = $2 RETURNING *`,
     [role, id]
   );
-  return result.rows[0] ?? null;
+  if (result.rows.length === 0) return null;
+  return rowToUser(result.rows[0]);
 }
 
 export async function updateUserActive(
@@ -79,7 +95,8 @@ export async function updateUserActive(
     `UPDATE users SET is_active = $1 WHERE id = $2 RETURNING *`,
     [isActive, id]
   );
-  return result.rows[0] ?? null;
+  if (result.rows.length === 0) return null;
+  return rowToUser(result.rows[0]);
 }
 
 export async function userExists(db: Queryable): Promise<boolean> {

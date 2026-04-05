@@ -1,4 +1,4 @@
-import { getPool } from "../db/client.js";
+import { getDb } from "../db/client.js";
 import {
   insertCard,
   updateCardById,
@@ -92,19 +92,14 @@ export async function executeBatchOp(
     input = agentIdOrInput;
   }
 
-  const pool = getPool();
-  const client = await pool.connect();
-
-  const result: BatchOpResult = {
-    created: [],
-    symlinked: [],
-    updated: [],
-    moved: [],
-    deleted: [],
-  };
-
-  try {
-    await client.query("BEGIN");
+  const result = await getDb().transaction(async (client) => {
+    const result: BatchOpResult = {
+      created: [],
+      symlinked: [],
+      updated: [],
+      moved: [],
+      deleted: [],
+    };
 
     // ── Creates ──────────────────────────────────────────────────────────────
     if (input.creates && input.creates.length > 0) {
@@ -332,13 +327,8 @@ export async function executeBatchOp(
       }
     }
 
-    await client.query("COMMIT");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
-  }
+    return result;
+  });
 
   // Emit a single batch event after the transaction commits
   eventBus.emit("atom:event", { type: "batch:completed", result });

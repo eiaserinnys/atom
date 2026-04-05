@@ -6,7 +6,7 @@ import { registerCardTools } from "./tools/card_tools.js";
 import { registerTreeTools } from "./tools/tree_tools.js";
 import { registerSearchTools } from "./tools/search_tools.js";
 import { registerBatchTools } from "./tools/batch_tools.js";
-import { runMigrations } from "../db/client.js";
+import { runMigrations, getDb } from "../db/client.js";
 import { config } from "dotenv";
 import { loadAdapters } from "../unfurl/loader.js";
 import { adapterRegistry } from "../unfurl/registry.js";
@@ -16,7 +16,11 @@ const __dirname = path.dirname(__filename);
 config({ path: path.join(__dirname, "../../.env") });
 
 async function main(): Promise<void> {
-  await runMigrations(path.join(__dirname, "../db/migrations"));
+  const db = getDb();
+  const migrationsDir = db.dbType === 'sqlite'
+    ? path.join(__dirname, "../db/migrations-sqlite")
+    : path.join(__dirname, "../db/migrations");
+  await runMigrations(migrationsDir);
   await loadAdapters(adapterRegistry);
 
   const server = new McpServer({

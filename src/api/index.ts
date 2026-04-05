@@ -14,7 +14,7 @@ import { cardApiRoutes } from "./routes/card_api.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
-import { runMigrations, getPool } from "../db/client.js";
+import { runMigrations, getDb } from "../db/client.js";
 import { config } from "dotenv";
 import { loadAdapters } from "../unfurl/loader.js";
 import { adapterRegistry } from "../unfurl/registry.js";
@@ -52,7 +52,7 @@ if (isNaN(port)) {
 }
 
 async function seedMigration(): Promise<void> {
-  const db = getPool();
+  const db = getDb();
 
   // ALLOWED_EMAIL → users 테이블 admin 마이그레이션
   const allowedEmail = process.env["ALLOWED_EMAIL"];
@@ -75,7 +75,11 @@ async function seedMigration(): Promise<void> {
 }
 
 const start = async (): Promise<void> => {
-  await runMigrations(path.join(__dirname, "../db/migrations"));
+  const db = getDb();
+  const migrationsDir = db.dbType === 'sqlite'
+    ? path.join(__dirname, "../db/migrations-sqlite")
+    : path.join(__dirname, "../db/migrations");
+  await runMigrations(migrationsDir);
   await seedMigration();
   await loadAdapters(adapterRegistry);
   await app.listen({ port, host: "0.0.0.0" });

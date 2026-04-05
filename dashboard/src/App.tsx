@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
@@ -29,6 +29,16 @@ function AppInner() {
   );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [dbType, setDbType] = useState<'postgres' | 'sqlite' | null>(null);
+
+  useEffect(() => {
+    if (!auth.authenticated) return;
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+    fetch(`${BASE_URL}/api/config/db-info`, { credentials: 'same-origin' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.dbType) setDbType(data.dbType); })
+      .catch(() => {});
+  }, [auth.authenticated]);
 
   const handleSelectNode = useCallback((nodeId: string | null) => {
     setSelectedNodeId(nodeId);
@@ -53,6 +63,18 @@ function AppInner() {
         <span className="text-xl font-bold tracking-wide text-node-user font-display shrink-0">
           atom
         </span>
+        {dbType && (
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
+              dbType === 'postgres'
+                ? 'bg-green-500/10 text-green-400'
+                : 'bg-yellow-500/10 text-yellow-400'
+            }`}
+            title={dbType === 'postgres' ? 'PostgreSQL' : 'SQLite'}
+          >
+            {dbType === 'postgres' ? '🟢 PG' : '🟡 SQLite'}
+          </span>
+        )}
         <div className="flex-1" />
         <div className="w-full max-w-[400px]">
           <SearchBar onSelectNode={(id) => handleSelectNode(id)} />

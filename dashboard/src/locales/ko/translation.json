@@ -22,7 +22,8 @@
     "tab_users": "사용자 관리",
     "tab_agents": "API 키 관리",
     "tab_credentials": "외부 참조 인증",
-    "tab_language": "언어"
+    "tab_language": "언어",
+    "tab_database": "데이터베이스"
   },
   "users": {
     "title": "사용자 관리",
@@ -173,5 +174,23 @@
   "searchbar": {
     "placeholder": "검색...",
     "no_results": "결과 없음"
+  },
+  "database": {
+    "title": "데이터베이스",
+    "desc": "현재 데이터베이스 모드와 SQLite 마이그레이션 상태를 확인합니다.",
+    "mode_label": "DB 모드",
+    "file_label": "SQLite 파일",
+    "file_path": "경로:",
+    "file_migrated": "마이그레이션 완료 (.deprecated)",
+    "file_exists": "파일 존재",
+    "file_none": "파일 없음",
+    "migration_label": "마이그레이션",
+    "migration_done": "이미 마이그레이션이 완료되었습니다. SQLite 파일이 .deprecated로 이름이 변경되었습니다.",
+    "migration_no_file": "마이그레이션할 SQLite 파일이 없습니다.",
+    "migration_desc": "SQLite 데이터를 현재 PostgreSQL 데이터베이스로 복사합니다. 완료 후 SQLite 파일은 .deprecated로 이름이 변경됩니다.",
+    "migration_confirm": "SQLite 데이터를 PostgreSQL로 마이그레이션합니다.\n\n이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+    "migration_running": "마이그레이션 진행 중...",
+    "migration_btn": "SQLite → PostgreSQL 마이그레이션",
+    "file_status": "상태"
   }
 }

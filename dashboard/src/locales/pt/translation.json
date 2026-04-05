@@ -22,7 +22,8 @@
     "tab_users": "Usuários",
     "tab_agents": "Chaves de API",
     "tab_credentials": "Auth externa",
-    "tab_language": "Idioma"
+    "tab_language": "Idioma",
+    "tab_database": "Banco de dados"
   },
   "users": {
     "title": "Gestão de usuários",
@@ -173,5 +174,23 @@
   "searchbar": {
     "placeholder": "Pesquisar...",
     "no_results": "Sem resultados"
+  },
+  "database": {
+    "title": "Banco de dados",
+    "desc": "Verificar o modo do banco de dados atual e o status da migração SQLite.",
+    "mode_label": "Modo BD",
+    "file_label": "Arquivo SQLite",
+    "file_path": "Caminho:",
+    "file_migrated": "Migração concluída (.deprecated)",
+    "file_exists": "Arquivo existente",
+    "file_none": "Sem arquivo",
+    "migration_label": "Migração",
+    "migration_done": "A migração já foi concluída. O arquivo SQLite foi renomeado para .deprecated.",
+    "migration_no_file": "Nenhum arquivo SQLite para migrar.",
+    "migration_desc": "Copiar dados SQLite para o banco de dados PostgreSQL atual. Após a conclusão, o arquivo SQLite será renomeado para .deprecated.",
+    "migration_confirm": "Migrar dados SQLite para PostgreSQL.\n\nEsta ação não pode ser desfeita. Continuar?",
+    "migration_running": "Migrando...",
+    "migration_btn": "Migração SQLite → PostgreSQL",
+    "file_status": "Estado"
   }
 }

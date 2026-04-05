@@ -1,7 +1,10 @@
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { randomBytes } from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import bcrypt from 'bcryptjs';
-import { getPool } from '../../db/client.js';
+import Database from 'better-sqlite3';
+import { getDb } from '../../db/client.js';
 import {
   listUsers,
   insertUser,
@@ -46,7 +49,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/config/users — list users (admin only)
   app.get('/api/config/users', async (req, reply) => {
     if (!requireRole(req, reply, 'admin')) return;
-    const users = await listUsers(getPool());
+    const users = await listUsers(getDb());
     return reply.send(users);
   });
 
@@ -59,7 +62,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       if (!email || !role) {
         return reply.code(400).send({ error: 'email and role are required' });
       }
-      const user = await insertUser(getPool(), { email, display_name, role });
+      const user = await insertUser(getDb(), { email, display_name, role });
       return reply.code(201).send(user);
     }
   );
@@ -70,7 +73,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     Body: { role?: UserRole; is_active?: boolean };
   }>('/api/config/users/:id', async (req, reply) => {
     if (!requireRole(req, reply, 'admin')) return;
-    const db = getPool();
+    const db = getDb();
     const { id } = req.params;
     const { role, is_active } = req.body;
 
@@ -103,7 +106,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/config/agents — list agents (admin or editor)
   app.get('/api/config/agents', async (req, reply) => {
     if (!requireRole(req, reply, 'editor')) return;
-    const agents = await listAgents(getPool());
+    const agents = await listAgents(getDb());
     return reply.send(agents.map(agentToPublic));
   });
 
@@ -119,7 +122,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
 
       const plainSecret = randomBytes(32).toString('hex');
       const secretHash = await bcrypt.hash(plainSecret, 10);
-      const agent = await insertAgent(getPool(), {
+      const agent = await insertAgent(getDb(), {
         agent_id,
         secret_hash: secretHash,
         display_name,
@@ -141,7 +144,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
 
       const plainSecret = randomBytes(32).toString('hex');
       const secretHash = await bcrypt.hash(plainSecret, 10);
-      const agent = await updateAgentSecret(getPool(), id, secretHash);
+      const agent = await updateAgentSecret(getDb(), id, secretHash);
       if (!agent) return reply.code(404).send({ error: 'Agent not found' });
 
       return reply.send({
@@ -157,7 +160,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     Body: { is_active?: boolean };
   }>('/api/config/agents/:id', async (req, reply) => {
     if (!requireRole(req, reply, 'editor')) return;
-    const db = getPool();
+    const db = getDb();
     const { id } = req.params;
     const { is_active } = req.body;
 
@@ -167,5 +170,118 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     const agent = await updateAgentActive(db, id, is_active);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
     return reply.send(agentToPublic(agent));
+  });
+
+  // ── Database Info ─────────────────────────────────────────────────────────
+
+  // GET /api/config/db-info — current DB mode & SQLite file status (editor+)
+  app.get('/api/config/db-info', async (req, reply) => {
+    if (!requireRole(req, reply, 'editor')) return;
+    const db = getDb();
+    const sqlitePath = process.env['SQLITE_PATH'] ?? path.join(process.cwd(), 'atom.db');
+    return reply.send({
+      dbType: db.dbType,
+      sqliteFile: sqlitePath,
+      sqliteFileExists: fs.existsSync(sqlitePath),
+      deprecatedFileExists: fs.existsSync(sqlitePath + '.deprecated'),
+    });
+  });
+
+  // POST /api/config/migrate-to-pg — one-shot SQLite → PostgreSQL migration (admin only)
+  app.post('/api/config/migrate-to-pg', async (req, reply) => {
+    if (!requireRole(req, reply, 'admin')) return;
+    const db = getDb();
+
+    // Preconditions
+    if (db.dbType !== 'postgres') {
+      return reply.code(400).send({ error: 'Current mode is not PostgreSQL. Switch to PostgreSQL first.' });
+    }
+    const sqlitePath = process.env['SQLITE_PATH'] ?? path.join(process.cwd(), 'atom.db');
+    if (!fs.existsSync(sqlitePath)) {
+      return reply.code(400).send({ error: `SQLite file not found: ${sqlitePath}` });
+    }
+    if (fs.existsSync(sqlitePath + '.deprecated')) {
+      return reply.code(400).send({ error: 'Migration already completed (.deprecated file exists).' });
+    }
+
+    // Open SQLite read-only
+    const sqliteDb = new Database(sqlitePath, { readonly: true });
+
+    try {
+      await db.transaction(async (tx) => {
+        // 1. users
+        const users = sqliteDb.prepare('SELECT * FROM users ORDER BY created_at').all() as Record<string, unknown>[];
+        for (const u of users) {
+          await tx.query(
+            `INSERT INTO users (id, email, display_name, role, is_active, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (id) DO NOTHING`,
+            [u['id'], u['email'], u['display_name'] ?? null, u['role'], Boolean(u['is_active']), u['created_at']]
+          );
+        }
+
+        // 2. agents
+        const agents = sqliteDb.prepare('SELECT * FROM agents ORDER BY created_at').all() as Record<string, unknown>[];
+        for (const a of agents) {
+          await tx.query(
+            `INSERT INTO agents (id, agent_id, secret_hash, display_name, is_active, created_by, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (id) DO NOTHING`,
+            [a['id'], a['agent_id'], a['secret_hash'], a['display_name'] ?? null, Boolean(a['is_active']), a['created_by'] ?? null, a['created_at']]
+          );
+        }
+
+        // 3. cards
+        const cards = sqliteDb.prepare('SELECT * FROM cards ORDER BY card_timestamp').all() as Record<string, unknown>[];
+        for (const c of cards) {
+          const refs = typeof c['references'] === 'string' ? JSON.parse(c['references'] as string) : (c['references'] ?? []);
+          const tags = typeof c['tags'] === 'string' ? JSON.parse(c['tags'] as string) : (c['tags'] ?? []);
+          await tx.query(
+            `INSERT INTO cards (id, card_type, title, content, "references", tags, card_timestamp, content_timestamp, source_type, source_ref, source_snapshot, source_checksum, source_checked_at, staleness, version, updated_at, created_by, updated_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+             ON CONFLICT (id) DO NOTHING`,
+            [
+              c['id'], c['card_type'], c['title'], c['content'] ?? null,
+              refs, tags,
+              c['card_timestamp'], c['content_timestamp'] ?? null,
+              c['source_type'] ?? null, c['source_ref'] ?? null,
+              c['source_snapshot'] ?? null, c['source_checksum'] ?? null,
+              c['source_checked_at'] ?? null, c['staleness'] ?? 'unverified',
+              c['version'] ?? 1, c['updated_at'],
+              c['created_by'] ?? null, c['updated_by'] ?? null,
+            ]
+          );
+        }
+
+        // 4. tree_nodes (BFS order to satisfy FK constraints)
+        const allNodes = sqliteDb.prepare('SELECT * FROM tree_nodes ORDER BY created_at').all() as Record<string, unknown>[];
+        const inserted = new Set<string>();
+        const queue = allNodes.filter((n) => n['parent_node_id'] === null);
+        while (queue.length > 0) {
+          const node = queue.shift()!;
+          const nodeId = node['id'] as string;
+          if (inserted.has(nodeId)) continue;
+          await tx.query(
+            `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (id) DO NOTHING`,
+            [nodeId, node['card_id'], node['parent_node_id'] ?? null, node['position'], Boolean(node['is_symlink']), node['created_at']]
+          );
+          inserted.add(nodeId);
+          const children = allNodes.filter((n) => n['parent_node_id'] === nodeId && !inserted.has(n['id'] as string));
+          queue.push(...children);
+        }
+      });
+
+      // Rename SQLite file to .deprecated
+      sqliteDb.close();
+      fs.renameSync(sqlitePath, sqlitePath + '.deprecated');
+
+      return reply.send({ ok: true, message: 'Migration completed. SQLite file renamed to .deprecated.' });
+    } catch (err) {
+      sqliteDb.close();
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.code(500).send({ error: `Migration failed: ${message}` });
+    }
   });
 };

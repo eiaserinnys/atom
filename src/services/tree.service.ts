@@ -1,4 +1,4 @@
-import { getPool } from "../db/client.js";
+import { getDb } from "../db/client.js";
 import {
   selectNodeById,
   selectChildren,
@@ -27,7 +27,7 @@ function serializeError(e: unknown): string {
 }
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
-  const db = getPool();
+  const db = getDb();
   const node = await selectNodeById(db, nodeId);
   if (!node) return null;
   const card = await selectCardById(db, node.card_id);
@@ -38,7 +38,7 @@ export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> 
 export async function listChildren(
   parentNodeId: string | null
 ): Promise<TreeNodeWithCard[]> {
-  const db = getPool();
+  const db = getDb();
 
   // symlink 해석: 부모가 symlink이면 canonical node의 자식을 반환
   let effectiveParentId = parentNodeId;
@@ -78,7 +78,7 @@ async function resolveRefs(
   mode: "cached" | "fresh",
   credentials: Record<string, UnfurlCredentials>
 ): Promise<Map<string, ResolvedRef>> {
-  const db = getPool();
+  const db = getDb();
   const resolved = new Map<string, ResolvedRef>();
   await Promise.allSettled(
     Array.from(cardCache.entries()).map(async ([cardId, card]) => {
@@ -136,7 +136,7 @@ export async function compileSubtree(
   resolveRefsMode?: false | "cached" | "fresh",
   credentials?: Record<string, UnfurlCredentials>
 ): Promise<CompileResult> {
-  const db = getPool();
+  const db = getDb();
 
   // Cache nodes and cards fetched during this compile to avoid repeated DB calls
   const nodeCache = new Map<string, TreeNode>();
@@ -272,7 +272,7 @@ export async function createSymlink(
   parent_node_id: string | null,
   position?: number
 ): Promise<TreeNode> {
-  const node = await insertNode(getPool(), card_id, parent_node_id, position, true);
+  const node = await insertNode(getDb(), card_id, parent_node_id, position, true);
   eventBus.emit("atom:event", {
     type: "node:created",
     nodeId: node.id,
@@ -283,7 +283,7 @@ export async function createSymlink(
 }
 
 export async function deleteNode(nodeId: string): Promise<boolean> {
-  const deleted = await deleteNodeById(getPool(), nodeId);
+  const deleted = await deleteNodeById(getDb(), nodeId);
   if (deleted) {
     eventBus.emit("atom:event", { type: "node:deleted", nodeId });
   }
@@ -295,7 +295,7 @@ export async function moveNode(
   new_parent_node_id: string | null,
   new_position?: number
 ): Promise<TreeNode | null> {
-  const node = await moveNodeQuery(getPool(), nodeId, new_parent_node_id, new_position);
+  const node = await moveNodeQuery(getDb(), nodeId, new_parent_node_id, new_position);
   if (node) {
     eventBus.emit("atom:event", {
       type: "node:moved",

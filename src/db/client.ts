@@ -1,48 +1,32 @@
-import pg from "pg";
-import fs from "fs";
 import path from "path";
+import type { DatabaseAdapter } from "./adapter.js";
+import { PostgresAdapter } from "./adapters/postgres.js";
+import { SqliteAdapter } from "./adapters/sqlite.js";
 
-const { Pool } = pg;
+let db: DatabaseAdapter | null = null;
 
-let pool: pg.Pool | null = null;
-
-export function getPool(): pg.Pool {
-  if (!pool) {
+export function getDb(): DatabaseAdapter {
+  if (!db) {
     const databaseUrl = process.env["DATABASE_URL"];
-    if (!databaseUrl) {
-      throw new Error("DATABASE_URL environment variable is required");
+    if (databaseUrl) {
+      db = new PostgresAdapter(databaseUrl);
+    } else {
+      const sqlitePath =
+        process.env["SQLITE_PATH"] ?? path.join(process.cwd(), "atom.db");
+      db = new SqliteAdapter(sqlitePath);
     }
-    pool = new Pool({ connectionString: databaseUrl });
   }
-  return pool;
+  return db;
 }
 
-export function setPool(p: pg.Pool): void {
-  pool = p;
-}
+export function setDb(adapter: DatabaseAdapter): void { db = adapter; }
+export async function closeDb(): Promise<void> { if (db) { await db.close(); db = null; } }
 
-export async function closePool(): Promise<void> {
-  if (pool) {
-    await pool.end();
-    pool = null;
-  }
-}
+// 하위 호환 re-export
+export const getPool = getDb;
+export const setPool = setDb;
+export const closePool = closeDb;
 
-/**
- * Run all SQL migration files in the given directory (sorted ascending).
- * @param migrationsDir Absolute path to the migrations folder.
- *   In production, pass `new URL("./migrations", import.meta.url).pathname` at the call site.
- *   In tests, pass an absolute path directly.
- */
 export async function runMigrations(migrationsDir: string): Promise<void> {
-  const files = fs
-    .readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
-
-  const db = getPool();
-  for (const file of files) {
-    const sql = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
-    await db.query(sql);
-  }
+  return getDb().runMigrations(migrationsDir);
 }
