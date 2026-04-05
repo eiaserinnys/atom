@@ -12,10 +12,8 @@ function rowToNode(row: Record<string, unknown>): TreeNode {
   };
 }
 
-// Detects if db is a PoolClient (inside a transaction) by duck-typing.
-// PoolClient has release(); Pool does not.
-function isTransactionClient(db: Queryable): boolean {
-  return typeof (db as { release?: unknown }).release === "function";
+function isInTransaction(db: Queryable): boolean {
+  return db.inTransaction === true;
 }
 
 export async function insertNode(
@@ -26,7 +24,7 @@ export async function insertNode(
   is_symlink: boolean = false
 ): Promise<TreeNode> {
   const MAX_RETRIES = 3;
-  const inTxn = isTransactionClient(db);
+  const inTxn = isInTransaction(db);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let resolvedPosition: number;
@@ -170,7 +168,7 @@ export async function moveNode(
   new_position: number | undefined
 ): Promise<TreeNode | null> {
   const MAX_RETRIES = 3;
-  const inTxn = isTransactionClient(db);
+  const inTxn = isInTransaction(db);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let resolvedPosition: number;

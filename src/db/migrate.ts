@@ -1,6 +1,6 @@
 import { fileURLToPath } from "url";
 import path from "path";
-import { runMigrations, closePool } from "./client.js";
+import { runMigrations, closeDb } from "./client.js";
 import { config } from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,7 +12,7 @@ const migrationsDir = path.join(__dirname, "migrations");
 runMigrations(migrationsDir)
   .then(() => {
     console.log("Migrations complete");
-    return closePool();
+    return closeDb();
   })
   .catch((err) => {
     console.error("Migration failed:", err);

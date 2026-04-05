@@ -1,7 +1,7 @@
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { getPool } from '../../db/client.js';
+import { getDb } from '../../db/client.js';
 import {
   listUsers,
   insertUser,
@@ -46,7 +46,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/config/users — list users (admin only)
   app.get('/api/config/users', async (req, reply) => {
     if (!requireRole(req, reply, 'admin')) return;
-    const users = await listUsers(getPool());
+    const users = await listUsers(getDb());
     return reply.send(users);
   });
 
@@ -59,7 +59,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       if (!email || !role) {
         return reply.code(400).send({ error: 'email and role are required' });
       }
-      const user = await insertUser(getPool(), { email, display_name, role });
+      const user = await insertUser(getDb(), { email, display_name, role });
       return reply.code(201).send(user);
     }
   );
@@ -70,7 +70,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     Body: { role?: UserRole; is_active?: boolean };
   }>('/api/config/users/:id', async (req, reply) => {
     if (!requireRole(req, reply, 'admin')) return;
-    const db = getPool();
+    const db = getDb();
     const { id } = req.params;
     const { role, is_active } = req.body;
 
@@ -103,7 +103,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/config/agents — list agents (admin or editor)
   app.get('/api/config/agents', async (req, reply) => {
     if (!requireRole(req, reply, 'editor')) return;
-    const agents = await listAgents(getPool());
+    const agents = await listAgents(getDb());
     return reply.send(agents.map(agentToPublic));
   });
 
@@ -119,7 +119,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
 
       const plainSecret = randomBytes(32).toString('hex');
       const secretHash = await bcrypt.hash(plainSecret, 10);
-      const agent = await insertAgent(getPool(), {
+      const agent = await insertAgent(getDb(), {
         agent_id,
         secret_hash: secretHash,
         display_name,
@@ -141,7 +141,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
 
       const plainSecret = randomBytes(32).toString('hex');
       const secretHash = await bcrypt.hash(plainSecret, 10);
-      const agent = await updateAgentSecret(getPool(), id, secretHash);
+      const agent = await updateAgentSecret(getDb(), id, secretHash);
       if (!agent) return reply.code(404).send({ error: 'Agent not found' });
 
       return reply.send({
@@ -157,7 +157,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     Body: { is_active?: boolean };
   }>('/api/config/agents/:id', async (req, reply) => {
     if (!requireRole(req, reply, 'editor')) return;
-    const db = getPool();
+    const db = getDb();
     const { id } = req.params;
     const { is_active } = req.body;
 

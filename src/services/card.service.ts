@@ -1,5 +1,4 @@
-import { getPool } from "../db/client.js";
-import pg from "pg";
+import { getDb } from "../db/client.js";
 import {
   insertCard,
   selectCardById,
@@ -29,10 +28,7 @@ export async function createCard(
     input = agentIdOrInput;
   }
 
-  const pool = getPool();
-  const client = await (pool as pg.Pool).connect();
-  try {
-    await client.query("BEGIN");
+  const { card, node } = await getDb().transaction(async (client) => {
     const card = await insertCard(client, input, agentId ?? undefined);
     const node = await insertNode(
       client,
@@ -41,28 +37,23 @@ export async function createCard(
       input.position,
       false
     );
-    await client.query("COMMIT");
+    return { card, node };
+  });
 
-    eventBus.emit("atom:event", {
-      type: "card:created",
-      cardId: card.id,
-      nodeId: node.id,
-      parentNodeId: input.parent_node_id ?? null,
-      data: card,
-      actor: agentId,
-    });
+  eventBus.emit("atom:event", {
+    type: "card:created",
+    cardId: card.id,
+    nodeId: node.id,
+    parentNodeId: input.parent_node_id ?? null,
+    data: card,
+    actor: agentId,
+  });
 
-    return { card, node_id: node.id };
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
-  }
+  return { card, node_id: node.id };
 }
 
 export async function getCard(id: string): Promise<Card | null> {
-  return selectCardById(getPool(), id);
+  return selectCardById(getDb(), id);
 }
 
 export type UpdateCardServiceResult =
@@ -98,7 +89,7 @@ export async function updateCard(
 
   const contentChanged = input.content !== undefined;
   const result = await updateCardById(
-    getPool(), id, input, contentChanged, agentId ?? undefined, expectedVersion
+    getDb(), id, input, contentChanged, agentId ?? undefined, expectedVersion
   );
 
   if (!result) return null;
@@ -115,7 +106,7 @@ export async function updateCard(
 
 export async function deleteCard(id: string): Promise<boolean> {
   // Cascade deletes tree_nodes via FK
-  const deleted = await deleteCardById(getPool(), id);
+  const deleted = await deleteCardById(getDb(), id);
   if (deleted) {
     eventBus.emit("atom:event", { type: "card:deleted", cardId: id, actor: null });
   }
@@ -123,7 +114,7 @@ export async function deleteCard(id: string): Promise<boolean> {
 }
 
 export async function getBacklinks(cardId: string): Promise<Card[]> {
-  const db = getPool();
+  const db = getDb();
   const result = await db.query(
     `SELECT * FROM cards WHERE $1 = ANY("references")`,
     [cardId]
@@ -132,5 +123,5 @@ export async function getBacklinks(cardId: string): Promise<Card[]> {
 }
 
 export async function getCardNodes(cardId: string) {
-  return selectNodesByCardId(getPool(), cardId);
+  return selectNodesByCardId(getDb(), cardId);
 }

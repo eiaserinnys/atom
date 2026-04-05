@@ -1,8 +1,8 @@
-import type pg from "pg";
+import type { Queryable } from "../queryable.js";
 import type { SearchResult } from "../../shared/types.js";
 
 export async function searchByBm25(
-  db: pg.Pool,
+  db: Queryable,
   query: string,
   limit: number = 20,
   rootNodeId?: string

@@ -2,7 +2,7 @@ import { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { SignJWT, jwtVerify } from 'jose';
 import crypto from 'crypto';
 import { findUserByEmail, insertUser, isEmailAllowed } from '../../db/queries/users.js';
-import { getPool } from '../../db/client.js';
+import { getDb } from '../../db/client.js';
 
 // Google OAuth
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -146,9 +146,9 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
       // Google: check users table, auto-create if ALLOWED_EMAIL domain matches
       const allowedEmail = process.env['ALLOWED_EMAIL'];
-      let dbUser = await findUserByEmail(getPool(), user.email);
+      let dbUser = await findUserByEmail(getDb(), user.email);
       if (!dbUser && isEmailAllowed(user.email, allowedEmail)) {
-        dbUser = await insertUser(getPool(), { email: user.email, display_name: user.name, role: 'editor' });
+        dbUser = await insertUser(getDb(), { email: user.email, display_name: user.name, role: 'editor' });
       }
       if (!dbUser) return reply.redirect(`${frontendUrl}/?auth_error=unauthorized`);
       if (!dbUser.is_active) return reply.redirect(`${frontendUrl}/?auth_error=deactivated`);
@@ -252,9 +252,9 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       // Slack: workspace 검증 통과 시 자동 유저 생성 (이메일 체크 불필요)
       const email = identityData.user.email;
       const name = identityData.user.name;
-      let dbUser = await findUserByEmail(getPool(), email);
+      let dbUser = await findUserByEmail(getDb(), email);
       if (!dbUser) {
-        dbUser = await insertUser(getPool(), { email, display_name: name, role: 'editor' });
+        dbUser = await insertUser(getDb(), { email, display_name: name, role: 'editor' });
         app.log.info({ email, name }, 'Auto-created user from Slack OAuth');
       }
       if (!dbUser.is_active) return reply.redirect(`${frontendUrl}/?auth_error=deactivated`);
