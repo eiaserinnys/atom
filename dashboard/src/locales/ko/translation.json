@@ -1,0 +1,97 @@
+{
+  "common": {
+    "close": "닫기",
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "confirm": "확인",
+    "loading": "로딩 중...",
+    "error": "오류",
+    "search": "검색",
+    "edit": "수정",
+    "add": "추가",
+    "copy": "복사",
+    "copied": "복사됨",
+    "invite": "초대",
+    "remove": "제거",
+    "revoke": "폐기",
+    "generating": "생성 중..."
+  },
+  "config": {
+    "settings": "설정",
+    "tab_users": "사용자 관리",
+    "tab_agents": "API 키 관리",
+    "tab_credentials": "외부 참조 인증",
+    "tab_language": "언어"
+  },
+  "users": {
+    "title": "사용자 관리",
+    "invite_placeholder": "이메일",
+    "invite_btn": "추가",
+    "no_users": "등록된 사용자가 없습니다.",
+    "remove_confirm": "\"{{email}}\" 사용자를 삭제하시겠습니까?",
+    "role_change_confirm": "\"{{email}}\" 사용자의 역할을 {{role}}으로 변경하시겠습니까?"
+  },
+  "agents": {
+    "title": "API 키 관리",
+    "desc": "API 시크릿은 지금만 표시됩니다. 안전한 곳에 저장하세요.",
+    "generate_btn": "생성",
+    "no_agents": "등록된 에이전트가 없습니다.",
+    "name_placeholder": "agent_id (예: my-agent)",
+    "copy_hint": "시크릿 복사",
+    "revoke_confirm": "\"{{name}}\" API 키를 폐기하시겠습니까?",
+    "new_key_warning": "API 시크릿 — 지금만 표시됩니다. 안전한 곳에 저장하세요."
+  },
+  "credentials": {
+    "title": "외부 참조 인증",
+    "no_creds": "등록된 외부 참조 어댑터가 없습니다.",
+    "add_btn": "추가",
+    "service": "서비스",
+    "token": "토큰",
+    "remove_confirm": "\"{{service}}\" 인증 정보를 삭제하시겠습니까?"
+  },
+  "language": {
+    "title": "언어",
+    "desc": "표시 언어를 선택합니다."
+  },
+  "tree": {
+    "empty": "노드가 없습니다.",
+    "search_placeholder": "검색...",
+    "search_empty": "결과 없음",
+    "add_structure": "구조",
+    "add_knowledge": "지식",
+    "add_symlink": "심링크",
+    "compile": "컴파일",
+    "context_rename": "수정",
+    "context_delete": "삭제",
+    "context_add_child": "하위 추가",
+    "context_add_sibling": "형제 추가"
+  },
+  "card": {
+    "type_structure": "structure",
+    "type_knowledge": "knowledge",
+    "type_symlink": "symlink",
+    "updated_at": "수정일",
+    "source": "출처",
+    "edit_title": "제목 수정",
+    "edit_content": "내용 수정",
+    "compile_view": "컴파일 문서"
+  },
+  "delete_modal": {
+    "title": "카드 삭제",
+    "desc": "\"{{name}}\" 항목을 삭제하시겠습니까?",
+    "confirm_btn": "삭제"
+  },
+  "login": {
+    "title": "atom",
+    "desc": "지식 관리 시스템",
+    "sign_in_google": "Google로 로그인",
+    "sign_in_error": "인증이 설정되지 않았습니다"
+  },
+  "app": {
+    "logout": "로그아웃",
+    "settings": "설정",
+    "theme_to_light": "라이트 모드로 전환",
+    "theme_to_dark": "다크 모드로 전환"
+  }
+}

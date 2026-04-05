@@ -1,0 +1,97 @@
+{
+  "common": {
+    "close": "閉じる",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "confirm": "確認",
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "search": "検索",
+    "edit": "編集",
+    "add": "追加",
+    "copy": "コピー",
+    "copied": "コピー済み",
+    "invite": "招待",
+    "remove": "削除",
+    "revoke": "失効",
+    "generating": "生成中..."
+  },
+  "config": {
+    "settings": "設定",
+    "tab_users": "ユーザー管理",
+    "tab_agents": "API キー",
+    "tab_credentials": "外部認証",
+    "tab_language": "言語"
+  },
+  "users": {
+    "title": "ユーザー管理",
+    "invite_placeholder": "メールアドレス",
+    "invite_btn": "追加",
+    "no_users": "登録されたユーザーがいません。",
+    "remove_confirm": "ユーザー \"{{email}}\" を削除しますか？",
+    "role_change_confirm": "\"{{email}}\" の役割を {{role}} に変更しますか？"
+  },
+  "agents": {
+    "title": "API キー管理",
+    "desc": "API シークレットは一度だけ表示されます。安全な場所に保存してください。",
+    "generate_btn": "生成",
+    "no_agents": "登録されたエージェントがいません。",
+    "name_placeholder": "agent_id（例：my-agent）",
+    "copy_hint": "シークレットをコピー",
+    "revoke_confirm": "API キー \"{{name}}\" を失効させますか？",
+    "new_key_warning": "API シークレット — 一度だけ表示されます。安全な場所に保存してください。"
+  },
+  "credentials": {
+    "title": "外部認証",
+    "no_creds": "登録された外部参照アダプターがありません。",
+    "add_btn": "追加",
+    "service": "サービス",
+    "token": "トークン",
+    "remove_confirm": "\"{{service}}\" の認証情報を削除しますか？"
+  },
+  "language": {
+    "title": "言語",
+    "desc": "表示言語を選択してください。"
+  },
+  "tree": {
+    "empty": "ノードがありません。",
+    "search_placeholder": "検索...",
+    "search_empty": "結果なし",
+    "add_structure": "構造",
+    "add_knowledge": "知識",
+    "add_symlink": "シンボリックリンク",
+    "compile": "コンパイル",
+    "context_rename": "名前変更",
+    "context_delete": "削除",
+    "context_add_child": "子を追加",
+    "context_add_sibling": "兄弟を追加"
+  },
+  "card": {
+    "type_structure": "structure",
+    "type_knowledge": "knowledge",
+    "type_symlink": "symlink",
+    "updated_at": "更新日時",
+    "source": "出典",
+    "edit_title": "タイトルを編集",
+    "edit_content": "内容を編集",
+    "compile_view": "コンパイル文書"
+  },
+  "delete_modal": {
+    "title": "カードを削除",
+    "desc": "\"{{name}}\" を削除しますか？",
+    "confirm_btn": "削除"
+  },
+  "login": {
+    "title": "atom",
+    "desc": "ナレッジ管理システム",
+    "sign_in_google": "Google でサインイン",
+    "sign_in_error": "認証が設定されていません"
+  },
+  "app": {
+    "logout": "ログアウト",
+    "settings": "設定",
+    "theme_to_light": "ライトモードに切り替え",
+    "theme_to_dark": "ダークモードに切り替え"
+  }
+}

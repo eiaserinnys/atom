@@ -1,0 +1,97 @@
+{
+  "common": {
+    "close": "Cerrar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "search": "Buscar",
+    "edit": "Editar",
+    "add": "Agregar",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "invite": "Invitar",
+    "remove": "Eliminar",
+    "revoke": "Revocar",
+    "generating": "Generando..."
+  },
+  "config": {
+    "settings": "Configuración",
+    "tab_users": "Usuarios",
+    "tab_agents": "Claves API",
+    "tab_credentials": "Auth externa",
+    "tab_language": "Idioma"
+  },
+  "users": {
+    "title": "Gestión de usuarios",
+    "invite_placeholder": "Correo electrónico",
+    "invite_btn": "Agregar",
+    "no_users": "No hay usuarios registrados.",
+    "remove_confirm": "¿Eliminar al usuario \"{{email}}\"?",
+    "role_change_confirm": "¿Cambiar el rol de \"{{email}}\" a {{role}}?"
+  },
+  "agents": {
+    "title": "Gestión de claves API",
+    "desc": "El secreto de API se muestra solo una vez. Guárdelo en un lugar seguro.",
+    "generate_btn": "Generar",
+    "no_agents": "No hay agentes registrados.",
+    "name_placeholder": "agent_id (ej.: my-agent)",
+    "copy_hint": "Copiar secreto",
+    "revoke_confirm": "¿Revocar la clave API \"{{name}}\"?",
+    "new_key_warning": "Secreto de API — se muestra solo una vez. Guárdelo en un lugar seguro."
+  },
+  "credentials": {
+    "title": "Autenticación externa",
+    "no_creds": "No hay adaptadores de referencia externa registrados.",
+    "add_btn": "Agregar",
+    "service": "Servicio",
+    "token": "Token",
+    "remove_confirm": "¿Eliminar las credenciales de \"{{service}}\"?"
+  },
+  "language": {
+    "title": "Idioma",
+    "desc": "Seleccione el idioma de visualización."
+  },
+  "tree": {
+    "empty": "No hay nodos.",
+    "search_placeholder": "Buscar...",
+    "search_empty": "Sin resultados",
+    "add_structure": "Estructura",
+    "add_knowledge": "Conocimiento",
+    "add_symlink": "Enlace simbólico",
+    "compile": "Compilar",
+    "context_rename": "Renombrar",
+    "context_delete": "Eliminar",
+    "context_add_child": "Agregar hijo",
+    "context_add_sibling": "Agregar hermano"
+  },
+  "card": {
+    "type_structure": "structure",
+    "type_knowledge": "knowledge",
+    "type_symlink": "symlink",
+    "updated_at": "Actualizado",
+    "source": "Fuente",
+    "edit_title": "Editar título",
+    "edit_content": "Editar contenido",
+    "compile_view": "Documento compilado"
+  },
+  "delete_modal": {
+    "title": "Eliminar tarjeta",
+    "desc": "¿Eliminar \"{{name}}\"?",
+    "confirm_btn": "Eliminar"
+  },
+  "login": {
+    "title": "atom",
+    "desc": "Sistema de gestión del conocimiento",
+    "sign_in_google": "Iniciar sesión con Google",
+    "sign_in_error": "La autenticación no está configurada"
+  },
+  "app": {
+    "logout": "Cerrar sesión",
+    "settings": "Configuración",
+    "theme_to_light": "Cambiar a modo claro",
+    "theme_to_dark": "Cambiar a modo oscuro"
+  }
+}

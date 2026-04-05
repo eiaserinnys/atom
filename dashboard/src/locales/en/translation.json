@@ -1,0 +1,97 @@
+{
+  "common": {
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "loading": "Loading...",
+    "error": "Error",
+    "search": "Search",
+    "edit": "Edit",
+    "add": "Add",
+    "copy": "Copy",
+    "copied": "Copied",
+    "invite": "Invite",
+    "remove": "Remove",
+    "revoke": "Revoke",
+    "generating": "Generating..."
+  },
+  "config": {
+    "settings": "Settings",
+    "tab_users": "Users",
+    "tab_agents": "API Keys",
+    "tab_credentials": "External Auth",
+    "tab_language": "Language"
+  },
+  "users": {
+    "title": "Users",
+    "invite_placeholder": "Email",
+    "invite_btn": "Add",
+    "no_users": "No users registered.",
+    "remove_confirm": "Remove user \"{{email}}\"?",
+    "role_change_confirm": "Change role of \"{{email}}\" to {{role}}?"
+  },
+  "agents": {
+    "title": "API Keys",
+    "desc": "API secret is shown only once. Store it in a safe place.",
+    "generate_btn": "Generate",
+    "no_agents": "No agents registered.",
+    "name_placeholder": "agent_id (e.g. my-agent)",
+    "copy_hint": "Copy secret",
+    "revoke_confirm": "Revoke API key \"{{name}}\"?",
+    "new_key_warning": "API Secret — shown only once. Store it safely."
+  },
+  "credentials": {
+    "title": "External Auth",
+    "no_creds": "No external reference adapters registered.",
+    "add_btn": "Add",
+    "service": "Service",
+    "token": "Token",
+    "remove_confirm": "Remove credentials for \"{{service}}\"?"
+  },
+  "language": {
+    "title": "Language",
+    "desc": "Select the display language."
+  },
+  "tree": {
+    "empty": "No nodes.",
+    "search_placeholder": "Search...",
+    "search_empty": "No results",
+    "add_structure": "Structure",
+    "add_knowledge": "Knowledge",
+    "add_symlink": "Symlink",
+    "compile": "Compile",
+    "context_rename": "Rename",
+    "context_delete": "Delete",
+    "context_add_child": "Add child",
+    "context_add_sibling": "Add sibling"
+  },
+  "card": {
+    "type_structure": "structure",
+    "type_knowledge": "knowledge",
+    "type_symlink": "symlink",
+    "updated_at": "Updated",
+    "source": "Source",
+    "edit_title": "Edit title",
+    "edit_content": "Edit content",
+    "compile_view": "Compiled Document"
+  },
+  "delete_modal": {
+    "title": "Delete Card",
+    "desc": "Delete \"{{name}}\"?",
+    "confirm_btn": "Delete"
+  },
+  "login": {
+    "title": "atom",
+    "desc": "Knowledge Management System",
+    "sign_in_google": "Sign in with Google",
+    "sign_in_error": "Authentication is not configured"
+  },
+  "app": {
+    "logout": "Logout",
+    "settings": "Settings",
+    "theme_to_light": "Switch to light mode",
+    "theme_to_dark": "Switch to dark mode"
+  }
+}

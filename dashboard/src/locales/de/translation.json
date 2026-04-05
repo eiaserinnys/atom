@@ -1,0 +1,97 @@
+{
+  "common": {
+    "close": "Schließen",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "confirm": "Bestätigen",
+    "loading": "Laden...",
+    "error": "Fehler",
+    "search": "Suchen",
+    "edit": "Bearbeiten",
+    "add": "Hinzufügen",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "invite": "Einladen",
+    "remove": "Entfernen",
+    "revoke": "Widerrufen",
+    "generating": "Wird generiert..."
+  },
+  "config": {
+    "settings": "Einstellungen",
+    "tab_users": "Benutzerverwaltung",
+    "tab_agents": "API-Schlüssel",
+    "tab_credentials": "Externe Authentifizierung",
+    "tab_language": "Sprache"
+  },
+  "users": {
+    "title": "Benutzerverwaltung",
+    "invite_placeholder": "E-Mail",
+    "invite_btn": "Hinzufügen",
+    "no_users": "Keine Benutzer registriert.",
+    "remove_confirm": "Benutzer \"{{email}}\" entfernen?",
+    "role_change_confirm": "Rolle von \"{{email}}\" zu {{role}} ändern?"
+  },
+  "agents": {
+    "title": "API-Schlüsselverwaltung",
+    "desc": "Das API-Secret wird nur einmal angezeigt. Bewahren Sie es sicher auf.",
+    "generate_btn": "Generieren",
+    "no_agents": "Keine Agenten registriert.",
+    "name_placeholder": "agent_id (z.B. my-agent)",
+    "copy_hint": "Secret kopieren",
+    "revoke_confirm": "API-Schlüssel \"{{name}}\" widerrufen?",
+    "new_key_warning": "API-Secret — wird nur einmal angezeigt. Bewahren Sie es sicher auf."
+  },
+  "credentials": {
+    "title": "Externe Authentifizierung",
+    "no_creds": "Keine externen Referenzadapter registriert.",
+    "add_btn": "Hinzufügen",
+    "service": "Dienst",
+    "token": "Token",
+    "remove_confirm": "Anmeldeinformationen für \"{{service}}\" entfernen?"
+  },
+  "language": {
+    "title": "Sprache",
+    "desc": "Anzeigesprache auswählen."
+  },
+  "tree": {
+    "empty": "Keine Knoten.",
+    "search_placeholder": "Suchen...",
+    "search_empty": "Keine Ergebnisse",
+    "add_structure": "Struktur",
+    "add_knowledge": "Wissen",
+    "add_symlink": "Symlink",
+    "compile": "Kompilieren",
+    "context_rename": "Umbenennen",
+    "context_delete": "Löschen",
+    "context_add_child": "Kind hinzufügen",
+    "context_add_sibling": "Geschwister hinzufügen"
+  },
+  "card": {
+    "type_structure": "structure",
+    "type_knowledge": "knowledge",
+    "type_symlink": "symlink",
+    "updated_at": "Aktualisiert",
+    "source": "Quelle",
+    "edit_title": "Titel bearbeiten",
+    "edit_content": "Inhalt bearbeiten",
+    "compile_view": "Kompiliertes Dokument"
+  },
+  "delete_modal": {
+    "title": "Karte löschen",
+    "desc": "\"{{name}}\" löschen?",
+    "confirm_btn": "Löschen"
+  },
+  "login": {
+    "title": "atom",
+    "desc": "Wissensmanagementsystem",
+    "sign_in_google": "Mit Google anmelden",
+    "sign_in_error": "Authentifizierung ist nicht konfiguriert"
+  },
+  "app": {
+    "logout": "Abmelden",
+    "settings": "Einstellungen",
+    "theme_to_light": "Zum hellen Modus wechseln",
+    "theme_to_dark": "Zum dunklen Modus wechseln"
+  }
+}

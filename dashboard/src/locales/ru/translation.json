@@ -1,0 +1,97 @@
+{
+  "common": {
+    "close": "Закрыть",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "confirm": "Подтвердить",
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "search": "Поиск",
+    "edit": "Редактировать",
+    "add": "Добавить",
+    "copy": "Копировать",
+    "copied": "Скопировано",
+    "invite": "Пригласить",
+    "remove": "Удалить",
+    "revoke": "Отозвать",
+    "generating": "Генерация..."
+  },
+  "config": {
+    "settings": "Настройки",
+    "tab_users": "Пользователи",
+    "tab_agents": "API-ключи",
+    "tab_credentials": "Внешняя авторизация",
+    "tab_language": "Язык"
+  },
+  "users": {
+    "title": "Управление пользователями",
+    "invite_placeholder": "Электронная почта",
+    "invite_btn": "Добавить",
+    "no_users": "Нет зарегистрированных пользователей.",
+    "remove_confirm": "Удалить пользователя \"{{email}}\"?",
+    "role_change_confirm": "Изменить роль \"{{email}}\" на {{role}}?"
+  },
+  "agents": {
+    "title": "Управление API-ключами",
+    "desc": "API-секрет отображается только один раз. Сохраните его в надёжном месте.",
+    "generate_btn": "Создать",
+    "no_agents": "Нет зарегистрированных агентов.",
+    "name_placeholder": "agent_id (например: my-agent)",
+    "copy_hint": "Копировать секрет",
+    "revoke_confirm": "Отозвать API-ключ \"{{name}}\"?",
+    "new_key_warning": "API-секрет — отображается только один раз. Сохраните его в надёжном месте."
+  },
+  "credentials": {
+    "title": "Внешняя авторизация",
+    "no_creds": "Нет зарегистрированных адаптеров внешних ссылок.",
+    "add_btn": "Добавить",
+    "service": "Сервис",
+    "token": "Токен",
+    "remove_confirm": "Удалить учётные данные \"{{service}}\"?"
+  },
+  "language": {
+    "title": "Язык",
+    "desc": "Выберите язык отображения."
+  },
+  "tree": {
+    "empty": "Нет узлов.",
+    "search_placeholder": "Поиск...",
+    "search_empty": "Нет результатов",
+    "add_structure": "Структура",
+    "add_knowledge": "Знание",
+    "add_symlink": "Символическая ссылка",
+    "compile": "Компилировать",
+    "context_rename": "Переименовать",
+    "context_delete": "Удалить",
+    "context_add_child": "Добавить дочерний",
+    "context_add_sibling": "Добавить соседний"
+  },
+  "card": {
+    "type_structure": "structure",
+    "type_knowledge": "knowledge",
+    "type_symlink": "symlink",
+    "updated_at": "Обновлено",
+    "source": "Источник",
+    "edit_title": "Редактировать заголовок",
+    "edit_content": "Редактировать содержимое",
+    "compile_view": "Скомпилированный документ"
+  },
+  "delete_modal": {
+    "title": "Удалить карточку",
+    "desc": "Удалить \"{{name}}\"?",
+    "confirm_btn": "Удалить"
+  },
+  "login": {
+    "title": "atom",
+    "desc": "Система управления знаниями",
+    "sign_in_google": "Войти через Google",
+    "sign_in_error": "Аутентификация не настроена"
+  },
+  "app": {
+    "logout": "Выйти",
+    "settings": "Настройки",
+    "theme_to_light": "Переключить на светлую тему",
+    "theme_to_dark": "Переключить на тёмную тему"
+  }
+}
