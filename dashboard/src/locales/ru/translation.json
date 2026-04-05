@@ -22,7 +22,8 @@
     "tab_users": "Пользователи",
     "tab_agents": "API-ключи",
     "tab_credentials": "Внешняя авторизация",
-    "tab_language": "Язык"
+    "tab_language": "Язык",
+    "tab_database": "База данных"
   },
   "users": {
     "title": "Управление пользователями",
@@ -173,5 +174,23 @@
   "searchbar": {
     "placeholder": "Поиск...",
     "no_results": "Нет результатов"
+  },
+  "database": {
+    "title": "База данных",
+    "desc": "Проверить текущий режим базы данных и статус миграции SQLite.",
+    "mode_label": "Режим БД",
+    "file_label": "Файл SQLite",
+    "file_path": "Путь:",
+    "file_migrated": "Миграция завершена (.deprecated)",
+    "file_exists": "Файл существует",
+    "file_none": "Файл отсутствует",
+    "migration_label": "Миграция",
+    "migration_done": "Миграция уже завершена. Файл SQLite переименован в .deprecated.",
+    "migration_no_file": "Нет файла SQLite для миграции.",
+    "migration_desc": "Скопировать данные SQLite в текущую базу данных PostgreSQL. После завершения файл SQLite будет переименован в .deprecated.",
+    "migration_confirm": "Мигрировать данные SQLite в PostgreSQL.\n\nЭто действие нельзя отменить. Продолжить?",
+    "migration_running": "Миграция...",
+    "migration_btn": "Миграция SQLite → PostgreSQL",
+    "file_status": "Статус"
   }
 }

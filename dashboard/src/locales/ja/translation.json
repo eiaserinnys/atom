@@ -22,7 +22,8 @@
     "tab_users": "ユーザー管理",
     "tab_agents": "API キー",
     "tab_credentials": "外部認証",
-    "tab_language": "言語"
+    "tab_language": "言語",
+    "tab_database": "データベース"
   },
   "users": {
     "title": "ユーザー管理",
@@ -173,5 +174,23 @@
   "searchbar": {
     "placeholder": "検索...",
     "no_results": "結果なし"
+  },
+  "database": {
+    "title": "データベース",
+    "desc": "現在のデータベースモードとSQLiteマイグレーション状態を確認します。",
+    "mode_label": "DBモード",
+    "file_label": "SQLiteファイル",
+    "file_path": "パス：",
+    "file_migrated": "マイグレーション完了 (.deprecated)",
+    "file_exists": "ファイルあり",
+    "file_none": "ファイルなし",
+    "migration_label": "マイグレーション",
+    "migration_done": "マイグレーションは既に完了しています。SQLiteファイルは.deprecatedにリネームされました。",
+    "migration_no_file": "マイグレーションするSQLiteファイルがありません。",
+    "migration_desc": "SQLiteデータを現在のPostgreSQLデータベースにコピーします。完了後、SQLiteファイルは.deprecatedにリネームされます。",
+    "migration_confirm": "SQLiteデータをPostgreSQLにマイグレーションします。\n\nこの操作は取り消せません。続行しますか？",
+    "migration_running": "マイグレーション中...",
+    "migration_btn": "SQLite → PostgreSQL マイグレーション",
+    "file_status": "状態"
   }
 }

@@ -22,7 +22,8 @@
     "tab_users": "用户管理",
     "tab_agents": "API 密钥",
     "tab_credentials": "外部认证",
-    "tab_language": "语言"
+    "tab_language": "语言",
+    "tab_database": "数据库"
   },
   "users": {
     "title": "用户管理",
@@ -173,5 +174,23 @@
   "searchbar": {
     "placeholder": "搜索...",
     "no_results": "无结果"
+  },
+  "database": {
+    "title": "数据库",
+    "desc": "查看当前数据库模式和SQLite迁移状态。",
+    "mode_label": "数据库模式",
+    "file_label": "SQLite文件",
+    "file_path": "路径：",
+    "file_migrated": "迁移完成 (.deprecated)",
+    "file_exists": "文件存在",
+    "file_none": "无文件",
+    "migration_label": "迁移",
+    "migration_done": "迁移已完成。SQLite文件已重命名为.deprecated。",
+    "migration_no_file": "没有可迁移的SQLite文件。",
+    "migration_desc": "将SQLite数据复制到当前PostgreSQL数据库。完成后，SQLite文件将重命名为.deprecated。",
+    "migration_confirm": "将SQLite数据迁移到PostgreSQL。\n\n此操作无法撤消。是否继续？",
+    "migration_running": "迁移中...",
+    "migration_btn": "SQLite → PostgreSQL 迁移",
+    "file_status": "状态"
   }
 }
