@@ -6,6 +6,8 @@ import { Copy, Link2 } from 'lucide-react';
 import { api, type UnfurlEntry } from '../../api/client';
 import { readStoredCredentials } from '../../hooks/useLocalStorageCredentials';
 import { UnfurlSectionList } from '../UnfurlSection';
+import { parseCompileSections, type SectionMap } from '../../utils/parseCompileSections';
+import { EditableHeading } from './EditableHeading';
 
 interface CompileViewProps {
   nodeId: string | null;
@@ -26,7 +28,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
   const standardQuery = useQuery({
     queryKey: ['compile', nodeId],
     queryFn: async () => {
-      const result = await api.compile(nodeId!, { numbering: true });
+      const result = await api.compile(nodeId!, { numbering: true, include_ids: true });
       return { markdown: result.markdown };
     },
     enabled: !!nodeId && !unfurlEnabled,
@@ -123,6 +125,30 @@ export function CompileView({ nodeId }: CompileViewProps) {
     () => Math.min(...tocEntries.map((e) => e.level), 1),
     [tocEntries]
   );
+
+  // 마크다운에서 섹션→카드ID 매핑 파싱 (편집 버튼 활성화용)
+  const sectionMap: SectionMap = useMemo(
+    () => (markdown ? parseCompileSections(markdown) : new Map()),
+    [markdown]
+  );
+
+  // EditableHeading 컴포넌트 팩토리 (nodeId prop 클로저)
+  const makeHeading = (level: number) =>
+    ({ children }: { children?: React.ReactNode }) => (
+      <EditableHeading level={level} sectionMap={sectionMap} compiledNodeId={nodeId!}>
+        {children}
+      </EditableHeading>
+    );
+  const headingComponents = nodeId
+    ? {
+        h1: makeHeading(1),
+        h2: makeHeading(2),
+        h3: makeHeading(3),
+        h4: makeHeading(4),
+        h5: makeHeading(5),
+        h6: makeHeading(6),
+      }
+    : {};
 
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
@@ -228,7 +254,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
                 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_hr]:my-4
                 [&_a]:text-node-user [&_a]:no-underline hover:[&_a]:underline
               ">
-                <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+                <Markdown remarkPlugins={[remarkGfm]} components={headingComponents}>{markdown}</Markdown>
               </div>
             )}
 
