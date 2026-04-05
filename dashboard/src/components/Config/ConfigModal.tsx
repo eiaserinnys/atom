@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { UserRole } from '../../hooks/useAuth';
 import { UserManagementTab } from './UserManagementTab';
 import { AgentManagementTab } from './AgentManagementTab';
 import { CredentialsTab } from './CredentialsTab';
+import { LanguageTab } from './LanguageTab';
 
 interface Props {
   isOpen: boolean;
@@ -12,7 +14,8 @@ interface Props {
 }
 
 export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail }: Props) {
-  const [activeTab, setActiveTab] = useState<'users' | 'agents' | 'credentials'>(
+  const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<'users' | 'agents' | 'credentials' | 'language'>(
     currentUserRole === 'admin' ? 'users' : 'agents'
   );
 
@@ -35,11 +38,11 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
       <div className="bg-background border border-border rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <span className="text-base font-semibold text-foreground">설정</span>
+          <span className="text-base font-semibold text-foreground">{t('config.settings')}</span>
           <button
             className="text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer text-lg leading-none"
             onClick={onClose}
-            aria-label="닫기"
+            aria-label={t('common.close')}
           >
             ✕
           </button>
@@ -56,7 +59,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
               }`}
               onClick={() => setActiveTab('users')}
             >
-              사용자 관리
+              {t('config.tab_users')}
             </button>
           )}
           <button
@@ -67,7 +70,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             }`}
             onClick={() => setActiveTab('agents')}
           >
-            API 키 관리
+            {t('config.tab_agents')}
           </button>
           <button
             className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
@@ -77,7 +80,17 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             }`}
             onClick={() => setActiveTab('credentials')}
           >
-            외부 참조 인증
+            {t('config.tab_credentials')}
+          </button>
+          <button
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              activeTab === 'language'
+                ? 'border-node-user text-node-user'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('language')}
+          >
+            {t('config.tab_language')}
           </button>
         </div>
 
@@ -88,6 +101,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           )}
           {activeTab === 'agents' && <AgentManagementTab />}
           {activeTab === 'credentials' && <CredentialsTab />}
+          {activeTab === 'language' && <LanguageTab />}
         </div>
       </div>
     </div>

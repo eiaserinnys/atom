@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
 import { TreeView } from './components/TreeView/TreeView';
@@ -21,6 +22,7 @@ const queryClient = new QueryClient({
 });
 
 function AppInner() {
+  const { t } = useTranslation();
   const auth = useAuth();
   const initialSelectedNodeId = useRef<string | null>(
     window.location.hash.length > 1 ? window.location.hash.slice(1) : null
@@ -59,8 +61,8 @@ function AppInner() {
           <button
             className="text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer text-lg leading-none px-1"
             onClick={() => setIsConfigOpen(true)}
-            title="설정"
-            aria-label="설정"
+            title={t('app.settings')}
+            aria-label={t('app.settings')}
           >
             ⚙️
           </button>

@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, type CardData, type TreeNodeData } from '../../api/client';
+import i18n from '../../i18n';
 
 interface CardDetailProps {
   nodeId: string | null;
 }
 
 export function CardDetail({ nodeId }: CardDetailProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   // Editing state
@@ -34,10 +37,10 @@ export function CardDetail({ nodeId }: CardDetailProps) {
     return (
       <div className="h-full flex flex-col bg-background">
         <div className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground border-b border-border shrink-0">
-          카드 상세
+          {t('card.header')}
         </div>
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-          <div className="text-muted-foreground text-sm py-4">이 카드는 삭제되었습니다.</div>
+          <div className="text-muted-foreground text-sm py-4">{t('card.deleted')}</div>
         </div>
       </div>
     );
@@ -57,7 +60,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
       setEditingTitle(false);
       queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
     } catch (e: unknown) {
-      alert(`저장 실패: ${e instanceof Error ? e.message : String(e)}`);
+      alert(`${t('card.save_failed')}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSaving(false);
     }
@@ -71,7 +74,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
       setEditingContent(false);
       queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
     } catch (e: unknown) {
-      alert(`저장 실패: ${e instanceof Error ? e.message : String(e)}`);
+      alert(`${t('card.save_failed')}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSaving(false);
     }
@@ -80,25 +83,25 @@ export function CardDetail({ nodeId }: CardDetailProps) {
   return (
     <div className="h-full flex flex-col bg-background">
       <div className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground border-b border-border shrink-0">
-        카드 상세
+        {t('card.header')}
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
         {!nodeId && (
-          <div className="text-muted-foreground text-sm">노드를 선택하면 카드 정보가 표시됩니다.</div>
+          <div className="text-muted-foreground text-sm">{t('card.no_selection')}</div>
         )}
-        {isLoading && <div className="text-muted-foreground text-sm">로딩 중...</div>}
+        {isLoading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
 
         {/* Dirty State Guard — 편집 중 외부 변경 감지 배너 */}
         {isDirty && card && (
           <div className="flex items-center justify-between gap-2 bg-node-plan/15 border border-node-plan/40 rounded-md px-3 py-2 text-sm text-foreground shrink-0">
             <span className="flex-1">
-              편집 중 외부에서 변경되었을 수 있습니다. 저장하지 않은 내용이 있습니다.
+              {t('card.unsaved_changes')}
             </span>
             <button
               className="bg-node-plan text-white border-none rounded px-2.5 py-0.5 text-[11px] cursor-pointer whitespace-nowrap hover:opacity-85"
               onClick={handleRefresh}
             >
-              새로고침
+              {t('card.refresh')}
             </button>
           </div>
         )}
@@ -107,7 +110,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
           <>
             {/* Title */}
             <div className="flex flex-col gap-1.5">
-              <div className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">제목</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('card.title_label')}</div>
               {editingTitle ? (
                 <div className="flex gap-1.5 items-center">
                   <input
@@ -122,20 +125,20 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                     onClick={saveTitle}
                     disabled={saving}
                   >
-                    {saving ? '...' : '저장'}
+                    {saving ? '...' : t('common.save')}
                   </button>
                   <button
                     className="bg-transparent text-muted-foreground border border-border rounded px-2.5 py-1 text-[13px] cursor-pointer font-sans hover:bg-muted"
                     onClick={() => setEditingTitle(false)}
                   >
-                    취소
+                    {t('common.cancel')}
                   </button>
                 </div>
               ) : (
                 <div
                   className="group text-base text-foreground cursor-pointer rounded px-2 py-1.5 border border-transparent relative transition-colors hover:border-border hover:bg-muted"
                   onClick={() => { setTitleDraft(card.title); setEditingTitle(true); }}
-                  title="클릭하여 편집"
+                  title={t('card.click_to_edit')}
                 >
                   {card.title}
                   <span className="text-[11px] text-muted-foreground ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
@@ -145,7 +148,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
 
             {/* Content */}
             <div className="flex flex-col gap-1.5">
-              <div className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">내용</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('card.content_label')}</div>
               {editingContent ? (
                 <div className="flex flex-col gap-1.5">
                   <textarea
@@ -161,13 +164,13 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                       onClick={saveContent}
                       disabled={saving}
                     >
-                      {saving ? '...' : '저장'}
+                      {saving ? '...' : t('common.save')}
                     </button>
                     <button
                       className="bg-transparent text-muted-foreground border border-border rounded px-2.5 py-1 text-[13px] cursor-pointer font-sans hover:bg-muted"
                       onClick={() => setEditingContent(false)}
                     >
-                      취소
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </div>
@@ -175,14 +178,14 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                 <div
                   className="group text-base text-foreground cursor-pointer rounded px-2 py-1.5 border border-transparent relative transition-colors hover:border-border hover:bg-muted"
                   onClick={() => { setContentDraft(card.content ?? ''); setEditingContent(true); }}
-                  title="클릭하여 편집"
+                  title={t('card.click_to_edit')}
                 >
                   {card.content ? (
                     <div className="prose prose-atom text-[15px] leading-relaxed">
                       <Markdown remarkPlugins={[remarkGfm]}>{card.content}</Markdown>
                     </div>
                   ) : (
-                    <span className="text-muted-foreground text-sm">내용 없음</span>
+                    <span className="text-muted-foreground text-sm">{t('card.empty_content')}</span>
                   )}
                   <span className="text-[11px] text-muted-foreground ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
                 </div>
@@ -192,42 +195,42 @@ export function CardDetail({ nodeId }: CardDetailProps) {
             {/* Read-only fields */}
             <div className="flex flex-col gap-1.5 pt-2 border-t border-border">
               <div className="flex gap-2.5 items-baseline">
-                <span className="text-xs text-muted-foreground w-[70px] shrink-0">유형</span>
+                <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.type_label')}</span>
                 <span className={`text-[13px] ${card.card_type === 'structure' ? 'text-node-tool' : 'text-node-response'}`}>
                   {card.card_type}
                 </span>
               </div>
               {node?.is_symlink && (
                 <div className="flex gap-2.5 items-baseline">
-                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">심링크</span>
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.symlink_label')}</span>
                   <span className="text-[13px] text-foreground">↗ yes</span>
                 </div>
               )}
               {card.source_type && (
                 <div className="flex gap-2.5 items-baseline">
-                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">출처 유형</span>
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.source_type_label')}</span>
                   <span className="text-[13px] text-foreground">{card.source_type}</span>
                 </div>
               )}
               {card.source_ref && (
                 <div className="flex gap-2.5 items-baseline">
-                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">출처 참조</span>
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.source_ref_label')}</span>
                   <span className="text-[13px] text-foreground break-all">{card.source_ref}</span>
                 </div>
               )}
               {card.tags.length > 0 && (
                 <div className="flex gap-2.5 items-baseline">
-                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">태그</span>
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.tags_label')}</span>
                   <div className="flex flex-wrap gap-1">
-                    {card.tags.map((t) => (
-                      <span key={t} className="text-xs bg-muted border border-border rounded px-1.5 py-px text-node-plan">{t}</span>
+                    {card.tags.map((tag) => (
+                      <span key={tag} className="text-xs bg-muted border border-border rounded px-1.5 py-px text-node-plan">{tag}</span>
                     ))}
                   </div>
                 </div>
               )}
               {card.references.length > 0 && (
                 <div className="flex gap-2.5 items-baseline">
-                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">참조</span>
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.refs_label')}</span>
                   <span className="text-[13px] text-foreground">{card.references.join(', ')}</span>
                 </div>
               )}
@@ -236,24 +239,24 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                 <span className="text-[13px] text-foreground">{card.staleness}</span>
               </div>
               <div className="flex gap-2.5 items-baseline">
-                <span className="text-xs text-muted-foreground w-[70px] shrink-0">버전</span>
+                <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.version_label')}</span>
                 <span className="text-[13px] text-foreground">{card.version}</span>
               </div>
               <div className="flex gap-2.5 items-baseline">
-                <span className="text-xs text-muted-foreground w-[70px] shrink-0">수정일</span>
+                <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.updated_at_label')}</span>
                 <span className="text-[13px] text-foreground">
-                  {new Date(card.updated_at).toLocaleString('ko-KR')}
+                  {new Date(card.updated_at).toLocaleString(i18n.language)}
                 </span>
               </div>
               {card.created_by && (
                 <div className="flex gap-2.5 items-baseline">
-                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">작성자</span>
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.created_by_label')}</span>
                   <span className="text-[13px] text-foreground">{card.created_by}</span>
                 </div>
               )}
               {card.updated_by && card.updated_by !== card.created_by && (
                 <div className="flex gap-2.5 items-baseline">
-                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">수정자</span>
+                  <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.updated_by_label')}</span>
                   <span className="text-[13px] text-foreground">{card.updated_by}</span>
                 </div>
               )}

@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -17,6 +18,7 @@ interface TreeNodeProps {
 }
 
 export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded, expandedNodes, onToggle, onContextMenu }: TreeNodeProps) {
+  const { t } = useTranslation();
   // node.children이 있으면 TreeView가 미리 로드한 상태 → initialData로 사용
   // node.children이 undefined이면 첫 expand 시 lazy fetch
   const propsChildren = node.children;
@@ -141,7 +143,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
           </span>
         )}
         {isError && (
-          <span className="ml-1 text-xs cursor-help shrink-0" title={error?.message ?? '오류 발생'}>⚠️</span>
+          <span className="ml-1 text-xs cursor-help shrink-0" title={error?.message ?? t('common.error')}>⚠️</span>
         )}
       </div>
 

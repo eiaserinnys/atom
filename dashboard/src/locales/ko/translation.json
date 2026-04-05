@@ -26,24 +26,46 @@
   },
   "users": {
     "title": "사용자 관리",
+    "add_section": "사용자 추가",
+    "list_section": "사용자 목록",
     "invite_placeholder": "이메일",
+    "display_name_placeholder": "표시 이름 (선택)",
     "invite_btn": "추가",
+    "adding": "추가 중...",
     "no_users": "등록된 사용자가 없습니다.",
+    "active": "활성",
+    "inactive": "비활성",
+    "activate": "활성화",
+    "deactivate": "비활성화",
+    "self_role_tooltip": "자신의 역할은 변경할 수 없습니다",
+    "self_account_tooltip": "자신의 계정은 변경할 수 없습니다",
     "remove_confirm": "\"{{email}}\" 사용자를 삭제하시겠습니까?",
     "role_change_confirm": "\"{{email}}\" 사용자의 역할을 {{role}}으로 변경하시겠습니까?"
   },
   "agents": {
     "title": "API 키 관리",
     "desc": "API 시크릿은 지금만 표시됩니다. 안전한 곳에 저장하세요.",
+    "create_section": "에이전트 생성",
+    "list_section": "에이전트 목록",
     "generate_btn": "생성",
+    "creating": "생성 중...",
     "no_agents": "등록된 에이전트가 없습니다.",
     "name_placeholder": "agent_id (예: my-agent)",
+    "display_name_placeholder": "표시 이름 (선택)",
+    "active": "활성",
+    "inactive": "비활성",
+    "activate": "활성화",
+    "deactivate": "비활성화",
+    "reissue": "시크릿 재발급",
+    "acknowledged": "확인했습니다",
     "copy_hint": "시크릿 복사",
     "revoke_confirm": "\"{{name}}\" API 키를 폐기하시겠습니까?",
     "new_key_warning": "API 시크릿 — 지금만 표시됩니다. 안전한 곳에 저장하세요."
   },
   "credentials": {
     "title": "외부 참조 인증",
+    "desc": "외부 참조(unfurl) 조회 시 사용할 인증 정보를 입력합니다. 브라우저에 저장되며 서버로 전송되지 않습니다.",
+    "loading": "어댑터 로딩 중...",
     "no_creds": "등록된 외부 참조 어댑터가 없습니다.",
     "add_btn": "추가",
     "service": "서비스",
@@ -55,7 +77,11 @@
     "desc": "표시 언어를 선택합니다."
   },
   "tree": {
+    "header": "트리 탐색",
+    "loading": "트리 로딩 중...",
     "empty": "노드가 없습니다.",
+    "create_root_structure": "루트 구조 카드 생성",
+    "create_root_knowledge": "루트 지식 카드 생성",
     "search_placeholder": "검색...",
     "search_empty": "결과 없음",
     "add_structure": "구조",
@@ -65,9 +91,31 @@
     "context_rename": "수정",
     "context_delete": "삭제",
     "context_add_child": "하위 추가",
-    "context_add_sibling": "형제 추가"
+    "context_add_sibling": "형제 추가",
+    "context_create_child_structure": "하위 구조 카드 생성",
+    "context_create_child_knowledge": "하위 지식 카드 생성"
   },
   "card": {
+    "header": "카드 상세",
+    "deleted": "이 카드는 삭제되었습니다.",
+    "no_selection": "노드를 선택하면 카드 정보가 표시됩니다.",
+    "unsaved_changes": "편집 중 외부에서 변경되었을 수 있습니다. 저장하지 않은 내용이 있습니다.",
+    "refresh": "새로고침",
+    "title_label": "제목",
+    "content_label": "내용",
+    "empty_content": "내용 없음",
+    "type_label": "유형",
+    "symlink_label": "심링크",
+    "source_type_label": "출처 유형",
+    "source_ref_label": "출처 참조",
+    "tags_label": "태그",
+    "refs_label": "참조",
+    "version_label": "버전",
+    "updated_at_label": "수정일",
+    "created_by_label": "작성자",
+    "updated_by_label": "수정자",
+    "save_failed": "저장 실패",
+    "click_to_edit": "클릭하여 편집",
     "type_structure": "structure",
     "type_knowledge": "knowledge",
     "type_symlink": "symlink",
@@ -77,15 +125,43 @@
     "edit_content": "내용 수정",
     "compile_view": "컴파일 문서"
   },
+  "compile": {
+    "header": "컴파일 문서 (BFS+2)",
+    "copy_id": "ID 복사",
+    "unfurl_enable": "외부 참조 조회 켜기",
+    "unfurl_disable": "외부 참조 조회 끄기",
+    "no_selection": "노드를 선택하면 컴파일된 문서가 표시됩니다.",
+    "loading": "컴파일 중...",
+    "toc_title": "문서 개요"
+  },
+  "unfurl": {
+    "failure": "외부 참조 조회 실패",
+    "section_title": "외부 참조"
+  },
+  "cardform": {
+    "new_structure": "새 구조 카드",
+    "new_knowledge": "새 지식 카드",
+    "edit": "카드 수정",
+    "title_label": "제목",
+    "title_placeholder": "제목 입력",
+    "content_label": "본문 (선택)",
+    "content_placeholder": "마크다운 형식으로 입력",
+    "saving": "저장 중…",
+    "creating": "생성"
+  },
   "delete_modal": {
     "title": "카드 삭제",
     "desc": "\"{{name}}\" 항목을 삭제하시겠습니까?",
-    "confirm_btn": "삭제"
+    "confirm_text": "\"{{name}}\"을(를) 삭제하시겠습니까?",
+    "sub_items_warning": "⚠️ 하위 항목도 함께 삭제됩니다.",
+    "confirm_btn": "삭제",
+    "deleting": "삭제 중…"
   },
   "login": {
     "title": "atom",
     "desc": "지식 관리 시스템",
     "sign_in_google": "Google로 로그인",
+    "sign_in_slack": "Slack으로 로그인",
     "sign_in_error": "인증이 설정되지 않았습니다"
   },
   "app": {
@@ -93,5 +169,9 @@
     "settings": "설정",
     "theme_to_light": "라이트 모드로 전환",
     "theme_to_dark": "다크 모드로 전환"
+  },
+  "searchbar": {
+    "placeholder": "검색...",
+    "no_results": "결과 없음"
   }
 }

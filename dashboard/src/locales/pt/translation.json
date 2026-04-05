@@ -26,24 +26,46 @@
   },
   "users": {
     "title": "Gestão de usuários",
+    "add_section": "Adicionar usuário",
+    "list_section": "Lista de usuários",
     "invite_placeholder": "E-mail",
+    "display_name_placeholder": "Nome de exibição (opcional)",
     "invite_btn": "Adicionar",
+    "adding": "Adicionando...",
     "no_users": "Nenhum usuário registrado.",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "activate": "Ativar",
+    "deactivate": "Desativar",
+    "self_role_tooltip": "Você não pode alterar seu próprio papel",
+    "self_account_tooltip": "Você não pode modificar sua própria conta",
     "remove_confirm": "Remover usuário \"{{email}}\"?",
     "role_change_confirm": "Alterar o papel de \"{{email}}\" para {{role}}?"
   },
   "agents": {
     "title": "Gestão de chaves de API",
     "desc": "O segredo da API é exibido apenas uma vez. Guarde-o em um lugar seguro.",
+    "create_section": "Criar agente",
+    "list_section": "Lista de agentes",
     "generate_btn": "Gerar",
+    "creating": "Criando...",
     "no_agents": "Nenhum agente registrado.",
     "name_placeholder": "agent_id (ex.: my-agent)",
+    "display_name_placeholder": "Nome de exibição (opcional)",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "activate": "Ativar",
+    "deactivate": "Desativar",
+    "reissue": "Reemitir segredo",
+    "acknowledged": "Entendido",
     "copy_hint": "Copiar segredo",
     "revoke_confirm": "Revogar chave de API \"{{name}}\"?",
     "new_key_warning": "Segredo de API — exibido apenas uma vez. Guarde-o em um lugar seguro."
   },
   "credentials": {
     "title": "Autenticação externa",
+    "desc": "Insira credenciais para consultas de referência externa (unfurl). Armazenado no navegador, nunca enviado ao servidor.",
+    "loading": "Carregando adaptadores...",
     "no_creds": "Nenhum adaptador de referência externa registrado.",
     "add_btn": "Adicionar",
     "service": "Serviço",
@@ -55,7 +77,11 @@
     "desc": "Selecione o idioma de exibição."
   },
   "tree": {
+    "header": "Navegação em árvore",
+    "loading": "Carregando árvore...",
     "empty": "Nenhum nó.",
+    "create_root_structure": "Criar cartão de estrutura raiz",
+    "create_root_knowledge": "Criar cartão de conhecimento raiz",
     "search_placeholder": "Pesquisar...",
     "search_empty": "Sem resultados",
     "add_structure": "Estrutura",
@@ -65,9 +91,31 @@
     "context_rename": "Renomear",
     "context_delete": "Excluir",
     "context_add_child": "Adicionar filho",
-    "context_add_sibling": "Adicionar irmão"
+    "context_add_sibling": "Adicionar irmão",
+    "context_create_child_structure": "Criar cartão de estrutura filho",
+    "context_create_child_knowledge": "Criar cartão de conhecimento filho"
   },
   "card": {
+    "header": "Detalhes do cartão",
+    "deleted": "Este cartão foi excluído.",
+    "no_selection": "Selecione um nó para ver os detalhes do cartão.",
+    "unsaved_changes": "O cartão pode ter sido modificado externamente. Você tem alterações não salvas.",
+    "refresh": "Atualizar",
+    "title_label": "Título",
+    "content_label": "Conteúdo",
+    "empty_content": "Sem conteúdo",
+    "type_label": "Tipo",
+    "symlink_label": "Link simbólico",
+    "source_type_label": "Tipo de fonte",
+    "source_ref_label": "Referência de fonte",
+    "tags_label": "Tags",
+    "refs_label": "Referências",
+    "version_label": "Versão",
+    "updated_at_label": "Atualizado",
+    "created_by_label": "Criado por",
+    "updated_by_label": "Atualizado por",
+    "save_failed": "Falha ao salvar",
+    "click_to_edit": "Clique para editar",
     "type_structure": "structure",
     "type_knowledge": "knowledge",
     "type_symlink": "symlink",
@@ -77,15 +125,43 @@
     "edit_content": "Editar conteúdo",
     "compile_view": "Documento compilado"
   },
+  "compile": {
+    "header": "Documento compilado (BFS+2)",
+    "copy_id": "Copiar ID",
+    "unfurl_enable": "Habilitar consulta de referência externa",
+    "unfurl_disable": "Desabilitar consulta de referência externa",
+    "no_selection": "Selecione um nó para ver o documento compilado.",
+    "loading": "Compilando...",
+    "toc_title": "Esboço do documento"
+  },
+  "unfurl": {
+    "failure": "Falha na consulta de referência externa",
+    "section_title": "Referências externas"
+  },
+  "cardform": {
+    "new_structure": "Novo cartão de estrutura",
+    "new_knowledge": "Novo cartão de conhecimento",
+    "edit": "Editar cartão",
+    "title_label": "Título",
+    "title_placeholder": "Digite o título",
+    "content_label": "Conteúdo (opcional)",
+    "content_placeholder": "Digite no formato Markdown",
+    "saving": "Salvando…",
+    "creating": "Criar"
+  },
   "delete_modal": {
     "title": "Excluir cartão",
     "desc": "Excluir \"{{name}}\"?",
-    "confirm_btn": "Excluir"
+    "confirm_text": "Excluir \"{{name}}\"?",
+    "sub_items_warning": "⚠️ Itens filho também serão excluídos.",
+    "confirm_btn": "Excluir",
+    "deleting": "Excluindo…"
   },
   "login": {
     "title": "atom",
     "desc": "Sistema de gestão do conhecimento",
     "sign_in_google": "Entrar com o Google",
+    "sign_in_slack": "Entrar com o Slack",
     "sign_in_error": "A autenticação não está configurada"
   },
   "app": {
@@ -93,5 +169,9 @@
     "settings": "Configurações",
     "theme_to_light": "Mudar para modo claro",
     "theme_to_dark": "Mudar para modo escuro"
+  },
+  "searchbar": {
+    "placeholder": "Pesquisar...",
+    "no_results": "Sem resultados"
   }
 }

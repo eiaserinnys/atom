@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   DndContext,
   DragOverlay,
@@ -93,6 +94,7 @@ function calcDropZone(
 }
 
 export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: TreeViewProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: roots, isLoading, error } = useQuery({
     queryKey: ['tree', null],
@@ -295,16 +297,16 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
     if (isStructure) {
       items.push({
-        label: '하위 구조 카드 생성',
+        label: t('tree.context_create_child_structure'),
         onClick: () => setModal({ type: 'create-child', cardType: 'structure', parentNode: node }),
       });
       items.push({
-        label: '하위 지식 카드 생성',
+        label: t('tree.context_create_child_knowledge'),
         onClick: () => setModal({ type: 'create-child', cardType: 'knowledge', parentNode: node }),
       });
     }
-    items.push({ label: '수정', onClick: () => setModal({ type: 'edit', node }) });
-    items.push({ label: '삭제', onClick: () => setModal({ type: 'delete', node }), danger: true });
+    items.push({ label: t('tree.context_rename'), onClick: () => setModal({ type: 'edit', node }) });
+    items.push({ label: t('tree.context_delete'), onClick: () => setModal({ type: 'delete', node }), danger: true });
     return items;
   }
 
@@ -324,8 +326,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   // 드래그 오버레이용 활성 노드
   const activeNode = activeId && roots ? findNodeInTree(activeId, roots) : null;
 
-  if (isLoading) return <div className="p-4 text-muted-foreground text-sm">트리 로딩 중...</div>;
-  if (error) return <div className="p-4 text-node-error text-sm">오류: {error.message}</div>;
+  if (isLoading) return <div className="p-4 text-muted-foreground text-sm">{t('tree.loading')}</div>;
+  if (error) return <div className="p-4 text-node-error text-sm">{t('common.error')}: {error.message}</div>;
 
   return (
     <DndContext
@@ -340,24 +342,24 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
           {/* 헤더 */}
           <div className="px-4 py-3 flex items-center justify-between border-b border-border shrink-0">
             <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              트리 탐색
+              {t('tree.header')}
             </span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setModal({ type: 'create-root', cardType: 'structure' })}
                 className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                title="루트 구조 카드 생성"
+                title={t('tree.create_root_structure')}
               >
                 <Plus className="w-3 h-3" />
-                <span>구조</span>
+                <span>{t('tree.add_structure')}</span>
               </button>
               <button
                 onClick={() => setModal({ type: 'create-root', cardType: 'knowledge' })}
                 className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                title="루트 지식 카드 생성"
+                title={t('tree.create_root_knowledge')}
               >
                 <Plus className="w-3 h-3" />
-                <span>지식</span>
+                <span>{t('tree.add_knowledge')}</span>
               </button>
             </div>
           </div>
@@ -365,7 +367,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
           {/* 트리 본문 */}
           <div className="flex-1 overflow-y-auto py-1">
             {(!roots || roots.length === 0) ? (
-              <div className="p-4 text-muted-foreground text-sm">노드가 없습니다.</div>
+              <div className="p-4 text-muted-foreground text-sm">{t('tree.empty')}</div>
             ) : (
               roots.map((root) => (
                 <TreeNode
@@ -387,10 +389,10 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
             <button
               onClick={() => api.logout().then(() => { window.location.href = '/'; })}
               className="flex items-center gap-2 w-full px-3 py-2 text-xs text-muted-foreground rounded hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              title="로그아웃"
+              title={t('app.logout')}
             >
               <LogOut className="w-3.5 h-3.5" />
-              로그아웃
+              {t('app.logout')}
             </button>
           </div>
 

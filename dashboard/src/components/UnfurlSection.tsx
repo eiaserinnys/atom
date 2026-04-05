@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { UnfurlEntry } from '../api/client';
 import type { TrelloCardUnfurlData } from '../types/unfurl';
 import { TrelloCardView } from './TrelloCardView';
@@ -9,10 +10,11 @@ interface UnfurlSectionProps {
 }
 
 export function UnfurlSection({ unfurlData, sourceType, error }: UnfurlSectionProps) {
+  const { t } = useTranslation();
   if (error || !unfurlData) {
     return (
       <div className="text-xs text-node-error mt-1">
-        ⚠️ 외부 참조 조회 실패{error ? `: ${error}` : ''}
+        ⚠️ {t('unfurl.failure')}{error ? `: ${error}` : ''}
       </div>
     );
   }
@@ -33,13 +35,14 @@ interface UnfurlSectionListProps {
 }
 
 export function UnfurlSectionList({ unfurls }: UnfurlSectionListProps) {
+  const { t } = useTranslation();
   const entries = Object.entries(unfurls);
   if (entries.length === 0) return null;
 
   return (
     <div className="space-y-2 mt-3">
       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        외부 참조 ({entries.length})
+        {t('unfurl.section_title')} ({entries.length})
       </div>
       {entries.map(([cardId, entry]) => (
         <UnfurlSection

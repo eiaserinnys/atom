@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface CardFormModalProps {
   mode: 'create' | 'edit';
@@ -19,6 +20,7 @@ export function CardFormModal({
   onClose,
   isLoading = false,
 }: CardFormModalProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -30,9 +32,9 @@ export function CardFormModal({
   const heading =
     mode === 'create'
       ? cardType === 'structure'
-        ? '새 구조 카드'
-        : '새 지식 카드'
-      : '카드 수정';
+        ? t('cardform.new_structure')
+        : t('cardform.new_knowledge')
+      : t('cardform.edit');
 
   function handleConfirm() {
     const trimmed = title.trim();
@@ -54,7 +56,7 @@ export function CardFormModal({
         <h2 className="text-base font-semibold text-white">{heading}</h2>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-neutral-400">제목</label>
+          <label className="text-xs text-neutral-400">{t('cardform.title_label')}</label>
           <input
             ref={titleRef}
             type="text"
@@ -62,18 +64,18 @@ export function CardFormModal({
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleConfirm(); }}
             className="bg-neutral-800 border border-neutral-600 rounded px-3 py-1.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400"
-            placeholder="제목 입력"
+            placeholder={t('cardform.title_placeholder')}
           />
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-neutral-400">본문 (선택)</label>
+          <label className="text-xs text-neutral-400">{t('cardform.content_label')}</label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={5}
             className="bg-neutral-800 border border-neutral-600 rounded px-3 py-1.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400 resize-none"
-            placeholder="마크다운 형식으로 입력"
+            placeholder={t('cardform.content_placeholder')}
           />
         </div>
 
@@ -83,14 +85,14 @@ export function CardFormModal({
             className="px-3 py-1.5 text-sm text-neutral-400 hover:text-white rounded hover:bg-neutral-800 transition-colors"
             disabled={isLoading}
           >
-            취소
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleConfirm}
             disabled={!title.trim() || isLoading}
             className="px-3 py-1.5 text-sm bg-neutral-700 hover:bg-neutral-600 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {isLoading ? '저장 중…' : mode === 'create' ? '생성' : '저장'}
+            {isLoading ? t('cardform.saving') : mode === 'create' ? t('cardform.creating') : t('common.save')}
           </button>
         </div>
       </div>

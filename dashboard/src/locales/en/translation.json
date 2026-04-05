@@ -26,24 +26,46 @@
   },
   "users": {
     "title": "Users",
+    "add_section": "Add User",
+    "list_section": "User List",
     "invite_placeholder": "Email",
+    "display_name_placeholder": "Display name (optional)",
     "invite_btn": "Add",
+    "adding": "Adding...",
     "no_users": "No users registered.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "self_role_tooltip": "You cannot change your own role",
+    "self_account_tooltip": "You cannot modify your own account",
     "remove_confirm": "Remove user \"{{email}}\"?",
     "role_change_confirm": "Change role of \"{{email}}\" to {{role}}?"
   },
   "agents": {
     "title": "API Keys",
     "desc": "API secret is shown only once. Store it in a safe place.",
+    "create_section": "Create Agent",
+    "list_section": "Agent List",
     "generate_btn": "Generate",
+    "creating": "Creating...",
     "no_agents": "No agents registered.",
     "name_placeholder": "agent_id (e.g. my-agent)",
+    "display_name_placeholder": "Display name (optional)",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "reissue": "Reissue Secret",
+    "acknowledged": "Got it",
     "copy_hint": "Copy secret",
     "revoke_confirm": "Revoke API key \"{{name}}\"?",
     "new_key_warning": "API Secret — shown only once. Store it safely."
   },
   "credentials": {
     "title": "External Auth",
+    "desc": "Enter credentials for external reference (unfurl) lookups. Stored in browser, never sent to server.",
+    "loading": "Loading adapters...",
     "no_creds": "No external reference adapters registered.",
     "add_btn": "Add",
     "service": "Service",
@@ -55,7 +77,11 @@
     "desc": "Select the display language."
   },
   "tree": {
+    "header": "Tree Navigation",
+    "loading": "Loading tree...",
     "empty": "No nodes.",
+    "create_root_structure": "Create root structure card",
+    "create_root_knowledge": "Create root knowledge card",
     "search_placeholder": "Search...",
     "search_empty": "No results",
     "add_structure": "Structure",
@@ -65,9 +91,31 @@
     "context_rename": "Rename",
     "context_delete": "Delete",
     "context_add_child": "Add child",
-    "context_add_sibling": "Add sibling"
+    "context_add_sibling": "Add sibling",
+    "context_create_child_structure": "Create child structure card",
+    "context_create_child_knowledge": "Create child knowledge card"
   },
   "card": {
+    "header": "Card Detail",
+    "deleted": "This card has been deleted.",
+    "no_selection": "Select a node to view card details.",
+    "unsaved_changes": "The card may have been modified externally. You have unsaved changes.",
+    "refresh": "Refresh",
+    "title_label": "Title",
+    "content_label": "Content",
+    "empty_content": "No content",
+    "type_label": "Type",
+    "symlink_label": "Symlink",
+    "source_type_label": "Source Type",
+    "source_ref_label": "Source Ref",
+    "tags_label": "Tags",
+    "refs_label": "References",
+    "version_label": "Version",
+    "updated_at_label": "Updated",
+    "created_by_label": "Created by",
+    "updated_by_label": "Updated by",
+    "save_failed": "Save failed",
+    "click_to_edit": "Click to edit",
     "type_structure": "structure",
     "type_knowledge": "knowledge",
     "type_symlink": "symlink",
@@ -77,15 +125,43 @@
     "edit_content": "Edit content",
     "compile_view": "Compiled Document"
   },
+  "compile": {
+    "header": "Compiled Document (BFS+2)",
+    "copy_id": "Copy ID",
+    "unfurl_enable": "Enable external reference lookup",
+    "unfurl_disable": "Disable external reference lookup",
+    "no_selection": "Select a node to view the compiled document.",
+    "loading": "Compiling...",
+    "toc_title": "Document Outline"
+  },
+  "unfurl": {
+    "failure": "External reference lookup failed",
+    "section_title": "External References"
+  },
+  "cardform": {
+    "new_structure": "New Structure Card",
+    "new_knowledge": "New Knowledge Card",
+    "edit": "Edit Card",
+    "title_label": "Title",
+    "title_placeholder": "Enter title",
+    "content_label": "Content (optional)",
+    "content_placeholder": "Enter in Markdown format",
+    "saving": "Saving…",
+    "creating": "Create"
+  },
   "delete_modal": {
     "title": "Delete Card",
     "desc": "Delete \"{{name}}\"?",
-    "confirm_btn": "Delete"
+    "confirm_text": "Delete \"{{name}}\"?",
+    "sub_items_warning": "⚠️ Child items will also be deleted.",
+    "confirm_btn": "Delete",
+    "deleting": "Deleting…"
   },
   "login": {
     "title": "atom",
     "desc": "Knowledge Management System",
     "sign_in_google": "Sign in with Google",
+    "sign_in_slack": "Sign in with Slack",
     "sign_in_error": "Authentication is not configured"
   },
   "app": {
@@ -93,5 +169,9 @@
     "settings": "Settings",
     "theme_to_light": "Switch to light mode",
     "theme_to_dark": "Switch to dark mode"
+  },
+  "searchbar": {
+    "placeholder": "Search...",
+    "no_results": "No results"
   }
 }

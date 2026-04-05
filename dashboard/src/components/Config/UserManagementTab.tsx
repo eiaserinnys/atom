@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useConfig } from '../../hooks/useConfig';
 import type { UserRole } from '../../api/client';
 
@@ -13,6 +14,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export function UserManagementTab({ currentUserEmail }: Props) {
+  const { t } = useTranslation();
   const { users, loading, loadUsers, addUser, updateUser } = useConfig();
   const [newEmail, setNewEmail] = useState('');
   const [newDisplayName, setNewDisplayName] = useState('');
@@ -77,18 +79,18 @@ export function UserManagementTab({ currentUserEmail }: Props) {
       {/* 새 사용자 추가 */}
       <div className="flex flex-col gap-2">
         <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          사용자 추가
+          {t('users.add_section')}
         </div>
         <div className="flex flex-col gap-2">
           <input
             className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
-            placeholder="이메일"
+            placeholder={t('users.invite_placeholder')}
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
           />
           <input
             className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
-            placeholder="표시 이름 (선택)"
+            placeholder={t('users.display_name_placeholder')}
             value={newDisplayName}
             onChange={(e) => setNewDisplayName(e.target.value)}
           />
@@ -107,7 +109,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
               onClick={handleAdd}
               disabled={adding}
             >
-              {adding ? '추가 중...' : '추가'}
+              {adding ? t('users.adding') : t('users.invite_btn')}
             </button>
           </div>
           {addError && (
@@ -119,11 +121,11 @@ export function UserManagementTab({ currentUserEmail }: Props) {
       {/* 사용자 목록 */}
       <div className="flex flex-col gap-2">
         <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          사용자 목록
+          {t('users.list_section')}
         </div>
-        {loading && <div className="text-muted-foreground text-sm">로딩 중...</div>}
+        {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
         {!loading && users.length === 0 && (
-          <div className="text-muted-foreground text-sm">등록된 사용자가 없습니다.</div>
+          <div className="text-muted-foreground text-sm">{t('users.no_users')}</div>
         )}
         <div className="flex flex-col gap-2">
           {users.map((user) => {
@@ -145,7 +147,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                         : 'text-muted-foreground border-border bg-muted'
                     }`}
                   >
-                    {user.is_active ? '활성' : '비활성'}
+                    {user.is_active ? t('users.active') : t('users.inactive')}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -153,7 +155,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                     className="bg-card border border-border rounded px-2 py-0.5 text-foreground text-xs outline-none focus:border-node-user font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                     value={user.role}
                     disabled={isSelf}
-                    title={isSelf ? '자신의 역할은 변경할 수 없습니다' : undefined}
+                    title={isSelf ? t('users.self_role_tooltip') : undefined}
                     onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
                   >
                     {Object.entries(ROLE_LABELS).map(([r, label]) => (
@@ -165,10 +167,10 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                   <button
                     className="text-xs rounded px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed font-sans"
                     disabled={isSelf}
-                    title={isSelf ? '자신의 계정은 변경할 수 없습니다' : undefined}
+                    title={isSelf ? t('users.self_account_tooltip') : undefined}
                     onClick={() => handleToggleActive(user.id, !user.is_active)}
                   >
-                    {user.is_active ? '비활성화' : '활성화'}
+                    {user.is_active ? t('users.deactivate') : t('users.activate')}
                   </button>
                 </div>
                 {updateErrors[user.id] && (

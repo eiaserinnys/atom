@@ -26,24 +26,46 @@
   },
   "users": {
     "title": "Benutzerverwaltung",
+    "add_section": "Benutzer hinzufügen",
+    "list_section": "Benutzerliste",
     "invite_placeholder": "E-Mail",
+    "display_name_placeholder": "Anzeigename (optional)",
     "invite_btn": "Hinzufügen",
+    "adding": "Hinzufügen...",
     "no_users": "Keine Benutzer registriert.",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "activate": "Aktivieren",
+    "deactivate": "Deaktivieren",
+    "self_role_tooltip": "Sie können Ihre eigene Rolle nicht ändern",
+    "self_account_tooltip": "Sie können Ihr eigenes Konto nicht ändern",
     "remove_confirm": "Benutzer \"{{email}}\" entfernen?",
     "role_change_confirm": "Rolle von \"{{email}}\" zu {{role}} ändern?"
   },
   "agents": {
     "title": "API-Schlüsselverwaltung",
     "desc": "Das API-Secret wird nur einmal angezeigt. Bewahren Sie es sicher auf.",
+    "create_section": "Agent erstellen",
+    "list_section": "Agentenliste",
     "generate_btn": "Generieren",
+    "creating": "Erstellen...",
     "no_agents": "Keine Agenten registriert.",
     "name_placeholder": "agent_id (z.B. my-agent)",
+    "display_name_placeholder": "Anzeigename (optional)",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "activate": "Aktivieren",
+    "deactivate": "Deaktivieren",
+    "reissue": "Secret neu ausstellen",
+    "acknowledged": "Verstanden",
     "copy_hint": "Secret kopieren",
     "revoke_confirm": "API-Schlüssel \"{{name}}\" widerrufen?",
     "new_key_warning": "API-Secret — wird nur einmal angezeigt. Bewahren Sie es sicher auf."
   },
   "credentials": {
     "title": "Externe Authentifizierung",
+    "desc": "Geben Sie Anmeldeinformationen für externe Referenzabfragen (unfurl) ein. Im Browser gespeichert, nie an den Server gesendet.",
+    "loading": "Adapter laden...",
     "no_creds": "Keine externen Referenzadapter registriert.",
     "add_btn": "Hinzufügen",
     "service": "Dienst",
@@ -55,7 +77,11 @@
     "desc": "Anzeigesprache auswählen."
   },
   "tree": {
+    "header": "Baumnavigation",
+    "loading": "Baum laden...",
     "empty": "Keine Knoten.",
+    "create_root_structure": "Stammstrukturkarte erstellen",
+    "create_root_knowledge": "Stammwissenskarte erstellen",
     "search_placeholder": "Suchen...",
     "search_empty": "Keine Ergebnisse",
     "add_structure": "Struktur",
@@ -65,9 +91,31 @@
     "context_rename": "Umbenennen",
     "context_delete": "Löschen",
     "context_add_child": "Kind hinzufügen",
-    "context_add_sibling": "Geschwister hinzufügen"
+    "context_add_sibling": "Geschwister hinzufügen",
+    "context_create_child_structure": "Kindstrukturkarte erstellen",
+    "context_create_child_knowledge": "Kindwissenskarte erstellen"
   },
   "card": {
+    "header": "Kartendetails",
+    "deleted": "Diese Karte wurde gelöscht.",
+    "no_selection": "Wählen Sie einen Knoten aus, um Kartendetails anzuzeigen.",
+    "unsaved_changes": "Die Karte wurde möglicherweise extern geändert. Sie haben ungespeicherte Änderungen.",
+    "refresh": "Aktualisieren",
+    "title_label": "Titel",
+    "content_label": "Inhalt",
+    "empty_content": "Kein Inhalt",
+    "type_label": "Typ",
+    "symlink_label": "Symlink",
+    "source_type_label": "Quellentyp",
+    "source_ref_label": "Quellenreferenz",
+    "tags_label": "Tags",
+    "refs_label": "Referenzen",
+    "version_label": "Version",
+    "updated_at_label": "Aktualisiert",
+    "created_by_label": "Erstellt von",
+    "updated_by_label": "Aktualisiert von",
+    "save_failed": "Speichern fehlgeschlagen",
+    "click_to_edit": "Zum Bearbeiten klicken",
     "type_structure": "structure",
     "type_knowledge": "knowledge",
     "type_symlink": "symlink",
@@ -77,15 +125,43 @@
     "edit_content": "Inhalt bearbeiten",
     "compile_view": "Kompiliertes Dokument"
   },
+  "compile": {
+    "header": "Kompiliertes Dokument (BFS+2)",
+    "copy_id": "ID kopieren",
+    "unfurl_enable": "Externe Referenzabfrage aktivieren",
+    "unfurl_disable": "Externe Referenzabfrage deaktivieren",
+    "no_selection": "Wählen Sie einen Knoten aus, um das kompilierte Dokument anzuzeigen.",
+    "loading": "Kompilieren...",
+    "toc_title": "Dokumentgliederung"
+  },
+  "unfurl": {
+    "failure": "Externe Referenzabfrage fehlgeschlagen",
+    "section_title": "Externe Referenzen"
+  },
+  "cardform": {
+    "new_structure": "Neue Strukturkarte",
+    "new_knowledge": "Neue Wissenskarte",
+    "edit": "Karte bearbeiten",
+    "title_label": "Titel",
+    "title_placeholder": "Titel eingeben",
+    "content_label": "Inhalt (optional)",
+    "content_placeholder": "Im Markdown-Format eingeben",
+    "saving": "Speichern…",
+    "creating": "Erstellen"
+  },
   "delete_modal": {
     "title": "Karte löschen",
     "desc": "\"{{name}}\" löschen?",
-    "confirm_btn": "Löschen"
+    "confirm_text": "\"{{name}}\" löschen?",
+    "sub_items_warning": "⚠️ Untergeordnete Elemente werden ebenfalls gelöscht.",
+    "confirm_btn": "Löschen",
+    "deleting": "Löschen…"
   },
   "login": {
     "title": "atom",
     "desc": "Wissensmanagementsystem",
     "sign_in_google": "Mit Google anmelden",
+    "sign_in_slack": "Mit Slack anmelden",
     "sign_in_error": "Authentifizierung ist nicht konfiguriert"
   },
   "app": {
@@ -93,5 +169,9 @@
     "settings": "Einstellungen",
     "theme_to_light": "Zum hellen Modus wechseln",
     "theme_to_dark": "Zum dunklen Modus wechseln"
+  },
+  "searchbar": {
+    "placeholder": "Suchen...",
+    "no_results": "Keine Ergebnisse"
   }
 }
