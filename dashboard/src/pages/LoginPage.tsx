@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -8,6 +9,7 @@ interface AuthProviders {
 }
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const [providers, setProviders] = useState<AuthProviders | null>(null);
 
   useEffect(() => {
@@ -20,8 +22,8 @@ export function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="flex flex-col items-center gap-3 px-12 py-10 bg-card border border-border rounded-xl min-w-[280px]">
-        <h1 className="m-0 text-2xl font-semibold text-foreground font-sans">atom</h1>
-        <p className="m-0 text-sm text-muted-foreground font-sans">지식 관리 시스템</p>
+        <h1 className="m-0 text-2xl font-semibold text-foreground font-sans">{t('login.title')}</h1>
+        <p className="m-0 text-sm text-muted-foreground font-sans">{t('login.desc')}</p>
 
         <div className="flex flex-col gap-2 mt-2 w-full">
           {providers?.slack && (
@@ -32,7 +34,7 @@ export function LoginPage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="currentColor"/>
               </svg>
-              Slack으로 로그인
+              {t('login.sign_in_slack')}
             </a>
           )}
 
@@ -47,13 +49,13 @@ export function LoginPage() {
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
-              Google로 로그인
+              {t('login.sign_in_google')}
             </a>
           )}
 
           {providers !== null && !providers.google && !providers.slack && (
             <p className="text-sm text-muted-foreground text-center">
-              인증이 설정되지 않았습니다
+              {t('login.sign_in_error')}
             </p>
           )}
 

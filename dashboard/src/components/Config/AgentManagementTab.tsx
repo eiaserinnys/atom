@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useConfig } from '../../hooks/useConfig';
 
 export function AgentManagementTab() {
+  const { t } = useTranslation();
   const {
     agents,
     loading,
@@ -87,7 +89,7 @@ export function AgentManagementTab() {
       {lastCreatedSecret && (
         <div className="flex flex-col gap-2 bg-node-plan/10 border border-node-plan/40 rounded-md px-3 py-3">
           <div className="text-xs font-semibold text-node-plan">
-            API 시크릿 — 지금만 표시됩니다. 안전한 곳에 저장하세요.
+            {t('agents.new_key_warning')}
           </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 text-xs bg-card border border-border rounded px-2 py-1.5 font-mono text-foreground break-all">
@@ -97,14 +99,14 @@ export function AgentManagementTab() {
               className="text-xs rounded px-2.5 py-1 border border-node-plan/60 bg-transparent text-node-plan cursor-pointer hover:bg-node-plan/10 font-sans whitespace-nowrap"
               onClick={handleCopy}
             >
-              {copied ? '복사됨' : '복사'}
+              {copied ? t('common.copied') : t('common.copy')}
             </button>
           </div>
           <button
             className="self-start text-xs rounded px-2.5 py-1 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
             onClick={clearSecret}
           >
-            확인했습니다
+            {t('agents.acknowledged')}
           </button>
         </div>
       )}
@@ -112,18 +114,18 @@ export function AgentManagementTab() {
       {/* 새 에이전트 생성 */}
       <div className="flex flex-col gap-2">
         <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          에이전트 생성
+          {t('agents.create_section')}
         </div>
         <div className="flex flex-col gap-2">
           <input
             className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
-            placeholder="agent_id (예: my-agent)"
+            placeholder={t('agents.name_placeholder')}
             value={newAgentId}
             onChange={(e) => setNewAgentId(e.target.value)}
           />
           <input
             className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
-            placeholder="표시 이름 (선택)"
+            placeholder={t('agents.display_name_placeholder')}
             value={newDisplayName}
             onChange={(e) => setNewDisplayName(e.target.value)}
           />
@@ -132,7 +134,7 @@ export function AgentManagementTab() {
             onClick={handleCreate}
             disabled={creating}
           >
-            {creating ? '생성 중...' : '생성'}
+            {creating ? t('agents.creating') : t('agents.generate_btn')}
           </button>
           {createError && (
             <div className="text-node-error text-xs">{createError}</div>
@@ -143,11 +145,11 @@ export function AgentManagementTab() {
       {/* 에이전트 목록 */}
       <div className="flex flex-col gap-2">
         <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          에이전트 목록
+          {t('agents.list_section')}
         </div>
-        {loading && <div className="text-muted-foreground text-sm">로딩 중...</div>}
+        {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
         {!loading && agents.length === 0 && (
-          <div className="text-muted-foreground text-sm">등록된 에이전트가 없습니다.</div>
+          <div className="text-muted-foreground text-sm">{t('agents.no_agents')}</div>
         )}
         <div className="flex flex-col gap-2">
           {agents.map((agent) => (
@@ -169,7 +171,7 @@ export function AgentManagementTab() {
                       : 'text-muted-foreground border-border bg-muted'
                   }`}
                 >
-                  {agent.is_active ? '활성' : '비활성'}
+                  {agent.is_active ? t('agents.active') : t('agents.inactive')}
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -177,13 +179,13 @@ export function AgentManagementTab() {
                   className="text-xs rounded px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
                   onClick={() => handleReissue(agent.id)}
                 >
-                  시크릿 재발급
+                  {t('agents.reissue')}
                 </button>
                 <button
                   className="text-xs rounded px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
                   onClick={() => handleToggleActive(agent.id, !agent.is_active)}
                 >
-                  {agent.is_active ? '비활성화' : '활성화'}
+                  {agent.is_active ? t('agents.deactivate') : t('agents.activate')}
                 </button>
               </div>
               {reissueErrors[agent.id] && (

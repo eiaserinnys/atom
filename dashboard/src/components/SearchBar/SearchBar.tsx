@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, type SearchResult } from '../../api/client';
 
 interface SearchBarProps {
@@ -6,6 +7,7 @@ interface SearchBarProps {
 }
 
 export function SearchBar({ onSelectNode }: SearchBarProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +62,7 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
         <input
           className="flex-1 bg-transparent border-none outline-none text-foreground text-[15px] font-sans py-2 placeholder:text-muted-foreground"
           type="text"
-          placeholder="검색..."
+          placeholder={t('searchbar.placeholder')}
           value={query}
           onChange={handleChange}
           onFocus={() => results.length > 0 && setOpen(true)}
@@ -97,7 +99,7 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
 
       {open && results.length === 0 && !loading && query && (
         <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-[100]">
-          <div className="p-3 text-sm text-muted-foreground text-center">결과 없음</div>
+          <div className="p-3 text-sm text-muted-foreground text-center">{t('searchbar.no_results')}</div>
         </div>
       )}
     </div>

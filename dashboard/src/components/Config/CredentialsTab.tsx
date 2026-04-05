@@ -1,22 +1,24 @@
+import { useTranslation } from 'react-i18next';
 import { useAdapters } from '../../hooks/useAdapters';
 import { useLocalStorageCredentials } from '../../hooks/useLocalStorageCredentials';
 
 export function CredentialsTab() {
+  const { t } = useTranslation();
   const { adapters, isLoading } = useAdapters();
   const { credentials, updateCredential } = useLocalStorageCredentials();
 
   return (
     <div className="flex flex-col gap-5">
       <div className="text-xs text-muted-foreground">
-        외부 참조(unfurl) 조회 시 사용할 인증 정보를 입력합니다. 브라우저에 저장되며 서버로 전송되지 않습니다.
+        {t('credentials.desc')}
       </div>
 
       {isLoading && (
-        <div className="text-muted-foreground text-sm">어댑터 로딩 중...</div>
+        <div className="text-muted-foreground text-sm">{t('credentials.loading')}</div>
       )}
 
       {!isLoading && adapters.length === 0 && (
-        <div className="text-muted-foreground text-sm">등록된 외부 참조 어댑터가 없습니다.</div>
+        <div className="text-muted-foreground text-sm">{t('credentials.no_creds')}</div>
       )}
 
       {adapters.map((adapter) => (

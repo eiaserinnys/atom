@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pencil } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -36,6 +37,7 @@ function extractNodeId(children: React.ReactNode): string | null {
 }
 
 export function EditableHeading({ level, children, sectionMap, compiledNodeId }: EditableHeadingProps) {
+  const { t } = useTranslation();
   const [showModal, setShowModal] = useState(false);
   const [cardData, setCardData] = useState<{ title: string; content: string } | null>(null);
   const [loadingCard, setLoadingCard] = useState(false);
@@ -85,7 +87,7 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
             onClick={handleEditClick}
             disabled={loadingCard}
             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-            title="카드 수정"
+            title={t('card.edit_title')}
           >
             {loadingCard ? (
               <span className="text-[10px]">…</span>

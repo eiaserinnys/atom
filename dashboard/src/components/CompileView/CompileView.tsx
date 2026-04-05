@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Link2 } from 'lucide-react';
@@ -22,6 +23,7 @@ interface TocEntry {
 const TOC_WIDTH = 200;
 
 export function CompileView({ nodeId }: CompileViewProps) {
+  const { t } = useTranslation();
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
 
   // Standard compile (GET) — used when unfurl is disabled
@@ -153,7 +155,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
       <div className="flex items-center px-4 py-3 border-b border-border text-xs font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
-        컴파일 문서 (BFS+2)
+        {t('compile.header')}
         {nodeId && (
           <div className="ml-auto flex items-center gap-1">
             <span className="px-2 py-0.5 text-xs font-mono bg-muted border border-border rounded-md text-muted-foreground">
@@ -162,7 +164,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
             <button
               onClick={() => navigator.clipboard.writeText(nodeId)}
               className="p-1 rounded hover:bg-muted text-muted-foreground"
-              title="ID 복사"
+              title={t('compile.copy_id')}
             >
               <Copy className="w-3 h-3" />
             </button>
@@ -171,7 +173,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
               className={`p-1 rounded text-muted-foreground transition-colors ${
                 unfurlEnabled ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
               }`}
-              title={unfurlEnabled ? '외부 참조 조회 끄기' : '외부 참조 조회 켜기'}
+              title={unfurlEnabled ? t('compile.unfurl_disable') : t('compile.unfurl_enable')}
             >
               <Link2 className="w-3 h-3" />
             </button>
@@ -199,7 +201,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
               style={{ width: TOC_WIDTH }}
             >
               <div className="px-3 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                문서 개요
+                {t('compile.toc_title')}
               </div>
               <nav className="px-1 pb-3">
                 {tocEntries.map((entry) => (
@@ -232,10 +234,10 @@ export function CompileView({ nodeId }: CompileViewProps) {
         <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
           <div className="p-4" ref={contentRef}>
             {!nodeId && (
-              <div className="text-muted-foreground text-sm">노드를 선택하면 컴파일된 문서가 표시됩니다.</div>
+              <div className="text-muted-foreground text-sm">{t('compile.no_selection')}</div>
             )}
-            {isLoading && <div className="text-muted-foreground text-sm">컴파일 중...</div>}
-            {error && <div className="text-node-error text-sm">오류: {(error as Error).message}</div>}
+            {isLoading && <div className="text-muted-foreground text-sm">{t('compile.loading')}</div>}
+            {error && <div className="text-node-error text-sm">{t('common.error')}: {(error as Error).message}</div>}
             {markdown && !isLoading && (
               <div className="
                 text-foreground text-base leading-[1.7]
