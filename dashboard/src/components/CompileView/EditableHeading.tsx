@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pencil } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -76,7 +76,7 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
     editMutation.mutate({ cardId: sectionInfo.cardId, title, content });
   }
 
-  const HeadingTag = `h${level}` as keyof JSX.IntrinsicElements;
+  const HeadingTag = `h${level}` as ElementType;
 
   return (
     <>
