@@ -57,10 +57,10 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <div className="flex items-center bg-card border border-border rounded-md px-2.5 gap-1.5">
-        <span className="text-muted-foreground text-base shrink-0">⌕</span>
+      <div className="flex items-center bg-white/10 border border-white/20 rounded-[11px] px-2.5 gap-1.5">
+        <span className="text-white/60 text-base shrink-0">⌕</span>
         <input
-          className="flex-1 bg-transparent border-none outline-none text-foreground text-[15px] font-sans py-2 placeholder:text-muted-foreground"
+          className="flex-1 bg-transparent border-none outline-none text-white text-[15px] font-sans py-2 placeholder:text-white/40"
           type="text"
           placeholder={t('searchbar.placeholder')}
           value={query}

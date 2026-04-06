@@ -154,7 +154,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
-      <div className="flex items-center px-4 py-3 border-b border-border bg-card text-xs font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
+      <div className="h-10 flex items-center px-4 border-b border-border bg-card text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground shrink-0">
         {t('compile.header')}
         {nodeId && (
           <div className="ml-auto flex items-center gap-1">

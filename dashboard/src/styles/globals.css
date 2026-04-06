@@ -44,10 +44,13 @@
   --radius-apple-large: 12px;       /* 카드, 컨테이너 */
   --radius-apple-pill: 980px;       /* 풀 라운드 */
 
-  /* Apple 그림자 — 단일 소프트 확산 그림자 */
-  --shadow-card: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
+  /* Apple 그림자 — 단일 소프트 확산 그림자 (모드별 값은 :root/.dark에서 오버라이드) */
+  --shadow-card: var(--shadow-card-raw);
   --shadow-hover: rgba(0, 0, 0, 0.32) 3px 5px 30px 0px;
-  --shadow-focus-ring: 0 0 0 3px rgba(0, 113, 227, 0.4);
+  --shadow-focus-ring: var(--shadow-focus-ring-raw);
+
+  /* Input border (별도 변수 — --border는 카드 보더 없음 원칙 유지) */
+  --color-input-border: var(--input-border);
 }
 
 /* Light mode (default) */
@@ -72,12 +75,15 @@
   --card: #f5f5f7;                 /* Apple Light Gray */
   --card-foreground: #1d1d1f;     /* Apple Near Black */
   --foreground: #1d1d1f;          /* Apple Near Black */
-  --input: #f5f5f7;               /* Apple Light Gray */
+  --input: #ffffff;               /* 입력 배경: 흰색 (카드와 구분) */
+  --input-border: #d2d2d7;        /* 입력 보더: Apple Light Gray Border */
   --muted: #f5f5f7;               /* Apple Light Gray */
   --muted-foreground: rgba(0, 0, 0, 0.48);  /* Black 48% */
   --primary: #1d1d1f;             /* Apple Near Black */
   --primary-foreground: #ffffff;
   --ring: #0071e3;                 /* Apple Blue */
+  --shadow-focus-ring-raw: 0 0 0 3px rgba(0, 113, 227, 0.2);
+  --shadow-card-raw: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
 }
 
 /* Dark mode */
@@ -97,17 +103,20 @@
   --accent-foreground: #f5f5f7;
   --background: #000000;           /* Apple Pure Black */
   --border: rgba(255, 255, 255, 0.1);  /* 극히 미미한 보더 */
-  --brand: #0071e3;                /* Apple Blue — 라이트/다크 동일 */
+  --brand: #2997ff;                /* Apple Blue — 다크 모드 전용 */
   --brand-foreground: #ffffff;
   --card: #272729;                 /* Apple Dark Surface 1 */
   --card-foreground: #f5f5f7;
   --foreground: #f5f5f7;
-  --input: #272729;
+  --input: #1c1c1e;               /* 입력 배경: 애플 다크 */
+  --input-border: #333336;        /* 입력 보더: Apple Dark Gray Border */
   --muted: #1d1d1f;               /* Near Black as dark muted */
   --muted-foreground: rgba(255, 255, 255, 0.48);  /* White 48% */
   --primary: #f5f5f7;
   --primary-foreground: #000000;
-  --ring: #0071e3;                 /* Apple Blue — 라이트/다크 동일 */
+  --ring: #2997ff;                 /* Apple Blue — 다크 모드 전용 */
+  --shadow-focus-ring-raw: 0 0 0 3px rgba(41, 151, 255, 0.25);
+  --shadow-card-raw: rgba(0, 0, 0, 0.5) 3px 5px 30px 0px;
 }
 
 @layer base {
@@ -151,6 +160,7 @@
   .prose-atom p {
     margin-bottom: 0.75em;
   }
+  .prose-atom :first-child { margin-top: 0; }
   .prose-atom p:last-child { margin-bottom: 0; }
   .prose-atom ul, .prose-atom ol {
     padding-left: 1.5em;

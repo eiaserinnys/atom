@@ -37,7 +37,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-background border border-border rounded-[14px] shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-card border border-border rounded-[14px] shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <span className="text-base font-semibold text-foreground">{t('config.settings')}</span>
