@@ -28,6 +28,14 @@ test.describe('Auth config and DB connection test', () => {
     // Click Save button within the modal
     await modal.getByRole('button', { name: /Save/i }).click();
 
+    // Wait a moment and capture state
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: 'e2e/debug-after-save.png', fullPage: true });
+
+    // Check for any visible text messages in the modal
+    const modalText = await modal.textContent();
+    console.log('Modal text after save:', modalText?.substring(0, 500));
+
     // Success message or check that save completed
     await expect(modal.locator('text=Settings saved').or(modal.locator('text=설정이 저장되었습니다'))).toBeVisible({ timeout: 5_000 });
   });
