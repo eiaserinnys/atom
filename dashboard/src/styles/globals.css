@@ -2,12 +2,11 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* 폰트 — Plus Jakarta Sans (Airbnb Cereal VF 대체: 동일한 워밍 톤, 500-700 weight range) */
-  --font-mono: 'Cascadia Code', 'Fira Code', monospace;
-  --font-sans: 'Plus Jakarta Sans', -apple-system, system-ui, Roboto, 'Helvetica Neue', sans-serif;
-  --font-display: 'Plus Jakarta Sans', -apple-system, system-ui, Roboto, 'Helvetica Neue', sans-serif;
+  /* 폰트 — Apple SF Pro 시스템 폰트 (외부 의존성 없음) */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'SF Pro Icons', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
 
-  /* 기존 시맨틱 색상 매핑 */
+  /* 시맨틱 색상 매핑 */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -22,11 +21,11 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
 
-  /* 신규: 브랜드 컬러 (Airbnb Rausch Red) */
+  /* 브랜드 컬러 (Apple Blue) */
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
 
-  /* 노드 타입 컬러 (앱 고유, 유지) */
+  /* 노드 타입 컬러 (앱 고유, 전체 유지) */
   --color-node-user: var(--node-user);
   --color-node-response: var(--node-response);
   --color-node-thinking: var(--node-thinking);
@@ -38,17 +37,17 @@
   --color-node-system: var(--node-system);
   --color-node-input-request: var(--node-input-request);
 
-  /* Airbnb border-radius 스케일 (DESIGN.md §5 Layout Principles) */
-  --radius-airbnb-subtle: 4px;   /* Small links */
-  --radius-airbnb-button: 8px;   /* Buttons, tabs, search elements */
-  --radius-airbnb-badge: 14px;   /* Status badges, labels */
-  --radius-airbnb-card: 20px;    /* Feature cards, large buttons */
-  --radius-airbnb-lg: 32px;      /* Large containers, hero elements */
+  /* Apple border-radius 스케일 */
+  --radius-apple-micro: 5px;        /* 아이콘, 태그 */
+  --radius-apple-button: 8px;       /* 버튼, 탭, 검색 */
+  --radius-apple-comfortable: 11px; /* 입력 필드 */
+  --radius-apple-large: 12px;       /* 카드, 컨테이너 */
+  --radius-apple-pill: 980px;       /* 풀 라운드 */
 
-  /* Airbnb 그림자 시스템 (DESIGN.md §6 Depth & Elevation) */
-  --shadow-card: rgba(0,0,0,0.02) 0px 0px 0px 1px, rgba(0,0,0,0.04) 0px 2px 6px, rgba(0,0,0,0.1) 0px 4px 8px;
-  --shadow-hover: rgba(0,0,0,0.08) 0px 4px 12px;
-  --shadow-focus-ring: rgb(255,255,255) 0px 0px 0px 4px;
+  /* Apple 그림자 — 단일 소프트 확산 그림자 */
+  --shadow-card: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
+  --shadow-hover: rgba(0, 0, 0, 0.32) 3px 5px 30px 0px;
+  --shadow-focus-ring: 0 0 0 3px rgba(0, 113, 227, 0.4);
 }
 
 /* Light mode (default) */
@@ -64,21 +63,21 @@
   --node-system: #6b7280;
   --node-input-request: #ec4899;
 
-  --accent: #f2f2f2;             /* Airbnb Light Surface */
-  --accent-foreground: #222222;  /* Airbnb near-black */
-  --background: #ffffff;         /* Airbnb Pure White */
-  --border: #c1c1c1;             /* Airbnb Border Gray */
-  --brand: #ff385c;              /* Airbnb Rausch Red */
+  --accent: #f5f5f7;               /* Apple Light Gray */
+  --accent-foreground: #1d1d1f;   /* Apple Near Black */
+  --background: #ffffff;           /* Apple Pure White */
+  --border: transparent;           /* Apple은 보더 거의 없음 */
+  --brand: #0071e3;                /* Apple Blue — 유일한 accent */
   --brand-foreground: #ffffff;
-  --card: #ffffff;
-  --card-foreground: #222222;    /* Airbnb near-black */
-  --foreground: #222222;         /* Airbnb near-black (was #262626) */
-  --input: rgba(0, 0, 0, 0.10);
-  --muted: #f2f2f2;              /* Airbnb Light Surface (was rgba(0,0,0,0.04)) */
-  --muted-foreground: #6a6a6a;   /* Airbnb Secondary Gray (was #6b7280) */
-  --primary: #222222;            /* Airbnb near-black button (was #262626) */
-  --primary-foreground: #ffffff; /* Pure white (was #fafafa) */
-  --ring: #ff385c;               /* Rausch Red focus ring (was #9ca3af) */
+  --card: #f5f5f7;                 /* Apple Light Gray */
+  --card-foreground: #1d1d1f;     /* Apple Near Black */
+  --foreground: #1d1d1f;          /* Apple Near Black */
+  --input: #f5f5f7;               /* Apple Light Gray */
+  --muted: #f5f5f7;               /* Apple Light Gray */
+  --muted-foreground: rgba(0, 0, 0, 0.48);  /* Black 48% */
+  --primary: #1d1d1f;             /* Apple Near Black */
+  --primary-foreground: #ffffff;
+  --ring: #0071e3;                 /* Apple Blue */
 }
 
 /* Dark mode */
@@ -94,21 +93,21 @@
   --node-system: hsl(220, 8%, 55%);
   --node-input-request: hsl(330, 65%, 65%);
 
-  --accent: rgba(255, 255, 255, 0.06);  /* 다크 모드 (was 0.04, 더 가시적) */
-  --accent-foreground: #f5f5f5;
-  --background: #161616;
-  --border: rgba(255, 255, 255, 0.15);  /* 다크 모드 (was 0.06, 더 가시적) */
-  --brand: #ff385c;                      /* Rausch Red — 다크에서도 동일 */
+  --accent: #272729;               /* Apple Dark Surface 1 */
+  --accent-foreground: #f5f5f7;
+  --background: #000000;           /* Apple Pure Black */
+  --border: rgba(255, 255, 255, 0.1);  /* 극히 미미한 보더 */
+  --brand: #0071e3;                /* Apple Blue — 라이트/다크 동일 */
   --brand-foreground: #ffffff;
-  --card: #191919;
-  --card-foreground: #f5f5f5;
-  --foreground: #f5f5f5;
-  --input: rgba(255, 255, 255, 0.08);
-  --muted: rgba(255, 255, 255, 0.06);   /* 다크 모드 (was 0.04) */
-  --muted-foreground: #818181;
-  --primary: #f5f5f5;
-  --primary-foreground: #222222;         /* Airbnb near-black (was #262626) */
-  --ring: #ff385c;                       /* Rausch Red (was #6b7280) */
+  --card: #272729;                 /* Apple Dark Surface 1 */
+  --card-foreground: #f5f5f7;
+  --foreground: #f5f5f7;
+  --input: #272729;
+  --muted: #1d1d1f;               /* Near Black as dark muted */
+  --muted-foreground: rgba(255, 255, 255, 0.48);  /* White 48% */
+  --primary: #f5f5f7;
+  --primary-foreground: #000000;
+  --ring: #0071e3;                 /* Apple Blue — 라이트/다크 동일 */
 }
 
 @layer base {
@@ -118,9 +117,10 @@
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
-    font-size: 14px;        /* Airbnb Body/Link: 14px (0.88rem) */
-    line-height: 1.43;      /* Airbnb Body/Link line-height */
-    font-weight: 400;       /* Airbnb Body weight */
+    font-size: 14px;
+    line-height: 1.47;      /* Apple body line-height */
+    font-weight: 400;
+    letter-spacing: -0.374px;  /* Apple body tracking — negative at ALL sizes */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -140,14 +140,14 @@
     margin-top: 1.25em;
     margin-bottom: 0.5em;
   }
-  /* Airbnb Typography §3: Section Heading — 28px/700/lh1.43/ls-0.44px */
-  .prose-atom h1 { font-size: 1.75rem; font-weight: 700; line-height: 1.43; letter-spacing: -0.44px; }
-  /* Airbnb Typography §3: Card Heading — 22px/600/lh1.18/ls-0.44px */
-  .prose-atom h2 { font-size: 1.38rem; font-weight: 600; line-height: 1.18; letter-spacing: -0.44px; }
-  /* Airbnb Typography §3: Feature Title — 20px/600/lh1.20/ls-0.18px */
-  .prose-atom h3 { font-size: 1.25rem; font-weight: 600; line-height: 1.20; letter-spacing: -0.18px; }
-  /* Airbnb Typography §3: UI Semibold — 16px/600/lh1.25/normal */
-  .prose-atom h4 { font-size: 1rem; font-weight: 600; line-height: 1.25; letter-spacing: normal; }
+  /* Apple Typography: Display Hero — 56px/600/lh1.07/ls-0.28px */
+  .prose-atom h1 { font-size: 3.5rem; font-weight: 600; line-height: 1.07; letter-spacing: -0.28px; }
+  /* Apple Typography: Section Heading — 40px/600/lh1.10 */
+  .prose-atom h2 { font-size: 2.5rem; font-weight: 600; line-height: 1.10; letter-spacing: normal; }
+  /* Apple Typography: Tile Heading — 28px/400/lh1.14/ls0.196px */
+  .prose-atom h3 { font-size: 1.75rem; font-weight: 400; line-height: 1.14; letter-spacing: 0.196px; }
+  /* Apple Typography: Card Title — 21px/700/lh1.19/ls0.231px */
+  .prose-atom h4 { font-size: 1.31rem; font-weight: 700; line-height: 1.19; letter-spacing: 0.231px; }
   .prose-atom p {
     margin-bottom: 0.75em;
   }

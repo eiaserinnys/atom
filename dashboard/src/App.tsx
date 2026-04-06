@@ -64,7 +64,7 @@ function AppInner() {
       <ReconnectOverlay />
       {/* Top bar with search */}
       <div className="h-12 flex items-center gap-4 px-4 border-b border-border bg-card shrink-0">
-        <span className="text-xl font-bold tracking-wide text-node-user font-display shrink-0">
+        <span className="text-xl font-bold tracking-wide text-node-user font-sans shrink-0">
           atom
         </span>
         {dbType && (
