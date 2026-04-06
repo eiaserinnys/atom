@@ -12,13 +12,9 @@ test('debug: check bypass mode UI state', async ({ page }) => {
   // Screenshot the full page
   await page.screenshot({ path: 'e2e/debug-screenshot.png', fullPage: true });
 
-  // Check auth status by inspecting network
-  const authResponse = await page.evaluate(async () => {
-    const BASE_URL = (import.meta as Record<string, Record<string, string>>).env?.VITE_API_BASE_URL ?? '';
-    const res = await fetch(`${BASE_URL}/api/auth/status`, { credentials: 'same-origin' });
-    return res.json();
-  });
-  console.log('Auth status:', JSON.stringify(authResponse));
+  // Check auth status directly
+  const authRes = await page.request.get('http://localhost:14200/api/auth/status');
+  console.log('Auth status:', await authRes.text());
 
   // Check all buttons on page
   const buttons = await page.locator('button').all();
