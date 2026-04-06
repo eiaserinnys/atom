@@ -20,6 +20,9 @@ export default defineConfig({
       command: 'pnpm run dev',
       url: `http://${TEST_API_HOST}:${TEST_API_PORT}/api/health`,
       reuseExistingServer: false,
+      timeout: 30_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: {
         API_PORT: TEST_API_PORT,
         JWT_SECRET: 'e2e-test-secret',
@@ -32,6 +35,9 @@ export default defineConfig({
       cwd: './dashboard',
       url: `http://${TEST_API_HOST}:${TEST_FRONTEND_PORT}`,
       reuseExistingServer: false,
+      timeout: 30_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: {
         VITE_API_BASE_URL: `http://${TEST_API_HOST}:${TEST_API_PORT}`,
       },
