@@ -30,7 +30,7 @@ export async function authMiddleware(
   // (MCP handles its own auth via Bearer token; well-known must be publicly reachable
   //  so MCP clients don't fall back to OAuth discovery)
   // /api/cards and /api/tree use agent key auth (handled in the route's own preHandler)
-  if (req.url.startsWith('/api/auth/') || req.url.startsWith('/mcp') || req.url.startsWith('/.well-known/') || req.url === '/register' || req.url.startsWith('/api/cards') || req.url.startsWith('/api/tree')) return;
+  if (req.url.startsWith('/api/auth/') || req.url === '/api/version' || req.url.startsWith('/mcp') || req.url.startsWith('/.well-known/') || req.url === '/register' || req.url.startsWith('/api/cards') || req.url.startsWith('/api/tree')) return;
 
   // Bypass mode: no OAuth configured → allow all requests
   const googleClientId = process.env['GOOGLE_CLIENT_ID'];

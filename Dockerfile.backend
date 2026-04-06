@@ -19,6 +19,10 @@ RUN npm run build
 # Stage 2: Production
 FROM node:22-alpine AS production
 
+# Build info — injected by deploy script, defaults for local builds
+ARG GIT_COMMIT_SHA=unknown
+ARG BUILD_DATE=unknown
+
 WORKDIR /app
 
 RUN apk add --no-cache wget
@@ -28,6 +32,10 @@ RUN npm ci --omit=dev
 
 # Copy built output (includes dist/db/migrations from build script)
 COPY --from=builder /app/dist/ ./dist/
+
+# Bake build info into env for /api/version endpoint
+ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
+ENV BUILD_DATE=${BUILD_DATE}
 
 EXPOSE 4200
 
