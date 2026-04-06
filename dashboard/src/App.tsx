@@ -7,9 +7,13 @@ import { CompileView } from './components/CompileView/CompileView';
 import { CardDetail } from './components/CardDetail/CardDetail';
 import { SearchBar } from './components/SearchBar/SearchBar';
 import { ThemeToggle } from './components/ThemeToggle';
+import { configApi } from './api/client';
 import { ConfigModal } from './components/Config/ConfigModal';
+import { RestartBanner } from './components/RestartBanner';
+import { ReconnectOverlay } from './components/ReconnectOverlay';
 import { useAuth } from './hooks/useAuth';
 import { useAtomEvents } from './hooks/useAtomEvents';
+import { SystemProvider } from './contexts/SystemContext';
 import { LoginPage } from './pages/LoginPage';
 
 const queryClient = new QueryClient({
@@ -33,10 +37,8 @@ function AppInner() {
 
   useEffect(() => {
     if (!auth.authenticated) return;
-    const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
-    fetch(`${BASE_URL}/api/config/db-info`, { credentials: 'same-origin' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (data?.dbType) setDbType(data.dbType); })
+    configApi.getDbInfo()
+      .then((data) => { if (data?.dbType) setDbType(data.dbType as 'postgres' | 'sqlite'); })
       .catch(() => {});
   }, [auth.authenticated]);
 
@@ -58,6 +60,8 @@ function AppInner() {
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+      <RestartBanner />
+      <ReconnectOverlay />
       {/* Top bar with search */}
       <div className="h-12 flex items-center gap-4 px-4 border-b border-border bg-card shrink-0">
         <span className="text-xl font-bold tracking-wide text-node-user font-display shrink-0">
@@ -122,7 +126,9 @@ function AppInner() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppInner />
+      <SystemProvider>
+        <AppInner />
+      </SystemProvider>
     </QueryClientProvider>
   );
 }

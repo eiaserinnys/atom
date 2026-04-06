@@ -23,7 +23,8 @@
     "tab_agents": "API Keys",
     "tab_credentials": "External Auth",
     "tab_language": "Language",
-    "tab_database": "Database"
+    "tab_database": "Database",
+    "tab_auth": "Auth"
   },
   "users": {
     "title": "Users",
@@ -191,6 +192,30 @@
     "migration_confirm": "Migrate SQLite data to PostgreSQL.\n\nThis action cannot be undone. Continue?",
     "migration_running": "Migrating...",
     "migration_btn": "SQLite → PostgreSQL Migration",
-    "file_status": "Status"
+    "file_status": "Status",
+    "test_connection": "Test Connection",
+    "test_success": "Connection successful",
+    "test_failed": "Connection failed",
+    "connection_string": "PostgreSQL Connection String",
+    "save_url": "Save URL"
+  },
+  "auth": {
+    "google_section": "Google OAuth",
+    "slack_section": "Slack OAuth",
+    "client_id": "Client ID",
+    "client_secret": "Client Secret",
+    "callback_url": "Callback URL",
+    "allowed_team_id": "Allowed Team ID",
+    "allowed_email": "Initial Admin Email",
+    "secret_set": "Set",
+    "secret_not_set": "Not set",
+    "save": "Save",
+    "save_success": "Settings saved"
+  },
+  "system": {
+    "restart_required": "Settings changed. Restart required to apply.",
+    "restart_now": "Restart Now",
+    "reconnecting": "Reconnecting to server...",
+    "reconnect_timeout": "Restart may have failed. Please check manually."
   }
 }

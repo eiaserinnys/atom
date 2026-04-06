@@ -17,7 +17,8 @@
     "test": "node --experimental-vm-modules node_modules/.bin/jest --runInBand",
     "test:unit": "node --experimental-vm-modules node_modules/.bin/jest tests/unit",
     "test:integration": "node --experimental-vm-modules node_modules/.bin/jest tests/integration --runInBand",
-    "migrate": "node dist/db/migrate.js"
+    "migrate": "node dist/db/migrate.js",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

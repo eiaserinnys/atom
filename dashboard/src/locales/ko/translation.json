@@ -23,7 +23,8 @@
     "tab_agents": "API 키 관리",
     "tab_credentials": "외부 참조 인증",
     "tab_language": "언어",
-    "tab_database": "데이터베이스"
+    "tab_database": "데이터베이스",
+    "tab_auth": "인증"
   },
   "users": {
     "title": "사용자 관리",
@@ -191,6 +192,30 @@
     "migration_confirm": "SQLite 데이터를 PostgreSQL로 마이그레이션합니다.\n\n이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
     "migration_running": "마이그레이션 진행 중...",
     "migration_btn": "SQLite → PostgreSQL 마이그레이션",
-    "file_status": "상태"
+    "file_status": "상태",
+    "test_connection": "연결 테스트",
+    "test_success": "연결 성공",
+    "test_failed": "연결 실패",
+    "connection_string": "PostgreSQL 연결 문자열",
+    "save_url": "URL 저장"
+  },
+  "auth": {
+    "google_section": "Google OAuth",
+    "slack_section": "Slack OAuth",
+    "client_id": "클라이언트 ID",
+    "client_secret": "클라이언트 시크릿",
+    "callback_url": "콜백 URL",
+    "allowed_team_id": "허용된 팀 ID",
+    "allowed_email": "첫 어드민 이메일",
+    "secret_set": "설정됨",
+    "secret_not_set": "미설정",
+    "save": "저장",
+    "save_success": "설정이 저장되었습니다"
+  },
+  "system": {
+    "restart_required": "설정이 변경되었습니다. 서버를 재시작해야 적용됩니다.",
+    "restart_now": "지금 재시작",
+    "reconnecting": "서버와 연결 중입니다...",
+    "reconnect_timeout": "재시작에 실패했을 수 있습니다. 수동으로 확인해주세요."
   }
 }

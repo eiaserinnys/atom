@@ -276,7 +276,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/auth/status — return current auth state
   app.get('/api/auth/status', async (req, reply) => {
     if (!authConfigured) {
-      return reply.send({ authenticated: true });
+      return reply.send({ authenticated: true, id: 'bypass', email: 'bypass@local', name: 'Bypass Admin', role: 'admin' });
     }
 
     const token = req.cookies[JWT_COOKIE_NAME];
