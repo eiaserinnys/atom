@@ -34,6 +34,16 @@ app.register(cors, {
   credentials: true,
 });
 app.register(cookie);
+
+// Version info — no auth required
+app.get('/api/version', async (_req, reply) => {
+  return reply.send({
+    commit: process.env['GIT_COMMIT_SHA'] || 'dev',
+    buildDate: process.env['BUILD_DATE'] || 'unknown',
+    uptime: Math.floor(process.uptime()),
+  });
+});
+
 app.register(authRoutes);
 app.addHook('preHandler', authMiddleware);
 app.register(cardRoutes);
