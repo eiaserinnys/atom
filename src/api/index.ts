@@ -33,6 +33,7 @@ const frontendUrl = process.env["FRONTEND_URL"];
 app.register(cors, {
   origin: frontendUrl ? [frontendUrl] : true,
   credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
 });
 app.register(cookie);
 
