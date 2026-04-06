@@ -76,7 +76,7 @@ function AppInner() {
         </span>
         {dbType && (
           <span
-            className="text-[11px] text-white/50 shrink-0"
+            className="text-[11px] font-medium text-white/70 bg-white/[0.12] rounded-[5px] px-2 py-0.5 shrink-0 leading-none"
             title={dbType === 'postgres' ? 'PostgreSQL' : 'SQLite'}
           >
             {dbType === 'postgres' ? 'postgre' : 'sqlite'}

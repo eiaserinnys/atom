@@ -52,7 +52,7 @@ export function CardFormModal({
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white dark:bg-card border border-border rounded-[14px] shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-xl mx-6 min-h-[420px] p-7 flex flex-col gap-4">
+      <div className="bg-white dark:bg-card border border-border rounded-[14px] shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-2xl mx-6 min-h-[520px] px-6 py-8 flex flex-col gap-5">
         <h2 className="text-base font-semibold text-foreground">{heading}</h2>
 
         <div className="flex flex-col gap-1">
@@ -73,8 +73,8 @@ export function CardFormModal({
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            rows={7}
-            className="bg-input border border-border rounded-[10px] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow resize-none"
+            rows={9}
+            className="bg-white dark:bg-[#1c1c1e] border border-[#d2d2d7] dark:border-[#333336] rounded-[8px] px-[14px] py-[10px] text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow resize-none"
             placeholder={t('cardform.content_placeholder')}
           />
         </div>
