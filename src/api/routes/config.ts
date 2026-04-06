@@ -1,9 +1,12 @@
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
+import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
+import pg from 'pg';
+import { setPendingRestart } from '../state.js';
 import { getDb } from '../../db/client.js';
 import {
   listUsers,
@@ -126,7 +129,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
         agent_id,
         secret_hash: secretHash,
         display_name,
-        created_by: req.jwtUser!.id,
+        created_by: req.jwtUser!.id === 'bypass' ? undefined : req.jwtUser!.id,
       });
       return reply.code(201).send({
         ...agentToPublic(agent),
@@ -282,6 +285,126 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       sqliteDb.close();
       const message = err instanceof Error ? err.message : String(err);
       return reply.code(500).send({ error: `Migration failed: ${message}` });
+    }
+  });
+
+  // .env file path — same as dotenv config in index.ts (3 levels up from routes/)
+  const __cfgDirname = path.dirname(fileURLToPath(import.meta.url));
+  const envFilePath = path.join(__cfgDirname, '../../../.env');
+
+  const MASKED_KEY_PATTERNS = ['SECRET', 'PASSWORD', 'TOKEN'];
+  function isSensitiveKey(key: string): boolean {
+    const upper = key.toUpperCase();
+    return MASKED_KEY_PATTERNS.some((p) => upper.includes(p));
+  }
+
+  // GET /api/config/env — admin only — returns .env key-value pairs (secrets masked)
+  app.get('/api/config/env', async (req, reply) => {
+    if (!requireRole(req, reply, 'admin')) return;
+
+    try {
+      const content = fs.readFileSync(envFilePath, 'utf-8');
+      const result: Record<string, string> = {};
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx < 0) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        const value = trimmed.slice(eqIdx + 1).trim();
+        if (isSensitiveKey(key)) {
+          result[key] = value ? '***' : '';
+        } else {
+          result[key] = value;
+        }
+      }
+      return reply.send(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.code(500).send({ error: `Failed to read .env: ${message}` });
+    }
+  });
+
+  // PUT /api/config/env — admin only — updates .env file preserving comments and order
+  app.put<{ Body: { key: string; value: string }[] }>('/api/config/env', async (req, reply) => {
+    if (!requireRole(req, reply, 'admin')) return;
+
+    const entries = req.body;
+    if (!Array.isArray(entries) || entries.some((e) => !e.key)) {
+      return reply.code(400).send({ error: 'Body must be an array of { key, value }' });
+    }
+
+    try {
+      const content = fs.existsSync(envFilePath) ? fs.readFileSync(envFilePath, 'utf-8') : '';
+      const lines = content.split('\n');
+      const updates = new Map(entries.map((e) => [e.key, e.value]));
+      const handled = new Set<string>();
+
+      const newLines = lines.map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return line;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx < 0) return line;
+        const key = trimmed.slice(0, eqIdx).trim();
+        if (updates.has(key)) {
+          const newValue = updates.get(key)!;
+          // Skip masked values ('***') to preserve existing secrets
+          if (isSensitiveKey(key) && newValue === '***') {
+            handled.add(key);
+            return line;
+          }
+          handled.add(key);
+          return `${key}=${newValue}`;
+        }
+        return line;
+      });
+
+      // Append new keys not found in existing file
+      for (const [key, value] of updates) {
+        if (!handled.has(key) && !(isSensitiveKey(key) && value === '***')) {
+          newLines.push(`${key}=${value}`);
+        }
+      }
+
+      fs.writeFileSync(envFilePath, newLines.join('\n'), 'utf-8');
+      setPendingRestart(true);
+      return reply.send({ ok: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.code(500).send({ error: `Failed to write .env: ${message}` });
+    }
+  });
+
+  // POST /api/config/db-test — admin only — test PostgreSQL connection
+  app.post<{ Body: { connectionString: string } }>('/api/config/db-test', async (req, reply) => {
+    if (!requireRole(req, reply, 'admin')) return;
+
+    const { connectionString } = req.body;
+    if (!connectionString) {
+      return reply.code(400).send({ ok: false, error: 'connectionString is required' });
+    }
+
+    const pool = new pg.Pool({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      const client = await pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      await pool.end();
+      return reply.send({ ok: true });
+    } catch (err: unknown) {
+      await pool.end().catch(() => {});
+      const pgErr = err as { code?: string; message?: string };
+      let errorMsg: string;
+      if (pgErr.code === 'ECONNREFUSED' || pgErr.message?.includes('ECONNREFUSED')) {
+        errorMsg = 'Connection refused: check host and port';
+      } else if (pgErr.code === '28P01') {
+        errorMsg = 'Authentication failed: check username/password';
+      } else if (pgErr.code === '3D000') {
+        errorMsg = 'Database does not exist';
+      } else {
+        errorMsg = pgErr.message ?? String(err);
+      }
+      return reply.send({ ok: false, error: errorMsg });
     }
   });
 };

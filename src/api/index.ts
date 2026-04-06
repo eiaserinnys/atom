@@ -11,6 +11,7 @@ import { batchRoutes } from "./routes/batch.js";
 import { configRoutes } from "./routes/config.js";
 import { unfurlRoutes } from "./routes/unfurl.js";
 import { cardApiRoutes } from "./routes/card_api.js";
+import { systemRoutes } from "./routes/system.js";
 import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -55,6 +56,7 @@ app.register(batchRoutes);
 app.register(configRoutes);
 app.register(unfurlRoutes);
 app.register(cardApiRoutes);
+app.register(systemRoutes);
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {
