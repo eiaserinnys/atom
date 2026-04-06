@@ -236,4 +236,28 @@ export const configApi = {
   updateAgent(id: string, body: { is_active: boolean }): Promise<Agent> {
     return request(`/api/config/agents/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   },
+  getEnv(): Promise<Record<string, string>> {
+    return request('/api/config/env');
+  },
+  putEnv(entries: { key: string; value: string }[]): Promise<{ ok: boolean }> {
+    return request('/api/config/env', { method: 'PUT', body: JSON.stringify(entries) });
+  },
+  testDbConnection(connectionString: string): Promise<{ ok: boolean; error?: string }> {
+    return request('/api/config/db-test', { method: 'POST', body: JSON.stringify({ connectionString }) });
+  },
+  getDbInfo(): Promise<{ dbType: string; sqliteFile: string; sqliteFileExists: boolean; deprecatedFileExists: boolean }> {
+    return request('/api/config/db-info');
+  },
+};
+
+export const systemApi = {
+  getHealth(): Promise<{ status: string }> {
+    return request('/api/health');
+  },
+  getStatus(): Promise<{ pendingRestart: boolean }> {
+    return request('/api/system/status');
+  },
+  restart(): Promise<{ ok: boolean }> {
+    return request('/api/system/restart', { method: 'POST' });
+  },
 };

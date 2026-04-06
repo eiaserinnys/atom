@@ -6,6 +6,7 @@ import { AgentManagementTab } from './AgentManagementTab';
 import { CredentialsTab } from './CredentialsTab';
 import { LanguageTab } from './LanguageTab';
 import { DatabaseTab } from './DatabaseTab';
+import { AuthTab } from './AuthTab';
 
 interface Props {
   isOpen: boolean;
@@ -16,13 +17,13 @@ interface Props {
 
 export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail }: Props) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'users' | 'agents' | 'credentials' | 'language' | 'database'>(
+  const [activeTab, setActiveTab] = useState<'users' | 'agents' | 'credentials' | 'language' | 'database' | 'auth'>(
     currentUserRole === 'admin' ? 'users' : 'agents'
   );
 
   // role이 바뀌면 기본 탭 재설정
   useEffect(() => {
-    if (currentUserRole !== 'admin' && (activeTab === 'users' || activeTab === 'database')) {
+    if (currentUserRole !== 'admin' && (activeTab === 'users' || activeTab === 'database' || activeTab === 'auth')) {
       setActiveTab('agents');
     }
   }, [currentUserRole, activeTab]);
@@ -105,6 +106,18 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
               {t('config.tab_database')}
             </button>
           )}
+          {currentUserRole === 'admin' && (
+            <button
+              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'auth'
+                  ? 'border-node-user text-node-user'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setActiveTab('auth')}
+            >
+              {t('config.tab_auth')}
+            </button>
+          )}
         </div>
 
         {/* 탭 컨텐츠 */}
@@ -116,6 +129,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           {activeTab === 'credentials' && <CredentialsTab />}
           {activeTab === 'language' && <LanguageTab />}
           {activeTab === 'database' && currentUserRole === 'admin' && <DatabaseTab />}
+          {activeTab === 'auth' && currentUserRole === 'admin' && <AuthTab />}
         </div>
       </div>
     </div>
