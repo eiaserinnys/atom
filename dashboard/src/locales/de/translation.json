@@ -89,6 +89,7 @@
     "add_knowledge": "Wissen",
     "add_symlink": "Symlink",
     "compile": "Kompilieren",
+    "context_move": "Karte verschieben",
     "context_rename": "Umbenennen",
     "context_delete": "Löschen",
     "context_add_child": "Kind hinzufügen",
@@ -149,6 +150,12 @@
     "content_placeholder": "Im Markdown-Format eingeben",
     "saving": "Speichern…",
     "creating": "Erstellen"
+  },
+  "move_modal": {
+    "title": "Karte verschieben",
+    "select_hint": "Ziel-Strukturkarte auswählen",
+    "confirm_btn": "Verschieben",
+    "empty": "Keine Strukturkarten vorhanden"
   },
   "delete_modal": {
     "title": "Karte löschen",

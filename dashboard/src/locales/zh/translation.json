@@ -89,6 +89,7 @@
     "add_knowledge": "知识",
     "add_symlink": "符号链接",
     "compile": "编译",
+    "context_move": "移动卡片",
     "context_rename": "重命名",
     "context_delete": "删除",
     "context_add_child": "添加子节点",
@@ -149,6 +150,12 @@
     "content_placeholder": "以 Markdown 格式输入",
     "saving": "保存中…",
     "creating": "创建"
+  },
+  "move_modal": {
+    "title": "移动卡片",
+    "select_hint": "选择目标结构卡片",
+    "confirm_btn": "移动",
+    "empty": "没有可用的结构卡片"
   },
   "delete_modal": {
     "title": "删除卡片",

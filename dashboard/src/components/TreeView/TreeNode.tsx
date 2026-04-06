@@ -98,6 +98,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
       <div
         ref={combinedRef}
         {...attributes}
+        {...listeners}
         className={`relative flex items-center gap-1 py-0.5 pr-2 cursor-pointer rounded mx-1 transition-colors min-h-[26px] ${
           isDragging
             ? 'opacity-40'
@@ -114,10 +115,9 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
-        {/* 드래그 핸들: 토글 화살표 영역에만 리스너 부착 (클릭과 분리) */}
+        {/* 토글 화살표: 클릭만 담당 (DnD listeners는 outer div로 이동) */}
         <span
           className="w-4 text-center text-[10px] text-muted-foreground cursor-grab shrink-0"
-          {...listeners}
           onClick={(e) => {
             e.stopPropagation();
             if (!loading && hasChildren) handleToggle(e);

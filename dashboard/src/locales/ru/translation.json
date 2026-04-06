@@ -89,6 +89,7 @@
     "add_knowledge": "Знание",
     "add_symlink": "Символическая ссылка",
     "compile": "Компилировать",
+    "context_move": "Переместить карточку",
     "context_rename": "Переименовать",
     "context_delete": "Удалить",
     "context_add_child": "Добавить дочерний",
@@ -149,6 +150,12 @@
     "content_placeholder": "Введите в формате Markdown",
     "saving": "Сохранение…",
     "creating": "Создать"
+  },
+  "move_modal": {
+    "title": "Переместить карточку",
+    "select_hint": "Выберите целевую карточку структуры",
+    "confirm_btn": "Переместить",
+    "empty": "Нет доступных карточек структуры"
   },
   "delete_modal": {
     "title": "Удалить карточку",
