@@ -16,7 +16,7 @@ test.describe('Auth config and DB connection test', () => {
     await expect(page.locator('text=Settings')).toBeVisible();
 
     // Click Auth tab
-    await page.getByRole('button', { name: /Auth/i }).click();
+    await page.getByRole('button', { name: 'Auth', exact: true }).click();
 
     // Fill Google OAuth Client ID (test value)
     const clientIdInput = page.locator('input').first();
@@ -41,7 +41,7 @@ test.describe('Auth config and DB connection test', () => {
     // Open settings → Auth → save something
     const settingsBtn = page.locator('button[aria-label]').filter({ hasText: '⚙️' });
     await settingsBtn.click();
-    await page.getByRole('button', { name: /Auth/i }).click();
+    await page.getByRole('button', { name: 'Auth', exact: true }).click();
 
     const clientIdInput = page.locator('input').first();
     await clientIdInput.fill('trigger-restart-banner');
