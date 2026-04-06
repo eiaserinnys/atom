@@ -5,12 +5,14 @@ interface SystemState {
   pendingRestart: boolean;
   reconnecting: boolean;
   triggerRestart: () => void;
+  refreshStatus: () => void;
 }
 
 const SystemContext = createContext<SystemState>({
   pendingRestart: false,
   reconnecting: false,
   triggerRestart: () => {},
+  refreshStatus: () => {},
 });
 
 export function useSystem() {
@@ -57,8 +59,14 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     }, 1000);
   }, []);
 
+  const refreshStatus = useCallback(() => {
+    systemApi.getStatus()
+      .then((s) => setPendingRestart(s.pendingRestart))
+      .catch(() => {});
+  }, []);
+
   return (
-    <SystemContext.Provider value={{ pendingRestart, reconnecting, triggerRestart }}>
+    <SystemContext.Provider value={{ pendingRestart, reconnecting, triggerRestart, refreshStatus }}>
       {children}
     </SystemContext.Provider>
   );

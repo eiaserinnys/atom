@@ -17,8 +17,7 @@ test.describe('Fresh install — bypass mode API key issuance', () => {
     await expect(page.locator('text=atom')).toBeVisible({ timeout: 15_000 });
 
     // Click settings button
-    const settingsBtn = page.locator('button[aria-label]').filter({ hasText: '⚙️' });
-    await settingsBtn.click();
+    await page.locator('button[aria-label="Settings"]').click();
 
     // Config modal should be visible
     await expect(page.locator('text=Settings')).toBeVisible();

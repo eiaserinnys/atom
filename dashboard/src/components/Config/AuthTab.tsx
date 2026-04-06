@@ -13,7 +13,7 @@ const SENSITIVE = new Set(['GOOGLE_CLIENT_SECRET', 'SLACK_CLIENT_SECRET']);
 
 export function AuthTab() {
   const { t } = useTranslation();
-  const { pendingRestart } = useSystem();
+  const { pendingRestart, refreshStatus } = useSystem();
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,6 +41,7 @@ export function AuthTab() {
       ];
       await configApi.putEnv(entries);
       setMessage({ ok: true, text: t('auth.save_success') });
+      refreshStatus();
     } catch (err) {
       setMessage({ ok: false, text: err instanceof Error ? err.message : String(err) });
     } finally {
