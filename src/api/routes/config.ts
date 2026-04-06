@@ -303,6 +303,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     if (!requireRole(req, reply, 'admin')) return;
 
     try {
+      if (!fs.existsSync(envFilePath)) return reply.send({});
       const content = fs.readFileSync(envFilePath, 'utf-8');
       const result: Record<string, string> = {};
       for (const line of content.split('\n')) {
