@@ -37,7 +37,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-background border border-border rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="bg-background border border-border rounded-[14px] shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <span className="text-base font-semibold text-foreground">{t('config.settings')}</span>
@@ -54,7 +54,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
         <div className="flex border-b border-border shrink-0">
           {currentUserRole === 'admin' && (
             <button
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                 activeTab === 'users'
                   ? 'border-node-user text-node-user'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -65,7 +65,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             </button>
           )}
           <button
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === 'agents'
                 ? 'border-node-user text-node-user'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -75,7 +75,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             {t('config.tab_agents')}
           </button>
           <button
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === 'credentials'
                 ? 'border-node-user text-node-user'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -85,7 +85,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             {t('config.tab_credentials')}
           </button>
           <button
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === 'language'
                 ? 'border-node-user text-node-user'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -96,7 +96,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           </button>
           {currentUserRole === 'admin' && (
             <button
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                 activeTab === 'database'
                   ? 'border-node-user text-node-user'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -108,7 +108,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           )}
           {currentUserRole === 'admin' && (
             <button
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                 activeTab === 'auth'
                   ? 'border-node-user text-node-user'
                   : 'border-transparent text-muted-foreground hover:text-foreground'

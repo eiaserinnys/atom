@@ -154,7 +154,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
-      <div className="flex items-center px-4 py-3 border-b border-border text-xs font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
+      <div className="flex items-center px-4 py-3 border-b border-border bg-card text-xs font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
         {t('compile.header')}
         {nodeId && (
           <div className="ml-auto flex items-center gap-1">
@@ -241,7 +241,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
             {markdown && !isLoading && (
               <div className="
                 text-foreground text-base leading-[1.7]
-                [&_h1]:mt-4 [&_h1]:mb-[0.4em] [&_h1]:font-semibold [&_h1]:text-[1.4em]
+                [&_h1]:mt-4 [&_h1:first-child]:mt-0 [&_h1]:mb-[0.4em] [&_h1]:font-semibold [&_h1]:text-[1.4em]
                 [&_h2]:mt-[1.4em] [&_h2]:mb-[0.4em] [&_h2]:font-semibold [&_h2]:text-[1.2em]
                 [&_h3]:mt-[1.4em] [&_h3]:mb-[0.4em] [&_h3]:font-semibold [&_h3]:text-[1.05em]
                 [&_h4]:mt-[1.4em] [&_h4]:mb-[0.4em] [&_h4]:font-semibold
