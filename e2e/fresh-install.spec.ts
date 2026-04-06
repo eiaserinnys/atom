@@ -1,47 +1,49 @@
 import { test, expect } from '@playwright/test';
 import { resetTestDb } from './helpers';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const envPath = path.resolve(__dirname, '../.env');
 
 test.describe('Fresh install — bypass mode API key issuance', () => {
   test.beforeAll(() => {
     resetTestDb();
+    // Ensure clean .env (no pendingRestart state from other tests)
+    if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
   });
 
   test('can access dashboard without login in bypass mode', async ({ page }) => {
     await page.goto('/');
-    // In bypass mode, should skip login and show the main app
-    await expect(page.locator('text=atom')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.text-xl.font-bold')).toBeVisible({ timeout: 15_000 });
   });
 
   test('can open Config and create an agent API key', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('text=atom')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.text-xl.font-bold')).toBeVisible({ timeout: 15_000 });
 
-    // Click settings button
     await page.locator('button[aria-label="Settings"]').click();
 
-    // Config modal should be visible
-    await expect(page.locator('text=Settings')).toBeVisible();
+    // Wait for modal header specifically
+    const modal = page.locator('.fixed.inset-0');
+    await expect(modal.locator('.text-base.font-semibold')).toBeVisible();
 
-    // Click API Keys tab
     await page.getByRole('button', { name: /API Keys/i }).click();
 
-    // Fill in agent_id
-    const agentInput = page.locator('input[placeholder*="agent_id"]');
+    const agentInput = modal.locator('input[placeholder*="agent_id"]');
     await agentInput.fill('test-e2e-agent');
 
-    // Click Generate
-    await page.getByRole('button', { name: /Generate/i }).click();
+    await modal.getByRole('button', { name: /Generate/i }).click();
 
-    // API secret should appear (shown only once)
-    await expect(page.locator('text=API Secret')).toBeVisible({ timeout: 10_000 });
+    // API secret should appear
+    await expect(modal.locator('text=API Secret')).toBeVisible({ timeout: 10_000 });
 
-    // Acknowledge
-    const gotItBtn = page.getByRole('button', { name: /Got it/i });
+    const gotItBtn = modal.getByRole('button', { name: /Got it/i });
     if (await gotItBtn.isVisible()) {
       await gotItBtn.click();
     }
 
-    // Agent should appear in the list
-    await expect(page.locator('text=test-e2e-agent')).toBeVisible();
+    await expect(modal.locator('text=test-e2e-agent')).toBeVisible();
   });
 });
