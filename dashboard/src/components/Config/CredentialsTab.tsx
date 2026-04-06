@@ -39,7 +39,7 @@ export function CredentialsTab() {
                   onChange={(e) =>
                     updateCredential(adapter.sourceType, field.key, e.target.value)
                   }
-                  className="flex-1 text-sm bg-background border border-border rounded px-2.5 py-1.5 text-foreground outline-none focus:border-node-user font-sans"
+                  className="flex-1 text-sm bg-background border border-border rounded px-2.5 py-1.5 text-foreground outline-none focus:border-brand font-sans"
                 />
               </div>
             ))}

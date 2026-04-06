@@ -81,7 +81,7 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
               <span className="text-xs shrink-0 mt-px">
                 {r.card_type === 'structure' ? '📁' : '📄'}
               </span>
-              {r.is_symlink && <span className="text-[10px] text-node-plan shrink-0 mt-[3px]">↗</span>}
+              {r.is_symlink && <span className="text-[10px] text-muted-foreground shrink-0 mt-[3px]">↗</span>}
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-foreground font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                   {r.title}
