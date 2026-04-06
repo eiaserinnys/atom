@@ -11,47 +11,48 @@ test.describe('Auth config and DB connection test', () => {
     await expect(page.locator('text=atom')).toBeVisible({ timeout: 15_000 });
 
     // Open settings
-    const settingsBtn = page.locator('button[aria-label]').filter({ hasText: '⚙️' });
-    await settingsBtn.click();
+    await page.locator('button[aria-label="Settings"]').click();
     await expect(page.locator('text=Settings')).toBeVisible();
 
-    // Click Auth tab
+    // Click Auth tab (exact match to avoid "External Auth")
     await page.getByRole('button', { name: 'Auth', exact: true }).click();
 
-    // Fill Google OAuth Client ID (test value)
-    const clientIdInput = page.locator('input').first();
-    await clientIdInput.fill('test-google-client-id');
+    // Wait for Auth tab content to load
+    await expect(page.locator('text=Google OAuth')).toBeVisible({ timeout: 5_000 });
 
-    // Fill ALLOWED_EMAIL
-    const emailInputs = page.locator('input[type="text"]');
-    const lastInput = emailInputs.last();
-    await lastInput.fill('admin@test.com');
+    // Fill Google OAuth Client ID — target the input within the modal
+    const modal = page.locator('.fixed.inset-0');
+    const inputs = modal.locator('input[type="text"]');
+    await inputs.first().fill('test-google-client-id');
 
-    // Click Save
-    await page.getByRole('button', { name: /Save/i }).click();
+    // Click Save button within the modal
+    await modal.getByRole('button', { name: /Save/i }).click();
 
-    // Success message
-    await expect(page.locator('text=Settings saved')).toBeVisible({ timeout: 5_000 });
+    // Success message or check that save completed
+    await expect(modal.locator('text=Settings saved').or(modal.locator('text=설정이 저장되었습니다'))).toBeVisible({ timeout: 5_000 });
   });
 
   test('restart banner appears after saving auth settings', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('text=atom')).toBeVisible({ timeout: 15_000 });
 
-    // Open settings → Auth → save something
-    const settingsBtn = page.locator('button[aria-label]').filter({ hasText: '⚙️' });
-    await settingsBtn.click();
+    // Open settings → Auth → save
+    await page.locator('button[aria-label="Settings"]').click();
     await page.getByRole('button', { name: 'Auth', exact: true }).click();
+    await expect(page.locator('text=Google OAuth')).toBeVisible({ timeout: 5_000 });
 
-    const clientIdInput = page.locator('input').first();
-    await clientIdInput.fill('trigger-restart-banner');
-    await page.getByRole('button', { name: /Save/i }).click();
+    const modal = page.locator('.fixed.inset-0');
+    await modal.locator('input[type="text"]').first().fill('trigger-restart');
+    await modal.getByRole('button', { name: /Save/i }).click();
+
+    // Wait for save to complete
+    await expect(modal.locator('text=Settings saved').or(modal.locator('text=설정이 저장되었습니다'))).toBeVisible({ timeout: 5_000 });
 
     // Close config modal
-    await page.locator('button[aria-label="Close"]').click();
+    await modal.locator('button[aria-label="Close"]').click();
 
-    // Restart banner should be visible
-    await expect(page.locator('text=Restart Now')).toBeVisible({ timeout: 10_000 });
+    // Restart banner should be visible (check both en/ko)
+    await expect(page.locator('text=Restart Now').or(page.locator('text=지금 재시작'))).toBeVisible({ timeout: 10_000 });
   });
 
   test('DB connection test with invalid URL shows error', async ({ page }) => {
@@ -59,18 +60,17 @@ test.describe('Auth config and DB connection test', () => {
     await expect(page.locator('text=atom')).toBeVisible({ timeout: 15_000 });
 
     // Open settings → Database tab
-    const settingsBtn = page.locator('button[aria-label]').filter({ hasText: '⚙️' });
-    await settingsBtn.click();
+    await page.locator('button[aria-label="Settings"]').click();
     await page.getByRole('button', { name: /Database/i }).click();
 
-    // If in SQLite mode, connection string input should be visible
-    const connInput = page.locator('input[placeholder*="postgresql"]');
+    const modal = page.locator('.fixed.inset-0');
+    const connInput = modal.locator('input[placeholder*="postgresql"]');
     if (await connInput.isVisible()) {
-      await connInput.fill('postgresql://invalid:invalid@localhost:9999/nonexistent');
-      await page.getByRole('button', { name: /Test Connection/i }).click();
+      await connInput.fill('postgresql://invalid:invalid@127.0.0.1:9999/nonexistent');
+      await modal.getByRole('button', { name: /Test Connection/i }).click();
 
       // Should show failure message
-      await expect(page.locator('text=Connection failed')).toBeVisible({ timeout: 10_000 });
+      await expect(modal.locator('text=Connection failed').or(modal.locator('text=연결 실패'))).toBeVisible({ timeout: 10_000 });
     }
   });
 });
