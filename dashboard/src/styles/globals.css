@@ -69,7 +69,7 @@
   --accent: #f5f5f7;               /* Apple Light Gray */
   --accent-foreground: #1d1d1f;   /* Apple Near Black */
   --background: #ffffff;           /* Apple Pure White */
-  --border: transparent;           /* Apple은 보더 거의 없음 */
+  --border: #d2d2d7;               /* Apple Light Gray Border — 구분선, 코드블록, 배지 등 */
   --brand: #0071e3;                /* Apple Blue — 유일한 accent */
   --brand-foreground: #ffffff;
   --card: #f5f5f7;                 /* Apple Light Gray */
@@ -102,7 +102,7 @@
   --accent: #272729;               /* Apple Dark Surface 1 */
   --accent-foreground: #f5f5f7;
   --background: #000000;           /* Apple Pure Black */
-  --border: rgba(255, 255, 255, 0.1);  /* 극히 미미한 보더 */
+  --border: #333336;               /* Apple Dark Gray Border */
   --brand: #2997ff;                /* Apple Blue — 다크 모드 전용 */
   --brand-foreground: #ffffff;
   --card: #272729;                 /* Apple Dark Surface 1 */
@@ -135,7 +135,8 @@
   }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 3px; }
+  :is(.dark *)::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); }
   ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 }
 
@@ -202,7 +203,7 @@
     margin: 1em 0;
   }
   .prose-atom a {
-    color: var(--node-user);
+    color: var(--brand);   /* Apple Blue: #0071e3 (light) / #2997ff (dark) */
     text-decoration: underline;
     text-underline-offset: 2px;
   }
