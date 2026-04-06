@@ -25,25 +25,13 @@ function joinChildren(children: React.ReactNode): string {
   return String(children ?? '');
 }
 
-/**
- * HTML 주석 제거, 섹션 번호 유지 — 화면 표시용.
- * 서버 마크다운 예시: "## 1.2 카드 제목 <!-- node:xxx card:yyy -->"
- * 결과: "1.2 카드 제목"
- */
+
 function extractDisplayTitle(children: React.ReactNode): string {
   return joinChildren(children)
     .replace(/<!--.*?-->/gs, '')
     .trim();
 }
 
-/**
- * HTML 주석 + 선행 번호 제거 — 편집 모달 초기값용.
- * (실제로는 api.getCard가 clean title을 반환하므로 편집 모달에서는 미사용이나 유지)
- */
-function extractCleanTitle(children: React.ReactNode): string {
-  return extractDisplayTitle(children)
-    .replace(/^[\d.]+\s+/, '');
-}
 
 /**
  * 헤딩 텍스트에서 node ID를 추출.
@@ -62,7 +50,6 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
   const queryClient = useQueryClient();
 
   const displayTitle = extractDisplayTitle(children);
-  const cleanTitle = extractCleanTitle(children); // 호환성 유지
   const nodeId = extractNodeId(children);
   const sectionInfo = nodeId ? sectionMap.get(nodeId) : null;
 
