@@ -13,11 +13,13 @@ import {
 } from '@dnd-kit/core';
 import { LogOut, Plus } from 'lucide-react';
 import { api, type TreeNodeData } from '../../api/client';
+import { fetchRootsWithChildren } from '../../api/treeQueries';
 import { TreeNode } from './TreeNode';
 import { TreeDndContext, type DropZone } from './TreeDndContext';
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu';
 import { CardFormModal } from '../CardFormModal/CardFormModal';
 import { DeleteConfirmModal } from '../DeleteConfirmModal/DeleteConfirmModal';
+import { MoveCardModal } from '../MoveCardModal/MoveCardModal';
 
 interface TreeViewProps {
   selectedNodeId: string | null;
@@ -36,22 +38,8 @@ type ModalState =
   | { type: 'create-root'; cardType: 'structure' | 'knowledge' }
   | { type: 'create-child'; cardType: 'structure' | 'knowledge'; parentNode: TreeNodeData }
   | { type: 'edit'; node: TreeNodeData }
-  | { type: 'delete'; node: TreeNodeData };
-
-async function fetchRootsWithChildren(): Promise<TreeNodeData[]> {
-  const roots = await api.getTree();
-  const rootsWithChildren = await Promise.all(
-    roots.map(async (root) => {
-      try {
-        const children = await api.listChildren(root.id);
-        return { ...root, children };
-      } catch {
-        return { ...root, children: [] };
-      }
-    })
-  );
-  return rootsWithChildren;
-}
+  | { type: 'delete'; node: TreeNodeData }
+  | { type: 'move'; node: TreeNodeData };
 
 /** 로드된 트리에서 특정 노드를 찾음 */
 function findNodeInTree(nodeId: string, nodes: TreeNodeData[]): TreeNodeData | null {
@@ -104,6 +92,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [modal, setModal] = useState<ModalState>({ type: 'none' });
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // DnD 상태
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -205,6 +194,10 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       if (selectedNodeId === nodeId) onSelect(null);
       invalidateTree();
       setModal({ type: 'none' });
+      setDeleteError(null);
+    },
+    onError: (err) => {
+      setDeleteError(err instanceof Error ? err.message : '삭제 중 오류가 발생했습니다.');
     },
   });
 
@@ -305,6 +298,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
         onClick: () => setModal({ type: 'create-child', cardType: 'knowledge', parentNode: node }),
       });
     }
+    items.push({ label: t('tree.context_move'), onClick: () => setModal({ type: 'move', node }) });
     items.push({ label: t('tree.context_rename'), onClick: () => setModal({ type: 'edit', node }) });
     items.push({ label: t('tree.context_delete'), onClick: () => setModal({ type: 'delete', node }), danger: true });
     return items;
@@ -419,14 +413,30 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
             />
           )}
 
+          {/* 카드 이동 모달 */}
+          {modal.type === 'move' && (
+            <MoveCardModal
+              nodeToMove={modal.node}
+              onConfirm={(targetParentNodeId) => {
+                moveMutation.mutate(
+                  { nodeId: modal.node.id, parentNodeId: targetParentNodeId, position: undefined },
+                  { onSuccess: () => setModal({ type: 'none' }) }
+                );
+              }}
+              onClose={() => setModal({ type: 'none' })}
+              isLoading={moveMutation.isPending}
+            />
+          )}
+
           {/* 삭제 확인 모달 */}
           {modal.type === 'delete' && (
             <DeleteConfirmModal
               title={modal.node.card.title}
               isStructure={modal.node.card.card_type === 'structure'}
               onConfirm={() => deleteMutation.mutate(modal.node.id)}
-              onClose={() => setModal({ type: 'none' })}
+              onClose={() => { setModal({ type: 'none' }); setDeleteError(null); }}
               isLoading={deleteMutation.isPending}
+              errorMessage={deleteError ?? undefined}
             />
           )}
         </div>

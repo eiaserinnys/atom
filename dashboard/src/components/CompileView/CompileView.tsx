@@ -118,9 +118,14 @@ export function CompileView({ nodeId }: CompileViewProps) {
 
   const scrollTo = useCallback((id: string) => {
     const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    const container = scrollContainerRef.current;
+    if (!el || !container) return;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    container.scrollTo({
+      top: container.scrollTop + (elRect.top - containerRect.top) - 16,
+      behavior: 'smooth',
+    });
   }, []);
 
   const minLevel = useMemo(

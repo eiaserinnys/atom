@@ -52,7 +52,7 @@ export function CardFormModal({
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white dark:bg-card border border-border rounded-[14px] shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-2xl mx-6 min-h-[520px] px-6 py-8 flex flex-col gap-5">
+      <div className="bg-white dark:bg-card border border-border rounded-[14px] shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-2xl mx-6 px-6 py-6 flex flex-col gap-5">
         <h2 className="text-base font-semibold text-foreground">{heading}</h2>
 
         <div className="flex flex-col gap-1">

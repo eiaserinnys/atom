@@ -89,6 +89,7 @@
     "add_knowledge": "Connaissance",
     "add_symlink": "Lien symbolique",
     "compile": "Compiler",
+    "context_move": "Déplacer la carte",
     "context_rename": "Renommer",
     "context_delete": "Supprimer",
     "context_add_child": "Ajouter un enfant",
@@ -149,6 +150,12 @@
     "content_placeholder": "Saisir en format Markdown",
     "saving": "Enregistrement…",
     "creating": "Créer"
+  },
+  "move_modal": {
+    "title": "Déplacer la carte",
+    "select_hint": "Sélectionner une carte structure cible",
+    "confirm_btn": "Déplacer",
+    "empty": "Aucune carte structure disponible"
   },
   "delete_modal": {
     "title": "Supprimer la carte",

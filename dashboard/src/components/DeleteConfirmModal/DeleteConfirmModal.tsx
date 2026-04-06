@@ -6,6 +6,7 @@ interface DeleteConfirmModalProps {
   onConfirm: () => void;
   onClose: () => void;
   isLoading?: boolean;
+  errorMessage?: string;
 }
 
 export function DeleteConfirmModal({
@@ -14,6 +15,7 @@ export function DeleteConfirmModal({
   onConfirm,
   onClose,
   isLoading = false,
+  errorMessage,
 }: DeleteConfirmModalProps) {
   const { t } = useTranslation();
 
@@ -39,6 +41,10 @@ export function DeleteConfirmModal({
           <div className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded px-3 py-2">
             {t('delete_modal.sub_items_warning')}
           </div>
+        )}
+
+        {errorMessage && (
+          <div className="text-xs text-node-error">{errorMessage}</div>
         )}
 
         <div className="flex justify-end gap-2">

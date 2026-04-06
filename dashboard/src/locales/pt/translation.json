@@ -89,6 +89,7 @@
     "add_knowledge": "Conhecimento",
     "add_symlink": "Link simbólico",
     "compile": "Compilar",
+    "context_move": "Mover cartão",
     "context_rename": "Renomear",
     "context_delete": "Excluir",
     "context_add_child": "Adicionar filho",
@@ -149,6 +150,12 @@
     "content_placeholder": "Digite no formato Markdown",
     "saving": "Salvando…",
     "creating": "Criar"
+  },
+  "move_modal": {
+    "title": "Mover cartão",
+    "select_hint": "Selecione um cartão de estrutura destino",
+    "confirm_btn": "Mover",
+    "empty": "Sem cartões de estrutura"
   },
   "delete_modal": {
     "title": "Excluir cartão",
