@@ -13,7 +13,7 @@ test('debug: check bypass mode UI state', async ({ page }) => {
   await page.screenshot({ path: 'e2e/debug-screenshot.png', fullPage: true });
 
   // Check auth status directly
-  const authRes = await page.request.get('http://localhost:14200/api/auth/status');
+  const authRes = await page.request.get('http://127.0.0.1:14200/api/auth/status');
   console.log('Auth status:', await authRes.text());
 
   // Check all buttons on page
