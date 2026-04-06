@@ -93,12 +93,12 @@ export function CardDetail({ nodeId }: CardDetailProps) {
 
         {/* Dirty State Guard — 편집 중 외부 변경 감지 배너 */}
         {isDirty && card && (
-          <div className="flex items-center justify-between gap-2 bg-node-plan/15 border border-node-plan/40 rounded-md px-3 py-2 text-sm text-foreground shrink-0">
+          <div className="flex items-center justify-between gap-2 bg-brand/8 border border-brand/25 rounded-md px-3 py-2 text-sm text-foreground shrink-0">
             <span className="flex-1">
               {t('card.unsaved_changes')}
             </span>
             <button
-              className="bg-node-plan text-white border-none rounded px-2.5 py-0.5 text-[11px] cursor-pointer whitespace-nowrap hover:opacity-85"
+              className="bg-brand text-white border-none rounded px-2.5 py-0.5 text-[11px] cursor-pointer whitespace-nowrap hover:opacity-85"
               onClick={handleRefresh}
             >
               {t('card.refresh')}
@@ -121,7 +121,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                     autoFocus
                   />
                   <button
-                    className="bg-node-user text-white border-none rounded px-3 py-1 text-[13px] cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-brand text-white border-none rounded px-3 py-1 text-[13px] cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={saveTitle}
                     disabled={saving}
                   >
@@ -160,7 +160,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                   />
                   <div className="flex gap-1.5 items-center">
                     <button
-                      className="bg-node-user text-white border-none rounded px-3 py-1 text-[13px] cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-brand text-white border-none rounded px-3 py-1 text-[13px] cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={saveContent}
                       disabled={saving}
                     >
@@ -196,7 +196,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
             <div className="flex flex-col gap-1.5 pt-2 border-t border-border">
               <div className="flex gap-2.5 items-baseline">
                 <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.type_label')}</span>
-                <span className={`text-[13px] ${card.card_type === 'structure' ? 'text-node-tool' : 'text-node-response'}`}>
+                <span className="text-[13px] text-muted-foreground">
                   {card.card_type}
                 </span>
               </div>
@@ -223,7 +223,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                   <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.tags_label')}</span>
                   <div className="flex flex-wrap gap-1">
                     {card.tags.map((tag) => (
-                      <span key={tag} className="text-xs bg-muted border border-border rounded px-1.5 py-px text-node-plan">{tag}</span>
+                      <span key={tag} className="text-xs bg-muted border border-border rounded px-1.5 py-px text-foreground">{tag}</span>
                     ))}
                   </div>
                 </div>

@@ -83,20 +83,20 @@ export function UserManagementTab({ currentUserEmail }: Props) {
         </div>
         <div className="flex flex-col gap-2">
           <input
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
+            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
             placeholder={t('users.invite_placeholder')}
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
           />
           <input
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
+            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
             placeholder={t('users.display_name_placeholder')}
             value={newDisplayName}
             onChange={(e) => setNewDisplayName(e.target.value)}
           />
           <div className="flex gap-2 items-center">
             <select
-              className="bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
+              className="bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as UserRole)}
             >
@@ -105,7 +105,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
               <option value="viewer">viewer</option>
             </select>
             <button
-              className="bg-node-user text-white border-none rounded px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-brand text-white border-none rounded px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleAdd}
               disabled={adding}
             >
@@ -152,7 +152,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <select
-                    className="bg-card border border-border rounded px-2 py-0.5 text-foreground text-xs outline-none focus:border-node-user font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-card border border-border rounded px-2 py-0.5 text-foreground text-xs outline-none focus:border-brand font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                     value={user.role}
                     disabled={isSelf}
                     title={isSelf ? t('users.self_role_tooltip') : undefined}

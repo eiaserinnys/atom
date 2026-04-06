@@ -92,7 +92,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
     <div className="select-none">
       {/* 위쪽 드롭 인디케이터 */}
       {currentDropZone === 'above' && (
-        <div className="h-0.5 bg-blue-500 mx-1 rounded-full" />
+        <div className="h-0.5 bg-brand mx-1 rounded-full" />
       )}
 
       <div
@@ -102,9 +102,9 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
           isDragging
             ? 'opacity-40'
             : isSelected
-            ? 'bg-node-user/15 text-node-user'
+            ? 'bg-brand/10 text-brand'
             : isDropTarget && currentDropZone === 'into'
-            ? 'bg-blue-500/20 ring-1 ring-blue-500/50'
+            ? 'bg-brand/15 ring-1 ring-brand/40'
             : 'hover:bg-muted'
         }`}
         style={{
@@ -129,14 +129,14 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
           {isStructure ? '📁' : '📄'}
         </span>
         {node.is_symlink && (
-          <span className="text-[10px] text-node-plan shrink-0" title="symlink">↗</span>
+          <span className="text-[10px] text-muted-foreground shrink-0" title="symlink">↗</span>
         )}
         <span className="flex-1 min-w-0 text-sm truncate">
           {node.card.title}
         </span>
         {node.is_symlink && node.canonical_path && (
           <span
-            className="ml-2 shrink-0 text-[10px] text-node-plan bg-node-plan/10 border border-node-plan/20 rounded px-1.5 py-0.5 max-w-[180px] truncate leading-none"
+            className="ml-2 shrink-0 text-[10px] text-muted-foreground bg-muted border border-border rounded px-1.5 py-0.5 max-w-[180px] truncate leading-none"
             title={node.canonical_path}
           >
             {node.canonical_path}
@@ -149,7 +149,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
 
       {/* 아래쪽 드롭 인디케이터 */}
       {currentDropZone === 'below' && (
-        <div className="h-0.5 bg-blue-500 mx-1 rounded-full" />
+        <div className="h-0.5 bg-brand mx-1 rounded-full" />
       )}
 
       {hasChildren && isExpanded && !loading && (
