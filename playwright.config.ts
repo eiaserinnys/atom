@@ -31,7 +31,7 @@ export default defineConfig({
       },
     },
     {
-      command: `pnpm run dev -- --port ${TEST_FRONTEND_PORT} --host ${TEST_API_HOST}`,
+      command: `pnpm exec vite --port ${TEST_FRONTEND_PORT} --host ${TEST_API_HOST}`,
       cwd: './dashboard',
       url: `http://${TEST_API_HOST}:${TEST_FRONTEND_PORT}`,
       reuseExistingServer: false,
