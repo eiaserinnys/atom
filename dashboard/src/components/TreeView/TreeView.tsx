@@ -340,8 +340,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       <TreeDndContext.Provider value={{ activeId, overId, dropZone }}>
         <div className="h-full flex flex-col bg-background border-r border-border">
           {/* 헤더 */}
-          <div className="px-4 py-3 flex items-center justify-between border-b border-border bg-card shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-card shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground">
               {t('tree.header')}
             </span>
             <div className="flex items-center gap-1">

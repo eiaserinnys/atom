@@ -62,21 +62,24 @@ function AppInner() {
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       <RestartBanner />
       <ReconnectOverlay />
-      {/* Top bar with search */}
-      <div className="h-12 flex items-center gap-4 px-4 border-b border-border bg-card shrink-0">
-        <span className="text-xl font-bold tracking-wide text-node-user font-sans shrink-0">
+      {/* Top bar — 항상 다크 글라스 (라이트/다크 무관) */}
+      <div
+        className="h-12 flex items-center gap-4 px-4 shrink-0"
+        style={{
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+        }}
+      >
+        <span className="text-sm font-semibold text-white tracking-[-0.28px] font-sans shrink-0">
           atom
         </span>
         {dbType && (
           <span
-            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
-              dbType === 'postgres'
-                ? 'bg-green-500/10 text-green-400'
-                : 'bg-yellow-500/10 text-yellow-400'
-            }`}
+            className="text-[11px] text-white/50 shrink-0"
             title={dbType === 'postgres' ? 'PostgreSQL' : 'SQLite'}
           >
-            {dbType === 'postgres' ? '🟢 PG' : '🟡 SQLite'}
+            {dbType === 'postgres' ? 'postgre' : 'sqlite'}
           </span>
         )}
         <div className="flex-1" />
@@ -85,7 +88,7 @@ function AppInner() {
         </div>
         {showConfigButton && (
           <button
-            className="text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer text-lg leading-none px-1"
+            className="text-white/70 hover:text-white bg-transparent hover:bg-white/10 border-none cursor-pointer text-lg leading-none px-2 py-1 rounded-md transition-colors"
             onClick={() => setIsConfigOpen(true)}
             title={t('app.settings')}
             aria-label={t('app.settings')}

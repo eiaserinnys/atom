@@ -36,7 +36,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
   if (isError && nodeId && !isLoading) {
     return (
       <div className="h-full flex flex-col bg-background">
-        <div className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground border-b border-border bg-card shrink-0">
+        <div className="h-10 px-4 flex items-center text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground border-b border-border bg-card shrink-0">
           {t('card.header')}
         </div>
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
@@ -82,7 +82,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <div className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground border-b border-border shrink-0">
+      <div className="h-10 px-4 flex items-center text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground border-b border-border bg-card shrink-0">
         {t('card.header')}
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
@@ -114,7 +114,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
               {editingTitle ? (
                 <div className="flex gap-1.5 items-center">
                   <input
-                    className="flex-1 bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-base font-sans focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow"
+                    className="flex-1 bg-white dark:bg-[#1c1c1e] border border-[#d2d2d7] dark:border-[#333336] rounded-[8px] px-[14px] py-[10px] text-foreground text-base font-sans focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow"
                     value={titleDraft}
                     onChange={(e) => setTitleDraft(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
@@ -152,7 +152,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
               {editingContent ? (
                 <div className="flex flex-col gap-1.5">
                   <textarea
-                    className="w-full bg-card border border-border rounded px-2.5 py-2 text-foreground text-[15px] resize-y font-sans leading-[1.6] focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow"
+                    className="w-full bg-white dark:bg-[#1c1c1e] border border-[#d2d2d7] dark:border-[#333336] rounded-[8px] px-[14px] py-[10px] text-foreground text-[15px] resize-y font-sans leading-[1.6] focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow"
                     value={contentDraft}
                     onChange={(e) => setContentDraft(e.target.value)}
                     rows={8}
