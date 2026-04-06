@@ -71,7 +71,7 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-[100] max-h-80 overflow-y-auto">
+        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-card z-[100] max-h-80 overflow-y-auto">
           {results.map((r) => (
             <div
               key={r.node_id}
@@ -98,7 +98,7 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
       )}
 
       {open && results.length === 0 && !loading && query && (
-        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-[100]">
+        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-card z-[100]">
           <div className="p-3 text-sm text-muted-foreground text-center">{t('searchbar.no_results')}</div>
         </div>
       )}

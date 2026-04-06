@@ -435,7 +435,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       {/* 드래그 오버레이 (드래그 중 유령 표시) */}
       <DragOverlay>
         {activeNode ? (
-          <div className="flex items-center gap-1 px-3 py-0.5 bg-neutral-800 border border-neutral-600 rounded shadow-lg text-sm text-white opacity-90 pointer-events-none">
+          <div className="flex items-center gap-1 px-3 py-0.5 bg-card border border-border rounded shadow-card text-sm text-foreground opacity-90 pointer-events-none">
             <span className="text-xs">
               {activeNode.card.card_type === 'structure' ? '📁' : '📄'}
             </span>

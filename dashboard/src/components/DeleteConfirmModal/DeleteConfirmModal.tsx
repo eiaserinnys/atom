@@ -28,10 +28,10 @@ export function DeleteConfirmModal({
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
-        <h2 className="text-base font-semibold text-white">{t('delete_modal.title')}</h2>
+      <div className="bg-card border border-border rounded-lg shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+        <h2 className="text-base font-semibold text-foreground">{t('delete_modal.title')}</h2>
 
-        <div className="text-sm text-neutral-300">
+        <div className="text-sm text-foreground">
           {t('delete_modal.desc', { name: title })}
         </div>
 
@@ -44,7 +44,7 @@ export function DeleteConfirmModal({
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-neutral-400 hover:text-white rounded hover:bg-neutral-800 transition-colors"
+            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors"
             disabled={isLoading}
           >
             {t('common.cancel')}
@@ -52,7 +52,7 @@ export function DeleteConfirmModal({
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="px-3 py-1.5 text-sm bg-red-700 hover:bg-red-600 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm bg-node-error hover:opacity-90 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isLoading ? t('delete_modal.deleting') : t('delete_modal.confirm_btn')}
           </button>
