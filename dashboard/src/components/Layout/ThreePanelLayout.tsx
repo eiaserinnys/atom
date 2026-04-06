@@ -12,11 +12,11 @@ export function ThreePanelLayout({ left, center, right }: ThreePanelLayoutProps)
       <Panel defaultSize={30} minSize={15} className="overflow-hidden flex flex-col">
         {left}
       </Panel>
-      <Separator className="w-1 bg-border cursor-col-resize transition-colors hover:bg-white/20 data-[resize-handle-active]:bg-white/20 shrink-0" />
+      <Separator className="w-1 bg-border cursor-col-resize transition-colors hover:bg-foreground/20 data-[resize-handle-active]:bg-foreground/20 shrink-0" />
       <Panel defaultSize={40} minSize={20} className="overflow-hidden flex flex-col">
         {center}
       </Panel>
-      <Separator className="w-1 bg-border cursor-col-resize transition-colors hover:bg-white/20 data-[resize-handle-active]:bg-white/20 shrink-0" />
+      <Separator className="w-1 bg-border cursor-col-resize transition-colors hover:bg-foreground/20 data-[resize-handle-active]:bg-foreground/20 shrink-0" />
       <Panel defaultSize={30} minSize={15} className="overflow-hidden flex flex-col">
         {right}
       </Panel>
