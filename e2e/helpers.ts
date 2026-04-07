@@ -93,6 +93,10 @@ export async function dragNodeToPosition(
   }
   const targetX = targetBB.x + targetBB.width / 2;
 
+  const ratio = (targetY - targetBB.y) / targetBB.height;
+  console.log(`[DnD] drag ${sourceNodeId.slice(-6)} → ${zone} ${targetNodeId.slice(-6)}`);
+  console.log(`[DnD]   source: (${startX.toFixed(0)}, ${startY.toFixed(0)})  target: (${targetX.toFixed(0)}, ${targetY.toFixed(0)})  ratio: ${ratio.toFixed(2)}`);
+
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   // activationConstraint distance=5px 초과 (10px 이동)
@@ -103,4 +107,20 @@ export async function dragNodeToPosition(
 
   // tree re-render 대기
   await page.waitForTimeout(800);
+}
+
+/** 트리 루트 상태를 콘솔에 출력하고 노드 배열을 반환한다 */
+export async function logRoots(label: string): Promise<TestTreeNode[]> {
+  const roots = await getTreeRoots();
+  const summary = roots.map(r => `${r.card.title}(pos=${r.position})`).join(', ');
+  console.log(`[API] ${label} → roots: [${summary}]`);
+  return roots;
+}
+
+/** 특정 노드의 자식 상태를 콘솔에 출력하고 노드 배열을 반환한다 */
+export async function logChildren(label: string, nodeId: string): Promise<TestTreeNode[]> {
+  const children = await getNodeChildren(nodeId);
+  const summary = children.map(c => `${c.card.title}(pos=${c.position})`).join(', ');
+  console.log(`[API] ${label} → children of ${nodeId.slice(-6)}: [${summary}]`);
+  return children;
 }
