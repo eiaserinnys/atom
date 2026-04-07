@@ -89,6 +89,7 @@
     "add_knowledge": "Знание",
     "add_symlink": "Символическая ссылка",
     "compile": "Компилировать",
+    "context_move": "Переместить карточку",
     "context_rename": "Переименовать",
     "context_delete": "Удалить",
     "context_add_child": "Добавить дочерний",
@@ -150,6 +151,12 @@
     "saving": "Сохранение…",
     "creating": "Создать"
   },
+  "move_modal": {
+    "title": "Переместить карточку",
+    "select_hint": "Выберите целевую карточку структуры",
+    "confirm_btn": "Переместить",
+    "empty": "Нет доступных карточек структуры"
+  },
   "delete_modal": {
     "title": "Удалить карточку",
     "desc": "Удалить \"{{name}}\"?",
@@ -192,5 +199,12 @@
     "migration_running": "Миграция...",
     "migration_btn": "Миграция SQLite → PostgreSQL",
     "file_status": "Статус"
+  },
+  "mobile": {
+    "tab_tree": "Дерево",
+    "tab_compile": "Компилировать",
+    "tab_detail": "Детали",
+    "tab_settings": "Настройки",
+    "settings_back": "← Настройки"
   }
 }

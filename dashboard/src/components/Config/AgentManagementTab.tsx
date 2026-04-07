@@ -87,8 +87,8 @@ export function AgentManagementTab() {
     <div className="flex flex-col gap-5">
       {/* 시크릿 1회 표시 배너 */}
       {lastCreatedSecret && (
-        <div className="flex flex-col gap-2 bg-node-plan/10 border border-node-plan/40 rounded-md px-3 py-3">
-          <div className="text-xs font-semibold text-node-plan">
+        <div className="flex flex-col gap-2 bg-brand/8 border border-brand/25 rounded-md px-3 py-3">
+          <div className="text-xs font-semibold text-brand">
             {t('agents.new_key_warning')}
           </div>
           <div className="flex items-center gap-2">
@@ -96,7 +96,7 @@ export function AgentManagementTab() {
               {lastCreatedSecret}
             </code>
             <button
-              className="text-xs rounded px-2.5 py-1 border border-node-plan/60 bg-transparent text-node-plan cursor-pointer hover:bg-node-plan/10 font-sans whitespace-nowrap"
+              className="text-xs rounded px-2.5 py-1 border border-brand/40 bg-transparent text-brand cursor-pointer hover:bg-brand/10 font-sans whitespace-nowrap"
               onClick={handleCopy}
             >
               {copied ? t('common.copied') : t('common.copy')}
@@ -118,19 +118,19 @@ export function AgentManagementTab() {
         </div>
         <div className="flex flex-col gap-2">
           <input
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
+            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
             placeholder={t('agents.name_placeholder')}
             value={newAgentId}
             onChange={(e) => setNewAgentId(e.target.value)}
           />
           <input
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-node-user font-sans"
+            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
             placeholder={t('agents.display_name_placeholder')}
             value={newDisplayName}
             onChange={(e) => setNewDisplayName(e.target.value)}
           />
           <button
-            className="self-start bg-node-user text-white border-none rounded px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+            className="self-start bg-brand text-white border-none rounded px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleCreate}
             disabled={creating}
           >

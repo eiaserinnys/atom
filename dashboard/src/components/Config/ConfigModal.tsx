@@ -37,7 +37,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-background border border-border rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-card border border-border rounded-[14px] shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <span className="text-base font-semibold text-foreground">{t('config.settings')}</span>
@@ -51,12 +51,12 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
         </div>
 
         {/* 탭 */}
-        <div className="flex border-b border-border shrink-0">
+        <div className="flex overflow-x-auto border-b border-border shrink-0">
           {currentUserRole === 'admin' && (
             <button
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'users'
-                  ? 'border-node-user text-node-user'
+                  ? 'border-brand text-brand'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
               onClick={() => setActiveTab('users')}
@@ -65,9 +65,9 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             </button>
           )}
           <button
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'agents'
-                ? 'border-node-user text-node-user'
+                ? 'border-brand text-brand'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
             onClick={() => setActiveTab('agents')}
@@ -75,9 +75,9 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             {t('config.tab_agents')}
           </button>
           <button
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'credentials'
-                ? 'border-node-user text-node-user'
+                ? 'border-brand text-brand'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
             onClick={() => setActiveTab('credentials')}
@@ -85,9 +85,9 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             {t('config.tab_credentials')}
           </button>
           <button
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'language'
-                ? 'border-node-user text-node-user'
+                ? 'border-brand text-brand'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
             onClick={() => setActiveTab('language')}
@@ -96,9 +96,9 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           </button>
           {currentUserRole === 'admin' && (
             <button
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'database'
-                  ? 'border-node-user text-node-user'
+                  ? 'border-brand text-brand'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
               onClick={() => setActiveTab('database')}
@@ -108,9 +108,9 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           )}
           {currentUserRole === 'admin' && (
             <button
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'auth'
-                  ? 'border-node-user text-node-user'
+                  ? 'border-brand text-brand'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
               onClick={() => setActiveTab('auth')}

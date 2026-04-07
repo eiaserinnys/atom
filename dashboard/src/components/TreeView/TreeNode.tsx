@@ -58,8 +58,10 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
   });
 
   // @dnd-kit droppable
+  // useDraggable과 동일한 id를 쓰면 dnd-kit이 droppable에 ":1" suffix를 자동 부여하므로
+  // "droppable-" prefix를 붙여 충돌을 방지한다.
   const { setNodeRef: setDroppableRef } = useDroppable({
-    id: node.id,
+    id: `droppable-${node.id}`,
     data: { node },
   });
 
@@ -89,22 +91,23 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
   };
 
   return (
-    <div className="select-none">
+    <div className="select-none" data-testid={`tree-node-${node.id}`}>
       {/* 위쪽 드롭 인디케이터 */}
       {currentDropZone === 'above' && (
-        <div className="h-0.5 bg-blue-500 mx-1 rounded-full" />
+        <div className="h-0.5 bg-brand mx-1 rounded-full" />
       )}
 
       <div
         ref={combinedRef}
         {...attributes}
+        {...listeners}
         className={`relative flex items-center gap-1 py-0.5 pr-2 cursor-pointer rounded mx-1 transition-colors min-h-[26px] ${
           isDragging
             ? 'opacity-40'
             : isSelected
-            ? 'bg-node-user/15 text-node-user'
+            ? 'bg-brand/10 text-brand'
             : isDropTarget && currentDropZone === 'into'
-            ? 'bg-blue-500/20 ring-1 ring-blue-500/50'
+            ? 'bg-brand/15 ring-1 ring-brand/40'
             : 'hover:bg-muted'
         }`}
         style={{
@@ -114,10 +117,9 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
-        {/* 드래그 핸들: 토글 화살표 영역에만 리스너 부착 (클릭과 분리) */}
+        {/* 토글 화살표: 클릭만 담당 (DnD listeners는 outer div로 이동) */}
         <span
           className="w-4 text-center text-[10px] text-muted-foreground cursor-grab shrink-0"
-          {...listeners}
           onClick={(e) => {
             e.stopPropagation();
             if (!loading && hasChildren) handleToggle(e);
@@ -129,14 +131,14 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
           {isStructure ? '📁' : '📄'}
         </span>
         {node.is_symlink && (
-          <span className="text-[10px] text-node-plan shrink-0" title="symlink">↗</span>
+          <span className="text-[10px] text-muted-foreground shrink-0" title="symlink">↗</span>
         )}
         <span className="flex-1 min-w-0 text-sm truncate">
           {node.card.title}
         </span>
         {node.is_symlink && node.canonical_path && (
           <span
-            className="ml-2 shrink-0 text-[10px] text-node-plan bg-node-plan/10 border border-node-plan/20 rounded px-1.5 py-0.5 max-w-[180px] truncate leading-none"
+            className="ml-2 shrink-0 text-[10px] text-muted-foreground bg-muted border border-border rounded px-1.5 py-0.5 max-w-[180px] truncate leading-none"
             title={node.canonical_path}
           >
             {node.canonical_path}
@@ -149,7 +151,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
 
       {/* 아래쪽 드롭 인디케이터 */}
       {currentDropZone === 'below' && (
-        <div className="h-0.5 bg-blue-500 mx-1 rounded-full" />
+        <div className="h-0.5 bg-brand mx-1 rounded-full" />
       )}
 
       {hasChildren && isExpanded && !loading && (

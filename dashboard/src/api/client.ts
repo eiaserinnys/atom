@@ -98,10 +98,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 async function requestVoid(path: string, options?: RequestInit): Promise<void> {
+  // body가 없는 DELETE 요청에 Content-Type: application/json을 보내면
+  // Fastify가 400을 반환하므로 body가 있을 때만 헤더를 전송한다.
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     ...options,
+    headers: {
+      ...(options?.body != null ? { 'Content-Type': 'application/json' } : {}),
+      ...options?.headers,
+    },
   });
   if (res.status === 401) {
     window.location.href = '/';

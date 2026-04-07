@@ -14,24 +14,30 @@ interface EditableHeadingProps {
 }
 
 /**
- * 헤딩 텍스트에서 섹션 번호(1.2.3 형태)와 HTML 주석을 제거하여 순수 제목만 반환.
- * 서버 마크다운 예시: "## 1.2 카드 제목 <!-- node:xxx card:yyy -->"
- * 렌더링 시 children은 이미 HTML 주석이 제거된 상태일 수 있으므로 번호만 제거하면 된다.
+ * react-markdown은 heading children을 배열로 전달한다.
+ * (예: ["1.2 카드 제목 ", "<!-- node:xxx card:yyy -->"])
+ * String(array)는 쉼표로 join하므로, 직접 문자열만 이어붙인다.
  */
-function extractCleanTitle(children: React.ReactNode): string {
-  return String(children ?? '')
-    .replace(/^[\d.]+\s+/, '')       // 선행 섹션 번호 제거 (e.g. "1.2 ")
-    .replace(/<!--.*?-->/gs, '')      // HTML 주석 제거 (react-markdown이 남길 경우)
+function joinChildren(children: React.ReactNode): string {
+  if (Array.isArray(children)) {
+    return children.map(c => (typeof c === 'string' ? c : '')).join('');
+  }
+  return String(children ?? '');
+}
+
+
+function extractDisplayTitle(children: React.ReactNode): string {
+  return joinChildren(children)
+    .replace(/<!--.*?-->/gs, '')
     .trim();
 }
 
+
 /**
  * 헤딩 텍스트에서 node ID를 추출.
- * react-markdown이 children으로 전달하는 텍스트에 <!-- node:ID card:ID --> 주석이
- * 포함될 수 있으므로 정규식으로 추출한다.
  */
 function extractNodeId(children: React.ReactNode): string | null {
-  const text = String(children ?? '');
+  const text = joinChildren(children);
   const m = text.match(/<!--\s*node:(\S+)/);
   return m ? m[1]! : null;
 }
@@ -43,7 +49,7 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
   const [loadingCard, setLoadingCard] = useState(false);
   const queryClient = useQueryClient();
 
-  const cleanTitle = extractCleanTitle(children);
+  const displayTitle = extractDisplayTitle(children);
   const nodeId = extractNodeId(children);
   const sectionInfo = nodeId ? sectionMap.get(nodeId) : null;
 
@@ -81,7 +87,7 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
   return (
     <>
       <HeadingTag className="group relative flex items-center gap-2">
-        <span>{cleanTitle}</span>
+        <span>{displayTitle}</span>
         {sectionInfo && (
           <button
             onClick={handleEditClick}

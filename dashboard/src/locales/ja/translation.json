@@ -89,6 +89,7 @@
     "add_knowledge": "知識",
     "add_symlink": "シンボリックリンク",
     "compile": "コンパイル",
+    "context_move": "カード移動",
     "context_rename": "名前変更",
     "context_delete": "削除",
     "context_add_child": "子を追加",
@@ -150,6 +151,12 @@
     "saving": "保存中…",
     "creating": "作成"
   },
+  "move_modal": {
+    "title": "カード移動",
+    "select_hint": "移動先の構造カードを選択",
+    "confirm_btn": "移動",
+    "empty": "移動先の構造カードがありません"
+  },
   "delete_modal": {
     "title": "カードを削除",
     "desc": "\"{{name}}\" を削除しますか？",
@@ -192,5 +199,12 @@
     "migration_running": "マイグレーション中...",
     "migration_btn": "SQLite → PostgreSQL マイグレーション",
     "file_status": "状態"
+  },
+  "mobile": {
+    "tab_tree": "ツリー",
+    "tab_compile": "コンパイル",
+    "tab_detail": "詳細",
+    "tab_settings": "設定",
+    "settings_back": "← 設定"
   }
 }

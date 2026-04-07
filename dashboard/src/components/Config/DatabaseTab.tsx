@@ -133,7 +133,7 @@ export function DatabaseTab() {
             />
             <div className="flex gap-2">
               <button
-                className="px-3 py-1.5 text-xs font-medium rounded bg-node-user text-white hover:opacity-90 disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-medium rounded bg-brand text-white hover:opacity-90 disabled:opacity-50"
                 onClick={handleTestConnection}
                 disabled={!connUrl || testing || pendingRestart}
               >
@@ -198,7 +198,7 @@ export function DatabaseTab() {
                 <button
                   className={`self-start px-4 py-2 rounded text-sm font-medium transition-colors ${
                     canMigrate && !migrating
-                      ? 'bg-node-user text-white hover:opacity-90 cursor-pointer'
+                      ? 'bg-brand text-white hover:opacity-90 cursor-pointer'
                       : 'bg-muted text-muted-foreground cursor-not-allowed'
                   }`}
                   disabled={!canMigrate || migrating}

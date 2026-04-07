@@ -8,20 +8,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '../.env');
 
 test.describe('Fresh install — bypass mode API key issuance', () => {
-  test.beforeAll(() => {
-    resetTestDb();
+  test.beforeAll(async () => {
+    await resetTestDb();
     // Ensure clean .env (no pendingRestart state from other tests)
     if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
   });
 
   test('can access dashboard without login in bypass mode', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.text-xl.font-bold')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('button[aria-label="Settings"]')).toBeVisible({ timeout: 15_000 });
   });
 
   test('can open Config and create an agent API key', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.text-xl.font-bold')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('button[aria-label="Settings"]')).toBeVisible({ timeout: 15_000 });
 
     await page.locator('button[aria-label="Settings"]').click();
 

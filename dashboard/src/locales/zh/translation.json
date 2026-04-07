@@ -89,6 +89,7 @@
     "add_knowledge": "知识",
     "add_symlink": "符号链接",
     "compile": "编译",
+    "context_move": "移动卡片",
     "context_rename": "重命名",
     "context_delete": "删除",
     "context_add_child": "添加子节点",
@@ -150,6 +151,12 @@
     "saving": "保存中…",
     "creating": "创建"
   },
+  "move_modal": {
+    "title": "移动卡片",
+    "select_hint": "选择目标结构卡片",
+    "confirm_btn": "移动",
+    "empty": "没有可用的结构卡片"
+  },
   "delete_modal": {
     "title": "删除卡片",
     "desc": "确认删除 \"{{name}}\"？",
@@ -192,5 +199,12 @@
     "migration_running": "迁移中...",
     "migration_btn": "SQLite → PostgreSQL 迁移",
     "file_status": "状态"
+  },
+  "mobile": {
+    "tab_tree": "树",
+    "tab_compile": "编译",
+    "tab_detail": "详情",
+    "tab_settings": "设置",
+    "settings_back": "← 设置"
   }
 }

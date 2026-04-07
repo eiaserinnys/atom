@@ -90,6 +90,7 @@
     "add_knowledge": "지식",
     "add_symlink": "심링크",
     "compile": "컴파일",
+    "context_move": "카드 이동",
     "context_rename": "수정",
     "context_delete": "삭제",
     "context_add_child": "하위 추가",
@@ -150,6 +151,12 @@
     "content_placeholder": "마크다운 형식으로 입력",
     "saving": "저장 중…",
     "creating": "생성"
+  },
+  "move_modal": {
+    "title": "카드 이동",
+    "select_hint": "이동할 위치(구조 카드)를 선택하세요",
+    "confirm_btn": "이동",
+    "empty": "이동 가능한 구조 카드 없음"
   },
   "delete_modal": {
     "title": "카드 삭제",
@@ -217,5 +224,12 @@
     "restart_now": "지금 재시작",
     "reconnecting": "서버와 연결 중입니다...",
     "reconnect_timeout": "재시작에 실패했을 수 있습니다. 수동으로 확인해주세요."
+  },
+  "mobile": {
+    "tab_tree": "트리",
+    "tab_compile": "컴파일",
+    "tab_detail": "상세",
+    "tab_settings": "설정",
+    "settings_back": "← 설정"
   }
 }

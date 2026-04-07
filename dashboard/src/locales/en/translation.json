@@ -90,6 +90,7 @@
     "add_knowledge": "Knowledge",
     "add_symlink": "Symlink",
     "compile": "Compile",
+    "context_move": "Move Card",
     "context_rename": "Rename",
     "context_delete": "Delete",
     "context_add_child": "Add child",
@@ -150,6 +151,12 @@
     "content_placeholder": "Enter in Markdown format",
     "saving": "Saving…",
     "creating": "Create"
+  },
+  "move_modal": {
+    "title": "Move Card",
+    "select_hint": "Select a destination structure card",
+    "confirm_btn": "Move",
+    "empty": "No structure cards available"
   },
   "delete_modal": {
     "title": "Delete Card",
@@ -217,5 +224,12 @@
     "restart_now": "Restart Now",
     "reconnecting": "Reconnecting to server...",
     "reconnect_timeout": "Restart may have failed. Please check manually."
+  },
+  "mobile": {
+    "tab_tree": "Tree",
+    "tab_compile": "Compile",
+    "tab_detail": "Detail",
+    "tab_settings": "Settings",
+    "settings_back": "← Settings"
   }
 }

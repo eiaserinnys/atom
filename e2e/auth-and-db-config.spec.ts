@@ -8,14 +8,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '../.env');
 
 test.describe('Auth config and DB connection test', () => {
-  test.beforeAll(() => {
-    resetTestDb();
+  test.beforeAll(async () => {
+    await resetTestDb();
     if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
   });
 
   test('save auth settings → success message → restart banner', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.text-xl.font-bold')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('button[aria-label="Settings"]')).toBeVisible({ timeout: 15_000 });
 
     // Open settings
     await page.locator('button[aria-label="Settings"]').click();
@@ -42,7 +42,7 @@ test.describe('Auth config and DB connection test', () => {
 
   test('DB connection test with invalid URL shows error', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.text-xl.font-bold')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('button[aria-label="Settings"]')).toBeVisible({ timeout: 15_000 });
 
     await page.locator('button[aria-label="Settings"]').click();
     const modal = page.locator('.fixed.inset-0');

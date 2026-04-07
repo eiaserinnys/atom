@@ -99,7 +99,7 @@ export function AuthTab() {
       )}
 
       <button
-        className="px-4 py-2 text-sm font-medium rounded bg-node-user text-white hover:opacity-90 disabled:opacity-50"
+        className="px-4 py-2 text-sm font-medium rounded bg-brand text-white hover:opacity-90 disabled:opacity-50"
         onClick={handleSave}
         disabled={saving || pendingRestart}
       >

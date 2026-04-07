@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,16 +8,19 @@ import {
   useSensor,
   useSensors,
   type DragStartEvent,
+  type DragMoveEvent,
   type DragOverEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { LogOut, Plus } from 'lucide-react';
 import { api, type TreeNodeData } from '../../api/client';
+import { fetchRootsWithChildren } from '../../api/treeQueries';
 import { TreeNode } from './TreeNode';
 import { TreeDndContext, type DropZone } from './TreeDndContext';
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu';
 import { CardFormModal } from '../CardFormModal/CardFormModal';
 import { DeleteConfirmModal } from '../DeleteConfirmModal/DeleteConfirmModal';
+import { MoveCardModal } from '../MoveCardModal/MoveCardModal';
 
 interface TreeViewProps {
   selectedNodeId: string | null;
@@ -36,22 +39,8 @@ type ModalState =
   | { type: 'create-root'; cardType: 'structure' | 'knowledge' }
   | { type: 'create-child'; cardType: 'structure' | 'knowledge'; parentNode: TreeNodeData }
   | { type: 'edit'; node: TreeNodeData }
-  | { type: 'delete'; node: TreeNodeData };
-
-async function fetchRootsWithChildren(): Promise<TreeNodeData[]> {
-  const roots = await api.getTree();
-  const rootsWithChildren = await Promise.all(
-    roots.map(async (root) => {
-      try {
-        const children = await api.listChildren(root.id);
-        return { ...root, children };
-      } catch {
-        return { ...root, children: [] };
-      }
-    })
-  );
-  return rootsWithChildren;
-}
+  | { type: 'delete'; node: TreeNodeData }
+  | { type: 'move'; node: TreeNodeData };
 
 /** 로드된 트리에서 특정 노드를 찾음 */
 function findNodeInTree(nodeId: string, nodes: TreeNodeData[]): TreeNodeData | null {
@@ -76,16 +65,14 @@ function isAncestorOf(ancestorId: string, targetId: string, nodes: TreeNodeData[
   return hasDescendant(ancestor, targetId);
 }
 
-/** 드래그 위치 → DropZone 계산 */
+/** 드래그 위치 → DropZone 계산 (실제 포인터 Y 좌표 기반) */
 function calcDropZone(
-  activeTranslatedTop: number,
-  activeHeight: number,
+  pointerY: number,
   overRectTop: number,
   overRectHeight: number,
   isStructure: boolean
 ): DropZone {
-  const cursorY = activeTranslatedTop + activeHeight / 2;
-  const relativeY = cursorY - overRectTop;
+  const relativeY = pointerY - overRectTop;
   const ratio = relativeY / overRectHeight;
 
   if (ratio < 0.3) return 'above';
@@ -104,11 +91,26 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [modal, setModal] = useState<ModalState>({ type: 'none' });
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // DnD 상태
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [dropZone, setDropZone] = useState<DropZone | null>(null);
+
+  // useRef로 실시간 값 추적 — handleDragOver/handleDragEnd는 이벤트 핸들러로 렌더 클로저 바깥에서 호출되어
+  // React state는 항상 직전 렌더 시점의 값을 캡처하므로 stale read가 발생한다.
+  // ref는 항상 최신 값을 가리키므로 DnD 정확도를 보장한다.
+  const pointerYRef = useRef<number | null>(null);
+  const dropZoneRef = useRef<DropZone | null>(null);
+
+  // 드래그 중에만 커서 Y 좌표를 추적한다 (activeId가 없으면 리스너 등록 안 함)
+  useEffect(() => {
+    if (!activeId) return;
+    const onPointerMove = (e: PointerEvent) => { pointerYRef.current = e.clientY; };
+    window.addEventListener('pointermove', onPointerMove);
+    return () => window.removeEventListener('pointermove', onPointerMove);
+  }, [activeId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -205,6 +207,10 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       if (selectedNodeId === nodeId) onSelect(null);
       invalidateTree();
       setModal({ type: 'none' });
+      setDeleteError(null);
+    },
+    onError: (err) => {
+      setDeleteError(err instanceof Error ? err.message : '삭제 중 오류가 발생했습니다.');
     },
   });
 
@@ -220,66 +226,92 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     setActiveId(event.active.id as string);
   }
 
-  function handleDragOver(event: DragOverEvent) {
-    const { over, active } = event;
-    if (!over) { setOverId(null); setDropZone(null); return; }
+  /**
+   * 드롭 존 계산 공통 로직.
+   * onDragOver: over 엘리먼트가 바뀔 때 1회 발생 → 엘리먼트 진입 시점에만 계산됨.
+   * onDragMove: 포인터가 움직일 때마다 발생 → 같은 엘리먼트 안에서도 매번 재계산.
+   * 두 이벤트 모두 이 함수를 통해 처리해야 same-element 내 위치 변화를 정확히 반영한다.
+   */
+  function applyDropZone(over: DragOverEvent['over'] | DragMoveEvent['over']): void {
+    if (!over) { setOverId(null); setDropZone(null); dropZoneRef.current = null; return; }
 
-    const overNode = (over.data.current as { node: TreeNodeData }).node;
-    const translatedRect = active.rect.current.translated;
+    const overData = over.data.current as { node?: TreeNodeData } | undefined;
+    if (!overData?.node) { setOverId(null); setDropZone(null); dropZoneRef.current = null; return; }
+    const overNode = overData.node;
     const overRect = over.rect;
 
-    if (!translatedRect || !overRect) {
-      setOverId(over.id as string);
-      setDropZone('into');
+    const currentPointerY = pointerYRef.current;
+    if (currentPointerY === null || !overRect) {
+      const fallbackZone: DropZone = overNode.card.card_type === 'structure' ? 'into' : 'above';
+      setOverId(overNode.id);
+      setDropZone(fallbackZone);
+      dropZoneRef.current = fallbackZone;
       return;
     }
 
     const zone = calcDropZone(
-      translatedRect.top,
-      translatedRect.height,
+      currentPointerY,
       overRect.top,
       overRect.height,
       overNode.card.card_type === 'structure'
     );
-    setOverId(over.id as string);
+    setOverId(overNode.id);
     setDropZone(zone);
+    dropZoneRef.current = zone;
   }
+
+  function handleDragMove(event: DragMoveEvent) { applyDropZone(event.over); }
+  function handleDragOver(event: DragOverEvent) { applyDropZone(event.over); }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (over && active.id !== over.id && dropZone && roots) {
-      const draggedNode = findNodeInTree(active.id as string, roots);
-      const targetNode = (over.data.current as { node: TreeNodeData }).node;
+    // dropZoneRef.current: handleDragOver에서 동기적으로 갱신된 최신 값.
+    // dropZone state는 렌더 클로저에 캡처된 이전 값일 수 있으므로 ref를 사용한다.
+    const currentDropZone = dropZoneRef.current;
+    if (over && currentDropZone && roots) {
+      const overData = over.data.current as { node?: TreeNodeData } | undefined;
+      const targetNode = overData?.node;
 
-      // 순환 참조 방지: 드래그 노드가 타겟의 조상이면 이동 불가
-      const circular = isAncestorOf(active.id as string, over.id as string, roots);
+      if (targetNode && active.id !== targetNode.id) {
+        const draggedNode = findNodeInTree(active.id as string, roots);
 
-      if (draggedNode && !circular) {
-        let parentNodeId: string | null;
-        let position: number | undefined;
+        // 순환 참조 방지: 드래그 노드가 타겟의 조상이면 이동 불가
+        // over.data.current.node.id를 사용해야 ":1" suffix 없는 실제 UUID를 얻음
+        const circular = isAncestorOf(active.id as string, targetNode.id, roots);
 
-        if (dropZone === 'into') {
-          parentNodeId = targetNode.id;
-          position = undefined; // 마지막 자식으로 append
-        } else if (dropZone === 'above') {
-          parentNodeId = targetNode.parent_node_id;
-          position = targetNode.position;
-        } else { // below
-          parentNodeId = targetNode.parent_node_id;
-          position = targetNode.position + 1;
+        if (draggedNode && !circular) {
+          let parentNodeId: string | null;
+          let position: number | undefined;
+
+          if (currentDropZone === 'into') {
+            parentNodeId = targetNode.id;
+            position = undefined; // 마지막 자식으로 append
+          } else if (currentDropZone === 'above') {
+            parentNodeId = targetNode.parent_node_id;
+            // target.position 자리에 직접 넣으면 target과 충돌한다.
+            // 서버는 100 간격으로 position을 관리하므로 position - 1은 항상 비어있다.
+            position = targetNode.position - 1;
+          } else { // below
+            parentNodeId = targetNode.parent_node_id;
+            position = targetNode.position + 1;
+          }
+
+          moveMutation.mutate({ nodeId: active.id as string, parentNodeId, position });
         }
-
-        moveMutation.mutate({ nodeId: active.id as string, parentNodeId, position });
       }
     }
 
+    pointerYRef.current = null;
+    dropZoneRef.current = null;
     setActiveId(null);
     setOverId(null);
     setDropZone(null);
   }
 
   function handleDragCancel() {
+    pointerYRef.current = null;
+    dropZoneRef.current = null;
     setActiveId(null);
     setOverId(null);
     setDropZone(null);
@@ -305,6 +337,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
         onClick: () => setModal({ type: 'create-child', cardType: 'knowledge', parentNode: node }),
       });
     }
+    items.push({ label: t('tree.context_move'), onClick: () => setModal({ type: 'move', node }) });
     items.push({ label: t('tree.context_rename'), onClick: () => setModal({ type: 'edit', node }) });
     items.push({ label: t('tree.context_delete'), onClick: () => setModal({ type: 'delete', node }), danger: true });
     return items;
@@ -333,6 +366,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
@@ -340,8 +374,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       <TreeDndContext.Provider value={{ activeId, overId, dropZone }}>
         <div className="h-full flex flex-col bg-background border-r border-border">
           {/* 헤더 */}
-          <div className="px-4 py-3 flex items-center justify-between border-b border-border shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-card shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground">
               {t('tree.header')}
             </span>
             <div className="flex items-center gap-1">
@@ -419,14 +453,30 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
             />
           )}
 
+          {/* 카드 이동 모달 */}
+          {modal.type === 'move' && (
+            <MoveCardModal
+              nodeToMove={modal.node}
+              onConfirm={(targetParentNodeId) => {
+                moveMutation.mutate(
+                  { nodeId: modal.node.id, parentNodeId: targetParentNodeId, position: undefined },
+                  { onSuccess: () => setModal({ type: 'none' }) }
+                );
+              }}
+              onClose={() => setModal({ type: 'none' })}
+              isLoading={moveMutation.isPending}
+            />
+          )}
+
           {/* 삭제 확인 모달 */}
           {modal.type === 'delete' && (
             <DeleteConfirmModal
               title={modal.node.card.title}
               isStructure={modal.node.card.card_type === 'structure'}
               onConfirm={() => deleteMutation.mutate(modal.node.id)}
-              onClose={() => setModal({ type: 'none' })}
+              onClose={() => { setModal({ type: 'none' }); setDeleteError(null); }}
               isLoading={deleteMutation.isPending}
+              errorMessage={deleteError ?? undefined}
             />
           )}
         </div>
@@ -435,7 +485,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       {/* 드래그 오버레이 (드래그 중 유령 표시) */}
       <DragOverlay>
         {activeNode ? (
-          <div className="flex items-center gap-1 px-3 py-0.5 bg-neutral-800 border border-neutral-600 rounded shadow-lg text-sm text-white opacity-90 pointer-events-none">
+          <div className="flex items-center gap-1 px-3 py-0.5 bg-card border border-border rounded shadow-card text-sm text-foreground opacity-90 pointer-events-none">
             <span className="text-xs">
               {activeNode.card.card_type === 'structure' ? '📁' : '📄'}
             </span>

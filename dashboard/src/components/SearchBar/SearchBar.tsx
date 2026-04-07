@@ -57,10 +57,10 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <div className="flex items-center bg-card border border-border rounded-md px-2.5 gap-1.5">
-        <span className="text-muted-foreground text-base shrink-0">⌕</span>
+      <div className="flex items-center bg-white/10 border border-white/20 rounded-[11px] px-2.5 gap-1.5">
+        <span className="text-white/60 text-base shrink-0">⌕</span>
         <input
-          className="flex-1 bg-transparent border-none outline-none text-foreground text-[15px] font-sans py-2 placeholder:text-muted-foreground"
+          className="flex-1 bg-transparent border-none outline-none text-white text-[15px] font-sans py-2 placeholder:text-white/40"
           type="text"
           placeholder={t('searchbar.placeholder')}
           value={query}
@@ -71,7 +71,7 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-[100] max-h-80 overflow-y-auto">
+        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-card z-[100] max-h-80 overflow-y-auto">
           {results.map((r) => (
             <div
               key={r.node_id}
@@ -81,7 +81,7 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
               <span className="text-xs shrink-0 mt-px">
                 {r.card_type === 'structure' ? '📁' : '📄'}
               </span>
-              {r.is_symlink && <span className="text-[10px] text-node-plan shrink-0 mt-[3px]">↗</span>}
+              {r.is_symlink && <span className="text-[10px] text-muted-foreground shrink-0 mt-[3px]">↗</span>}
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-foreground font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                   {r.title}
@@ -98,7 +98,7 @@ export function SearchBar({ onSelectNode }: SearchBarProps) {
       )}
 
       {open && results.length === 0 && !loading && query && (
-        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-[100]">
+        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-card z-[100]">
           <div className="p-3 text-sm text-muted-foreground text-center">{t('searchbar.no_results')}</div>
         </div>
       )}

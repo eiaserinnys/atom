@@ -9,14 +9,14 @@ interface ThreePanelLayoutProps {
 export function ThreePanelLayout({ left, center, right }: ThreePanelLayoutProps) {
   return (
     <Group orientation="horizontal" className="h-full w-full">
-      <Panel defaultSize={30} minSize={15} className="overflow-hidden flex flex-col">
+      <Panel defaultSize={25} minSize={15} className="overflow-hidden flex flex-col">
         {left}
       </Panel>
-      <Separator className="w-1 bg-border cursor-col-resize transition-colors hover:bg-white/20 data-[resize-handle-active]:bg-white/20 shrink-0" />
-      <Panel defaultSize={40} minSize={20} className="overflow-hidden flex flex-col">
+      <Separator className="w-1 bg-[#d2d2d7] dark:bg-[#333336] cursor-col-resize transition-colors hover:bg-foreground/20 data-[resize-handle-active]:bg-foreground/20 shrink-0" />
+      <Panel defaultSize={45} minSize={20} className="overflow-hidden flex flex-col">
         {center}
       </Panel>
-      <Separator className="w-1 bg-border cursor-col-resize transition-colors hover:bg-white/20 data-[resize-handle-active]:bg-white/20 shrink-0" />
+      <Separator className="w-1 bg-[#d2d2d7] dark:bg-[#333336] cursor-col-resize transition-colors hover:bg-foreground/20 data-[resize-handle-active]:bg-foreground/20 shrink-0" />
       <Panel defaultSize={30} minSize={15} className="overflow-hidden flex flex-col">
         {right}
       </Panel>
