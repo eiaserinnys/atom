@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
+import { MobileLayout } from './components/Layout/MobileLayout';
 import { TreeView } from './components/TreeView/TreeView';
 import { CompileView } from './components/CompileView/CompileView';
 import { CardDetail } from './components/CardDetail/CardDetail';
@@ -13,6 +14,7 @@ import { RestartBanner } from './components/RestartBanner';
 import { ReconnectOverlay } from './components/ReconnectOverlay';
 import { useAuth } from './hooks/useAuth';
 import { useAtomEvents } from './hooks/useAtomEvents';
+import { useMobile } from './hooks/useMobile';
 import { SystemProvider } from './contexts/SystemContext';
 import { LoginPage } from './pages/LoginPage';
 
@@ -53,6 +55,8 @@ function AppInner() {
 
   useAtomEvents();
 
+  const isMobile = useMobile();
+
   if (auth.loading) return null;
   if (!auth.authenticated) return <LoginPage />;
 
@@ -86,7 +90,8 @@ function AppInner() {
         <div className="w-full max-w-[400px]">
           <SearchBar onSelectNode={(id) => handleSelectNode(id)} />
         </div>
-        {showConfigButton && (
+        {/* 모바일에서는 설정 버튼 숨김 (설정 탭으로 접근) */}
+        {!isMobile && showConfigButton && (
           <button
             className="text-white/70 hover:text-white bg-transparent hover:bg-white/10 border-none cursor-pointer text-lg leading-none px-2 py-1 rounded-md transition-colors"
             onClick={() => setIsConfigOpen(true)}
@@ -99,7 +104,8 @@ function AppInner() {
         <ThemeToggle />
       </div>
 
-      {showConfigButton && (
+      {/* 모바일에서는 ConfigModal 마운트 자체를 방지 (MobileSettingsPage로 대체) */}
+      {!isMobile && showConfigButton && (
         <ConfigModal
           isOpen={isConfigOpen}
           onClose={() => setIsConfigOpen(false)}
@@ -108,19 +114,27 @@ function AppInner() {
         />
       )}
 
-      {/* 3-panel layout */}
+      {/* 레이아웃: 모바일 = 하단 탭바, 데스크탑 = 3패널 */}
       <div className="flex-1 overflow-hidden">
-        <ThreePanelLayout
-          left={
-            <TreeView
-              selectedNodeId={selectedNodeId}
-              onSelect={handleSelectNode}
-              initialSelectedNodeId={initialSelectedNodeId.current ?? undefined}
-            />
-          }
-          center={<CompileView nodeId={selectedNodeId} />}
-          right={<CardDetail nodeId={selectedNodeId} />}
-        />
+        {isMobile ? (
+          <MobileLayout
+            selectedNodeId={selectedNodeId}
+            onSelectNode={handleSelectNode}
+            initialSelectedNodeId={initialSelectedNodeId.current ?? undefined}
+          />
+        ) : (
+          <ThreePanelLayout
+            left={
+              <TreeView
+                selectedNodeId={selectedNodeId}
+                onSelect={handleSelectNode}
+                initialSelectedNodeId={initialSelectedNodeId.current ?? undefined}
+              />
+            }
+            center={<CompileView nodeId={selectedNodeId} />}
+            right={<CardDetail nodeId={selectedNodeId} />}
+          />
+        )}
       </div>
     </div>
   );

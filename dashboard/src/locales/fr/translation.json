@@ -199,5 +199,12 @@
     "migration_running": "Migration en cours...",
     "migration_btn": "Migration SQLite → PostgreSQL",
     "file_status": "État"
+  },
+  "mobile": {
+    "tab_tree": "Arbre",
+    "tab_compile": "Compiler",
+    "tab_detail": "Détail",
+    "tab_settings": "Paramètres",
+    "settings_back": "← Paramètres"
   }
 }

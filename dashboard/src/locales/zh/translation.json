@@ -199,5 +199,12 @@
     "migration_running": "迁移中...",
     "migration_btn": "SQLite → PostgreSQL 迁移",
     "file_status": "状态"
+  },
+  "mobile": {
+    "tab_tree": "树",
+    "tab_compile": "编译",
+    "tab_detail": "详情",
+    "tab_settings": "设置",
+    "settings_back": "← 设置"
   }
 }

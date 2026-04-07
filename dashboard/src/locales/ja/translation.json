@@ -199,5 +199,12 @@
     "migration_running": "マイグレーション中...",
     "migration_btn": "SQLite → PostgreSQL マイグレーション",
     "file_status": "状態"
+  },
+  "mobile": {
+    "tab_tree": "ツリー",
+    "tab_compile": "コンパイル",
+    "tab_detail": "詳細",
+    "tab_settings": "設定",
+    "settings_back": "← 設定"
   }
 }

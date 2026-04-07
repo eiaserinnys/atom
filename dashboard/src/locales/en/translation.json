@@ -224,5 +224,12 @@
     "restart_now": "Restart Now",
     "reconnecting": "Reconnecting to server...",
     "reconnect_timeout": "Restart may have failed. Please check manually."
+  },
+  "mobile": {
+    "tab_tree": "Tree",
+    "tab_compile": "Compile",
+    "tab_detail": "Detail",
+    "tab_settings": "Settings",
+    "settings_back": "← Settings"
   }
 }
