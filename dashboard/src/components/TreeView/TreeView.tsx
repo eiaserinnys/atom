@@ -98,11 +98,10 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   const [dropZone, setDropZone] = useState<DropZone | null>(null);
   const [pointerY, setPointerY] = useState<number | null>(null);
 
-  // 드래그 중 실제 커서 Y 좌표 추적 (calcDropZone에 전달)
+  // 드래그 중에만 커서 Y 좌표를 추적한다 (activeId가 없으면 리스너 등록 안 함)
   useEffect(() => {
-    const onPointerMove = (e: PointerEvent) => {
-      if (activeId) setPointerY(e.clientY);
-    };
+    if (!activeId) return;
+    const onPointerMove = (e: PointerEvent) => setPointerY(e.clientY);
     window.addEventListener('pointermove', onPointerMove);
     return () => window.removeEventListener('pointermove', onPointerMove);
   }, [activeId]);
@@ -225,12 +224,14 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     const { over } = event;
     if (!over) { setOverId(null); setDropZone(null); return; }
 
-    const overNode = (over.data.current as { node: TreeNodeData }).node;
+    const overData = over.data.current as { node?: TreeNodeData } | undefined;
+    if (!overData?.node) { setOverId(null); setDropZone(null); return; }
+    const overNode = overData.node;
     const overRect = over.rect;
 
     if (pointerY === null || !overRect) {
       setOverId(overNode.id);
-      setDropZone('into');
+      setDropZone(overNode.card.card_type === 'structure' ? 'into' : 'above');
       return;
     }
 
@@ -248,9 +249,10 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     const { active, over } = event;
 
     if (over && dropZone && roots) {
-      const targetNode = (over.data.current as { node: TreeNodeData }).node;
+      const overData = over.data.current as { node?: TreeNodeData } | undefined;
+      const targetNode = overData?.node;
 
-      if (active.id !== targetNode.id) {
+      if (targetNode && active.id !== targetNode.id) {
         const draggedNode = findNodeInTree(active.id as string, roots);
 
         // 순환 참조 방지: 드래그 노드가 타겟의 조상이면 이동 불가
