@@ -58,8 +58,10 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
   });
 
   // @dnd-kit droppable
+  // useDraggable과 동일한 id를 쓰면 dnd-kit이 droppable에 ":1" suffix를 자동 부여하므로
+  // "droppable-" prefix를 붙여 충돌을 방지한다.
   const { setNodeRef: setDroppableRef } = useDroppable({
-    id: node.id,
+    id: `droppable-${node.id}`,
     data: { node },
   });
 
@@ -89,7 +91,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
   };
 
   return (
-    <div className="select-none">
+    <div className="select-none" data-testid={`tree-node-${node.id}`}>
       {/* 위쪽 드롭 인디케이터 */}
       {currentDropZone === 'above' && (
         <div className="h-0.5 bg-brand mx-1 rounded-full" />

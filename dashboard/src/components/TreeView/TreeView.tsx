@@ -64,16 +64,14 @@ function isAncestorOf(ancestorId: string, targetId: string, nodes: TreeNodeData[
   return hasDescendant(ancestor, targetId);
 }
 
-/** 드래그 위치 → DropZone 계산 */
+/** 드래그 위치 → DropZone 계산 (실제 포인터 Y 좌표 기반) */
 function calcDropZone(
-  activeTranslatedTop: number,
-  activeHeight: number,
+  pointerY: number,
   overRectTop: number,
   overRectHeight: number,
   isStructure: boolean
 ): DropZone {
-  const cursorY = activeTranslatedTop + activeHeight / 2;
-  const relativeY = cursorY - overRectTop;
+  const relativeY = pointerY - overRectTop;
   const ratio = relativeY / overRectHeight;
 
   if (ratio < 0.3) return 'above';
@@ -98,6 +96,16 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [dropZone, setDropZone] = useState<DropZone | null>(null);
+  const [pointerY, setPointerY] = useState<number | null>(null);
+
+  // 드래그 중 실제 커서 Y 좌표 추적 (calcDropZone에 전달)
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => {
+      if (activeId) setPointerY(e.clientY);
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    return () => window.removeEventListener('pointermove', onPointerMove);
+  }, [activeId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -214,68 +222,72 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   }
 
   function handleDragOver(event: DragOverEvent) {
-    const { over, active } = event;
+    const { over } = event;
     if (!over) { setOverId(null); setDropZone(null); return; }
 
     const overNode = (over.data.current as { node: TreeNodeData }).node;
-    const translatedRect = active.rect.current.translated;
     const overRect = over.rect;
 
-    if (!translatedRect || !overRect) {
-      setOverId(over.id as string);
+    if (pointerY === null || !overRect) {
+      setOverId(overNode.id);
       setDropZone('into');
       return;
     }
 
     const zone = calcDropZone(
-      translatedRect.top,
-      translatedRect.height,
+      pointerY,
       overRect.top,
       overRect.height,
       overNode.card.card_type === 'structure'
     );
-    setOverId(over.id as string);
+    setOverId(overNode.id);
     setDropZone(zone);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (over && active.id !== over.id && dropZone && roots) {
-      const draggedNode = findNodeInTree(active.id as string, roots);
+    if (over && dropZone && roots) {
       const targetNode = (over.data.current as { node: TreeNodeData }).node;
 
-      // 순환 참조 방지: 드래그 노드가 타겟의 조상이면 이동 불가
-      const circular = isAncestorOf(active.id as string, over.id as string, roots);
+      if (active.id !== targetNode.id) {
+        const draggedNode = findNodeInTree(active.id as string, roots);
 
-      if (draggedNode && !circular) {
-        let parentNodeId: string | null;
-        let position: number | undefined;
+        // 순환 참조 방지: 드래그 노드가 타겟의 조상이면 이동 불가
+        // over.data.current.node.id를 사용해야 ":1" suffix 없는 실제 UUID를 얻음
+        const circular = isAncestorOf(active.id as string, targetNode.id, roots);
 
-        if (dropZone === 'into') {
-          parentNodeId = targetNode.id;
-          position = undefined; // 마지막 자식으로 append
-        } else if (dropZone === 'above') {
-          parentNodeId = targetNode.parent_node_id;
-          position = targetNode.position;
-        } else { // below
-          parentNodeId = targetNode.parent_node_id;
-          position = targetNode.position + 1;
+        if (draggedNode && !circular) {
+          let parentNodeId: string | null;
+          let position: number | undefined;
+
+          if (dropZone === 'into') {
+            parentNodeId = targetNode.id;
+            position = undefined; // 마지막 자식으로 append
+          } else if (dropZone === 'above') {
+            parentNodeId = targetNode.parent_node_id;
+            position = targetNode.position;
+          } else { // below
+            parentNodeId = targetNode.parent_node_id;
+            position = targetNode.position + 1;
+          }
+
+          moveMutation.mutate({ nodeId: active.id as string, parentNodeId, position });
         }
-
-        moveMutation.mutate({ nodeId: active.id as string, parentNodeId, position });
       }
     }
 
     setActiveId(null);
     setOverId(null);
     setDropZone(null);
+    setPointerY(null);
   }
 
   function handleDragCancel() {
     setActiveId(null);
     setOverId(null);
     setDropZone(null);
+    setPointerY(null);
   }
 
   // 컨텍스트 메뉴 핸들러

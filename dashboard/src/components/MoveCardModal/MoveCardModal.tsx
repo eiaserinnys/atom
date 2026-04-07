@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { type TreeNodeData } from '../../api/client';
-import { fetchRootsWithChildren } from '../../api/treeQueries';
+import { fetchFullStructureTree } from '../../api/treeQueries';
 
 interface MoveCardModalProps {
   nodeToMove: TreeNodeData;
@@ -69,9 +69,11 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
   const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // fetchFullStructureTree: structure 노드만 재귀적으로 전체 트리 로드
+  // queryKey를 ['structureTree']로 분리하여 TreeView의 ['tree', null] 캐시를 오염시키지 않음
   const { data: roots, isLoading: treeLoading } = useQuery({
-    queryKey: ['tree', null],
-    queryFn: fetchRootsWithChildren,
+    queryKey: ['structureTree'],
+    queryFn: fetchFullStructureTree,
     staleTime: 30_000,
   });
 
@@ -79,7 +81,7 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
   const excludeIds = new Set<string>();
   collectDescendantIds(nodeToMove, excludeIds);
 
-  const structureRoots = (roots ?? []).filter(r => r.card.card_type === 'structure');
+  const structureRoots = roots ?? [];
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') onClose();
