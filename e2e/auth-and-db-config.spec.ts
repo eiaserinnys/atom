@@ -8,8 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '../.env');
 
 test.describe('Auth config and DB connection test', () => {
-  test.beforeAll(() => {
-    resetTestDb();
+  test.beforeAll(async () => {
+    await resetTestDb();
     if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
   });
 

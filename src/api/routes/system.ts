@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { getPendingRestart, setPendingRestart } from '../state.js';
+import { getDb } from '../../db/client.js';
 
 function requireAdmin(req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply): boolean {
   const user = req.jwtUser;
@@ -19,6 +20,19 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   app.get('/api/health', async (_req, reply) => {
     return reply.send({ status: 'ok' });
   });
+
+  // DELETE /test/reset — E2E test helper, only available in NODE_ENV=test
+  // Truncates all content tables so each test scenario starts clean.
+  if (process.env['NODE_ENV'] === 'test') {
+    app.delete('/test/reset', async (_req, reply) => {
+      const db = getDb();
+      // DELETE FROM cards cascades to tree_nodes (ON DELETE CASCADE)
+      // cards_fts is kept in sync by triggers
+      await db.query('DELETE FROM tree_nodes', []);
+      await db.query('DELETE FROM cards', []);
+      return reply.code(204).send();
+    });
+  }
 
   // GET /api/system/status — admin only
   app.get('/api/system/status', async (req, reply) => {

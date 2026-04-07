@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   type DragStartEvent,
+  type DragMoveEvent,
   type DragOverEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
@@ -96,12 +97,17 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [dropZone, setDropZone] = useState<DropZone | null>(null);
-  const [pointerY, setPointerY] = useState<number | null>(null);
+
+  // useRef로 실시간 값 추적 — handleDragOver/handleDragEnd는 이벤트 핸들러로 렌더 클로저 바깥에서 호출되어
+  // React state는 항상 직전 렌더 시점의 값을 캡처하므로 stale read가 발생한다.
+  // ref는 항상 최신 값을 가리키므로 DnD 정확도를 보장한다.
+  const pointerYRef = useRef<number | null>(null);
+  const dropZoneRef = useRef<DropZone | null>(null);
 
   // 드래그 중에만 커서 Y 좌표를 추적한다 (activeId가 없으면 리스너 등록 안 함)
   useEffect(() => {
     if (!activeId) return;
-    const onPointerMove = (e: PointerEvent) => setPointerY(e.clientY);
+    const onPointerMove = (e: PointerEvent) => { pointerYRef.current = e.clientY; };
     window.addEventListener('pointermove', onPointerMove);
     return () => window.removeEventListener('pointermove', onPointerMove);
   }, [activeId]);
@@ -220,35 +226,50 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     setActiveId(event.active.id as string);
   }
 
-  function handleDragOver(event: DragOverEvent) {
-    const { over } = event;
-    if (!over) { setOverId(null); setDropZone(null); return; }
+  /**
+   * 드롭 존 계산 공통 로직.
+   * onDragOver: over 엘리먼트가 바뀔 때 1회 발생 → 엘리먼트 진입 시점에만 계산됨.
+   * onDragMove: 포인터가 움직일 때마다 발생 → 같은 엘리먼트 안에서도 매번 재계산.
+   * 두 이벤트 모두 이 함수를 통해 처리해야 same-element 내 위치 변화를 정확히 반영한다.
+   */
+  function applyDropZone(over: DragOverEvent['over'] | DragMoveEvent['over']): void {
+    if (!over) { setOverId(null); setDropZone(null); dropZoneRef.current = null; return; }
 
     const overData = over.data.current as { node?: TreeNodeData } | undefined;
-    if (!overData?.node) { setOverId(null); setDropZone(null); return; }
+    if (!overData?.node) { setOverId(null); setDropZone(null); dropZoneRef.current = null; return; }
     const overNode = overData.node;
     const overRect = over.rect;
 
-    if (pointerY === null || !overRect) {
+    const currentPointerY = pointerYRef.current;
+    if (currentPointerY === null || !overRect) {
+      const fallbackZone: DropZone = overNode.card.card_type === 'structure' ? 'into' : 'above';
       setOverId(overNode.id);
-      setDropZone(overNode.card.card_type === 'structure' ? 'into' : 'above');
+      setDropZone(fallbackZone);
+      dropZoneRef.current = fallbackZone;
       return;
     }
 
     const zone = calcDropZone(
-      pointerY,
+      currentPointerY,
       overRect.top,
       overRect.height,
       overNode.card.card_type === 'structure'
     );
     setOverId(overNode.id);
     setDropZone(zone);
+    dropZoneRef.current = zone;
   }
+
+  function handleDragMove(event: DragMoveEvent) { applyDropZone(event.over); }
+  function handleDragOver(event: DragOverEvent) { applyDropZone(event.over); }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (over && dropZone && roots) {
+    // dropZoneRef.current: handleDragOver에서 동기적으로 갱신된 최신 값.
+    // dropZone state는 렌더 클로저에 캡처된 이전 값일 수 있으므로 ref를 사용한다.
+    const currentDropZone = dropZoneRef.current;
+    if (over && currentDropZone && roots) {
       const overData = over.data.current as { node?: TreeNodeData } | undefined;
       const targetNode = overData?.node;
 
@@ -263,12 +284,14 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
           let parentNodeId: string | null;
           let position: number | undefined;
 
-          if (dropZone === 'into') {
+          if (currentDropZone === 'into') {
             parentNodeId = targetNode.id;
             position = undefined; // 마지막 자식으로 append
-          } else if (dropZone === 'above') {
+          } else if (currentDropZone === 'above') {
             parentNodeId = targetNode.parent_node_id;
-            position = targetNode.position;
+            // target.position 자리에 직접 넣으면 target과 충돌한다.
+            // 서버는 100 간격으로 position을 관리하므로 position - 1은 항상 비어있다.
+            position = targetNode.position - 1;
           } else { // below
             parentNodeId = targetNode.parent_node_id;
             position = targetNode.position + 1;
@@ -279,17 +302,19 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       }
     }
 
+    pointerYRef.current = null;
+    dropZoneRef.current = null;
     setActiveId(null);
     setOverId(null);
     setDropZone(null);
-    setPointerY(null);
   }
 
   function handleDragCancel() {
+    pointerYRef.current = null;
+    dropZoneRef.current = null;
     setActiveId(null);
     setOverId(null);
     setDropZone(null);
-    setPointerY(null);
   }
 
   // 컨텍스트 메뉴 핸들러
@@ -341,6 +366,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}

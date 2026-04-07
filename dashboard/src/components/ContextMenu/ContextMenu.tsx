@@ -41,12 +41,14 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   return createPortal(
     <div
       ref={menuRef}
+      data-testid="context-menu"
       style={{ top: adjustedY, left: adjustedX }}
       className="fixed z-[100] min-w-[140px] max-w-[200px] bg-card border border-border rounded shadow-card py-1"
     >
       {items.map((item, i) => (
         <button
           key={i}
+          data-testid="context-menu-item"
           onClick={() => { item.onClick(); onClose(); }}
           className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors truncate ${
             item.danger ? 'text-node-error' : 'text-foreground'

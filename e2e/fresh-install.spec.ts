@@ -8,8 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '../.env');
 
 test.describe('Fresh install — bypass mode API key issuance', () => {
-  test.beforeAll(() => {
-    resetTestDb();
+  test.beforeAll(async () => {
+    await resetTestDb();
     // Ensure clean .env (no pendingRestart state from other tests)
     if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
   });
