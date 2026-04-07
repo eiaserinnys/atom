@@ -29,7 +29,9 @@ export default defineConfig({
         API_PORT: TEST_API_PORT,
         JWT_SECRET: 'e2e-test-secret',
         NODE_ENV: 'test',
-        // GOOGLE_CLIENT_ID and SLACK_CLIENT_ID intentionally unset → bypass mode
+        // bypass mode: explicitly clear OAuth credentials so authMiddleware skips JWT check
+        GOOGLE_CLIENT_ID: '',
+        SLACK_CLIENT_ID: '',
       },
     },
     {
