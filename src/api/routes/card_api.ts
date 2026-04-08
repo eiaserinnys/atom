@@ -87,10 +87,12 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
       const qs = req.query as Record<string, string>;
       const depth = qs["depth"] !== undefined ? parseInt(qs["depth"]) : 2;
       const titlesOnly = qs["titles_only"] === "true";
+      const includeIds = qs["include_ids"] === "true";
       const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
       const maxChars = maxCharsRaw !== undefined && !isNaN(maxCharsRaw) ? maxCharsRaw : undefined;
       const result = await compileSubtree(req.params.nodeId, depth, {
         titlesOnly: titlesOnly || undefined,
+        includeIds: includeIds || undefined,
         maxChars,
       });
       return { markdown: result.markdown };
