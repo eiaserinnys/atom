@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
-import { listChildren, compileSubtree } from "../../services/tree.service.js";
+import { getNode, listChildren, compileSubtree } from "../../services/tree.service.js";
 import { findActiveAgents } from "../../db/queries/agents.js";
 import { getDb } from "../../db/client.js";
 import bcrypt from "bcryptjs";
@@ -79,7 +79,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  // GET /api/tree/:nodeId/compile — compile subtree (agent key auth)
+  // GET /api/tree/:nodeId/compile — compile subtree (agent key auth, query params)
   app.get<{ Params: { nodeId: string } }>(
     "/api/tree/:nodeId/compile",
     { preHandler: agentKeyPreHandler },
@@ -90,6 +90,28 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
       const includeIds = qs["include_ids"] === "true";
       const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
       const maxChars = maxCharsRaw !== undefined && !isNaN(maxCharsRaw) ? maxCharsRaw : undefined;
+      const result = await compileSubtree(req.params.nodeId, depth, {
+        titlesOnly: titlesOnly || undefined,
+        includeIds: includeIds || undefined,
+        maxChars,
+      });
+      return { markdown: result.markdown };
+    }
+  );
+
+  // POST /api/tree/:nodeId/compile — compile subtree (agent key auth, body params)
+  // depth 기본값 3: soul-server가 항상 명시적으로 depth를 전달하므로 기본값 불일치 무관.
+  app.post<{ Params: { nodeId: string } }>(
+    "/api/tree/:nodeId/compile",
+    { preHandler: agentKeyPreHandler },
+    async (req, reply) => {
+      const body = (req.body as Record<string, unknown>) ?? {};
+      const depth = typeof body["depth"] === "number" ? body["depth"] : 3;
+      const titlesOnly = body["titlesOnly"] === true;
+      const includeIds = body["includeIds"] === true;
+      const maxChars = typeof body["maxChars"] === "number" ? body["maxChars"] : undefined;
+      const node = await getNode(req.params.nodeId);
+      if (!node) return reply.code(404).send({ error: "Node not found" });
       const result = await compileSubtree(req.params.nodeId, depth, {
         titlesOnly: titlesOnly || undefined,
         includeIds: includeIds || undefined,
