@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { Copy, Link2 } from 'lucide-react';
+import { closeUnclosedCodeFences } from '../../utils/markdownUtils';
 import { api, type UnfurlEntry } from '../../api/client';
 import { readStoredCredentials } from '../../hooks/useLocalStorageCredentials';
 import { UnfurlSectionList } from '../UnfurlSection';
@@ -70,6 +72,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
 
   const activeQuery = unfurlEnabled ? unfurlQuery : standardQuery;
   const markdown = activeQuery.data?.markdown;
+  const processedMarkdown = markdown ? closeUnclosedCodeFences(markdown) : undefined;
   const isLoading = activeQuery.isLoading;
   const error = activeQuery.error;
   const unfurls = unfurlEnabled ? (unfurlQuery.data?.unfurls ?? null) : null;
@@ -291,18 +294,25 @@ export function CompileView({ nodeId }: CompileViewProps) {
                 [&_h2]:mt-[1.4em] [&_h2]:mb-[0.4em] [&_h2]:font-semibold [&_h2]:text-[1.2em]
                 [&_h3]:mt-[1.4em] [&_h3]:mb-[0.4em] [&_h3]:font-semibold [&_h3]:text-[1.05em]
                 [&_h4]:mt-[1.4em] [&_h4]:mb-[0.4em] [&_h4]:font-semibold
+                [&_h5]:mt-[1.4em] [&_h5]:mb-[0.4em] [&_h5]:font-semibold [&_h5]:text-[0.95em]
+                [&_h6]:mt-[1.4em] [&_h6]:mb-[0.4em] [&_h6]:font-semibold [&_h6]:text-[0.9em] [&_h6]:text-muted-foreground
                 [&_p]:mb-[0.8em]
-                [&_ul]:mb-[0.8em] [&_ul]:pl-6
-                [&_ol]:mb-[0.8em] [&_ol]:pl-6
+                [&_ul]:mb-[0.8em] [&_ul]:pl-6 [&_ul]:list-disc
+                [&_ol]:mb-[0.8em] [&_ol]:pl-6 [&_ol]:list-decimal
                 [&_li]:mb-[0.2em]
+                [&_li_ul]:mt-[0.2em] [&_li_ol]:mt-[0.2em]
                 [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:bg-muted [&_code]:border [&_code]:border-border [&_code]:rounded [&_code]:px-[0.35em] [&_code]:py-[0.1em]
                 [&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:mb-[1em]
                 [&_pre_code]:bg-transparent [&_pre_code]:border-0 [&_pre_code]:p-0 [&_pre_code]:text-[0.88em]
                 [&_blockquote]:border-l-[3px] [&_blockquote]:border-border [&_blockquote]:ml-0 [&_blockquote]:mb-[0.8em] [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground
                 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_hr]:my-4
                 [&_a]:text-node-user [&_a]:no-underline hover:[&_a]:underline
+                [&_table]:w-full [&_table]:border-collapse [&_table]:mb-[1.25em]
+                [&_thead_th]:border [&_thead_th]:border-border [&_thead_th]:px-3 [&_thead_th]:py-2 [&_thead_th]:text-left [&_thead_th]:font-semibold [&_thead_th]:bg-muted/50
+                [&_tbody_td]:border [&_tbody_td]:border-border [&_tbody_td]:px-3 [&_tbody_td]:py-2
+                [&_tbody_tr:nth-child(even)_td]:bg-muted/20
               ">
-                <Markdown remarkPlugins={[remarkGfm]} components={headingComponents}>{markdown}</Markdown>
+                <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={headingComponents}>{processedMarkdown}</Markdown>
               </div>
             )}
 
