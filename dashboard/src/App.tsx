@@ -53,7 +53,7 @@ function AppInner() {
     }
   }, []);
 
-  useAtomEvents();
+  useAtomEvents(selectedNodeId);
 
   const isMobile = useMobile();
 
