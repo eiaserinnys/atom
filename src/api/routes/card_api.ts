@@ -69,6 +69,15 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // GET /api/tree — list root nodes (agent key auth)
+  app.get(
+    "/api/tree",
+    { preHandler: agentKeyPreHandler },
+    async (_req, _reply) => {
+      return listChildren(null);
+    }
+  );
+
   // GET /api/tree/:nodeId/children — list children of a node (agent key auth)
   app.get<{ Params: { nodeId: string } }>(
     "/api/tree/:nodeId/children",
