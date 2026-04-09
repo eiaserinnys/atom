@@ -136,7 +136,11 @@ export const api = {
     exclude_nodes?: string[];
   }): Promise<{ markdown: string }> {
     const params = new URLSearchParams();
-    if (options?.depth !== undefined) params.set("depth", String(options.depth));
+    if (options?.depth === Infinity) {
+      params.set("depth", "Infinity");
+    } else if (options?.depth !== undefined) {
+      params.set("depth", String(options.depth));
+    }
     if (options?.include_ids) params.set("include_ids", "true");
     if (options?.titles_only) params.set("titles_only", "true");
     if (options?.numbering) params.set("numbering", "true");
@@ -158,7 +162,7 @@ export const api = {
   ): Promise<{ markdown: string; unfurls?: Record<string, UnfurlEntry> }> {
     return request(`/tree/${nodeId}/compile`, {
       method: 'POST',
-      body: JSON.stringify({ depth, resolveRefs, credentials }),
+      body: JSON.stringify({ depth: depth === Infinity ? null : depth, resolveRefs, credentials }),
     });
   },
 

@@ -128,13 +128,14 @@
     "compile_view": "Documento compilado"
   },
   "compile": {
-    "header": "Documento compilado (BFS+2)",
+    "header": "Documento compilado",
     "copy_id": "Copiar ID",
     "unfurl_enable": "Habilitar consulta de referencia externa",
     "unfurl_disable": "Deshabilitar consulta de referencia externa",
     "no_selection": "Seleccione un nodo para ver el documento compilado.",
     "loading": "Compilando...",
-    "toc_title": "Esquema del documento"
+    "toc_title": "Esquema del documento",
+    "depth_label": "Profundidad de compilación: {{depth}}"
   },
   "unfurl": {
     "failure": "Error en consulta de referencia externa",
