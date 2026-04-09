@@ -131,7 +131,7 @@ export interface CompileResult {
 
 export async function compileSubtree(
   nodeId: string,
-  depth: number = 2,
+  depth: number = 3,
   options: CompileOptions = {},
   resolveRefsMode?: false | "cached" | "fresh",
   credentials?: Record<string, UnfurlCredentials>

@@ -128,13 +128,14 @@
     "compile_view": "コンパイル文書"
   },
   "compile": {
-    "header": "コンパイル文書 (BFS+2)",
+    "header": "コンパイル文書",
     "copy_id": "ID をコピー",
     "unfurl_enable": "外部参照照会を有効化",
     "unfurl_disable": "外部参照照会を無効化",
     "no_selection": "ノードを選択するとコンパイルされた文書が表示されます。",
     "loading": "コンパイル中...",
-    "toc_title": "文書アウトライン"
+    "toc_title": "文書アウトライン",
+    "depth_label": "コンパイル深度: {{depth}}"
   },
   "unfurl": {
     "failure": "外部参照照会失敗",

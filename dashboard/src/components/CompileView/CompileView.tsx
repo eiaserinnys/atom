@@ -22,15 +22,38 @@ interface TocEntry {
 
 const TOC_WIDTH = 200;
 
+const DEPTH_SLIDER_KEY = 'atom-compile-depth';
+const DEFAULT_SLIDER = 5;
+const INFINITY_SLIDER_VALUE = 10;
+
+function sliderToDepth(v: number): number {
+  return v === INFINITY_SLIDER_VALUE ? Infinity : v;
+}
+
 export function CompileView({ nodeId }: CompileViewProps) {
   const { t } = useTranslation();
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
 
+  // Depth slider — 1~9 are literal depth values, 10 (INFINITY_SLIDER_VALUE) means Infinity
+  const [sliderValue, setSliderValue] = useState<number>(() => {
+    const stored = localStorage.getItem(DEPTH_SLIDER_KEY);
+    const parsed = stored ? parseInt(stored, 10) : NaN;
+    return isNaN(parsed) ? DEFAULT_SLIDER : Math.min(INFINITY_SLIDER_VALUE, Math.max(1, parsed));
+  });
+
+  const depth = sliderToDepth(sliderValue);
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseInt(e.target.value, 10);
+    setSliderValue(v);
+    localStorage.setItem(DEPTH_SLIDER_KEY, String(v));
+  };
+
   // Standard compile (GET) — used when unfurl is disabled
   const standardQuery = useQuery({
-    queryKey: ['compile', nodeId],
+    queryKey: ['compile', nodeId, depth],
     queryFn: async () => {
-      const result = await api.compile(nodeId!, { numbering: true, include_ids: true });
+      const result = await api.compile(nodeId!, { depth, numbering: true, include_ids: true });
       return { markdown: result.markdown };
     },
     enabled: !!nodeId && !unfurlEnabled,
@@ -38,9 +61,9 @@ export function CompileView({ nodeId }: CompileViewProps) {
 
   // Unfurl compile (POST) — credentials는 설정 탭에서 관리, 실행 시점에 localStorage에서 직접 읽음
   const unfurlQuery = useQuery({
-    queryKey: ['compile-unfurl', nodeId],
+    queryKey: ['compile-unfurl', nodeId, depth],
     queryFn: async () => {
-      return api.compileWithRefs(nodeId!, 2, 'cached', readStoredCredentials());
+      return api.compileWithRefs(nodeId!, depth, 'cached', readStoredCredentials());
     },
     enabled: !!nodeId && unfurlEnabled,
   });
@@ -157,12 +180,30 @@ export function CompileView({ nodeId }: CompileViewProps) {
       }
     : {};
 
+  const depthLabel = sliderValue === INFINITY_SLIDER_VALUE ? '∞' : String(sliderValue);
+
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
       <div className="h-10 flex items-center px-4 border-b border-border bg-card text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground shrink-0">
         {t('compile.header')}
         {nodeId && (
           <div className="ml-auto flex items-center gap-1">
+            {/* Depth slider */}
+            <div className="flex items-center gap-1">
+              <input
+                type="range"
+                min={1}
+                max={INFINITY_SLIDER_VALUE}
+                step={1}
+                value={sliderValue}
+                onChange={handleSliderChange}
+                className="w-16 accent-primary cursor-pointer"
+                title={t('compile.depth_label', { depth: depthLabel })}
+              />
+              <span className="text-xs font-mono text-muted-foreground w-4 text-center">
+                {depthLabel}
+              </span>
+            </div>
             <span className="px-2 py-0.5 text-xs font-mono bg-muted border border-border rounded-md text-muted-foreground">
               {nodeId.slice(0, 8)}
             </span>

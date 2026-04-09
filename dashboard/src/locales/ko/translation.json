@@ -129,13 +129,14 @@
     "compile_view": "컴파일 문서"
   },
   "compile": {
-    "header": "컴파일 문서 (BFS+2)",
+    "header": "컴파일 문서",
     "copy_id": "ID 복사",
     "unfurl_enable": "외부 참조 조회 켜기",
     "unfurl_disable": "외부 참조 조회 끄기",
     "no_selection": "노드를 선택하면 컴파일된 문서가 표시됩니다.",
     "loading": "컴파일 중...",
-    "toc_title": "문서 개요"
+    "toc_title": "문서 개요",
+    "depth_label": "컴파일 깊이: {{depth}}"
   },
   "unfurl": {
     "failure": "외부 참조 조회 실패",

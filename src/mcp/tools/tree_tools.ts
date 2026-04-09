@@ -56,7 +56,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       "  • Default: full markdown with # headings per depth level and card content.",
       "  • titles_only=true: indented tree of card titles with content size in chars — useful for quick overviews.",
       "Options:",
-      "  • depth (default 2): how many levels deep to expand.",
+      "  • depth (default 3): how many levels deep to expand. Pass null to drill the full tree without limit (use with caution on large trees).",
       "  • include_ids=true: appends <!-- node:<uuid> card:<uuid> depth:<N> --> HTML comments to each heading for programmatic reference.",
       "  • numbering=true: prepends hierarchical numbering (1, 1.1, 1.1.1, …) to each heading. Root node is unnumbered; children start at 1.",
       "  • max_chars: truncates output to at most N characters (on a line boundary) and appends <!-- truncated: M chars omitted -->. 0 or negative = no limit.",
@@ -67,7 +67,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
     ].join("\n"),
     {
       node_id: z.string().uuid().describe("Root node of the subtree to compile."),
-      depth: z.number().int().optional().describe("Max depth to expand (default 2)."),
+      depth: z.number().int().nullable().optional().describe("Max depth to expand (default 3). Pass null to drill the entire tree without limit."),
       include_ids: z.boolean().optional().describe("Add <!-- node/card/depth --> HTML comments to headings."),
       titles_only: z.boolean().optional().describe("Output indented title tree instead of full markdown."),
       numbering: z.boolean().optional().describe("Prepend hierarchical numbering (1, 1.1, 1.1.1, …) to headings."),
@@ -78,7 +78,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       credentials: z.record(z.string(), z.record(z.string(), z.string())).optional().describe("Credentials per source_type, e.g. { trello: { apiKey: '...', token: '...' } }."),
     },
     async ({ node_id, depth, include_ids, titles_only, numbering, max_chars, exclude_nodes, limit, resolve_refs, credentials }) => {
-      const result = await compileSubtree(node_id, depth ?? 2, {
+      const result = await compileSubtree(node_id, depth === null ? Infinity : (depth ?? 3), {
         includeIds: include_ids,
         titlesOnly: titles_only,
         numbering,

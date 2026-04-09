@@ -128,13 +128,14 @@
     "compile_view": "编译文档"
   },
   "compile": {
-    "header": "编译文档 (BFS+2)",
+    "header": "编译文档",
     "copy_id": "复制 ID",
     "unfurl_enable": "启用外部引用查询",
     "unfurl_disable": "禁用外部引用查询",
     "no_selection": "选择节点以查看编译后的文档。",
     "loading": "编译中...",
-    "toc_title": "文档大纲"
+    "toc_title": "文档大纲",
+    "depth_label": "编译深度: {{depth}}"
   },
   "unfurl": {
     "failure": "外部引用查询失败",
