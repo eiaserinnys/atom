@@ -22,6 +22,7 @@
     "react-i18next": "^17.0.2",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.8.0",
+    "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
