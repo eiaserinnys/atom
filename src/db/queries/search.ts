@@ -29,6 +29,8 @@ export async function searchByBm25(
   }));
 }
 
+// SQLite is used only for unit tests. breadcrumb (node_path) is intentionally
+// not implemented here — all results return node_path: [] via the result mapper.
 async function searchSqlite(
   db: Queryable,
   query: string,

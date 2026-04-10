@@ -489,6 +489,7 @@ describe("BM25 Search", () => {
     expect(r).toHaveProperty("card_type");
     expect(r).toHaveProperty("snippet");
     expect(r).toHaveProperty("is_symlink");
+    expect(r).toHaveProperty("node_path");
   });
 
   it("supports OR search with websearch syntax", async () => {
