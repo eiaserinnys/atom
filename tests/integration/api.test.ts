@@ -36,8 +36,11 @@ beforeAll(async () => {
     );
   }
 
-  if (databaseUrl.includes("atom_db") && !databaseUrl.includes("test")) {
-    throw new Error("TEST_DATABASE_URL must use a test database, not the production atom_db.\nUse: postgresql://atom:atom@localhost:5434/atom_test_db");
+  if (!databaseUrl.includes("test")) {
+    throw new Error(
+      "TEST_DATABASE_URL must point to a test database (URL must contain 'test').\n" +
+        "Got: " + databaseUrl
+    );
   }
 
   pool = new PostgresAdapter(databaseUrl);
@@ -486,6 +489,50 @@ describe("BM25 Search", () => {
     expect(r).toHaveProperty("card_type");
     expect(r).toHaveProperty("snippet");
     expect(r).toHaveProperty("is_symlink");
+  });
+
+  it("supports OR search with websearch syntax", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "Astrophysics Overview",
+      content: "The study of stars and galaxies",
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "Oceanography Basics",
+      content: "The study of ocean currents",
+    });
+
+    const results = await searchService.searchCards("astrophysics OR oceanography");
+    const titles = results.map((r) => r.title);
+    expect(titles).toContain("Astrophysics Overview");
+    expect(titles).toContain("Oceanography Basics");
+  });
+
+  it("includes node_path breadcrumb in search results", async () => {
+    const rootResult = await cardService.createCard({
+      card_type: "structure",
+      title: "RootSection",
+      content: null,
+    });
+    const parentResult = await cardService.createCard({
+      card_type: "structure",
+      title: "ParentSection",
+      content: null,
+      parent_node_id: rootResult.node_id!,
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "LeafCard Breadcrumb Test",
+      content: "Testing the breadcrumb path",
+      parent_node_id: parentResult.node_id!,
+    });
+
+    const results = await searchService.searchCards("breadcrumb");
+    expect(results.length).toBeGreaterThan(0);
+    const r = results.find((x) => x.title === "LeafCard Breadcrumb Test");
+    expect(r).toBeDefined();
+    expect(r!.node_path).toEqual(["RootSection", "ParentSection"]);
   });
 });
 

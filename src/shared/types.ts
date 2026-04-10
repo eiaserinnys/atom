@@ -71,6 +71,7 @@ export interface SearchResult {
   card_type: CardType;
   is_symlink: boolean;
   snippet: string;
+  node_path: string[];  // 조상 타이틀 배열 (루트 → 부모 순서). 고아 카드이면 []
 }
 
 // ---------------------------------------------------------------------------

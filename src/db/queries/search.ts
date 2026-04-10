@@ -25,6 +25,7 @@ export async function searchByBm25(
     card_type: row["card_type"] as SearchResult["card_type"],
     is_symlink: deserializeBoolean(row["is_symlink"]),
     snippet: row["snippet"] as string,
+    node_path: (row["node_path"] as string[] | null) ?? [],
   }));
 }
 
@@ -92,44 +93,95 @@ async function searchPostgres(
          UNION ALL
          SELECT tn.id FROM tree_nodes tn
          INNER JOIN subtree s ON tn.parent_node_id = s.id
+       ), tsq AS (
+         SELECT websearch_to_tsquery('simple', $1) AS q
        )
        SELECT
          c.id AS card_id,
-         (SELECT tn.id FROM tree_nodes tn WHERE tn.card_id = c.id AND tn.is_symlink = FALSE LIMIT 1) AS node_id,
+         canonical_node.node_id,
          c.title,
          c.card_type,
          FALSE AS is_symlink,
          ts_headline('simple',
            coalesce(c.content, c.title),
-           plainto_tsquery('simple', $1),
+           tsq.q,
            'MaxWords=20, MinWords=10'
-         ) AS snippet
-       FROM cards c
-       WHERE c.fts_vector @@ plainto_tsquery('simple', $1)
+         ) AS snippet,
+         COALESCE(breadcrumb.path, '{}') AS node_path
+       FROM cards c, tsq
+       LEFT JOIN LATERAL (
+         SELECT tn.id AS node_id
+         FROM tree_nodes tn
+         WHERE tn.card_id = c.id AND tn.is_symlink = FALSE
+         LIMIT 1
+       ) canonical_node ON TRUE
+       LEFT JOIN LATERAL (
+         WITH RECURSIVE anc AS (
+           SELECT tn.parent_node_id, ac.title, 1 AS depth
+           FROM tree_nodes tn
+           JOIN cards ac ON ac.id = tn.card_id
+           WHERE tn.id = canonical_node.node_id
+           UNION ALL
+           SELECT tn.parent_node_id, ac.title, a.depth + 1
+           FROM tree_nodes tn
+           JOIN cards ac ON ac.id = tn.card_id
+           INNER JOIN anc a ON tn.id = a.parent_node_id
+         )
+         SELECT array_agg(title ORDER BY depth DESC) AS path
+         FROM anc
+         WHERE depth > 1
+       ) breadcrumb ON canonical_node.node_id IS NOT NULL
+       WHERE c.fts_vector @@ tsq.q
          AND EXISTS (
            SELECT 1 FROM tree_nodes tn2
            WHERE tn2.card_id = c.id AND tn2.id IN (SELECT id FROM subtree)
          )
-       ORDER BY ts_rank(c.fts_vector, plainto_tsquery('simple', $1)) DESC
+       ORDER BY ts_rank(c.fts_vector, tsq.q) DESC
        LIMIT $2`,
       [query, limit, rootNodeId]
     );
   } else {
     return db.query(
-      `SELECT
+      `WITH tsq AS (
+         SELECT websearch_to_tsquery('simple', $1) AS q
+       )
+       SELECT
          c.id AS card_id,
-         (SELECT tn.id FROM tree_nodes tn WHERE tn.card_id = c.id AND tn.is_symlink = FALSE LIMIT 1) AS node_id,
+         canonical_node.node_id,
          c.title,
          c.card_type,
          FALSE AS is_symlink,
          ts_headline('simple',
            coalesce(c.content, c.title),
-           plainto_tsquery('simple', $1),
+           tsq.q,
            'MaxWords=20, MinWords=10'
-         ) AS snippet
-       FROM cards c
-       WHERE c.fts_vector @@ plainto_tsquery('simple', $1)
-       ORDER BY ts_rank(c.fts_vector, plainto_tsquery('simple', $1)) DESC
+         ) AS snippet,
+         COALESCE(breadcrumb.path, '{}') AS node_path
+       FROM cards c, tsq
+       LEFT JOIN LATERAL (
+         SELECT tn.id AS node_id
+         FROM tree_nodes tn
+         WHERE tn.card_id = c.id AND tn.is_symlink = FALSE
+         LIMIT 1
+       ) canonical_node ON TRUE
+       LEFT JOIN LATERAL (
+         WITH RECURSIVE anc AS (
+           SELECT tn.parent_node_id, ac.title, 1 AS depth
+           FROM tree_nodes tn
+           JOIN cards ac ON ac.id = tn.card_id
+           WHERE tn.id = canonical_node.node_id
+           UNION ALL
+           SELECT tn.parent_node_id, ac.title, a.depth + 1
+           FROM tree_nodes tn
+           JOIN cards ac ON ac.id = tn.card_id
+           INNER JOIN anc a ON tn.id = a.parent_node_id
+         )
+         SELECT array_agg(title ORDER BY depth DESC) AS path
+         FROM anc
+         WHERE depth > 1
+       ) breadcrumb ON canonical_node.node_id IS NOT NULL
+       WHERE c.fts_vector @@ tsq.q
+       ORDER BY ts_rank(c.fts_vector, tsq.q) DESC
        LIMIT $2`,
       [query, limit]
     );

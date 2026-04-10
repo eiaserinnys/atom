@@ -6,7 +6,7 @@ export function registerSearchTools(server: McpServer): void {
   // search_cards
   server.tool(
     "search_cards",
-    "Full-text search across card titles, content, and tags using PostgreSQL BM25 ranking (ts_rank). Returns cards sorted by relevance. Supports natural language queries and PostgreSQL tsquery operators (& for AND, | for OR).",
+    "Full-text search across card titles and content using PostgreSQL BM25 ranking (ts_rank). Returns cards sorted by relevance.\n\nQuery syntax (websearch_to_tsquery):\n- Plain text: 'quantum mechanics' → AND search\n- OR: 'quantum OR classical' → either keyword\n- Exact phrase: '\"quantum mechanics\"' → exact match\n- Exclude: 'quantum -classical' → exclude word\n\nEach result includes node_path: ancestor title array from root to parent (e.g. ['project', 'atom', 'TODO']). Empty array for orphan cards.",
     {
       query: z.string().describe("Search query. Natural language or tsquery syntax (e.g. 'design & principles')."),
       limit: z.number().int().optional().describe("Max results to return (default 20)."),
