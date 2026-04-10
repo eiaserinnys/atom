@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { api, type CardData, type TreeNodeData } from '../../api/client';
 import i18n from '../../i18n';
 
@@ -182,7 +183,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                 >
                   {card.content ? (
                     <div className="prose prose-atom text-[15px] leading-relaxed">
-                      <Markdown remarkPlugins={[remarkGfm]}>{card.content}</Markdown>
+                      <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>{card.content}</Markdown>
                     </div>
                   ) : (
                     <span className="text-muted-foreground text-sm">{t('card.empty_content')}</span>
@@ -215,7 +216,18 @@ export function CardDetail({ nodeId }: CardDetailProps) {
               {card.source_ref && (
                 <div className="flex gap-2.5 items-baseline">
                   <span className="text-xs text-muted-foreground w-[70px] shrink-0">{t('card.source_ref_label')}</span>
-                  <span className="text-[13px] text-foreground break-all">{card.source_ref}</span>
+                  {/^https?:\/\//.test(card.source_ref) ? (
+                    <a
+                      href={card.source_ref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[13px] text-primary underline break-all"
+                    >
+                      {card.source_ref}
+                    </a>
+                  ) : (
+                    <span className="text-[13px] text-foreground break-all">{card.source_ref}</span>
+                  )}
                 </div>
               )}
               {card.tags.length > 0 && (

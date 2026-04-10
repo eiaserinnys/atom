@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
-import { listChildren } from "../../services/tree.service.js";
+import { listChildren, compileSubtree } from "../../services/tree.service.js";
 import { findActiveAgents } from "../../db/queries/agents.js";
 import { getDb } from "../../db/client.js";
 import bcrypt from "bcryptjs";
@@ -69,6 +69,15 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // GET /api/tree — list root nodes (agent key auth)
+  app.get(
+    "/api/tree",
+    { preHandler: agentKeyPreHandler },
+    async (_req, _reply) => {
+      return listChildren(null);
+    }
+  );
+
   // GET /api/tree/:nodeId/children — list children of a node (agent key auth)
   app.get<{ Params: { nodeId: string } }>(
     "/api/tree/:nodeId/children",
@@ -78,4 +87,25 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
       return children;
     }
   );
+
+  // GET /api/tree/:nodeId/compile — compile subtree (agent key auth, query params)
+  app.get<{ Params: { nodeId: string } }>(
+    "/api/tree/:nodeId/compile",
+    { preHandler: agentKeyPreHandler },
+    async (req, reply) => {
+      const qs = req.query as Record<string, string>;
+      const depth = qs["depth"] !== undefined ? parseInt(qs["depth"]) : 2;
+      const titlesOnly = qs["titles_only"] === "true";
+      const includeIds = qs["include_ids"] === "true";
+      const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
+      const maxChars = maxCharsRaw !== undefined && !isNaN(maxCharsRaw) ? maxCharsRaw : undefined;
+      const result = await compileSubtree(req.params.nodeId, depth, {
+        titlesOnly: titlesOnly || undefined,
+        includeIds: includeIds || undefined,
+        maxChars,
+      });
+      return { markdown: result.markdown };
+    }
+  );
+
 }

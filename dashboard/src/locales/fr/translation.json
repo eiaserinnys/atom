@@ -128,13 +128,14 @@
     "compile_view": "Document compilé"
   },
   "compile": {
-    "header": "Document compilé (BFS+2)",
+    "header": "Document compilé",
     "copy_id": "Copier l'ID",
     "unfurl_enable": "Activer la consultation de référence externe",
     "unfurl_disable": "Désactiver la consultation de référence externe",
     "no_selection": "Sélectionnez un nœud pour afficher le document compilé.",
     "loading": "Compilation en cours...",
-    "toc_title": "Plan du document"
+    "toc_title": "Plan du document",
+    "depth_label": "Profondeur de compilation: {{depth}}"
   },
   "unfurl": {
     "failure": "Échec de la consultation de référence externe",
@@ -199,5 +200,12 @@
     "migration_running": "Migration en cours...",
     "migration_btn": "Migration SQLite → PostgreSQL",
     "file_status": "État"
+  },
+  "mobile": {
+    "tab_tree": "Arbre",
+    "tab_compile": "Compiler",
+    "tab_detail": "Détail",
+    "tab_settings": "Paramètres",
+    "settings_back": "← Paramètres"
   }
 }

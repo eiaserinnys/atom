@@ -95,6 +95,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
   // DnD 상태
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeDragNode, setActiveDragNode] = useState<TreeNodeData | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [dropZone, setDropZone] = useState<DropZone | null>(null);
 
@@ -223,6 +224,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
   // DnD 이벤트 핸들러
   function handleDragStart(event: DragStartEvent) {
+    const activeData = event.active.data.current as { node?: TreeNodeData } | undefined;
+    setActiveDragNode(activeData?.node ?? null);
     setActiveId(event.active.id as string);
   }
 
@@ -273,14 +276,12 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       const overData = over.data.current as { node?: TreeNodeData } | undefined;
       const targetNode = overData?.node;
 
-      if (targetNode && active.id !== targetNode.id) {
-        const draggedNode = findNodeInTree(active.id as string, roots);
-
+      if (targetNode && activeDragNode && active.id !== targetNode.id) {
         // 순환 참조 방지: 드래그 노드가 타겟의 조상이면 이동 불가
         // over.data.current.node.id를 사용해야 ":1" suffix 없는 실제 UUID를 얻음
         const circular = isAncestorOf(active.id as string, targetNode.id, roots);
 
-        if (draggedNode && !circular) {
+        if (!circular) {
           let parentNodeId: string | null;
           let position: number | undefined;
 
@@ -304,6 +305,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
     pointerYRef.current = null;
     dropZoneRef.current = null;
+    setActiveDragNode(null);
     setActiveId(null);
     setOverId(null);
     setDropZone(null);
@@ -312,6 +314,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   function handleDragCancel() {
     pointerYRef.current = null;
     dropZoneRef.current = null;
+    setActiveDragNode(null);
     setActiveId(null);
     setOverId(null);
     setDropZone(null);
@@ -356,8 +359,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
   const isMutating = createMutation.isPending || editMutation.isPending || deleteMutation.isPending;
 
-  // 드래그 오버레이용 활성 노드
-  const activeNode = activeId && roots ? findNodeInTree(activeId, roots) : null;
+  // 드래그 오버레이용 활성 노드 — handleDragStart에서 저장한 state를 사용
+  // (roots는 depth 0/1만 포함하므로 findNodeInTree로는 depth 2+ 노드를 찾을 수 없음)
 
   if (isLoading) return <div className="p-4 text-muted-foreground text-sm">{t('tree.loading')}</div>;
   if (error) return <div className="p-4 text-node-error text-sm">{t('common.error')}: {error.message}</div>;
@@ -484,13 +487,13 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
       {/* 드래그 오버레이 (드래그 중 유령 표시) */}
       <DragOverlay>
-        {activeNode ? (
+        {activeDragNode ? (
           <div className="flex items-center gap-1 px-3 py-0.5 bg-card border border-border rounded shadow-card text-sm text-foreground opacity-90 pointer-events-none">
             <span className="text-xs">
-              {activeNode.card.card_type === 'structure' ? '📁' : '📄'}
+              {activeDragNode.card.card_type === 'structure' ? '📁' : '📄'}
             </span>
             <span className="overflow-hidden text-ellipsis whitespace-nowrap max-w-[200px]">
-              {activeNode.card.title}
+              {activeDragNode.card.title}
             </span>
           </div>
         ) : null}

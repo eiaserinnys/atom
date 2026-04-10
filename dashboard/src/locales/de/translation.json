@@ -128,13 +128,14 @@
     "compile_view": "Kompiliertes Dokument"
   },
   "compile": {
-    "header": "Kompiliertes Dokument (BFS+2)",
+    "header": "Kompiliertes Dokument",
     "copy_id": "ID kopieren",
     "unfurl_enable": "Externe Referenzabfrage aktivieren",
     "unfurl_disable": "Externe Referenzabfrage deaktivieren",
     "no_selection": "Wählen Sie einen Knoten aus, um das kompilierte Dokument anzuzeigen.",
     "loading": "Kompilieren...",
-    "toc_title": "Dokumentgliederung"
+    "toc_title": "Dokumentgliederung",
+    "depth_label": "Kompilierungstiefe: {{depth}}"
   },
   "unfurl": {
     "failure": "Externe Referenzabfrage fehlgeschlagen",
@@ -199,5 +200,12 @@
     "migration_running": "Migration läuft...",
     "migration_btn": "SQLite → PostgreSQL Migration",
     "file_status": "Status"
+  },
+  "mobile": {
+    "tab_tree": "Baum",
+    "tab_compile": "Kompilieren",
+    "tab_detail": "Detail",
+    "tab_settings": "Einstellungen",
+    "settings_back": "← Einstellungen"
   }
 }

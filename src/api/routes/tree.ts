@@ -41,7 +41,12 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     "/tree/:nodeId/compile",
     async (req, reply) => {
       const qs = req.query as Record<string, string>;
-      const depth = qs["depth"] !== undefined ? parseInt(qs["depth"]) : 2;
+      const depthStr = qs["depth"];
+      const depth = depthStr === "Infinity"
+        ? Infinity
+        : depthStr !== undefined && !isNaN(parseInt(depthStr, 10))
+          ? parseInt(depthStr, 10)
+          : 3;
       const includeIds = qs["include_ids"] === "true";
       const titlesOnly = qs["titles_only"] === "true";
       const numbering = qs["numbering"] === "true";
@@ -69,7 +74,9 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     "/tree/:nodeId/compile",
     async (req, reply) => {
       const body = req.body as Record<string, unknown> | null ?? {};
-      const depth = typeof body["depth"] === "number" ? body["depth"] : 2;
+      const depth = body["depth"] === null
+        ? Infinity
+        : typeof body["depth"] === "number" ? body["depth"] : 3;
       const resolveRefs = (body["resolveRefs"] as "cached" | "fresh" | undefined) ?? undefined;
       const credentials = (body["credentials"] as Record<string, Record<string, string>> | undefined) ?? undefined;
       const result = await compileSubtree(

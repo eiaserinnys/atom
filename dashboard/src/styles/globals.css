@@ -51,6 +51,11 @@
 
   /* Input border (별도 변수 — --border는 카드 보더 없음 원칙 유지) */
   --color-input-border: var(--input-border);
+
+  /* Apple DESIGN.md 기준 모바일 폰트 크기 */
+  --font-size-body: 17px;
+  --font-size-caption: 14px;
+  --font-size-micro: 12px;
 }
 
 /* Light mode (default) */
@@ -224,5 +229,12 @@
   }
   .prose-atom input[type="checkbox"] {
     margin-right: 0.4em;
+  }
+}
+
+@media (max-width: 767px) {
+  body {
+    font-size: var(--font-size-body);
+    -webkit-text-size-adjust: 100%;
   }
 }

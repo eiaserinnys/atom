@@ -129,13 +129,14 @@
     "compile_view": "Compiled Document"
   },
   "compile": {
-    "header": "Compiled Document (BFS+2)",
+    "header": "Compiled Document",
     "copy_id": "Copy ID",
     "unfurl_enable": "Enable external reference lookup",
     "unfurl_disable": "Disable external reference lookup",
     "no_selection": "Select a node to view the compiled document.",
     "loading": "Compiling...",
-    "toc_title": "Document Outline"
+    "toc_title": "Document Outline",
+    "depth_label": "Compile depth: {{depth}}"
   },
   "unfurl": {
     "failure": "External reference lookup failed",
@@ -224,5 +225,12 @@
     "restart_now": "Restart Now",
     "reconnecting": "Reconnecting to server...",
     "reconnect_timeout": "Restart may have failed. Please check manually."
+  },
+  "mobile": {
+    "tab_tree": "Tree",
+    "tab_compile": "Compile",
+    "tab_detail": "Detail",
+    "tab_settings": "Settings",
+    "settings_back": "← Settings"
   }
 }

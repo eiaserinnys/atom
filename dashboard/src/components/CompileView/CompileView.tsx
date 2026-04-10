@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { Copy, Link2 } from 'lucide-react';
+import { closeUnclosedCodeFences } from '../../utils/markdownUtils';
 import { api, type UnfurlEntry } from '../../api/client';
 import { readStoredCredentials } from '../../hooks/useLocalStorageCredentials';
 import { UnfurlSectionList } from '../UnfurlSection';
@@ -22,15 +24,38 @@ interface TocEntry {
 
 const TOC_WIDTH = 200;
 
+const DEPTH_SLIDER_KEY = 'atom-compile-depth';
+const DEFAULT_SLIDER = 5;
+const INFINITY_SLIDER_VALUE = 10;
+
+function sliderToDepth(v: number): number {
+  return v === INFINITY_SLIDER_VALUE ? Infinity : v;
+}
+
 export function CompileView({ nodeId }: CompileViewProps) {
   const { t } = useTranslation();
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
 
+  // Depth slider — 1~9 are literal depth values, 10 (INFINITY_SLIDER_VALUE) means Infinity
+  const [sliderValue, setSliderValue] = useState<number>(() => {
+    const stored = localStorage.getItem(DEPTH_SLIDER_KEY);
+    const parsed = stored ? parseInt(stored, 10) : NaN;
+    return isNaN(parsed) ? DEFAULT_SLIDER : Math.min(INFINITY_SLIDER_VALUE, Math.max(1, parsed));
+  });
+
+  const depth = sliderToDepth(sliderValue);
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseInt(e.target.value, 10);
+    setSliderValue(v);
+    localStorage.setItem(DEPTH_SLIDER_KEY, String(v));
+  };
+
   // Standard compile (GET) — used when unfurl is disabled
   const standardQuery = useQuery({
-    queryKey: ['compile', nodeId],
+    queryKey: ['compile', nodeId, depth],
     queryFn: async () => {
-      const result = await api.compile(nodeId!, { numbering: true, include_ids: true });
+      const result = await api.compile(nodeId!, { depth, numbering: true, include_ids: true });
       return { markdown: result.markdown };
     },
     enabled: !!nodeId && !unfurlEnabled,
@@ -38,15 +63,16 @@ export function CompileView({ nodeId }: CompileViewProps) {
 
   // Unfurl compile (POST) — credentials는 설정 탭에서 관리, 실행 시점에 localStorage에서 직접 읽음
   const unfurlQuery = useQuery({
-    queryKey: ['compile-unfurl', nodeId],
+    queryKey: ['compile-unfurl', nodeId, depth],
     queryFn: async () => {
-      return api.compileWithRefs(nodeId!, 2, 'cached', readStoredCredentials());
+      return api.compileWithRefs(nodeId!, depth, 'cached', readStoredCredentials());
     },
     enabled: !!nodeId && unfurlEnabled,
   });
 
   const activeQuery = unfurlEnabled ? unfurlQuery : standardQuery;
   const markdown = activeQuery.data?.markdown;
+  const processedMarkdown = markdown ? closeUnclosedCodeFences(markdown) : undefined;
   const isLoading = activeQuery.isLoading;
   const error = activeQuery.error;
   const unfurls = unfurlEnabled ? (unfurlQuery.data?.unfurls ?? null) : null;
@@ -157,12 +183,30 @@ export function CompileView({ nodeId }: CompileViewProps) {
       }
     : {};
 
+  const depthLabel = sliderValue === INFINITY_SLIDER_VALUE ? '∞' : String(sliderValue);
+
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
       <div className="h-10 flex items-center px-4 border-b border-border bg-card text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground shrink-0">
         {t('compile.header')}
         {nodeId && (
           <div className="ml-auto flex items-center gap-1">
+            {/* Depth slider */}
+            <div className="flex items-center gap-1">
+              <input
+                type="range"
+                min={1}
+                max={INFINITY_SLIDER_VALUE}
+                step={1}
+                value={sliderValue}
+                onChange={handleSliderChange}
+                className="w-16 accent-primary cursor-pointer"
+                title={t('compile.depth_label', { depth: depthLabel })}
+              />
+              <span className="text-xs font-mono text-muted-foreground w-4 text-center">
+                {depthLabel}
+              </span>
+            </div>
             <span className="px-2 py-0.5 text-xs font-mono bg-muted border border-border rounded-md text-muted-foreground">
               {nodeId.slice(0, 8)}
             </span>
@@ -250,18 +294,25 @@ export function CompileView({ nodeId }: CompileViewProps) {
                 [&_h2]:mt-[1.4em] [&_h2]:mb-[0.4em] [&_h2]:font-semibold [&_h2]:text-[1.2em]
                 [&_h3]:mt-[1.4em] [&_h3]:mb-[0.4em] [&_h3]:font-semibold [&_h3]:text-[1.05em]
                 [&_h4]:mt-[1.4em] [&_h4]:mb-[0.4em] [&_h4]:font-semibold
+                [&_h5]:mt-[1.4em] [&_h5]:mb-[0.4em] [&_h5]:font-semibold [&_h5]:text-[0.95em]
+                [&_h6]:mt-[1.4em] [&_h6]:mb-[0.4em] [&_h6]:font-semibold [&_h6]:text-[0.9em] [&_h6]:text-muted-foreground
                 [&_p]:mb-[0.8em]
-                [&_ul]:mb-[0.8em] [&_ul]:pl-6
-                [&_ol]:mb-[0.8em] [&_ol]:pl-6
+                [&_ul]:mb-[0.8em] [&_ul]:pl-6 [&_ul]:list-disc
+                [&_ol]:mb-[0.8em] [&_ol]:pl-6 [&_ol]:list-decimal
                 [&_li]:mb-[0.2em]
+                [&_li_ul]:mt-[0.2em] [&_li_ol]:mt-[0.2em]
                 [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:bg-muted [&_code]:border [&_code]:border-border [&_code]:rounded [&_code]:px-[0.35em] [&_code]:py-[0.1em]
                 [&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:mb-[1em]
                 [&_pre_code]:bg-transparent [&_pre_code]:border-0 [&_pre_code]:p-0 [&_pre_code]:text-[0.88em]
                 [&_blockquote]:border-l-[3px] [&_blockquote]:border-border [&_blockquote]:ml-0 [&_blockquote]:mb-[0.8em] [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground
                 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border [&_hr]:my-4
                 [&_a]:text-node-user [&_a]:no-underline hover:[&_a]:underline
+                [&_table]:w-full [&_table]:border-collapse [&_table]:mb-[1.25em]
+                [&_thead_th]:border [&_thead_th]:border-border [&_thead_th]:px-3 [&_thead_th]:py-2 [&_thead_th]:text-left [&_thead_th]:font-semibold [&_thead_th]:bg-muted/50
+                [&_tbody_td]:border [&_tbody_td]:border-border [&_tbody_td]:px-3 [&_tbody_td]:py-2
+                [&_tbody_tr:nth-child(even)_td]:bg-muted/20
               ">
-                <Markdown remarkPlugins={[remarkGfm]} components={headingComponents}>{markdown}</Markdown>
+                <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={headingComponents}>{processedMarkdown}</Markdown>
               </div>
             )}
 

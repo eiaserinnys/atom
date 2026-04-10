@@ -10,22 +10,22 @@
  * by omitting DATABASE_URL (Testcontainers support can be added when Docker is available).
  */
 
-import pg from "pg";
 import path from "path";
+import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 import { setPool, closePool, runMigrations, getPool } from "../../src/db/client.js";
+import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import * as cardService from "../../src/services/card.service.js";
 import * as treeService from "../../src/services/tree.service.js";
 import * as searchService from "../../src/services/search.service.js";
 import { insertAgent } from "../../src/db/queries/agents.js";
 import { insertUser } from "../../src/db/queries/users.js";
 
-const { Pool } = pg;
+// Resolve migrations directory relative to this test file (works regardless of cwd)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = path.resolve(__dirname, "../../src/db/migrations");
 
-// Resolve migrations directory using process.cwd() (worktree root)
-const MIGRATIONS_DIR = path.resolve(process.cwd(), "src/db/migrations");
-
-let pool: pg.Pool;
+let pool: PostgresAdapter;
 
 beforeAll(async () => {
   const databaseUrl = process.env["TEST_DATABASE_URL"];
@@ -40,7 +40,7 @@ beforeAll(async () => {
     throw new Error("TEST_DATABASE_URL must use a test database, not the production atom_db.\nUse: postgresql://atom:atom@localhost:5434/atom_test_db");
   }
 
-  pool = new Pool({ connectionString: databaseUrl });
+  pool = new PostgresAdapter(databaseUrl);
   setPool(pool);
   await runMigrations(MIGRATIONS_DIR);
 }, 30000);
@@ -587,6 +587,30 @@ describe("compile_subtree", () => {
     });
     expect(md).toContain("# ExRoot");
     expect(md).not.toContain("ExChild");
+  });
+
+  it("includeIds adds HTML comments with node_id, absent by default", async () => {
+    const { node_id: rootId } = await cardService.createCard({
+      card_type: "structure",
+      title: "IncludeIdsRoot",
+      content: "root content",
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "IncludeIdsChild",
+      content: "child content",
+      parent_node_id: rootId,
+    });
+
+    // includeIds=true: HTML 주석 포함
+    const { markdown: mdWithIds } = await treeService.compileSubtree(rootId, 2, { includeIds: true });
+    expect(mdWithIds).toContain("<!-- node:");
+    expect(mdWithIds).toContain("card:");
+    expect(mdWithIds).toContain("IncludeIdsRoot");
+
+    // includeIds 미전달(기본값): HTML 주석 미포함 (backward compatible)
+    const { markdown: mdNoIds } = await treeService.compileSubtree(rootId, 2);
+    expect(mdNoIds).not.toContain("<!-- node:");
   });
 });
 

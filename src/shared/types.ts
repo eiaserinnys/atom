@@ -127,8 +127,10 @@ export interface BatchDeleteItem {
 export interface BatchSymlinkItem {
   /** Card ID to create a symlink for. */
   card_id: string;
-  /** Parent node to place the symlink under. */
-  parent_node_id: string | null;
+  /** Real node UUID — use this OR parent_temp_id, not both. */
+  parent_node_id?: string | null;
+  /** temp_id of a create in this batch to use as parent. */
+  parent_temp_id?: string;
   /** Position among siblings. */
   position?: number;
 }

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetTestDb, createTestCard, getTreeRoots, getNodeChildren, dragNodeToPosition } from './helpers.js';
+import { resetTestDb, createTestCard, logRoots, logChildren, dragNodeToPosition } from './helpers.js';
 
 test.describe('Tree DnD — 시나리오 1: 루트 노드 위치 이동', () => {
   let nodeA: string;
@@ -16,6 +16,8 @@ test.describe('Tree DnD — 시나리오 1: 루트 노드 위치 이동', () => 
     nodeA = a.node_id;
     nodeB = b.node_id;
     nodeX = x.node_id;
+    console.log(`[SETUP] A=${nodeA.slice(-6)} B=${nodeB.slice(-6)} X=${nodeX.slice(-6)}`);
+    await logRoots('초기 DB 상태');
   });
 
   test('초기 상태: A, B, X 순서', async ({ page }) => {
@@ -24,7 +26,7 @@ test.describe('Tree DnD — 시나리오 1: 루트 노드 위치 이동', () => 
     await expect(page.locator(`[data-testid="tree-node-${nodeB}"]`)).toBeVisible();
     await expect(page.locator(`[data-testid="tree-node-${nodeX}"]`)).toBeVisible();
 
-    const roots = await getTreeRoots();
+    const roots = await logRoots('초기 상태 확인');
     const titles = roots.map(r => r.card.title);
     expect(titles).toEqual(['FolderA', 'FolderB', 'CardX']);
   });
@@ -33,10 +35,12 @@ test.describe('Tree DnD — 시나리오 1: 루트 노드 위치 이동', () => 
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeX}"]`)).toBeVisible({ timeout: 15_000 });
 
+    await logRoots('드래그 전');
     await dragNodeToPosition(page, nodeX, nodeA, 'above');
+    const roots = await logRoots('드래그 후 (X above A)');
 
-    const roots = await getTreeRoots();
     const titles = roots.map(r => r.card.title);
+    console.log(`[ASSERT] expected=[CardX, FolderA, FolderB]  got=[${titles.join(', ')}]  pass=${JSON.stringify(titles) === JSON.stringify(['CardX', 'FolderA', 'FolderB'])}`);
     expect(titles).toEqual(['CardX', 'FolderA', 'FolderB']);
   });
 
@@ -44,10 +48,12 @@ test.describe('Tree DnD — 시나리오 1: 루트 노드 위치 이동', () => 
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeX}"]`)).toBeVisible({ timeout: 15_000 });
 
+    await logRoots('드래그 전');
     await dragNodeToPosition(page, nodeX, nodeA, 'below');
+    const roots = await logRoots('드래그 후 (X below A)');
 
-    const roots = await getTreeRoots();
     const titles = roots.map(r => r.card.title);
+    console.log(`[ASSERT] expected=[FolderA, CardX, FolderB]  got=[${titles.join(', ')}]  pass=${JSON.stringify(titles) === JSON.stringify(['FolderA', 'CardX', 'FolderB'])}`);
     expect(titles).toEqual(['FolderA', 'CardX', 'FolderB']);
   });
 
@@ -55,10 +61,12 @@ test.describe('Tree DnD — 시나리오 1: 루트 노드 위치 이동', () => 
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeX}"]`)).toBeVisible({ timeout: 15_000 });
 
+    await logRoots('드래그 전');
     await dragNodeToPosition(page, nodeX, nodeB, 'below');
+    const roots = await logRoots('드래그 후 (X below B)');
 
-    const roots = await getTreeRoots();
     const titles = roots.map(r => r.card.title);
+    console.log(`[ASSERT] expected=[FolderA, FolderB, CardX]  got=[${titles.join(', ')}]  pass=${JSON.stringify(titles) === JSON.stringify(['FolderA', 'FolderB', 'CardX'])}`);
     expect(titles).toEqual(['FolderA', 'FolderB', 'CardX']);
   });
 });
@@ -81,17 +89,20 @@ test.describe('Tree DnD — 시나리오 2: 구조 카드 자식 위치 이동',
     nodeB = b.node_id;
     nodeC = c.node_id;
     nodeX = x.node_id;
+    console.log(`[SETUP] A=${nodeA.slice(-6)} B=${nodeB.slice(-6)} C=${nodeC.slice(-6)} X=${nodeX.slice(-6)}`);
+    await logRoots('초기 DB 상태');
+    await logChildren('초기 A 자식', nodeA);
   });
 
   test('초기 상태: 루트=[A, X], A의 자식=[B, C]', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeA}"]`)).toBeVisible({ timeout: 15_000 });
 
-    const roots = await getTreeRoots();
+    const roots = await logRoots('초기 루트 상태');
     expect(roots.map(r => r.card.title)).toContain('FolderA');
     expect(roots.map(r => r.card.title)).toContain('CardX');
 
-    const children = await getNodeChildren(nodeA);
+    const children = await logChildren('초기 A 자식', nodeA);
     expect(children.map(c => c.card.title)).toEqual(['CardB', 'CardC']);
   });
 
@@ -99,10 +110,12 @@ test.describe('Tree DnD — 시나리오 2: 구조 카드 자식 위치 이동',
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeX}"]`)).toBeVisible({ timeout: 15_000 });
 
+    await logRoots('드래그 전 루트');
     await dragNodeToPosition(page, nodeX, nodeA, 'into');
+    const children = await logChildren('드래그 후 A 자식 (X into A)', nodeA);
 
-    const children = await getNodeChildren(nodeA);
     const titles = children.map(c => c.card.title);
+    console.log(`[ASSERT] X가 A의 자식에 있어야 함  got=[${titles.join(', ')}]  pass=${titles.includes('CardX')}`);
     expect(titles).toContain('CardX');
   });
 
@@ -110,8 +123,6 @@ test.describe('Tree DnD — 시나리오 2: 구조 카드 자식 위치 이동',
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeA}"]`)).toBeVisible({ timeout: 15_000 });
 
-    // 페이지 로드 시 A(루트 structure)는 자동 펼쳐진다.
-    // toggle 클릭은 이미 열린 경우 닫아버리므로, B가 안 보일 때만 클릭한다.
     const bLocator = page.locator(`[data-testid="tree-node-${nodeB}"]`);
     const bVisible = await bLocator.isVisible();
     if (!bVisible) {
@@ -122,13 +133,14 @@ test.describe('Tree DnD — 시나리오 2: 구조 카드 자식 위치 이동',
 
     await expect(bLocator).toBeVisible({ timeout: 5_000 });
 
+    await logChildren('드래그 전 A 자식', nodeA);
     await dragNodeToPosition(page, nodeX, nodeB, 'above');
+    const children = await logChildren('드래그 후 A 자식 (X above B)', nodeA);
 
-    const children = await getNodeChildren(nodeA);
     const titles = children.map(c => c.card.title);
-    // X가 B 앞에 위치해야 함
     const xIdx = titles.indexOf('CardX');
     const bIdx = titles.indexOf('CardB');
+    console.log(`[ASSERT] X(${xIdx}) < B(${bIdx})  got=[${titles.join(', ')}]  pass=${xIdx >= 0 && bIdx >= 0 && xIdx < bIdx}`);
     expect(xIdx).toBeGreaterThanOrEqual(0);
     expect(bIdx).toBeGreaterThanOrEqual(0);
     expect(xIdx).toBeLessThan(bIdx);
@@ -138,7 +150,6 @@ test.describe('Tree DnD — 시나리오 2: 구조 카드 자식 위치 이동',
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeA}"]`)).toBeVisible({ timeout: 15_000 });
 
-    // A는 자동 펼쳐짐 — B가 안 보일 때만 toggle
     const bLocator = page.locator(`[data-testid="tree-node-${nodeB}"]`);
     const bVisible = await bLocator.isVisible();
     if (!bVisible) {
@@ -150,13 +161,15 @@ test.describe('Tree DnD — 시나리오 2: 구조 카드 자식 위치 이동',
     await expect(bLocator).toBeVisible({ timeout: 5_000 });
     await expect(page.locator(`[data-testid="tree-node-${nodeX}"]`)).toBeVisible({ timeout: 5_000 });
 
+    await logChildren('드래그 전 A 자식', nodeA);
     await dragNodeToPosition(page, nodeX, nodeB, 'below');
+    const children = await logChildren('드래그 후 A 자식 (X below B)', nodeA);
 
-    const children = await getNodeChildren(nodeA);
     const titles = children.map(c => c.card.title);
     const xIdx = titles.indexOf('CardX');
     const bIdx = titles.indexOf('CardB');
     const cIdx = titles.indexOf('CardC');
+    console.log(`[ASSERT] B(${bIdx}) < X(${xIdx}) < C(${cIdx})  got=[${titles.join(', ')}]  pass=${xIdx > bIdx && xIdx < cIdx}`);
     expect(xIdx).toBeGreaterThan(bIdx);
     expect(xIdx).toBeLessThan(cIdx);
   });
@@ -165,7 +178,6 @@ test.describe('Tree DnD — 시나리오 2: 구조 카드 자식 위치 이동',
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeA}"]`)).toBeVisible({ timeout: 15_000 });
 
-    // A는 자동 펼쳐짐 — C가 안 보일 때만 toggle
     const cLocator = page.locator(`[data-testid="tree-node-${nodeC}"]`);
     const cVisible = await cLocator.isVisible();
     if (!cVisible) {
@@ -177,12 +189,14 @@ test.describe('Tree DnD — 시나리오 2: 구조 카드 자식 위치 이동',
     await expect(cLocator).toBeVisible({ timeout: 5_000 });
     await expect(page.locator(`[data-testid="tree-node-${nodeX}"]`)).toBeVisible({ timeout: 5_000 });
 
+    await logChildren('드래그 전 A 자식', nodeA);
     await dragNodeToPosition(page, nodeX, nodeC, 'below');
+    const children = await logChildren('드래그 후 A 자식 (X below C)', nodeA);
 
-    const children = await getNodeChildren(nodeA);
     const titles = children.map(c => c.card.title);
     const xIdx = titles.indexOf('CardX');
     const cIdx = titles.indexOf('CardC');
+    console.log(`[ASSERT] C(${cIdx}) < X(${xIdx})  got=[${titles.join(', ')}]  pass=${xIdx > cIdx}`);
     expect(xIdx).toBeGreaterThan(cIdx);
   });
 });

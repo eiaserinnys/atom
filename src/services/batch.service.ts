@@ -152,11 +152,26 @@ export async function executeBatchOp(
 
     // ── Symlinks ─────────────────────────────────────────────────────────────
     if (input.symlinks && input.symlinks.length > 0) {
+      // Build temp_id → node_id map from this batch's creates (same pattern as moves)
+      const symlinkTempIdToNodeId = new Map<string, string>(
+        result.created.map((c) => [c.temp_id, c.node_id])
+      );
+
       for (const item of input.symlinks) {
+        let parentNodeId: string | null = item.parent_node_id ?? null;
+        if (item.parent_temp_id !== undefined) {
+          const resolved = symlinkTempIdToNodeId.get(item.parent_temp_id);
+          if (resolved === undefined) {
+            throw new Error(
+              `Symlink: parent_temp_id "${item.parent_temp_id}" not found among batch creates`
+            );
+          }
+          parentNodeId = resolved;
+        }
         const node = await insertNode(
           client,
           item.card_id,
-          item.parent_node_id,
+          parentNodeId,
           item.position,
           true
         );
