@@ -27,6 +27,7 @@ export function applyChildrenPatch(
           ? (children[children.length - 1].position ?? 0) + 100
           : 100,
         is_symlink: false,
+        journal_limit: null,
         created_at: new Date().toISOString(),
         card: event.data,
       };

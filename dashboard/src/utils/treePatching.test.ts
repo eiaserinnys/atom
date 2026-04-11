@@ -32,6 +32,7 @@ function makeNode(id: string, cardId: string, parentNodeId: string | null = null
     parent_node_id: parentNodeId,
     position,
     is_symlink: false,
+    journal_limit: null,
     created_at: '2026-01-01T00:00:00Z',
     card: makeCard(cardId, `Card ${cardId}`),
   };
