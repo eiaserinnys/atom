@@ -63,6 +63,8 @@ function AppInner() {
   const showConfigButton = auth.role && auth.role !== 'viewer';
 
   return (
+    // SystemProvider를 인증 후 영역에 마운트 — 인증 전 /api/system/status 폴링으로 인한 401 루프 방지
+    <SystemProvider>
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       <RestartBanner />
       <ReconnectOverlay />
@@ -137,15 +139,14 @@ function AppInner() {
         )}
       </div>
     </div>
+    </SystemProvider>
   );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <SystemProvider>
-        <AppInner />
-      </SystemProvider>
+      <AppInner />
     </QueryClientProvider>
   );
 }

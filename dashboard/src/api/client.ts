@@ -88,7 +88,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
   if (res.status === 401) {
-    window.location.href = '/';
+    // 이미 루트(/)에 있으면 리다이렉트하지 않음 → 루프 방지 안전장치
+    if (window.location.pathname !== '/') {
+      window.location.href = '/';
+    }
     throw new Error('Unauthorized');
   }
   if (!res.ok) {
@@ -110,7 +113,10 @@ async function requestVoid(path: string, options?: RequestInit): Promise<void> {
     },
   });
   if (res.status === 401) {
-    window.location.href = '/';
+    // 이미 루트(/)에 있으면 리다이렉트하지 않음 → 루프 방지 안전장치
+    if (window.location.pathname !== '/') {
+      window.location.href = '/';
+    }
     throw new Error('Unauthorized');
   }
   if (!res.ok) {
