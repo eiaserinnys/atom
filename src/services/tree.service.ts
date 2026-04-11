@@ -7,6 +7,7 @@ import {
   insertNode,
   moveNode as moveNodeQuery,
   getNodeBreadcrumb,
+  updateNodeProperties as updateNodePropertiesQuery,
 } from "../db/queries/tree.js";
 import { selectCardById, updateCardSnapshot, updateCardSourceType } from "../db/queries/cards.js";
 import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
@@ -214,9 +215,16 @@ export async function compileSubtree(
       ? findCanonicalNodeId(node.card_id) ?? nid
       : nid;
 
-    return Array.from(nodeCache.values()).filter(
-      (n) => n.parent_node_id === effectiveParentId
-    ).sort((a, b) => a.position - b.position);
+    const children = Array.from(nodeCache.values())
+      .filter((n) => n.parent_node_id === effectiveParentId)
+      .sort((a, b) => a.position - b.position);
+
+    const jl = node.journal_limit;
+    if (jl === null || jl === undefined) return children;
+    // position 역순(최신 우선)으로 정렬 후 N개 선택, 다시 position 오름차순으로 반환
+    const byPosition = [...children].sort((a, b) => b.position - a.position);
+    const limited = jl === 0 ? byPosition : byPosition.slice(0, jl);
+    return limited.sort((a, b) => a.position - b.position);
   }
 
   function findCanonicalNodeId(card_id: string): string | null {
@@ -302,6 +310,17 @@ export async function moveNode(
       nodeId,
       newParentNodeId: new_parent_node_id,
     });
+  }
+  return node;
+}
+
+export async function updateNodeProperties(
+  nodeId: string,
+  props: { journal_limit?: number | null }
+): Promise<TreeNode | null> {
+  const node = await updateNodePropertiesQuery(getDb(), nodeId, props);
+  if (node) {
+    eventBus.emit("atom:event", { type: "node:updated", nodeId });
   }
   return node;
 }

@@ -10,6 +10,7 @@ function rowToNode(row: Record<string, unknown>): TreeNode {
     position: row["position"] as number,
     is_symlink: deserializeBoolean(row["is_symlink"]),
     created_at: row["created_at"] as string,
+    journal_limit: (row["journal_limit"] as number | null) ?? null,
   };
 }
 
@@ -215,4 +216,17 @@ export async function moveNode(
   throw new Error(
     `moveNode: position conflict persists after ${MAX_RETRIES} retries (parent_node_id=${new_parent_node_id})`
   );
+}
+
+export async function updateNodeProperties(
+  db: Queryable,
+  nodeId: string,
+  props: { journal_limit?: number | null }
+): Promise<TreeNode | null> {
+  const result = await db.query(
+    `UPDATE tree_nodes SET journal_limit = $1 WHERE id = $2 RETURNING *`,
+    [props.journal_limit !== undefined ? props.journal_limit : null, nodeId]
+  );
+  if (result.rows.length === 0) return null;
+  return rowToNode(result.rows[0]);
 }

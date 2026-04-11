@@ -103,13 +103,24 @@ export class SqliteAdapter implements DatabaseAdapter {
   }
 
   async runMigrations(migrationsDir: string): Promise<void> {
+    // schema_migrations 테이블로 실행 이력을 추적하여 idempotent 동작 보장
+    this.db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    const applied = new Set<string>(
+      (this.db.prepare("SELECT name FROM schema_migrations").all() as { name: string }[])
+        .map((r) => r.name)
+    );
     const files = fs
       .readdirSync(migrationsDir)
       .filter((f) => f.endsWith(".sql"))
       .sort();
     for (const file of files) {
+      if (applied.has(file)) continue;
       const sql = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
       this.db.exec(sql);
+      this.db.prepare("INSERT INTO schema_migrations (name) VALUES (?)").run(file);
     }
   }
 }

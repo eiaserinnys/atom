@@ -30,6 +30,7 @@ export interface TreeNode {
   position: number;
   is_symlink: boolean;
   created_at: string;
+  journal_limit: number | null;
 }
 
 export interface TreeNodeWithCard extends TreeNode {

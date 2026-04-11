@@ -765,3 +765,98 @@ describe("User login checks", () => {
     expect(dbUser!.is_active).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// journal_limit — 노드별 자식 제한
+// ---------------------------------------------------------------------------
+
+describe("journal_limit", () => {
+  it("PATCH /tree/:nodeId sets journal_limit and getNode returns it", async () => {
+    const { node_id } = await cardService.createCard({
+      card_type: "structure",
+      title: "JournalParent",
+    });
+
+    const updated = await treeService.updateNodeProperties(node_id, { journal_limit: 3 });
+    expect(updated).not.toBeNull();
+    expect(updated!.journal_limit).toBe(3);
+
+    const fetched = await treeService.getNode(node_id);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.journal_limit).toBe(3);
+  });
+
+  it("journal_limit=N limits compile_subtree to N most recent children", async () => {
+    const { node_id: parentId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Journal",
+    });
+
+    // 자식 4개 생성 (position 오름차순으로 추가됨)
+    for (const title of ["Child1", "Child2", "Child3", "Child4"]) {
+      await cardService.createCard({ card_type: "knowledge", title, parent_node_id: parentId });
+    }
+
+    // journal_limit=2: 최신 2개(position 역순 기준 상위 2개)만 컴파일에 포함
+    await treeService.updateNodeProperties(parentId, { journal_limit: 2 });
+    const { markdown } = await treeService.compileSubtree(parentId, 2);
+
+    // position이 높을수록 최신 → Child3, Child4 포함, Child1, Child2 미포함
+    expect(markdown).not.toContain("Child1");
+    expect(markdown).not.toContain("Child2");
+    expect(markdown).toContain("Child3");
+    expect(markdown).toContain("Child4");
+  });
+
+  it("journal_limit=0 includes all children (unlimited)", async () => {
+    const { node_id: parentId } = await cardService.createCard({
+      card_type: "structure",
+      title: "JournalAll",
+    });
+
+    for (const title of ["A1", "A2", "A3", "A4", "A5"]) {
+      await cardService.createCard({ card_type: "knowledge", title, parent_node_id: parentId });
+    }
+
+    await treeService.updateNodeProperties(parentId, { journal_limit: 0 });
+    const { markdown } = await treeService.compileSubtree(parentId, 2);
+
+    // 0이면 전체 포함
+    expect(markdown).toContain("A1");
+    expect(markdown).toContain("A5");
+  });
+
+  it("nested journal_limit applies independently per node", async () => {
+    // 구조: Root(journal_limit=2) → Grp1(journal_limit=1) → [X1, X2]
+    //                              → Grp2(journal_limit=null) → [Y1, Y2]
+    const { node_id: rootId } = await cardService.createCard({
+      card_type: "structure", title: "NestedRoot",
+    });
+    const { node_id: grp1Id } = await cardService.createCard({
+      card_type: "structure", title: "Grp1", parent_node_id: rootId,
+    });
+    const { node_id: grp2Id } = await cardService.createCard({
+      card_type: "structure", title: "Grp2", parent_node_id: rootId,
+    });
+
+    await cardService.createCard({ card_type: "knowledge", title: "X1", parent_node_id: grp1Id });
+    await cardService.createCard({ card_type: "knowledge", title: "X2", parent_node_id: grp1Id });
+    await cardService.createCard({ card_type: "knowledge", title: "Y1", parent_node_id: grp2Id });
+    await cardService.createCard({ card_type: "knowledge", title: "Y2", parent_node_id: grp2Id });
+
+    // Root: journal_limit=2 → Grp1, Grp2 모두 포함 (자식 2개)
+    // Grp1: journal_limit=1 → X1, X2 중 최신 1개만 (X2)
+    // Grp2: journal_limit=null → Y1, Y2 모두 포함
+    await treeService.updateNodeProperties(rootId, { journal_limit: 2 });
+    await treeService.updateNodeProperties(grp1Id, { journal_limit: 1 });
+
+    const { markdown } = await treeService.compileSubtree(rootId, 3);
+
+    expect(markdown).toContain("Grp1");
+    expect(markdown).toContain("Grp2");
+    expect(markdown).not.toContain("X1");
+    expect(markdown).toContain("X2");
+    expect(markdown).toContain("Y1");
+    expect(markdown).toContain("Y2");
+  });
+});

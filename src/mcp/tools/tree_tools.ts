@@ -73,7 +73,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       numbering: z.boolean().optional().describe("Prepend hierarchical numbering (1, 1.1, 1.1.1, …) to headings."),
       max_chars: z.number().int().optional().describe("Max output chars. 0 or negative = unlimited."),
       exclude_nodes: z.array(z.string().uuid()).optional().describe("Node IDs whose subtrees to skip entirely."),
-      limit: z.number().int().positive().optional().describe("Limit direct children (depth=1) to latest n items by card_timestamp."),
+      limit: z.number().int().positive().optional().describe("Limit direct children (depth=1) to latest n items by card_timestamp. Independent of journal_limit: journal_limit is a per-node DB property that filters children by position order; limit is a compile-time option that filters depth=1 children by card_timestamp across the whole request."),
       resolve_refs: z.enum(["cached", "fresh"]).optional().describe("Resolve external references (unfurl). 'cached': use snapshot if available; 'fresh': always fetch."),
       credentials: z.record(z.string(), z.record(z.string(), z.string())).optional().describe("Credentials per source_type, e.g. { trello: { apiKey: '...', token: '...' } }."),
     },
