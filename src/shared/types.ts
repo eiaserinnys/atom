@@ -30,6 +30,7 @@ export interface TreeNode {
   position: number;
   is_symlink: boolean;
   created_at: string;
+  journal_limit: number | null;
 }
 
 export interface TreeNodeWithCard extends TreeNode {
@@ -71,6 +72,7 @@ export interface SearchResult {
   card_type: CardType;
   is_symlink: boolean;
   snippet: string;
+  node_path: string[];  // 조상 타이틀 배열 (루트 → 부모 순서). 고아 카드이면 []
 }
 
 // ---------------------------------------------------------------------------
@@ -127,8 +129,10 @@ export interface BatchDeleteItem {
 export interface BatchSymlinkItem {
   /** Card ID to create a symlink for. */
   card_id: string;
-  /** Parent node to place the symlink under. */
-  parent_node_id: string | null;
+  /** Real node UUID — use this OR parent_temp_id, not both. */
+  parent_node_id?: string | null;
+  /** temp_id of a create in this batch to use as parent. */
+  parent_temp_id?: string;
   /** Position among siblings. */
   position?: number;
 }

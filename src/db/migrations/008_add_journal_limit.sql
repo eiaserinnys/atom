@@ -1,0 +1,1 @@
+ALTER TABLE tree_nodes ADD COLUMN IF NOT EXISTS journal_limit INT DEFAULT NULL;

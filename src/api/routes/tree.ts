@@ -6,6 +6,7 @@ import {
   createSymlink,
   deleteNode,
   moveNode,
+  updateNodeProperties,
 } from "../../services/tree.service.js";
 
 export async function treeRoutes(app: FastifyInstance): Promise<void> {
@@ -113,6 +114,26 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       );
       if (!moved) return reply.code(404).send({ error: "Node not found" });
       return moved;
+    }
+  );
+
+  // PATCH /tree/:nodeId — 노드 속성 업데이트 (journal_limit 등)
+  app.patch<{ Params: { nodeId: string } }>(
+    "/tree/:nodeId",
+    async (req, reply) => {
+      const body = req.body as Record<string, unknown>;
+      const props: { journal_limit?: number | null } = {};
+      if ("journal_limit" in body) {
+        const jl = body["journal_limit"];
+        if (jl === null || (typeof jl === "number" && Number.isInteger(jl) && jl >= 0)) {
+          props.journal_limit = jl as number | null;
+        } else {
+          return reply.code(400).send({ error: "journal_limit must be a non-negative integer or null" });
+        }
+      }
+      const node = await updateNodeProperties(req.params.nodeId, props);
+      if (!node) return reply.code(404).send({ error: "Node not found" });
+      return node;
     }
   );
 

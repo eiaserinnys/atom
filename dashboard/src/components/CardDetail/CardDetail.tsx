@@ -20,9 +20,11 @@ export function CardDetail({ nodeId }: CardDetailProps) {
   const [titleDraft, setTitleDraft] = useState('');
   const [editingContent, setEditingContent] = useState(false);
   const [contentDraft, setContentDraft] = useState('');
+  const [editingJournalLimit, setEditingJournalLimit] = useState(false);
+  const [journalLimitDraft, setJournalLimitDraft] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const isDirty = editingTitle || editingContent;
+  const isDirty = editingTitle || editingContent || editingJournalLimit;
 
   const { data: node, isLoading, isError } = useQuery<TreeNodeData>({
     queryKey: ['node', nodeId],
@@ -50,6 +52,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
   const handleRefresh = () => {
     setEditingTitle(false);
     setEditingContent(false);
+    setEditingJournalLimit(false);
     queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
   };
 
@@ -73,6 +76,27 @@ export function CardDetail({ nodeId }: CardDetailProps) {
     try {
       await api.updateCard(card.id, { content: contentDraft });
       setEditingContent(false);
+      queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
+    } catch (e: unknown) {
+      alert(`${t('card.save_failed')}: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveJournalLimit = async () => {
+    if (!nodeId) return;
+    const val = journalLimitDraft.trim();
+    const parsed = val === '' ? null : parseInt(val, 10);
+    // 유효하지 않은 값(음수, 비정수) 무시
+    if (val !== '' && (isNaN(parsed!) || parsed! < 0)) {
+      setEditingJournalLimit(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.updateNode(nodeId, { journal_limit: parsed });
+      setEditingJournalLimit(false);
       queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
     } catch (e: unknown) {
       alert(`${t('card.save_failed')}: ${e instanceof Error ? e.message : String(e)}`);
@@ -246,6 +270,51 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                   <span className="text-[13px] text-foreground">{card.references.join(', ')}</span>
                 </div>
               )}
+              <div className="flex gap-2.5 items-baseline">
+                <span className="text-xs text-muted-foreground w-[70px] shrink-0">journal limit</span>
+                {editingJournalLimit ? (
+                  <div className="flex gap-1.5 items-center flex-1">
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-20 bg-white dark:bg-[#1c1c1e] border border-[#d2d2d7] dark:border-[#333336] rounded-[6px] px-2 py-1 text-foreground text-[13px] font-sans focus:outline-none focus:border-brand"
+                      value={journalLimitDraft}
+                      placeholder="빈값=무제한"
+                      onChange={(e) => setJournalLimitDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveJournalLimit(); if (e.key === 'Escape') setEditingJournalLimit(false); }}
+                      autoFocus
+                    />
+                    <button
+                      className="bg-brand text-white border-none rounded px-2.5 py-0.5 text-[11px] cursor-pointer font-sans disabled:opacity-50"
+                      onClick={saveJournalLimit}
+                      disabled={saving}
+                    >
+                      {saving ? '...' : t('common.save')}
+                    </button>
+                    <button
+                      className="bg-transparent text-muted-foreground border border-border rounded px-2 py-0.5 text-[11px] cursor-pointer font-sans hover:bg-muted"
+                      onClick={() => setEditingJournalLimit(false)}
+                    >
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                ) : (
+                  <span
+                    className="group text-[13px] text-foreground cursor-pointer rounded px-1 py-0.5 border border-transparent hover:border-border hover:bg-muted"
+                    onClick={() => {
+                      const cur = node?.journal_limit;
+                      setJournalLimitDraft(cur !== null && cur !== undefined ? String(cur) : '');
+                      setEditingJournalLimit(true);
+                    }}
+                    title={t('card.click_to_edit')}
+                  >
+                    {node?.journal_limit !== null && node?.journal_limit !== undefined
+                      ? `최근 ${node.journal_limit === 0 ? '전체' : node.journal_limit + '개'}`
+                      : <span className="text-muted-foreground">—</span>}
+                    <span className="text-[10px] text-muted-foreground ml-1 opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
+                  </span>
+                )}
+              </div>
               <div className="flex gap-2.5 items-baseline">
                 <span className="text-xs text-muted-foreground w-[70px] shrink-0">staleness</span>
                 <span className="text-[13px] text-foreground">{card.staleness}</span>

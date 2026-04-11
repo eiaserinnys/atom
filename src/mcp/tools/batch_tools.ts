@@ -19,7 +19,8 @@ const batchCreateItemSchema = z.object({
 
 const batchSymlinkItemSchema = z.object({
   card_id: z.string().uuid(),
-  parent_node_id: z.string().uuid().nullable(),
+  parent_node_id: z.string().uuid().nullable().optional(),
+  parent_temp_id: z.string().optional(),
   position: z.number().int().optional(),
 });
 

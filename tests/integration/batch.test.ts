@@ -627,6 +627,53 @@ describe("executeBatchOp — symlinks", () => {
     expect(nodes.rows[0]["is_symlink"]).toBe(false);
     expect(nodes.rows[1]["is_symlink"]).toBe(true);
   });
+
+  it("places symlink under a node created in the same batch via parent_temp_id", async () => {
+    // Create a card to symlink
+    const { card: srcCard } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Symlink source",
+    });
+
+    // Single batch: create a folder and place a symlink under it using parent_temp_id
+    const result = await executeBatchOp({
+      creates: [
+        { temp_id: "folder", card_type: "structure", title: "New Folder" },
+      ],
+      symlinks: [
+        { card_id: srcCard.id, parent_temp_id: "folder" },
+      ],
+    });
+
+    expect(result.created).toHaveLength(1);
+    expect(result.symlinked).toHaveLength(1);
+
+    const folderNodeId = result.created[0].node_id;
+    const symlinkNodeId = result.symlinked[0];
+
+    // Verify the symlink node is a child of the newly created folder
+    const nodeRow = await pool.query(
+      "SELECT parent_id, is_symlink FROM tree_nodes WHERE id = $1",
+      [symlinkNodeId]
+    );
+    expect(nodeRow.rows[0]["parent_id"]).toBe(folderNodeId);
+    expect(nodeRow.rows[0]["is_symlink"]).toBe(true);
+  });
+
+  it("throws when parent_temp_id references a temp_id not in the same batch", async () => {
+    const { card } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Orphan symlink source",
+    });
+
+    await expect(
+      executeBatchOp({
+        symlinks: [
+          { card_id: card.id, parent_temp_id: "nonexistent-temp-id" },
+        ],
+      })
+    ).rejects.toThrow('parent_temp_id "nonexistent-temp-id" not found among batch creates');
+  });
 });
 
 // ---------------------------------------------------------------------------

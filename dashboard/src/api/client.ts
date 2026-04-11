@@ -26,6 +26,7 @@ export interface TreeNodeData {
   position: number;
   is_symlink: boolean;
   created_at: string;
+  journal_limit: number | null;
   card: CardData;
   children?: TreeNodeData[];
   canonical_path?: string;
@@ -177,6 +178,13 @@ export const api = {
   updateCard(cardId: string, data: { title?: string; content?: string }): Promise<CardData> {
     return request(`/cards/${cardId}`, {
       method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateNode(nodeId: string, data: { journal_limit?: number | null }): Promise<TreeNodeData> {
+    return request(`/tree/${nodeId}`, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   },

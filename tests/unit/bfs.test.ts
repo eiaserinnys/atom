@@ -32,6 +32,7 @@ function makeNode(overrides: Partial<TreeNode> & { id: string; card_id: string }
     position: overrides.position ?? 100,
     is_symlink: overrides.is_symlink ?? false,
     created_at: "2026-01-01T00:00:00Z",
+    journal_limit: overrides.journal_limit ?? null,
   };
 }
 
