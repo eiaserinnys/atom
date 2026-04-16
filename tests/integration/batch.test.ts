@@ -5,17 +5,17 @@
  *   TEST_DATABASE_URL=postgresql://atom:atom@localhost:5434/atom_test_db npx jest tests/integration/batch.test.ts
  */
 
-import pg from "pg";
 import path from "path";
+import { fileURLToPath } from "url";
 import { setPool, closePool, runMigrations } from "../../src/db/client.js";
+import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import { executeBatchOp, topologicalSortCreates } from "../../src/services/batch.service.js";
 import * as cardService from "../../src/services/card.service.js";
 
-const { Pool } = pg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = path.resolve(__dirname, "../../src/db/migrations");
 
-const MIGRATIONS_DIR = path.resolve(process.cwd(), "src/db/migrations");
-
-let pool: pg.Pool;
+let pool: PostgresAdapter;
 
 beforeAll(async () => {
   const databaseUrl = process.env["TEST_DATABASE_URL"];
@@ -26,11 +26,14 @@ beforeAll(async () => {
     );
   }
 
-  if (databaseUrl.includes("atom_db") && !databaseUrl.includes("test")) {
-    throw new Error("TEST_DATABASE_URL must use a test database, not the production atom_db.\nUse: postgresql://atom:atom@localhost:5434/atom_test_db");
+  if (!databaseUrl.includes("test")) {
+    throw new Error(
+      "TEST_DATABASE_URL must point to a test database (URL must contain 'test').\n" +
+        "Got: " + databaseUrl
+    );
   }
 
-  pool = new Pool({ connectionString: databaseUrl });
+  pool = new PostgresAdapter(databaseUrl);
   setPool(pool);
   await runMigrations(MIGRATIONS_DIR);
 }, 30000);
@@ -155,6 +158,76 @@ describe("executeBatchOp — updates", () => {
     expect(updated!.title).toBe("Updated Title");
     expect(updated!.content).toBe("New content");
     expect(updated!.version).toBeGreaterThan(card.version);
+  });
+});
+
+describe("executeBatchOp — node_updates", () => {
+  it("sets journal_limit on an existing node", async () => {
+    const { node_id } = await cardService.createCard({
+      card_type: "structure",
+      title: "Target",
+    });
+
+    const result = await executeBatchOp({
+      node_updates: [{ node_id, journal_limit: 15 }],
+    });
+
+    expect(result.node_updated).toContain(node_id);
+
+    const row = await pool.query(
+      "SELECT journal_limit FROM tree_nodes WHERE id = $1",
+      [node_id]
+    );
+    expect(row.rows[0]["journal_limit"]).toBe(15);
+  });
+
+  it("throws and rolls back when node_id does not exist", async () => {
+    const { card: existing, node_id } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Existing",
+    });
+    const fakeNodeId = "00000000-0000-0000-0000-000000000000";
+
+    await expect(
+      executeBatchOp({
+        updates: [{ card_id: existing.id, title: "Renamed" }],
+        node_updates: [{ node_id: fakeNodeId, journal_limit: 15 }],
+      })
+    ).rejects.toThrow(/Node not found/);
+
+    // Transaction rolled back: title must remain unchanged
+    const card = await cardService.getCard(existing.id);
+    expect(card!.title).toBe("Existing");
+
+    // node itself exists, its journal_limit is still NULL
+    const row = await pool.query(
+      "SELECT journal_limit FROM tree_nodes WHERE id = $1",
+      [node_id]
+    );
+    expect(row.rows[0]["journal_limit"]).toBeNull();
+  });
+
+  it("applies node_updates alongside other operations in order", async () => {
+    const { node_id: targetNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Target",
+    });
+
+    const result = await executeBatchOp({
+      creates: [
+        { temp_id: "new", card_type: "knowledge", title: "New card" },
+      ],
+      node_updates: [{ node_id: targetNodeId, journal_limit: 6 }],
+    });
+
+    expect(result.created).toHaveLength(1);
+    expect(result.node_updated).toEqual([targetNodeId]);
+
+    const row = await pool.query(
+      "SELECT journal_limit FROM tree_nodes WHERE id = $1",
+      [targetNodeId]
+    );
+    expect(row.rows[0]["journal_limit"]).toBe(6);
   });
 });
 
@@ -653,10 +726,10 @@ describe("executeBatchOp — symlinks", () => {
 
     // Verify the symlink node is a child of the newly created folder
     const nodeRow = await pool.query(
-      "SELECT parent_id, is_symlink FROM tree_nodes WHERE id = $1",
+      "SELECT parent_node_id, is_symlink FROM tree_nodes WHERE id = $1",
       [symlinkNodeId]
     );
-    expect(nodeRow.rows[0]["parent_id"]).toBe(folderNodeId);
+    expect(nodeRow.rows[0]["parent_node_id"]).toBe(folderNodeId);
     expect(nodeRow.rows[0]["is_symlink"]).toBe(true);
   });
 

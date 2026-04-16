@@ -4,7 +4,7 @@ import {
   updateCardById,
   deleteCardById,
 } from "../db/queries/cards.js";
-import { insertNode, moveNode } from "../db/queries/tree.js";
+import { insertNode, moveNode, updateNodeProperties } from "../db/queries/tree.js";
 import type {
   BatchOpInput,
   BatchOpResult,
@@ -97,6 +97,7 @@ export async function executeBatchOp(
       created: [],
       symlinked: [],
       updated: [],
+      node_updated: [],
       moved: [],
       deleted: [],
     };
@@ -196,6 +197,22 @@ export async function executeBatchOp(
           );
         }
         result.updated.push(card_id);
+      }
+    }
+
+    // ── Node updates ─────────────────────────────────────────────────────────
+    // Tree-node property updates (journal_limit). DB-query direct call on purpose:
+    // the aggregate `batch:completed` event covers batch consumers; we don't
+    // emit per-node `node:updated` here, matching the pattern of updates/moves/
+    // deletes/symlinks above which also skip per-item events.
+    if (input.node_updates && input.node_updates.length > 0) {
+      for (const item of input.node_updates) {
+        const { node_id, ...props } = item;
+        const updated = await updateNodeProperties(client, node_id, props);
+        if (updated === null) {
+          throw new Error(`Node not found: ${node_id}`);
+        }
+        result.node_updated.push(node_id);
       }
     }
 

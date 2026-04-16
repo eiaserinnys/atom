@@ -314,12 +314,30 @@ export async function moveNode(
   return node;
 }
 
+/**
+ * Update tree-node properties (journal_limit, etc.).
+ *
+ * Symlink policy: symlink nodes are NOT redirected to their canonical node.
+ * A symlink stores its own journal_limit which is referenced by
+ * getChildrenSync (see tree.service.ts:222 equivalent in compile path)
+ * when compile_subtree descends into that node. This lets the same card
+ * appear under multiple parents with different per-parent limits.
+ *
+ * Emits `node:updated` on success. The batch_op.node_updates path calls the
+ * underlying DB query directly and does NOT emit this per-node event —
+ * the aggregate `batch:completed` event covers batch consumers. This is
+ * consistent with other batch operations (updates/moves/deletes/symlinks).
+ */
 export async function updateNodeProperties(
   nodeId: string,
   props: { journal_limit?: number | null }
 ): Promise<TreeNode | null> {
   const node = await updateNodePropertiesQuery(getDb(), nodeId, props);
-  if (node) {
+  // Emit only when an update actually occurred. A no-op call (no provided
+  // fields) returns the existing node via `selectNodeById`, but we should
+  // not push a misleading `node:updated` to SSE consumers.
+  const didUpdate = props.journal_limit !== undefined;
+  if (node && didUpdate) {
     eventBus.emit("atom:event", { type: "node:updated", nodeId });
   }
   return node;

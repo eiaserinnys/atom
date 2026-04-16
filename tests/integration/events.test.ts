@@ -10,22 +10,22 @@
  * Requires TEST_DATABASE_URL to point to a running PostgreSQL instance.
  */
 
-import pg from "pg";
 import path from "path";
 import http from "http";
 import Fastify from "fastify";
+import { fileURLToPath } from "url";
 import { setPool, closePool, runMigrations } from "../../src/db/client.js";
+import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import * as cardService from "../../src/services/card.service.js";
 import * as treeService from "../../src/services/tree.service.js";
 import { eventBus } from "../../src/events/eventBus.js";
 import type { AtomEvent } from "../../src/events/eventBus.js";
 import { eventsRoutes } from "../../src/api/routes/events.js";
 
-const { Pool } = pg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = path.resolve(__dirname, "../../src/db/migrations");
 
-const MIGRATIONS_DIR = path.resolve(process.cwd(), "src/db/migrations");
-
-let pool: pg.Pool;
+let pool: PostgresAdapter;
 
 // ---------------------------------------------------------------------------
 // Test app for SSE HTTP tests
@@ -57,11 +57,14 @@ beforeAll(async () => {
     );
   }
 
-  if (databaseUrl.includes("atom_db") && !databaseUrl.includes("test")) {
-    throw new Error("TEST_DATABASE_URL must use a test database, not the production atom_db.\nUse: postgresql://atom:atom@localhost:5434/atom_test_db");
+  if (!databaseUrl.includes("test")) {
+    throw new Error(
+      "TEST_DATABASE_URL must point to a test database (URL must contain 'test').\n" +
+        "Got: " + databaseUrl
+    );
   }
 
-  pool = new Pool({ connectionString: databaseUrl });
+  pool = new PostgresAdapter(databaseUrl);
   setPool(pool);
   await runMigrations(MIGRATIONS_DIR);
   await buildTestApp();
@@ -192,6 +195,22 @@ describe("Event Bus — emit cases", () => {
 
     expect(event.type).toBe("node:deleted");
     if (event.type === "node:deleted") {
+      expect(event.nodeId).toBe(node_id);
+    }
+  });
+
+  it("updateNodeProperties emits node:updated", async () => {
+    const { node_id } = await cardService.createCard({
+      card_type: "structure",
+      title: "JournalTarget",
+    });
+
+    const eventPromise = nextEvent();
+    await treeService.updateNodeProperties(node_id, { journal_limit: 5 });
+    const event = await eventPromise;
+
+    expect(event.type).toBe("node:updated");
+    if (event.type === "node:updated") {
       expect(event.nodeId).toBe(node_id);
     }
   });

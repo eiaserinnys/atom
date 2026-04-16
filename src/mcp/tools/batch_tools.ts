@@ -39,6 +39,11 @@ const batchUpdateItemSchema = z.object({
   expected_version: z.number().int().optional(),
 });
 
+const batchNodeUpdateItemSchema = z.object({
+  node_id: z.string().uuid(),
+  journal_limit: z.number().int().nonnegative().nullable().optional(),
+});
+
 const batchMoveItemSchema = z.object({
   node_id: z.string().uuid(),
   new_parent_node_id: z.string().uuid().nullable().optional(),
@@ -55,7 +60,7 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
     "batch_op",
     [
       "Execute multiple card/tree operations in a single atomic transaction. All succeed or all are rolled back.",
-      "Execution order: creates → symlinks → updates → moves → deletes.",
+      "Execution order: creates → symlinks → updates → node_updates → moves → deletes.",
       "",
       "temp_id referencing:",
       "  • Each create item has a temp_id (any string, e.g. 't1').",
@@ -66,6 +71,10 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
       "  • card_id must reference an existing card (FK constraint — rolls back on invalid ID).",
       "  • Useful for placing a card under multiple parents without duplicating content.",
       "",
+      "updates: card field updates (title/content/tags/references/source/...). Targets card_id.",
+      "",
+      "node_updates: tree_node property updates (journal_limit). Targets pre-existing node_id only — temp_id is not supported here.",
+      "",
       "moves: node_id is the node to relocate; new_parent_node_id is the destination parent (null = root).",
       "",
       "deletes: removes the card and all its tree nodes.",
@@ -74,7 +83,8 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
       creates: z.array(batchCreateItemSchema).optional().describe("Cards to create. Processed first."),
       symlinks: z.array(batchSymlinkItemSchema).optional().describe("Symlinks to existing cards. Processed after creates."),
       updates: z.array(batchUpdateItemSchema).optional().describe("Card field updates. Processed after symlinks."),
-      moves: z.array(batchMoveItemSchema).optional().describe("Node relocations. Processed after updates."),
+      node_updates: z.array(batchNodeUpdateItemSchema).optional().describe("Tree node property updates (journal_limit). Pre-existing node_id only (no temp_id). Processed after updates, before moves."),
+      moves: z.array(batchMoveItemSchema).optional().describe("Node relocations. Processed after node_updates."),
       deletes: z.array(batchDeleteItemSchema).optional().describe("Cards to delete (with all tree nodes). Processed last."),
     },
     async (args) => {
@@ -82,6 +92,7 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
         creates: args.creates,
         symlinks: args.symlinks,
         updates: args.updates,
+        node_updates: args.node_updates,
         moves: args.moves,
         deletes: args.deletes,
       });
