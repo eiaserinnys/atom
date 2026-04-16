@@ -137,10 +137,22 @@ export interface BatchSymlinkItem {
   position?: number;
 }
 
+/**
+ * Tree node property update (batch_op.node_updates).
+ * node_id must reference a pre-existing node — temp_id is not supported here.
+ */
+export interface BatchNodeUpdateItem {
+  /** Real node UUID to update. */
+  node_id: string;
+  /** Per-node children limit. null = no limit; 0 = unlimited; N = latest N. Omit to leave unchanged. */
+  journal_limit?: number | null;
+}
+
 export interface BatchOpInput {
   creates?: BatchCreateItem[];
   symlinks?: BatchSymlinkItem[];
   updates?: BatchUpdateItem[];
+  node_updates?: BatchNodeUpdateItem[];
   moves?: BatchMoveItem[];
   deletes?: BatchDeleteItem[];
 }
@@ -155,6 +167,13 @@ export interface BatchOpResult {
   created: BatchCreatedItem[];
   symlinked: string[];
   updated: string[];
+  /**
+   * Note: named `node_updated` (not `updates` past tense) because `updated` above
+   * already holds card-update results. This field records tree_node property updates
+   * performed by the `node_updates` block. The name makes the card/node distinction
+   * explicit rather than following the one-word past-tense pattern of siblings.
+   */
+  node_updated: string[];
   moved: string[];
   deleted: string[];
 }
@@ -168,6 +187,7 @@ export type AtomEvent =
   | { type: 'card:updated'; cardId: string; data: Card; actor: string | null }
   | { type: 'card:deleted'; cardId: string; actor: string | null }
   | { type: 'node:created'; nodeId: string; cardId: string; parentNodeId: string | null }
+  | { type: 'node:updated'; nodeId: string }
   | { type: 'node:deleted'; nodeId: string }
   | { type: 'node:moved'; nodeId: string; newParentNodeId: string | null }
   | { type: 'batch:completed'; result: BatchOpResult };

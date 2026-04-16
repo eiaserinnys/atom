@@ -223,9 +223,19 @@ export async function updateNodeProperties(
   nodeId: string,
   props: { journal_limit?: number | null }
 ): Promise<TreeNode | null> {
+  // Partial-update semantics: a field is considered "provided" only when its
+  // value is not `undefined`. Both "absent key" and "key present with value
+  // `undefined`" mean "leave the column untouched" — this distinction is lost
+  // once a payload passes through Zod/JSON boundaries, so we normalize here.
+  // Explicit `null` still reaches the UPDATE and clears the column.
+  // Avoids the silent-overwrite bug where `{ }` or `{ journal_limit: undefined }`
+  // would have blanked a previously-set `journal_limit`.
+  if (props.journal_limit === undefined) {
+    return await selectNodeById(db, nodeId);
+  }
   const result = await db.query(
     `UPDATE tree_nodes SET journal_limit = $1 WHERE id = $2 RETURNING *`,
-    [props.journal_limit !== undefined ? props.journal_limit : null, nodeId]
+    [props.journal_limit, nodeId]
   );
   if (result.rows.length === 0) return null;
   return rowToNode(result.rows[0]);

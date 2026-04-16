@@ -7,6 +7,7 @@ import {
   createSymlink,
   deleteNode,
   moveNode,
+  updateNodeProperties,
 } from "../../services/tree.service.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -120,6 +121,39 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
         return { content: [{ type: "text", text: `Node not found: ${node_id}` }], isError: true };
       }
       return { content: [{ type: "text", text: JSON.stringify(moved) }] };
+    }
+  );
+
+  // update_node
+  server.tool(
+    "update_node",
+    [
+      "Update tree node properties (journal_limit). Partial update — only provided fields are changed; omitted fields are left untouched.",
+      "journal_limit: number of most-recent children (by position desc) to include when compile_subtree descends into this node.",
+      "  • null — no limit (default).",
+      "  • 0 — include all children (alias for 'unlimited').",
+      "  • N (>0) — include the top N children by position desc.",
+      "Symlink nodes store their own journal_limit; this is intentional (not redirected to canonical).",
+      "Targets a pre-existing node_id only; temp_id references are not supported.",
+    ].join("\n"),
+    {
+      node_id: z.string().uuid().describe("The tree node UUID to update."),
+      journal_limit: z
+        .number()
+        .int()
+        .nonnegative()
+        .nullable()
+        .optional()
+        .describe("Per-node children limit. null = no limit; 0 = unlimited; N = latest N by position desc."),
+    },
+    async ({ node_id, journal_limit }) => {
+      const props: { journal_limit?: number | null } = {};
+      if (journal_limit !== undefined) props.journal_limit = journal_limit;
+      const node = await updateNodeProperties(node_id, props);
+      if (!node) {
+        return { content: [{ type: "text", text: `Node not found: ${node_id}` }], isError: true };
+      }
+      return { content: [{ type: "text", text: JSON.stringify(node) }] };
     }
   );
 

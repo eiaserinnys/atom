@@ -859,4 +859,29 @@ describe("journal_limit", () => {
     expect(markdown).toContain("Y1");
     expect(markdown).toContain("Y2");
   });
+
+  it("updateNodeProperties with empty or undefined props preserves journal_limit (partial-update regression)", async () => {
+    const { node_id } = await cardService.createCard({
+      card_type: "structure",
+      title: "PartialUpdate",
+    });
+
+    // 먼저 journal_limit을 설정
+    await treeService.updateNodeProperties(node_id, { journal_limit: 7 });
+
+    // 1) 키가 아예 없는 경우
+    const r1 = await treeService.updateNodeProperties(node_id, {});
+    expect(r1!.journal_limit).toBe(7);
+
+    // 2) 키는 있지만 값이 undefined인 경우 (Zod/JSON 경계를 통과한 payload 시뮬레이션)
+    const r2 = await treeService.updateNodeProperties(node_id, { journal_limit: undefined });
+    expect(r2!.journal_limit).toBe(7);
+
+    // 3) 명시적 null은 여전히 클리어해야 한다
+    const r3 = await treeService.updateNodeProperties(node_id, { journal_limit: null });
+    expect(r3!.journal_limit).toBeNull();
+
+    const fetched = await treeService.getNode(node_id);
+    expect(fetched!.journal_limit).toBeNull();
+  });
 });
