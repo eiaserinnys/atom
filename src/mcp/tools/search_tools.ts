@@ -11,11 +11,11 @@ export function registerSearchTools(server: McpServer): void {
       query: z.string().min(1).describe("Search query (required, non-empty). Natural language or tsquery syntax."),
       limit: z.number().int().positive().optional().describe("Max results to return (default 20)."),
       root_node_id: z.string().uuid().optional().describe("Restrict search to this node's subtree."),
-      tags: z.array(z.string()).optional().describe("Filter: cards containing ALL specified tags."),
+      tags: z.array(z.string().min(1)).optional().describe("Filter: cards containing ALL specified tags."),
       card_type: z.enum(["structure", "knowledge"]).optional().describe("Filter: card type."),
       updated_after: z.string().datetime({ offset: true }).optional().describe("Filter: updated_at >= this ISO 8601 timestamp."),
       updated_before: z.string().datetime({ offset: true }).optional().describe("Filter: updated_at <= this ISO 8601 timestamp."),
-      source_type: z.string().optional().describe("Filter: exact source_type match (e.g. 'trello', 'github')."),
+      source_type: z.string().min(1).optional().describe("Filter: exact source_type match (e.g. 'trello', 'github')."),
     },
     async (filters) => {
       const results = await searchCards(filters);

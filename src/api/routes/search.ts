@@ -31,15 +31,18 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "updated_before must be a valid ISO 8601 timestamp" });
     }
 
+    // Parse tags: trim whitespace, drop empty strings
+    const rawTags = qs["tags"]?.split(",").map((t) => t.trim()).filter(Boolean);
+
     const filters: SearchFilters = {
       query: qs["q"],
       limit,
-      root_node_id: qs["rootNodeId"],
-      tags: qs["tags"] ? qs["tags"].split(",") : undefined,
+      root_node_id: qs["rootNodeId"] || undefined,
+      tags: rawTags?.length ? rawTags : undefined,
       card_type: qs["card_type"] as CardType | undefined,
-      updated_after: qs["updated_after"],
-      updated_before: qs["updated_before"],
-      source_type: qs["source_type"],
+      updated_after: qs["updated_after"] || undefined,
+      updated_before: qs["updated_before"] || undefined,
+      source_type: qs["source_type"] || undefined,
     };
 
     const results = await searchCards(filters);
