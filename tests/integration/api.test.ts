@@ -457,7 +457,7 @@ describe("BM25 Search", () => {
       tags: ["music"],
     });
 
-    const results = await searchService.searchCards("quantum");
+    const results = await searchService.searchCards({ query: "quantum" });
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]!.title).toBe("Quantum Mechanics");
   });
@@ -469,7 +469,7 @@ describe("BM25 Search", () => {
       content: "Some content",
     });
 
-    const results = await searchService.searchCards("xyznonexistentkeyword12345");
+    const results = await searchService.searchCards({ query: "xyznonexistentkeyword12345" });
     expect(results.length).toBe(0);
   });
 
@@ -480,7 +480,7 @@ describe("BM25 Search", () => {
       content: "Plants convert sunlight to energy",
     });
 
-    const results = await searchService.searchCards("photosynthesis");
+    const results = await searchService.searchCards({ query: "photosynthesis" });
     expect(results.length).toBeGreaterThan(0);
     const r = results[0]!;
     expect(r).toHaveProperty("card_id");
@@ -504,7 +504,7 @@ describe("BM25 Search", () => {
       content: "The study of ocean currents",
     });
 
-    const results = await searchService.searchCards("astrophysics OR oceanography");
+    const results = await searchService.searchCards({ query: "astrophysics OR oceanography" });
     const titles = results.map((r) => r.title);
     expect(titles).toContain("Astrophysics Overview");
     expect(titles).toContain("Oceanography Basics");
@@ -529,11 +529,168 @@ describe("BM25 Search", () => {
       parent_node_id: parentResult.node_id!,
     });
 
-    const results = await searchService.searchCards("breadcrumb");
+    const results = await searchService.searchCards({ query: "breadcrumb" });
     expect(results.length).toBeGreaterThan(0);
     const r = results.find((x) => x.title === "LeafCard Breadcrumb Test");
     expect(r).toBeDefined();
     expect(r!.node_path).toEqual(["RootSection", "ParentSection"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Search Filters
+// ---------------------------------------------------------------------------
+
+describe("Search Filters", () => {
+  it("filters by tags (AND semantics)", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "FilterTag Physics Chemistry",
+      content: "Atoms and molecules study",
+      tags: ["physics", "chemistry"],
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "FilterTag Physics Only",
+      content: "Atoms in isolation study",
+      tags: ["physics"],
+    });
+
+    // Filter by both tags — only the first card has both
+    const results = await searchService.searchCards({
+      query: "atoms",
+      tags: ["physics", "chemistry"],
+    });
+    expect(results.length).toBe(1);
+    expect(results[0]!.title).toBe("FilterTag Physics Chemistry");
+  });
+
+  it("filters by card_type", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "CardTypeFilter Knowledge Item",
+      content: "This is knowledge content",
+    });
+    await cardService.createCard({
+      card_type: "structure",
+      title: "CardTypeFilter Structure Item",
+      content: "This is structure content",
+    });
+
+    const knowledgeResults = await searchService.searchCards({
+      query: "cardtypefilter",
+      card_type: "knowledge",
+    });
+    expect(knowledgeResults.length).toBe(1);
+    expect(knowledgeResults[0]!.card_type).toBe("knowledge");
+
+    const structureResults = await searchService.searchCards({
+      query: "cardtypefilter",
+      card_type: "structure",
+    });
+    expect(structureResults.length).toBe(1);
+    expect(structureResults[0]!.card_type).toBe("structure");
+  });
+
+  it("filters by source_type", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "SourceTypeFilter Trello Card",
+      content: "Imported from trello board",
+      source_type: "trello",
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "SourceTypeFilter GitHub Issue",
+      content: "Imported from github repo",
+      source_type: "github",
+    });
+
+    const results = await searchService.searchCards({
+      query: "sourcetypefilter",
+      source_type: "trello",
+    });
+    expect(results.length).toBe(1);
+    expect(results[0]!.title).toBe("SourceTypeFilter Trello Card");
+  });
+
+  it("filters by updated_after / updated_before", async () => {
+    // Create cards — they'll have current timestamps
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "DateFilter Recent Card",
+      content: "Created recently for date filter test",
+    });
+
+    // Search with updated_after far in the past → should find the card
+    const pastResults = await searchService.searchCards({
+      query: "datefilter",
+      updated_after: "2000-01-01T00:00:00Z",
+    });
+    expect(pastResults.length).toBe(1);
+
+    // Search with updated_after far in the future → should find nothing
+    const futureResults = await searchService.searchCards({
+      query: "datefilter",
+      updated_after: "2099-01-01T00:00:00Z",
+    });
+    expect(futureResults.length).toBe(0);
+
+    // Search with updated_before far in the past → should find nothing
+    const beforePastResults = await searchService.searchCards({
+      query: "datefilter",
+      updated_before: "2000-01-01T00:00:00Z",
+    });
+    expect(beforePastResults.length).toBe(0);
+  });
+
+  it("combines multiple filters (compound conditions)", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "Compound Alpha Filter Test",
+      content: "Testing compound filter combination",
+      tags: ["alpha"],
+      source_type: "trello",
+    });
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "Compound Beta Filter Test",
+      content: "Another compound filter combination test",
+      tags: ["beta"],
+      source_type: "github",
+    });
+    await cardService.createCard({
+      card_type: "structure",
+      title: "Compound Alpha Structure Filter",
+      content: "Structure with alpha tag compound",
+      tags: ["alpha"],
+      source_type: "trello",
+    });
+
+    // tags=alpha + card_type=knowledge + source_type=trello → only first card
+    const results = await searchService.searchCards({
+      query: "compound",
+      tags: ["alpha"],
+      card_type: "knowledge",
+      source_type: "trello",
+    });
+    expect(results.length).toBe(1);
+    expect(results[0]!.title).toBe("Compound Alpha Filter Test");
+  });
+
+  it("returns empty when tag does not exist on any card", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "NoSuchTag Card",
+      content: "Content for no such tag test",
+      tags: ["existing"],
+    });
+
+    const results = await searchService.searchCards({
+      query: "nosuchtag",
+      tags: ["nonexistent_tag_xyz"],
+    });
+    expect(results.length).toBe(0);
   });
 });
 

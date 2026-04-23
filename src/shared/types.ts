@@ -65,6 +65,17 @@ export interface UpdateCardInput {
   staleness?: Staleness;
 }
 
+export interface SearchFilters {
+  query: string;
+  limit?: number;
+  root_node_id?: string;
+  tags?: string[];           // @> containment: cards with ALL specified tags
+  card_type?: CardType;      // exact match
+  updated_after?: string;    // ISO 8601, updated_at >= this value
+  updated_before?: string;   // ISO 8601, updated_at <= this value
+  source_type?: string;      // exact match
+}
+
 export interface SearchResult {
   card_id: string;
   node_id: string | null;
