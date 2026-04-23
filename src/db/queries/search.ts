@@ -153,15 +153,14 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
   const params: unknown[] = [];
   let idx = 1;
 
-  // $1: FTS query
+  // $1: FTS query (always first)
   params.push(filters.query);
   const matchIdx = idx++;
 
-  // $2: LIMIT (reserved early, but appended to SQL at the end)
-  params.push(filters.limit ?? 20);
-  const limitIdx = idx++;
-
   // Additional WHERE conditions beyond FTS MATCH
+  // NOTE: limit is pushed LAST to keep params in SQL appearance order.
+  // translateQuery replaces $N → ? positionally, so params must match
+  // the order $N placeholders appear in the generated SQL.
   const extraConditions: string[] = [];
 
   // tags filter: each tag requires a separate EXISTS check (AND semantics)
@@ -220,6 +219,10 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
   const whereExtra = extraConditions.length > 0
     ? "\n         AND " + extraConditions.join("\n         AND ")
     : "";
+
+  // LIMIT is always the last parameter (matches SQL appearance order)
+  const limitIdx = idx;
+  params.push(filters.limit ?? 20);
 
   const sql = `${subtreeCte}SELECT
          c.id AS card_id,
