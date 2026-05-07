@@ -151,6 +151,13 @@ export interface BatchSymlinkItem {
 /**
  * Tree node property update (batch_op.node_updates).
  * node_id must reference a pre-existing node — temp_id is not supported here.
+ *
+ * Duplicate semantics: if the same `node_id` appears more than once within a
+ * single `batch_op.node_updates` array, items are applied in array order under
+ * one transaction, so **the last entry wins** (later UPDATEs overwrite earlier
+ * ones). The id is also pushed to `BatchOpResult.node_updated` once per
+ * occurrence — callers that dedupe on the response should account for this.
+ * Callers should normally deduplicate by `node_id` before calling.
  */
 export interface BatchNodeUpdateItem {
   /** Real node UUID to update. */
@@ -183,6 +190,18 @@ export interface BatchOpResult {
    * already holds card-update results. This field records tree_node property updates
    * performed by the `node_updates` block. The name makes the card/node distinction
    * explicit rather than following the one-word past-tense pattern of siblings.
+   *
+   * Naming-asymmetry caveat: today only `node_updates` exists at the input layer,
+   * so `node_updated` is the lone two-word field here while `moved`/`deleted` stay
+   * one word (their card/node semantics happen to coincide). If future work adds
+   * node-only counterparts such as `node_moves` / `node_deletes` (e.g. for
+   * symlink-only relocation/removal), revisit the whole naming pattern at that
+   * point — either rename `moved`/`deleted` to `card_moved`/`card_deleted` for
+   * full card/node symmetry, or pick a different consistent convention. Don't
+   * just append `node_moved` / `node_deleted` and leave `moved`/`deleted` as is.
+   *
+   * Duplicates: if `node_updates` contains the same `node_id` more than once,
+   * this array contains that id once per occurrence (no dedup).
    */
   node_updated: string[];
   moved: string[];
