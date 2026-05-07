@@ -11,6 +11,7 @@ import { setPool, closePool, runMigrations } from "../../src/db/client.js";
 import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import { executeBatchOp, topologicalSortCreates } from "../../src/services/batch.service.js";
 import * as cardService from "../../src/services/card.service.js";
+import type { BatchNodeUpdateItem } from "../../src/shared/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = path.resolve(__dirname, "../../src/db/migrations");
@@ -221,8 +222,15 @@ describe("executeBatchOp — node_updates", () => {
       title: "Target Noop",
     });
 
+    // 비정상 호출자 시나리오 모방: TypeScript 인터페이스(P1-2 적용 후
+    // BatchNodeUpdateItem.journal_limit이 required)와 Zod
+    // (`batchNodeUpdateItemSchema`)를 모두 우회한 noop이 service 레이어에
+    // 도달했을 때, service 레벨 partial-update 가드가
+    // result.node_updated에서 noop을 제외하는지 검증한다. 정상
+    // TypeScript 경로에서는 이 입력을 만들 수 없으므로 명시적 캐스팅을
+    // 통해 안전망 회귀를 살려둔다.
     const result = await executeBatchOp({
-      node_updates: [{ node_id, journal_limit: undefined }],
+      node_updates: [{ node_id } as unknown as BatchNodeUpdateItem],
     });
 
     expect(result.node_updated).not.toContain(node_id);
