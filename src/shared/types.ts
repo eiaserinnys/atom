@@ -162,8 +162,20 @@ export interface BatchSymlinkItem {
 export interface BatchNodeUpdateItem {
   /** Real node UUID to update. */
   node_id: string;
-  /** Per-node children limit. null = no limit; 0 = unlimited; N = latest N. Omit to leave unchanged. */
-  journal_limit?: number | null;
+  /**
+   * Per-node children limit. null = no limit (explicit clear via DB write);
+   * 0 = unlimited; N = latest N.
+   *
+   * P1-2: Required (not optional) — to skip a node, omit the entire item from
+   * the array; do not include {node_id} alone with journal_limit absent. This
+   * is asymmetric with the standalone `update_node` MCP tool and PATCH
+   * /tree/:nodeId route, both of which keep journal_limit optional (no-op
+   * read pattern is allowed there). The batch path treats noop items as
+   * input bug signals because batch_op is a bulk-change operation. The Zod
+   * schema `batchNodeUpdateItemSchema` mirrors this required-ness; both are
+   * the canonical source of input shape (design-principles §3 정본 하나).
+   */
+  journal_limit: number | null;
 }
 
 export interface BatchOpInput {

@@ -11,6 +11,7 @@ import { setPool, closePool, runMigrations } from "../../src/db/client.js";
 import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import { executeBatchOp, topologicalSortCreates } from "../../src/services/batch.service.js";
 import * as cardService from "../../src/services/card.service.js";
+import type { BatchNodeUpdateItem } from "../../src/shared/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = path.resolve(__dirname, "../../src/db/migrations");
@@ -200,6 +201,42 @@ describe("executeBatchOp — node_updates", () => {
     expect(card!.title).toBe("Existing");
 
     // node itself exists, its journal_limit is still NULL
+    const row = await pool.query(
+      "SELECT journal_limit FROM tree_nodes WHERE id = $1",
+      [node_id]
+    );
+    expect(row.rows[0]["journal_limit"]).toBeNull();
+  });
+
+  it("noop item (journal_limit undefined) does NOT include node_id in result.node_updated", async () => {
+    // P1-2 regression: a no-op node_updates entry (no provided fields) must
+    // stay symmetric with the standalone update_node({node_id}) omit path —
+    // it should not be reported as a successful update because no UPDATE
+    // statement was actually issued.
+    //
+    // Phase 2 will tighten the Zod schema so omitting journal_limit is
+    // rejected at the input boundary; until then the service layer guards
+    // the asymmetry, and this test pins that behaviour.
+    const { node_id } = await cardService.createCard({
+      card_type: "structure",
+      title: "Target Noop",
+    });
+
+    // 비정상 호출자 시나리오 모방: TypeScript 인터페이스(P1-2 적용 후
+    // BatchNodeUpdateItem.journal_limit이 required)와 Zod
+    // (`batchNodeUpdateItemSchema`)를 모두 우회한 noop이 service 레이어에
+    // 도달했을 때, service 레벨 partial-update 가드가
+    // result.node_updated에서 noop을 제외하는지 검증한다. 정상
+    // TypeScript 경로에서는 이 입력을 만들 수 없으므로 명시적 캐스팅을
+    // 통해 안전망 회귀를 살려둔다.
+    const result = await executeBatchOp({
+      node_updates: [{ node_id } as unknown as BatchNodeUpdateItem],
+    });
+
+    expect(result.node_updated).not.toContain(node_id);
+    expect(result.node_updated).toHaveLength(0);
+
+    // Existing journal_limit must remain NULL (unchanged).
     const row = await pool.query(
       "SELECT journal_limit FROM tree_nodes WHERE id = $1",
       [node_id]

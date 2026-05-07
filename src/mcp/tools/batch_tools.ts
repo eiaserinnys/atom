@@ -39,9 +39,16 @@ const batchUpdateItemSchema = z.object({
   expected_version: z.number().int().optional(),
 });
 
-const batchNodeUpdateItemSchema = z.object({
+// Exported for direct schema-level unit tests
+// (P1-2 Zod rejection regression — see tests/unit/batch-tools-schema.test.ts).
+export const batchNodeUpdateItemSchema = z.object({
   node_id: z.string().uuid(),
-  journal_limit: z.number().int().nonnegative().nullable().optional(),
+  // P1-2: required (not optional) — see BatchNodeUpdateItem doc comment in
+  // src/shared/types.ts for rationale. Allows null to explicitly clear the
+  // column. To skip a node, omit the entire item from the array (do not
+  // include {node_id} alone). Asymmetric with standalone update_node tool
+  // and PATCH /tree/:nodeId route; both kept optional for no-op read pattern.
+  journal_limit: z.number().int().nonnegative().nullable(),
 });
 
 const batchMoveItemSchema = z.object({
