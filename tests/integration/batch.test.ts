@@ -207,6 +207,35 @@ describe("executeBatchOp — node_updates", () => {
     expect(row.rows[0]["journal_limit"]).toBeNull();
   });
 
+  it("noop item (journal_limit undefined) does NOT include node_id in result.node_updated", async () => {
+    // P1-2 regression: a no-op node_updates entry (no provided fields) must
+    // stay symmetric with the standalone update_node({node_id}) omit path —
+    // it should not be reported as a successful update because no UPDATE
+    // statement was actually issued.
+    //
+    // Phase 2 will tighten the Zod schema so omitting journal_limit is
+    // rejected at the input boundary; until then the service layer guards
+    // the asymmetry, and this test pins that behaviour.
+    const { node_id } = await cardService.createCard({
+      card_type: "structure",
+      title: "Target Noop",
+    });
+
+    const result = await executeBatchOp({
+      node_updates: [{ node_id, journal_limit: undefined }],
+    });
+
+    expect(result.node_updated).not.toContain(node_id);
+    expect(result.node_updated).toHaveLength(0);
+
+    // Existing journal_limit must remain NULL (unchanged).
+    const row = await pool.query(
+      "SELECT journal_limit FROM tree_nodes WHERE id = $1",
+      [node_id]
+    );
+    expect(row.rows[0]["journal_limit"]).toBeNull();
+  });
+
   it("applies node_updates alongside other operations in order", async () => {
     const { node_id: targetNodeId } = await cardService.createCard({
       card_type: "structure",

@@ -208,11 +208,17 @@ export async function executeBatchOp(
     if (input.node_updates && input.node_updates.length > 0) {
       for (const item of input.node_updates) {
         const { node_id, ...props } = item;
-        const updated = await updateNodeProperties(client, node_id, props);
-        if (updated === null) {
+        // `updated` is the canonical partial-update signal from the DB layer
+        // (see `db/queries/tree.ts` updateNodeProperties). A no-op item must
+        // not be reported as a successful update — symmetric with the
+        // standalone update_node({node_id}) omit path which also stays silent.
+        const { node, updated } = await updateNodeProperties(client, node_id, props);
+        if (node === null) {
           throw new Error(`Node not found: ${node_id}`);
         }
-        result.node_updated.push(node_id);
+        if (updated) {
+          result.node_updated.push(node_id);
+        }
       }
     }
 

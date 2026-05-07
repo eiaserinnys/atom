@@ -218,25 +218,42 @@ export async function moveNode(
   );
 }
 
+/**
+ * Update tree-node properties.
+ *
+ * Partial-update semantics: a field is considered "provided" only when its
+ * value is not `undefined`. Both "absent key" and "key present with value
+ * `undefined`" mean "leave the column untouched" — this distinction is lost
+ * once a payload passes through Zod/JSON boundaries, so we normalize here.
+ * Explicit `null` still reaches the UPDATE and clears the column.
+ *
+ * Returns `{ node, updated }` so callers can distinguish a no-op (no
+ * provided fields → no UPDATE issued) from a real update without re-checking
+ * the input shape themselves. This is the single canonical guard for the
+ * partial-update rule (design-principles §3); both `tree.service.ts` and
+ * `batch.service.ts` consume the `updated` flag rather than re-deriving it.
+ *
+ * - `node`: the current row (always returned when the node exists), or `null`
+ *   if the node was not found.
+ * - `updated`: `true` iff at least one column was actually written to.
+ *
+ * Avoids the silent-overwrite bug where `{ }` or `{ journal_limit: undefined }`
+ * would have blanked a previously-set `journal_limit`, and the asymmetric-
+ * success bug where a no-op was reported as a successful update.
+ */
 export async function updateNodeProperties(
   db: Queryable,
   nodeId: string,
   props: { journal_limit?: number | null }
-): Promise<TreeNode | null> {
-  // Partial-update semantics: a field is considered "provided" only when its
-  // value is not `undefined`. Both "absent key" and "key present with value
-  // `undefined`" mean "leave the column untouched" — this distinction is lost
-  // once a payload passes through Zod/JSON boundaries, so we normalize here.
-  // Explicit `null` still reaches the UPDATE and clears the column.
-  // Avoids the silent-overwrite bug where `{ }` or `{ journal_limit: undefined }`
-  // would have blanked a previously-set `journal_limit`.
+): Promise<{ node: TreeNode | null; updated: boolean }> {
   if (props.journal_limit === undefined) {
-    return await selectNodeById(db, nodeId);
+    const node = await selectNodeById(db, nodeId);
+    return { node, updated: false };
   }
   const result = await db.query(
     `UPDATE tree_nodes SET journal_limit = $1 WHERE id = $2 RETURNING *`,
     [props.journal_limit, nodeId]
   );
-  if (result.rows.length === 0) return null;
-  return rowToNode(result.rows[0]);
+  if (result.rows.length === 0) return { node: null, updated: false };
+  return { node: rowToNode(result.rows[0]), updated: true };
 }

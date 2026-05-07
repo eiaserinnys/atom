@@ -332,12 +332,13 @@ export async function updateNodeProperties(
   nodeId: string,
   props: { journal_limit?: number | null }
 ): Promise<TreeNode | null> {
-  const node = await updateNodePropertiesQuery(getDb(), nodeId, props);
-  // Emit only when an update actually occurred. A no-op call (no provided
-  // fields) returns the existing node via `selectNodeById`, but we should
-  // not push a misleading `node:updated` to SSE consumers.
-  const didUpdate = props.journal_limit !== undefined;
-  if (node && didUpdate) {
+  // The DB layer is the canonical guard for partial-update semantics
+  // (see `updateNodeProperties` in `db/queries/tree.ts`): it returns
+  // `updated=false` when no provided field triggered an UPDATE. We trust
+  // that flag rather than re-deriving it from `props` here, so adding a
+  // new updatable column requires changes in exactly one place.
+  const { node, updated } = await updateNodePropertiesQuery(getDb(), nodeId, props);
+  if (node && updated) {
     eventBus.emit("atom:event", { type: "node:updated", nodeId });
   }
   return node;

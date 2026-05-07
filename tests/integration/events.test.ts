@@ -215,6 +215,41 @@ describe("Event Bus — emit cases", () => {
     }
   });
 
+  it("updateNodeProperties with empty props does NOT emit node:updated", async () => {
+    // P1-1/P1-2 regression: a no-op update (no provided fields) must not push
+    // a misleading `node:updated` to SSE consumers, and must stay symmetric
+    // with the standalone update_node({node_id}) omit path.
+    const { node_id } = await cardService.createCard({
+      card_type: "structure",
+      title: "JournalTarget NoEmit",
+    });
+
+    // Capture every event emitted within the window.
+    const captured: AtomEvent[] = [];
+    const handler = (event: AtomEvent) => {
+      captured.push(event);
+    };
+    eventBus.on("atom:event", handler);
+
+    try {
+      // No-op update: omit journal_limit entirely.
+      await treeService.updateNodeProperties(node_id, {});
+      // Subsequent emitting update acts as a synchronization barrier so we
+      // know the eventBus has had a chance to deliver any (unwanted) prior
+      // node:updated event for this node.
+      await treeService.updateNodeProperties(node_id, { journal_limit: 7 });
+    } finally {
+      eventBus.off("atom:event", handler);
+    }
+
+    // The non-empty call must emit exactly once for this node_id; the noop
+    // call must not contribute any node:updated event.
+    const nodeUpdated = captured.filter(
+      (e) => e.type === "node:updated" && e.nodeId === node_id
+    );
+    expect(nodeUpdated).toHaveLength(1);
+  });
+
   it("moveNode emits node:moved", async () => {
     const { node_id: rootA } = await cardService.createCard({
       card_type: "structure",
