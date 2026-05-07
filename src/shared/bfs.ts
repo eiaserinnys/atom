@@ -6,6 +6,13 @@ export type ResolvedRef =
   | { ok: false; error: string; sourceType: string };
 
 export interface CompileOptions {
+  /**
+   * Tri-state ID/metadata exposure (260508 변경):
+   *  - `undefined` (default) — ID-annotated output: short `[node:X card:Y]` label
+   *    in titlesOnly mode, full HTML metadata comment in heading mode.
+   *  - `true` — full HTML metadata comment in both modes.
+   *  - `false` — minimal output (no IDs, pre-260508 legacy behavior).
+   */
   includeIds?: boolean;
   titlesOnly?: boolean;
   numbering?: boolean;
@@ -15,6 +22,10 @@ export interface CompileOptions {
   /** Limit depth-1 children (direct children of the root node) to the latest n items.
    *  Sorted by card_timestamp descending. Does not affect deeper levels. */
   limit?: number;
+}
+
+function buildIdLabel(nodeId: string, cardId: string): string {
+  return `[node:${nodeId} card:${cardId}]`;
 }
 
 function buildMetaComment(
@@ -132,17 +143,27 @@ export function compileNode(
     const indent = "  ".repeat(currentDepth);
     const prefix = currentDepth === 0 ? "" : "├── ";
     const symlinkMark = is_symlink ? "~ " : "";
-    const metaComment = options.includeIds
-      ? " " + buildMetaComment(nodeId, card, currentDepth, contentChars, is_symlink)
-      : ` (${contentChars} chars)`;
-    lines.push(`${indent}${prefix}${numberLabel}${symlinkMark}${card.title}${metaComment}`);
+    let metaPart: string;
+    if (options.includeIds === true) {
+      // full metadata HTML 주석 (명시적 true 보존)
+      metaPart = " " + buildMetaComment(nodeId, card, currentDepth, contentChars, is_symlink);
+    } else if (options.includeIds === false) {
+      // minimal — UUID 생략 (명시적 false, pre-260508 legacy)
+      metaPart = ` (${contentChars} chars)`;
+    } else {
+      // 디폴트 — 짧은 ID 라벨 + chars (260508)
+      metaPart = ` ${buildIdLabel(nodeId, card.id)} (${contentChars} chars)`;
+    }
+    lines.push(`${indent}${prefix}${numberLabel}${symlinkMark}${card.title}${metaPart}`);
   } else {
     const heading = "#".repeat(Math.min(headingLevel, 6));
     const symlinkMark = is_symlink ? "~ " : "";
-    if (options.includeIds) {
-      lines.push(`${heading} ${numberLabel}${symlinkMark}${card.title} ${buildMetaComment(nodeId, card, currentDepth, undefined, is_symlink)}`);
-    } else {
+    if (options.includeIds === false) {
+      // minimal (명시적 false, pre-260508 legacy) — HTML 주석 생략
       lines.push(`${heading} ${numberLabel}${symlinkMark}${card.title}`);
+    } else {
+      // 디폴트(undefined) 또는 true — full metadata HTML 주석 노출 (260508)
+      lines.push(`${heading} ${numberLabel}${symlinkMark}${card.title} ${buildMetaComment(nodeId, card, currentDepth, undefined, is_symlink)}`);
     }
     if (card.content) {
       lines.push(card.content);

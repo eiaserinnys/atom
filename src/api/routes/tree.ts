@@ -48,7 +48,9 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
         : depthStr !== undefined && !isNaN(parseInt(depthStr, 10))
           ? parseInt(depthStr, 10)
           : 3;
-      const includeIds = qs["include_ids"] === "true";
+      // 트리스테이트 보존 (260508): include_ids 미전달 → undefined (디폴트 동작)
+      const includeIds: boolean | undefined =
+        qs["include_ids"] === undefined ? undefined : qs["include_ids"] === "true";
       const titlesOnly = qs["titles_only"] === "true";
       const numbering = qs["numbering"] === "true";
       const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
@@ -59,7 +61,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
         : undefined;
       const limit = qs["limit"] !== undefined ? parseInt(qs["limit"]) : undefined;
       const result = await compileSubtree(req.params.nodeId, depth, {
-        includeIds: includeIds || undefined,
+        includeIds,
         titlesOnly: titlesOnly || undefined,
         numbering: numbering || undefined,
         maxChars: maxChars,

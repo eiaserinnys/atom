@@ -56,7 +56,7 @@ describe("BFS compileNode", () => {
         0
       );
 
-      expect(result).toBe("# Node A\nContent A");
+      expect(result).toMatch(/^# Node A <!-- node:node-a card:card-a depth:0 created:[\d-]+ -->\nContent A$/);
       expect(result).not.toContain("Node B");
     });
   });
@@ -110,7 +110,7 @@ describe("BFS compileNode", () => {
         2
       );
 
-      expect(result).toBe("# Structure");
+      expect(result).toMatch(/^# Structure <!-- node:node-a card:card-a depth:0 created:[\d-]+ -->$/);
     });
   });
 
@@ -269,7 +269,7 @@ describe("BFS compileNode", () => {
       expect(result).not.toContain("<!--");
     });
 
-    it("omits HTML comment when options is undefined (default)", () => {
+    it("appends HTML comment with node/card IDs by default (options undefined)", () => {
       const cards = new Map<string, Card>([
         ["card-a", makeCard({ id: "card-a", title: "Root" })],
       ]);
@@ -285,8 +285,55 @@ describe("BFS compileNode", () => {
         0
       );
 
+      // 디폴트 — 헤딩 뒤에 HTML 주석 노출 (260508 변경)
+      expect(result).toContain("# Root <!-- node:node-a card:card-a depth:0 created:2026-01-01 -->");
+    });
+
+    it("heading mode: includeIds=false explicitly omits HTML comment (minimal, legacy)", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+      ]);
+
+      const result = compileNode(
+        "node-a",
+        (nid) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink }),
+        () => [],
+        (cid) => cards.get(cid)!,
+        0,
+        new Set(),
+        1,
+        { includeIds: false }
+      );
+
       expect(result).toBe("# Root");
       expect(result).not.toContain("<!--");
+    });
+
+    it("heading mode: default outputs HTML comment with node/card IDs and depth (multi-node)", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root" })],
+        ["card-b", makeCard({ id: "card-b", title: "Child" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+        ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a" })],
+      ]);
+      const getChildren = (nid: string): TreeNode[] =>
+        Array.from(nodes.values()).filter((n) => n.parent_node_id === nid);
+
+      const result = compileNode(
+        "node-a",
+        (nid) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink }),
+        getChildren,
+        (cid) => cards.get(cid)!,
+        1
+      );
+
+      expect(result).toContain("# Root <!-- node:node-a card:card-a depth:0 created:2026-01-01 -->");
+      expect(result).toContain("## Child <!-- node:node-b card:card-b depth:1 created:2026-01-01 -->");
     });
 
     it("does not add comment to cycle nodes even with includeIds=true", () => {
@@ -407,6 +454,31 @@ describe("BFS compileNode", () => {
       expect(result).toContain("node:node-b");
       expect(result).toContain("depth:1");
       expect(result).toContain("chars:13");
+    });
+
+    it("default (includeIds undefined) includes [node:X card:Y] short label and chars (260508)", () => {
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard,
+        1, new Set(), 1, { titlesOnly: true }
+      );
+
+      expect(result).toContain("Root [node:node-a card:card-a] (17 chars)");
+      expect(result).toContain("├── Child [node:node-b card:card-b] (13 chars)");
+      // 디폴트는 HTML 주석을 사용하지 않음 — depth/created 메타 미포함
+      expect(result).not.toContain("<!--");
+      expect(result).not.toContain("depth:");
+    });
+
+    it("includeIds=false explicitly omits IDs (minimal mode, legacy behavior)", () => {
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, getCard,
+        1, new Set(), 1, { titlesOnly: true, includeIds: false }
+      );
+
+      expect(result).toContain("Root (17 chars)");
+      expect(result).toContain("├── Child (13 chars)");
+      expect(result).not.toContain("[node:");
+      expect(result).not.toContain("<!--");
     });
   });
 
@@ -730,8 +802,31 @@ describe("BFS compileNode", () => {
         0, new Set(), 1, {}
       );
 
-      expect(result).toBe("# Regular Node");
+      expect(result).toContain("# Regular Node <!-- node:node-a card:card-a depth:0 created:");
       expect(result).not.toContain("~");
+      expect(result).not.toContain("symlink:true");
+    });
+
+    it("titles_only default: symlink node carries [node:X card:Y] with canonical card_id", () => {
+      const cards = new Map<string, Card>([
+        ["card-a", makeCard({ id: "card-a", title: "Root", content: "R" })],
+        ["card-b", makeCard({ id: "card-b", title: "Sym", content: "S" })],
+      ]);
+      const nodes = new Map<string, TreeNode>([
+        ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],
+        ["node-b", makeNode({ id: "node-b", card_id: "card-b", parent_node_id: "node-a", is_symlink: true })],
+      ]);
+      const getChildren = (nid: string): TreeNode[] =>
+        Array.from(nodes.values()).filter((n) => n.parent_node_id === nid);
+      const getNodeCard = (nid: string) => ({ card_id: nodes.get(nid)!.card_id, is_symlink: nodes.get(nid)!.is_symlink });
+
+      const result = compileNode(
+        "node-a", getNodeCard, getChildren, (cid) => cards.get(cid)!,
+        1, new Set(), 1, { titlesOnly: true }
+      );
+
+      // ~ 마커는 그대로, 라벨에 symlink 노드의 자체 node_id와 canonical card_id 노출
+      expect(result).toContain("├── ~ Sym [node:node-b card:card-b] (1 chars)");
     });
   });
 
@@ -789,7 +884,8 @@ describe("BFS compileNode", () => {
       const result = compileNode(
         "node-a", getNodeCard, getChildren, getCard, 0, new Set(), 1, { resolvedRefs }
       );
-      expect(result).toBe("# Root\nRoot content");
+      // 디폴트 헤딩 모드는 HTML 주석 포함 (260508). 단언은 unfurl 부재만 검증.
+      expect(result).toMatch(/^# Root <!-- node:node-a card:card-a depth:0 created:[\d-]+ -->\nRoot content$/);
       expect(result).not.toContain("unfurl");
     });
 
@@ -824,7 +920,9 @@ describe("BFS compileNode", () => {
       const result = compileNode(
         "node-a", getNodeCard, getChildren, getCard, 0, new Set(), 1, {}
       );
-      expect(result).toBe("# Root\nRoot content");
+      // 디폴트 헤딩 모드는 HTML 주석 포함 (260508). resolvedRefs 미사용을 검증.
+      expect(result).toMatch(/^# Root <!-- node:node-a card:card-a depth:0 created:[\d-]+ -->\nRoot content$/);
+      expect(result).not.toContain("unfurl");
     });
   });
 

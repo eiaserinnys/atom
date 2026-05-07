@@ -115,7 +115,8 @@ Renders a subtree as markdown via BFS traversal. Options:
 | Option | Description |
 |--------|-------------|
 | `depth` | Max traversal depth (default: 2) |
-| `titles_only` | Extract headings only, skip card bodies |
+| `titles_only` | Extract headings only, skip card bodies. Each line carries `[node:<uuid> card:<uuid>] (N chars)` by default; pass `include_ids=false` for minimal output. |
+| `include_ids` | Tri-state. Omit (default) for ID-annotated output (short label in `titles_only`, full HTML metadata in heading mode). `true` forces full HTML metadata in `titles_only` mode as well. `false` for minimal output (no IDs, legacy). |
 | `max_chars` | Truncate output at N characters |
 | `exclude_nodes` | Skip specific node IDs |
 | `numbering` | Auto-assign hierarchical numbers (1.2.3) |
