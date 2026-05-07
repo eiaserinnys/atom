@@ -1041,4 +1041,70 @@ describe("journal_limit", () => {
     const fetched = await treeService.getNode(node_id);
     expect(fetched!.journal_limit).toBeNull();
   });
+
+  it("update_node on symlink does NOT redirect to canonical (symlink stores its own journal_limit)", async () => {
+    // P1-4 회귀: tree.service.ts updateNodeProperties는 symlink 노드에 대해
+    // journal_limit을 *symlink 자체*에 저장하고 canonical로 redirect하지
+    // 않는다 (의도된 설계). docstring에만 있던 정책을 테스트로 고정한다.
+    const { card: cardX, node_id: canonicalNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "SymRoot",
+    });
+
+    // 다른 부모 노드를 만들어 symlink를 그 아래에 둔다
+    const { node_id: parentBId } = await cardService.createCard({
+      card_type: "structure",
+      title: "ParentB",
+    });
+
+    // parentB 아래 cardX의 symlink 생성 — positional 시그니처
+    const symlinkNode = await treeService.createSymlink(cardX.id, parentBId);
+
+    // act: symlink node_id에 update_node({journal_limit: 5})
+    const updatedSymlink = await treeService.updateNodeProperties(symlinkNode.id, {
+      journal_limit: 5,
+    });
+
+    // assert: symlink 노드 자체에 journal_limit=5 저장 (canonical로 redirect 안 됨)
+    expect(updatedSymlink).not.toBeNull();
+    expect(updatedSymlink!.journal_limit).toBe(5);
+    expect(updatedSymlink!.is_symlink).toBe(true);
+
+    // canonical 노드는 변경 없음 — 별도로 update하지 않았으므로 null 유지
+    const canonicalAfter = await treeService.getNode(canonicalNodeId);
+    expect(canonicalAfter).not.toBeNull();
+    expect(canonicalAfter!.journal_limit).toBeNull();
+    expect(canonicalAfter!.is_symlink).toBe(false);
+  });
+
+  it("update_node omit returns node with same response shape as a real update (response shape regression)", async () => {
+    // P1-5 회귀: omit 호출(`updateNodeProperties(node_id, {})`)이 정상 update와
+    // 응답 객체의 키 셋이 동일한지 검증한다. 기존 L1020 케이스가 *값 보존*을
+    // 검증하는 것과 직교 — 본 케이스는 *구조 회귀*만 가드한다. 응답 객체에서
+    // 필드 하나가 누락되어도 값 보존 테스트는 잡지 못하므로 직교 방어가 필요.
+    const { node_id } = await cardService.createCard({
+      card_type: "structure",
+      title: "OmitShapeTest",
+    });
+
+    // 정상 update 응답 구조 캡처
+    const updateResp = await treeService.updateNodeProperties(node_id, {
+      journal_limit: 3,
+    });
+    expect(updateResp).not.toBeNull();
+    const realUpdateKeys = Object.keys(updateResp!).sort();
+
+    // omit (빈 props) 응답 구조 캡처
+    const omitResp = await treeService.updateNodeProperties(node_id, {});
+    expect(omitResp).not.toBeNull();
+    const omitKeys = Object.keys(omitResp!).sort();
+
+    // 응답 객체 키 셋 동일 — 필수 필드 누락 없음 (구조 회귀 보호)
+    expect(omitKeys).toEqual(realUpdateKeys);
+
+    // 추가 검증: 식별자 일치, 값은 유지(omit이라 update 결과 그대로)
+    expect(omitResp!.id).toBe(node_id);
+    expect(omitResp!.card_id).toBe(updateResp!.card_id);
+    expect(omitResp!.journal_limit).toBe(3);
+  });
 });
