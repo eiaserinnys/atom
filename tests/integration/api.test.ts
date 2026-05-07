@@ -794,7 +794,7 @@ describe("compile_subtree", () => {
     expect(md).not.toContain("ExChild");
   });
 
-  it("includeIds adds HTML comments with node_id, absent by default", async () => {
+  it("compileSubtree exposes node/card IDs by default; includeIds=false yields minimal output (260508)", async () => {
     const { node_id: rootId } = await cardService.createCard({
       card_type: "structure",
       title: "IncludeIdsRoot",
@@ -807,15 +807,20 @@ describe("compile_subtree", () => {
       parent_node_id: rootId,
     });
 
-    // includeIds=true: HTML 주석 포함
+    // 디폴트 (옵션 미지정) — HTML 주석 노출 (260508 변경)
+    const { markdown: mdDefault } = await treeService.compileSubtree(rootId, 2);
+    expect(mdDefault).toContain("<!-- node:");
+    expect(mdDefault).toContain("card:");
+    expect(mdDefault).toContain("IncludeIdsRoot");
+
+    // includeIds=true 명시 — 디폴트와 동일 형식 (헤딩 모드 한정)
     const { markdown: mdWithIds } = await treeService.compileSubtree(rootId, 2, { includeIds: true });
     expect(mdWithIds).toContain("<!-- node:");
-    expect(mdWithIds).toContain("card:");
-    expect(mdWithIds).toContain("IncludeIdsRoot");
 
-    // includeIds 미전달(기본값): HTML 주석 미포함 (backward compatible)
-    const { markdown: mdNoIds } = await treeService.compileSubtree(rootId, 2);
-    expect(mdNoIds).not.toContain("<!-- node:");
+    // includeIds=false 명시 — minimal (HTML 주석 미포함)
+    const { markdown: mdMinimal } = await treeService.compileSubtree(rootId, 2, { includeIds: false });
+    expect(mdMinimal).not.toContain("<!-- node:");
+    expect(mdMinimal).toContain("# IncludeIdsRoot");
   });
 });
 
