@@ -42,6 +42,14 @@ export async function insertNode(
   position: number | undefined,
   is_symlink: boolean = false
 ): Promise<TreeNode> {
+  // Cycle A1: reject negative position at the service boundary. Park
+  // territory ('!' / '"' prefix) is reserved for batch.service's internal
+  // park-and-assign transactions; allowing external callers to write
+  // there would muddle the invariant that rowToNode never sees a park
+  // prefix on commit (design-principles §4 + §7).
+  if (position !== undefined && position < 0) {
+    throw new Error(`insertNode: position must be non-negative, got ${position}`);
+  }
   const MAX_RETRIES = 3;
   const inTxn = isInTransaction(db);
 
@@ -204,6 +212,10 @@ export async function moveNode(
   new_parent_node_id: string | null,
   new_position: number | undefined
 ): Promise<TreeNode | null> {
+  // Cycle A1: same negative-position guard as insertNode — see comment there.
+  if (new_position !== undefined && new_position < 0) {
+    throw new Error(`moveNode: new_position must be non-negative, got ${new_position}`);
+  }
   const MAX_RETRIES = 3;
   const inTxn = isInTransaction(db);
 

@@ -135,6 +135,55 @@ describe("migration 010 — idempotency", () => {
     );
     expect(result.rows[0]["data_type"]).toBe("text");
   });
+
+  it("M3-FULL: re-running the entire migrations directory after 010 with duplicate-key data does not fail", async () => {
+    // Regression for the incident 3a1b7800 root cause: PostgreSQL has no
+    // schema_migrations tracking, so every migration is re-executed on
+    // server start. Once 010 has converted position to TEXT and allowed
+    // duplicates, the original 002 must NOT try to recreate its UNIQUE
+    // index on data that already contains same-key siblings.
+    //
+    // Seed the table with two rows that share (parent, position):
+    const parent = await insertCard(pool, { card_type: "structure", title: "P" });
+    const parentNode = await insertNode(pool, parent.id, null, undefined);
+    const cardA = await insertCard(pool, { card_type: "knowledge", title: "A" });
+    const cardB = await insertCard(pool, { card_type: "knowledge", title: "B" });
+    await pool.query(
+      `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink)
+       VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $4, $5)`,
+      [
+        crypto.randomUUID(), cardA.id, parentNode.id, "0000000600", false,
+        crypto.randomUUID(), cardB.id, parentNode.id,
+      ]
+    );
+
+    // Re-run every .sql in migrations/ in order, mimicking server restart.
+    const files = fs
+      .readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+    for (const file of files) {
+      const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), "utf-8");
+      await pool.query(sql);
+    }
+
+    // Duplicate rows survived (002's UNIQUE index was skipped, 010 left them alone).
+    const dups = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM tree_nodes
+       WHERE parent_node_id = $1 AND position = $2`,
+      [parentNode.id, "0000000600"]
+    );
+    expect(dups.rows[0]["n"]).toBe(2);
+
+    // And the UNIQUE index was not recreated.
+    const idx = await pool.query(
+      `SELECT indexname FROM pg_indexes
+       WHERE tablename = 'tree_nodes'
+         AND indexname IN ('uidx_tree_nodes_root_pos', 'uidx_tree_nodes_child_pos')`,
+      []
+    );
+    expect(idx.rows).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

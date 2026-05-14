@@ -32,11 +32,25 @@ BEGIN
     ALTER TABLE tree_nodes
       ALTER COLUMN position TYPE TEXT COLLATE "C"
       USING (
+        -- Mirror runtime posToKey from src/shared/lexorank.ts:
+        --   n >= 0           → lpad(n, 10, '0')
+        --   -1B ≤ n ≤ -1     → '"' || lpad(n + 1B, 10, '0')      (park non-group)
+        --   -2B ≤ n ≤ -1B-1  → '!' || lpad(n + 2B, 10, '0')      (park group)
+        --   out of range     → NULL → NOT NULL violation surfaces the bad row
+        --
+        -- Permanent data should not contain park-territory values
+        -- (those exist only inside batch.service transactions), but the
+        -- defensive CASE mirrors the runtime so the on-disk byte sort is
+        -- identical to what posToKey would produce.
         CASE
-          WHEN position < 0 THEN
-            '!' || lpad((2000000000 + position)::text, 10, '0')
-          ELSE
+          WHEN position >= 0 THEN
             lpad(position::text, 10, '0')
+          WHEN position >= -1000000000 THEN
+            '"' || lpad((position + 1000000000)::text, 10, '0')
+          WHEN position >= -2000000000 THEN
+            '!' || lpad((position + 2000000000)::text, 10, '0')
+          ELSE
+            NULL
         END
       );
 

@@ -24,14 +24,22 @@ CREATE TABLE tree_nodes_new (
 
 -- C. Copy rows, converting position to zero-padded TEXT.
 --    Negative positions (transient park values) get a '!' prefix.
+-- Mirror runtime posToKey (src/shared/lexorank.ts) so byte-wise sort
+-- matches what new inserts will produce. Park territory should not
+-- appear in permanent data, but the defensive CASE keeps the SQL and
+-- runtime conversions identical (design-principles §3).
 INSERT INTO tree_nodes_new (id, card_id, parent_node_id, position, is_symlink, created_at, journal_limit)
 SELECT
   id, card_id, parent_node_id,
   CASE
-    WHEN position < 0
-      THEN '!' || substr('0000000000' || (2000000000 + position), -10)
-    ELSE
+    WHEN position >= 0 THEN
       substr('0000000000' || position, -10)
+    WHEN position >= -1000000000 THEN
+      '"' || substr('0000000000' || (position + 1000000000), -10)
+    WHEN position >= -2000000000 THEN
+      '!' || substr('0000000000' || (position + 2000000000), -10)
+    ELSE
+      NULL
   END,
   is_symlink, created_at, journal_limit
 FROM tree_nodes;
