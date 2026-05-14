@@ -63,7 +63,10 @@ const batchMoveItemSchema = z.object({
 
 const batchChildOrderItemSchema = z.object({
   parent_node_id: z.string().uuid().nullable(),
-  order: z.array(z.string().uuid()).min(1),
+  order: z.array(z.string().uuid()).min(1).refine(
+    (arr) => new Set(arr).size === arr.length,
+    "duplicate node_id in order"
+  ),
 });
 
 const batchDeleteItemSchema = z.object({

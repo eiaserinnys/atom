@@ -246,6 +246,8 @@ export interface BatchOpResult {
   /** Parent node IDs (or null for root) whose children were reordered by child_orders. */
   child_ordered: (string | null)[];
   deleted: string[];
+  /** Deprecation warnings (cycle B). Present only when deprecated position input was used. */
+  _warnings?: string[];
 }
 
 // ---------------------------------------------------------------------------

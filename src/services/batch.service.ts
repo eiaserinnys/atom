@@ -88,6 +88,7 @@ export async function executeBatchOp(
     input = agentIdOrInput;
   }
 
+  const batchWarnings: string[] = [];
   const result = await getDb().transaction(async (client) => {
     const result: BatchOpResult = {
       created: [],
@@ -257,7 +258,7 @@ export async function executeBatchOp(
           effectiveParent = resolvedParent;
         }
 
-        const { key } = await resolvePositionKey(
+        const { key, warnings: moveWarnings } = await resolvePositionKey(
           client,
           effectiveParent,
           item.node_id,
@@ -268,6 +269,9 @@ export async function executeBatchOp(
             position: item.new_position,
           }
         );
+        if (moveWarnings.length > 0) {
+          batchWarnings.push(...moveWarnings);
+        }
 
         await moveNode(client, item.node_id, effectiveParent, key);
         result.moved.push(item.node_id);
@@ -311,5 +315,9 @@ export async function executeBatchOp(
   // Emit a single batch event after the transaction commits
   eventBus.emit("atom:event", { type: "batch:completed", result });
 
+  // Attach deprecation warnings if any (cycle B — deprecated position usage)
+  if (batchWarnings.length > 0) {
+    return { ...result, _warnings: batchWarnings };
+  }
   return result;
 }
