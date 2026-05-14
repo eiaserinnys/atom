@@ -6,33 +6,23 @@ import { posToKey, keyToPos } from "../../shared/lexorank.js";
 /**
  * Map a DB row to the public TreeNode shape.
  *
- * Cycle A1: `position` is stored as TEXT (zero-padded 10-digit key in normal
- * territory) but exposed externally as `number` for backward compatibility.
- * `keyToPos` performs the bijective conversion and defensively throws if a
- * park-territory key (transient batch.service state) leaks through — that
- * would indicate a transactional invariant violation upstream.
+ * Cycle A1 stored `position` as TEXT (zero-padded 10-digit key); the
+ * external response keeps it as `number` via `keyToPos` for backward
+ * compatibility. Cycle A2 removed the `number` fallback that guarded
+ * hypothetical driver coercion — both pg and better-sqlite3 return
+ * TEXT columns as strings, so an unexpected `number` here would mean
+ * a real bug upstream and we let `keyToPos` throw rather than coerce.
  */
 function rowToNode(row: Record<string, unknown>): TreeNode {
-  const rawPosition = row["position"];
-  const position =
-    typeof rawPosition === "string"
-      ? keyToPos(rawPosition)
-      // Defensive fallback: if some driver coerces TEXT to number, accept it
-      // but still funnel through posToKey/keyToPos to validate range.
-      : keyToPos(posToKey(rawPosition as number));
   return {
     id: row["id"] as string,
     card_id: row["card_id"] as string,
     parent_node_id: (row["parent_node_id"] as string | null) ?? null,
-    position,
+    position: keyToPos(row["position"] as string),
     is_symlink: deserializeBoolean(row["is_symlink"]),
     created_at: row["created_at"] as string,
     journal_limit: (row["journal_limit"] as number | null) ?? null,
   };
-}
-
-function isInTransaction(db: Queryable): boolean {
-  return db.inTransaction === true;
 }
 
 export async function insertNode(
@@ -42,90 +32,38 @@ export async function insertNode(
   position: number | undefined,
   is_symlink: boolean = false
 ): Promise<TreeNode> {
-  // Cycle A1: reject negative position at the service boundary. Park
-  // territory ('!' / '"' prefix) is reserved for batch.service's internal
-  // park-and-assign transactions; allowing external callers to write
-  // there would muddle the invariant that rowToNode never sees a park
-  // prefix on commit (design-principles §4 + §7).
+  // Negative position is rejected at posToKey (cycle A2 boundary
+  // tightening — park territory removed). The explicit guard here
+  // gives a clearer error message than the lower-level throw.
   if (position !== undefined && position < 0) {
     throw new Error(`insertNode: position must be non-negative, got ${position}`);
   }
-  const MAX_RETRIES = 3;
-  const inTxn = isInTransaction(db);
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    let resolvedKey: string;
-    if (position !== undefined) {
-      resolvedKey = posToKey(position);
-    } else {
-      // Default: append at end. MAX(position) on the normal-territory subset
-      // — the `position >= '0000000000'` filter excludes park keys ('!', '"')
-      // that batch.service may have parked transiently. COALESCE handles the
-      // empty-parent case (no siblings yet).
-      const maxResult = await db.query(
-        `SELECT COALESCE(MAX(position), '0000000000') AS max_pos
-         FROM tree_nodes
-         WHERE parent_node_id IS NOT DISTINCT FROM $1
-           AND position >= '0000000000'`,
-        [parent_node_id]
-      );
-      const maxNumeric = keyToPos(maxResult.rows[0]["max_pos"] as string);
-      resolvedKey = posToKey(maxNumeric + 100);
-    }
-
-    const sp = `sp_insert_node_${attempt}`;
-    if (inTxn) await db.query(`SAVEPOINT ${sp}`);
-
-    const id = crypto.randomUUID();
-    try {
-      const result = await db.query(
-        `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [id, card_id, parent_node_id, resolvedKey, is_symlink]
-      );
-      if (inTxn) await db.query(`RELEASE SAVEPOINT ${sp}`);
-      return rowToNode(result.rows[0]);
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
-      if (code === "23505" || code === "SQLITE_CONSTRAINT_UNIQUE") {
-        // Cycle A1: dead branch — the (parent, position) UNIQUE constraint was
-        // removed in migration 010, so 23505 / SQLITE_CONSTRAINT_UNIQUE never
-        // triggers for position collisions. Kept for defensive symmetry; cycle
-        // A2 will remove the retry-loop entirely along with park-and-assign.
-        if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
-        await renumberSiblings(db, parent_node_id);
-      } else {
-        if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
-        throw err;
-      }
-    }
+  let resolvedKey: string;
+  if (position !== undefined) {
+    resolvedKey = posToKey(position);
+  } else {
+    // Default: append at end. MAX(position) on the full key space —
+    // cycle A2 removed the park-territory filter (`position >= '0000000000'`)
+    // because park keys are no longer produced. COALESCE handles the
+    // empty-parent case (no siblings yet).
+    const maxResult = await db.query(
+      `SELECT COALESCE(MAX(position), '0000000000') AS max_pos
+       FROM tree_nodes
+       WHERE parent_node_id IS NOT DISTINCT FROM $1`,
+      [parent_node_id]
+    );
+    const maxNumeric = keyToPos(maxResult.rows[0]["max_pos"] as string);
+    resolvedKey = posToKey(maxNumeric + 100);
   }
-  throw new Error(
-    `insertNode: position conflict persists after ${MAX_RETRIES} retries (parent_node_id=${parent_node_id})`
-  );
-}
 
-async function renumberSiblings(
-  db: Queryable,
-  parent_node_id: string | null
-): Promise<void> {
-  // Cycle A1: this function is no longer reached at runtime — UNIQUE conflicts
-  // can't occur. Kept for symmetry with cycle A2's removal pass.
-  // Fetch all siblings ordered by current position, reassign '0000000100',
-  // '0000000200', '0000000300'…
-  const siblings = await db.query(
-    `SELECT id FROM tree_nodes
-     WHERE parent_node_id IS NOT DISTINCT FROM $1
-     ORDER BY position ASC, id ASC`,
-    [parent_node_id]
+  const id = crypto.randomUUID();
+  const result = await db.query(
+    `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [id, card_id, parent_node_id, resolvedKey, is_symlink]
   );
-
-  for (let i = 0; i < siblings.rows.length; i++) {
-    await db.query(`UPDATE tree_nodes SET position = $1 WHERE id = $2`, [
-      posToKey((i + 1) * 100),
-      siblings.rows[i]["id"],
-    ]);
-  }
+  return rowToNode(result.rows[0]);
 }
 
 export async function selectNodeById(
@@ -212,59 +150,35 @@ export async function moveNode(
   new_parent_node_id: string | null,
   new_position: number | undefined
 ): Promise<TreeNode | null> {
-  // Cycle A1: same negative-position guard as insertNode — see comment there.
+  // Same boundary tightening as insertNode (cycle A2).
   if (new_position !== undefined && new_position < 0) {
     throw new Error(`moveNode: new_position must be non-negative, got ${new_position}`);
   }
-  const MAX_RETRIES = 3;
-  const inTxn = isInTransaction(db);
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    let resolvedKey: string;
-    if (new_position !== undefined) {
-      resolvedKey = posToKey(new_position);
-    } else {
-      const maxResult = await db.query(
-        `SELECT COALESCE(MAX(position), '0000000000') AS max_pos
-         FROM tree_nodes
-         WHERE parent_node_id IS NOT DISTINCT FROM $1
-           AND id != $2
-           AND position >= '0000000000'`,
-        [new_parent_node_id, nodeId]
-      );
-      const maxNumeric = keyToPos(maxResult.rows[0]["max_pos"] as string);
-      resolvedKey = posToKey(maxNumeric + 100);
-    }
-
-    const sp = `sp_move_node_${attempt}`;
-    if (inTxn) await db.query(`SAVEPOINT ${sp}`);
-
-    try {
-      const result = await db.query(
-        `UPDATE tree_nodes
-         SET parent_node_id = $1, position = $2
-         WHERE id = $3
-         RETURNING *`,
-        [new_parent_node_id, resolvedKey, nodeId]
-      );
-      if (inTxn) await db.query(`RELEASE SAVEPOINT ${sp}`);
-      if (result.rows.length === 0) return null;
-      return rowToNode(result.rows[0]);
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
-      if (code === "23505" || code === "SQLITE_CONSTRAINT_UNIQUE") {
-        // Cycle A1: dead branch (UNIQUE removed). Same rationale as insertNode.
-        if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
-        await renumberSiblings(db, new_parent_node_id);
-      } else {
-        if (inTxn) await db.query(`ROLLBACK TO SAVEPOINT ${sp}`);
-        throw err;
-      }
-    }
+  let resolvedKey: string;
+  if (new_position !== undefined) {
+    resolvedKey = posToKey(new_position);
+  } else {
+    const maxResult = await db.query(
+      `SELECT COALESCE(MAX(position), '0000000000') AS max_pos
+       FROM tree_nodes
+       WHERE parent_node_id IS NOT DISTINCT FROM $1
+         AND id != $2`,
+      [new_parent_node_id, nodeId]
+    );
+    const maxNumeric = keyToPos(maxResult.rows[0]["max_pos"] as string);
+    resolvedKey = posToKey(maxNumeric + 100);
   }
-  throw new Error(
-    `moveNode: position conflict persists after ${MAX_RETRIES} retries (parent_node_id=${new_parent_node_id})`
+
+  const result = await db.query(
+    `UPDATE tree_nodes
+     SET parent_node_id = $1, position = $2
+     WHERE id = $3
+     RETURNING *`,
+    [new_parent_node_id, resolvedKey, nodeId]
   );
+  if (result.rows.length === 0) return null;
+  return rowToNode(result.rows[0]);
 }
 
 /**

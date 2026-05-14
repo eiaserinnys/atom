@@ -481,9 +481,20 @@ describe("executeBatchOp — same-parent reorder moves", () => {
     expect(children.map((c) => c.id)).toEqual([bNodeId, aNodeId, cNodeId]);
   });
 
-  it("handles position conflicts with non-group siblings", async () => {
-    // A(100), B(200), C(300), D(400) under parent.
-    // Reorder only A and B to positions that overlap with C and D.
+  it("explicit position collisions share keys deterministically (cycle A2)", async () => {
+    // Cycle A2 semantic change: park-and-assign is gone. When a caller
+    // moves nodes to positions that overlap with existing siblings, the
+    // keys are simply *shared* — non-conflict-avoidance is now the
+    // contract of the absolute-position API. Ordering remains
+    // deterministic via the (position, id) tie-break.
+    //
+    // Callers needing automatic collision avoidance will use cycle B's
+    // `before/after` MCP interface (see analysis cache §2.1).
+    //
+    // Setup: A(100), B(200), C(300), D(400) under parent.
+    // Move A→300 and B→400. Expected post-move: A & C share key 300,
+    // B & D share key 400. All four nodes remain. Order is
+    // [min-id@300, max-id@300, min-id@400, max-id@400].
     const createResult = await executeBatchOp({
       creates: [
         { temp_id: "parent", card_type: "structure", title: "Parent" },
@@ -534,7 +545,6 @@ describe("executeBatchOp — same-parent reorder moves", () => {
       (c) => c.temp_id === "d"
     )!.node_id;
 
-    // Move A to 300 and B to 400 — overlaps with C(300) and D(400)
     await executeBatchOp({
       moves: [
         { node_id: aNodeId, new_parent_node_id: parentNodeId, new_position: 300 },
@@ -542,21 +552,35 @@ describe("executeBatchOp — same-parent reorder moves", () => {
       ],
     });
 
-    // Verify: C and D should have been relocated, A and B at requested positions
     const children = await selectChildren(pool, parentNodeId);
-    const positions = children.map((c) => c.position);
-    const ids = children.map((c) => c.id);
+    expect(children).toHaveLength(4);
 
-    // All positions should be unique
-    expect(new Set(positions).size).toBe(4);
-    // A and B should be at their requested positions
+    // Positions sorted ascending: two 300s then two 400s.
+    const positions = children.map((c) => c.position);
+    expect(positions).toEqual([300, 300, 400, 400]);
+
+    // Within each shared-position group, id ASC tie-break makes order
+    // deterministic. Compare to a sorted view that uses the same key.
+    const ids = children.map((c) => c.id);
+    const expectedIds = [...children]
+      .sort((x, y) => x.position - y.position || x.id.localeCompare(y.id))
+      .map((c) => c.id);
+    expect(ids).toEqual(expectedIds);
+
+    // All four originals survive; A & B sit at their requested positions.
+    expect(new Set(ids)).toEqual(
+      new Set([aNodeId, bNodeId, cNodeId, dNodeId])
+    );
     const aPos = children.find((c) => c.id === aNodeId)!.position;
     const bPos = children.find((c) => c.id === bNodeId)!.position;
     expect(aPos).toBe(300);
     expect(bPos).toBe(400);
-    // C and D should still be present (relocated to non-conflicting positions)
-    expect(ids).toContain(cNodeId);
-    expect(ids).toContain(dNodeId);
+    // C and D keep their original positions — park-and-assign no
+    // longer relocates them.
+    const cPos = children.find((c) => c.id === cNodeId)!.position;
+    const dPos = children.find((c) => c.id === dNodeId)!.position;
+    expect(cPos).toBe(300);
+    expect(dPos).toBe(400);
   });
 
   it("reorders with undefined positions (append-to-end)", async () => {

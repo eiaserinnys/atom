@@ -5,8 +5,6 @@ import {
   keyBetween,
   rekeyEvenly,
   NORMAL_ALPHABET,
-  PARK_GROUP_PREFIX,
-  PARK_NONGROUP_PREFIX,
 } from "../../src/shared/lexorank.js";
 
 describe("lexorank — alphabet constants", () => {
@@ -18,16 +16,6 @@ describe("lexorank — alphabet constants", () => {
         NORMAL_ALPHABET.charCodeAt(i)
       );
     }
-  });
-
-  it("park prefixes sort before normal alphabet (PARK_GROUP < PARK_NONGROUP < '0')", () => {
-    // 0x21 = '!', 0x22 = '"', 0x30 = '0'
-    expect(PARK_GROUP_PREFIX.charCodeAt(0)).toBe(0x21);
-    expect(PARK_NONGROUP_PREFIX.charCodeAt(0)).toBe(0x22);
-    expect(PARK_GROUP_PREFIX.charCodeAt(0)).toBeLessThan(
-      PARK_NONGROUP_PREFIX.charCodeAt(0)
-    );
-    expect(PARK_NONGROUP_PREFIX.charCodeAt(0)).toBeLessThan("0".charCodeAt(0));
   });
 });
 
@@ -61,39 +49,6 @@ describe("lexorank — posToKey / keyToPos (positive)", () => {
   );
 });
 
-describe("lexorank — park (negative) territory", () => {
-  // T6
-  it("T6: posToKey(-2_000_000_000) === '!0000000000' (magnitude 0 zero-padded)", () => {
-    expect(posToKey(-2_000_000_000)).toBe("!0000000000");
-  });
-
-  it("T6: keyToPos throws on park-group key", () => {
-    expect(() => keyToPos("!0000000000")).toThrow();
-    expect(() => keyToPos(posToKey(-2_000_000_000))).toThrow();
-  });
-
-  // T7
-  it("T7: posToKey(-1_000_000_000) starts with '\"' (park-nongroup prefix)", () => {
-    const key = posToKey(-1_000_000_000);
-    expect(key.startsWith(PARK_NONGROUP_PREFIX)).toBe(true);
-    expect(key).toHaveLength(11); // 1 prefix + 10 digits
-  });
-
-  it("T7: park-nongroup magnitude increases monotonically", () => {
-    // -1_000_000_000 + i for i = 0..3
-    const keys = [
-      posToKey(-1_000_000_000),
-      posToKey(-1_000_000_000 + 1),
-      posToKey(-1_000_000_000 + 2),
-      posToKey(-1_000_000_000 + 3),
-    ];
-    // byte-wise ascending
-    for (let i = 1; i < keys.length; i++) {
-      expect(compareKeys(keys[i - 1], keys[i])).toBeLessThan(0);
-    }
-  });
-});
-
 describe("lexorank — input guards (T8)", () => {
   it("posToKey throws on NaN", () => {
     expect(() => posToKey(NaN)).toThrow();
@@ -107,7 +62,14 @@ describe("lexorank — input guards (T8)", () => {
     expect(() => posToKey(Math.pow(2, 32))).toThrow();
   });
 
-  it("posToKey throws on out-of-range negative (below INTEGER_MIN)", () => {
+  // Cycle A2: negative input is now rejected at the boundary.
+  it("posToKey throws on -1 (park territory removed in cycle A2)", () => {
+    expect(() => posToKey(-1)).toThrow(/out-of-range/);
+  });
+
+  it("posToKey throws on any negative input", () => {
+    expect(() => posToKey(-1_000_000_000)).toThrow(/out-of-range/);
+    expect(() => posToKey(-2_000_000_000)).toThrow(/out-of-range/);
     expect(() => posToKey(-Math.pow(2, 32))).toThrow();
   });
 
@@ -117,27 +79,25 @@ describe("lexorank — input guards (T8)", () => {
   });
 });
 
-describe("lexorank — compareKeys (T9, T10, T11)", () => {
+describe("lexorank — keyToPos boundary defense", () => {
+  // Cycle A2: legacy park prefixes are never produced any more, but the
+  // guard remains as a boundary defense. Anything reaching keyToPos with
+  // these prefixes must throw rather than silently coerce to a number.
+  it("keyToPos throws on legacy park-group prefix '!'", () => {
+    expect(() => keyToPos("!0000000000")).toThrow(/legacy park prefix/);
+  });
+
+  it("keyToPos throws on legacy park-nongroup prefix '\"'", () => {
+    expect(() => keyToPos('"0000000000')).toThrow(/legacy park prefix/);
+  });
+});
+
+describe("lexorank — compareKeys (T9)", () => {
   // T9
   it("T9: compareKeys orders positive zero-padded keys correctly", () => {
     expect(compareKeys("0000000100", "0000000200")).toBeLessThan(0);
     expect(compareKeys("0000000100", "0000000099")).toBeGreaterThan(0);
     expect(compareKeys("0000000100", "0000000100")).toBe(0);
-  });
-
-  // T10
-  it("T10: park-group key < normal key (byte-wise)", () => {
-    expect(compareKeys("!0000000000", "0000000000")).toBeLessThan(0);
-    expect(compareKeys(posToKey(-2_000_000_000), posToKey(0))).toBeLessThan(0);
-  });
-
-  // T11
-  it("T11: park-group < park-nongroup < normal", () => {
-    const group = posToKey(-2_000_000_000);
-    const nongroup = posToKey(-1_000_000_000);
-    const normal = posToKey(0);
-    expect(compareKeys(group, nongroup)).toBeLessThan(0);
-    expect(compareKeys(nongroup, normal)).toBeLessThan(0);
   });
 });
 
@@ -231,22 +191,5 @@ describe("lexorank — byte-wise sort consistency (T17)", () => {
     const sortedKeys = [...keys].sort(compareKeys);
     const expectedKeys = [...integers].sort((a, b) => a - b).map(posToKey);
     expect(sortedKeys).toEqual(expectedKeys);
-  });
-
-  it("T17: byte-wise sort across mixed positive and park territory", () => {
-    const items = [
-      posToKey(100),
-      posToKey(-2_000_000_000),
-      posToKey(0),
-      posToKey(-1_000_000_000),
-      posToKey(50),
-    ];
-    const sorted = [...items].sort(compareKeys);
-    // Order: park-group(-2B) < park-nongroup(-1B) < 0 < 50 < 100
-    expect(sorted[0]).toBe(posToKey(-2_000_000_000));
-    expect(sorted[1]).toBe(posToKey(-1_000_000_000));
-    expect(sorted[2]).toBe(posToKey(0));
-    expect(sorted[3]).toBe(posToKey(50));
-    expect(sorted[4]).toBe(posToKey(100));
   });
 });
