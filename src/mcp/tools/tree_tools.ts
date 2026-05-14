@@ -98,7 +98,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
     {
       card_id: z.string().uuid().describe("The existing card UUID to symlink to."),
       parent_node_id: z.string().uuid().nullable().optional().describe("Parent node for the new symlink. Null = root level."),
-      position: z.number().int().optional().describe("0-based position among siblings. Omit to append at end."),
+      position: z.number().int().nonnegative().optional().describe("0-based position among siblings. Omit to append at end."),
     },
     async ({ card_id, parent_node_id, position }) => {
       const node = await createSymlink(card_id, parent_node_id ?? null, position);
@@ -113,7 +113,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
     {
       node_id: z.string().uuid().describe("The node to move."),
       parent_node_id: z.string().uuid().nullable().optional().describe("Destination parent node. Null = move to root level."),
-      position: z.number().int().optional().describe("0-based position among siblings at the destination. Omit to append at end."),
+      position: z.number().int().nonnegative().optional().describe("0-based position among siblings at the destination. Omit to append at end."),
     },
     async ({ node_id, parent_node_id, position }) => {
       const moved = await moveNode(node_id, parent_node_id ?? null, position);

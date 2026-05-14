@@ -18,7 +18,7 @@ export function registerCardTools(server: McpServer, agentId: string): void {
       title: z.string().max(50).describe("Card title (max 50 chars)."),
       content: z.string().optional().describe("Card body text (markdown). Null for structure cards."),
       parent_node_id: z.string().uuid().optional().describe("Place under this parent node. Omit to create at root level."),
-      position: z.number().int().optional().describe("0-based position among siblings. Omit to append at end."),
+      position: z.number().int().nonnegative().optional().describe("0-based position among siblings. Omit to append at end."),
       tags: z.array(z.string()).optional().describe("Freeform tags for categorization and search."),
       references: z.array(z.string().uuid()).optional().describe("Card UUIDs this card references (creates backlinks)."),
       content_timestamp: z.string().optional().describe("ISO timestamp for when the content was originally authored."),

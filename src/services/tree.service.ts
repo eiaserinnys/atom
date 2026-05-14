@@ -217,14 +217,16 @@ export async function compileSubtree(
 
     const children = Array.from(nodeCache.values())
       .filter((n) => n.parent_node_id === effectiveParentId)
-      .sort((a, b) => a.position - b.position);
+      .sort((a, b) => (a.position - b.position) || a.id.localeCompare(b.id));
 
     const jl = node.journal_limit;
     if (jl === null || jl === undefined) return children;
-    // position 역순(최신 우선)으로 정렬 후 N개 선택, 다시 position 오름차순으로 반환
-    const byPosition = [...children].sort((a, b) => b.position - a.position);
+    // position 역순(최신 우선)으로 정렬 후 N개 선택, 다시 position 오름차순으로 반환.
+    // Cycle A1: tie-break by id (descending in reverse-sort, ascending in final).
+    // Matches SQL `ORDER BY position, id ASC` (queries/tree.ts selectChildren).
+    const byPosition = [...children].sort((a, b) => (b.position - a.position) || b.id.localeCompare(a.id));
     const limited = jl === 0 ? byPosition : byPosition.slice(0, jl);
-    return limited.sort((a, b) => a.position - b.position);
+    return limited.sort((a, b) => (a.position - b.position) || a.id.localeCompare(b.id));
   }
 
   function findCanonicalNodeId(card_id: string): string | null {

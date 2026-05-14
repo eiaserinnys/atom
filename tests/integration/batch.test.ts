@@ -11,6 +11,7 @@ import { setPool, closePool, runMigrations } from "../../src/db/client.js";
 import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import { executeBatchOp, topologicalSortCreates } from "../../src/services/batch.service.js";
 import * as cardService from "../../src/services/card.service.js";
+import { selectChildren } from "../../src/db/queries/tree.js";
 import type { BatchNodeUpdateItem } from "../../src/shared/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -383,16 +384,11 @@ describe("executeBatchOp — same-parent reorder moves", () => {
       ],
     });
 
-    // Verify final order
-    const rows = await pool.query(
-      "SELECT id, position FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
-      [parentNodeId]
-    );
-    expect(rows.rows.map((r: Record<string, unknown>) => r["id"])).toEqual([
-      bNodeId,
-      cNodeId,
-      aNodeId,
-    ]);
+    // Verify final order — selectChildren funnels through rowToNode which
+    // converts the TEXT position to number, so legacy integer assertions
+    // (e.g. toBe(300)) keep working with the cycle A1 schema.
+    const children = await selectChildren(pool, parentNodeId);
+    expect(children.map((c) => c.id)).toEqual([bNodeId, cNodeId, aNodeId]);
   });
 
   it("reorders 10+ children under the same parent", async () => {
@@ -425,11 +421,8 @@ describe("executeBatchOp — same-parent reorder moves", () => {
     await executeBatchOp({ moves: reversedMoves });
 
     // Verify reversed order
-    const rows = await pool.query(
-      "SELECT id FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
-      [parentNodeId]
-    );
-    const actualOrder = rows.rows.map((r: Record<string, unknown>) => r["id"]);
+    const children = await selectChildren(pool, parentNodeId);
+    const actualOrder = children.map((c) => c.id);
     expect(actualOrder).toEqual([...childNodeIds].reverse());
   });
 
@@ -484,15 +477,8 @@ describe("executeBatchOp — same-parent reorder moves", () => {
       ],
     });
 
-    const rows = await pool.query(
-      "SELECT id FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
-      [p1NodeId]
-    );
-    expect(rows.rows.map((r: Record<string, unknown>) => r["id"])).toEqual([
-      bNodeId,
-      aNodeId,
-      cNodeId,
-    ]);
+    const children = await selectChildren(pool, p1NodeId);
+    expect(children.map((c) => c.id)).toEqual([bNodeId, aNodeId, cNodeId]);
   });
 
   it("handles position conflicts with non-group siblings", async () => {
@@ -557,24 +543,15 @@ describe("executeBatchOp — same-parent reorder moves", () => {
     });
 
     // Verify: C and D should have been relocated, A and B at requested positions
-    const rows = await pool.query(
-      "SELECT id, position FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
-      [parentNodeId]
-    );
-    const positions = rows.rows.map(
-      (r: Record<string, unknown>) => r["position"]
-    );
-    const ids = rows.rows.map((r: Record<string, unknown>) => r["id"]);
+    const children = await selectChildren(pool, parentNodeId);
+    const positions = children.map((c) => c.position);
+    const ids = children.map((c) => c.id);
 
     // All positions should be unique
     expect(new Set(positions).size).toBe(4);
     // A and B should be at their requested positions
-    const aPos = rows.rows.find(
-      (r: Record<string, unknown>) => r["id"] === aNodeId
-    )!["position"];
-    const bPos = rows.rows.find(
-      (r: Record<string, unknown>) => r["id"] === bNodeId
-    )!["position"];
+    const aPos = children.find((c) => c.id === aNodeId)!.position;
+    const bPos = children.find((c) => c.id === bNodeId)!.position;
     expect(aPos).toBe(300);
     expect(bPos).toBe(400);
     // C and D should still be present (relocated to non-conflicting positions)
@@ -622,14 +599,9 @@ describe("executeBatchOp — same-parent reorder moves", () => {
     });
 
     // Both should still be under parent, positions should be distinct
-    const rows = await pool.query(
-      "SELECT id, position FROM tree_nodes WHERE parent_node_id = $1 ORDER BY position ASC",
-      [parentNodeId]
-    );
-    expect(rows.rows).toHaveLength(2);
-    const positions = rows.rows.map(
-      (r: Record<string, unknown>) => r["position"]
-    );
+    const children = await selectChildren(pool, parentNodeId);
+    expect(children).toHaveLength(2);
+    const positions = children.map((c) => c.position);
     expect(new Set(positions).size).toBe(2); // distinct positions
   });
 });

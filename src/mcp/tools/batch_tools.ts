@@ -14,14 +14,14 @@ const batchCreateItemSchema = z.object({
   source_ref: z.string().nullable().optional(),
   parent_node_id: z.string().uuid().nullable().optional(),
   parent_temp_id: z.string().optional(),
-  position: z.number().int().optional(),
+  position: z.number().int().nonnegative().optional(),
 });
 
 const batchSymlinkItemSchema = z.object({
   card_id: z.string().uuid(),
   parent_node_id: z.string().uuid().nullable().optional(),
   parent_temp_id: z.string().optional(),
-  position: z.number().int().optional(),
+  position: z.number().int().nonnegative().optional(),
 });
 
 const batchUpdateItemSchema = z.object({
@@ -55,7 +55,7 @@ const batchMoveItemSchema = z.object({
   node_id: z.string().uuid(),
   new_parent_node_id: z.string().uuid().nullable().optional(),
   parent_temp_id: z.string().optional(),
-  new_position: z.number().int().optional(),
+  new_position: z.number().int().nonnegative().optional(),
 });
 
 const batchDeleteItemSchema = z.object({
