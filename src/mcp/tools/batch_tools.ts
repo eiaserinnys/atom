@@ -56,6 +56,14 @@ const batchMoveItemSchema = z.object({
   new_parent_node_id: z.string().uuid().nullable().optional(),
   parent_temp_id: z.string().optional(),
   new_position: z.number().int().nonnegative().optional(),
+  before: z.string().uuid().optional(),
+  after: z.string().uuid().optional(),
+  to: z.enum(["start", "end"]).optional(),
+});
+
+const batchChildOrderItemSchema = z.object({
+  parent_node_id: z.string().uuid().nullable(),
+  order: z.array(z.string().uuid()).min(1),
 });
 
 const batchDeleteItemSchema = z.object({
@@ -67,7 +75,7 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
     "batch_op",
     [
       "Execute multiple card/tree operations in a single atomic transaction. All succeed or all are rolled back.",
-      "Execution order: creates → symlinks → updates → node_updates → moves → deletes.",
+      "Execution order: creates → symlinks → updates → node_updates → moves → child_orders → deletes.",
       "",
       "temp_id referencing:",
       "  • Each create item has a temp_id (any string, e.g. 't1').",
@@ -83,7 +91,14 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
       "node_updates: tree_node property updates (journal_limit). Targets pre-existing node_id only — temp_id is not supported here.",
       "  • Duplicate node_id within node_updates: items are applied in array order under one transaction, so the last entry wins. The id appears once per occurrence in the result. Deduplicate by node_id before calling unless you intend this.",
       "",
-      "moves: node_id is the node to relocate; new_parent_node_id is the destination parent (null = root).",
+      "moves: node_id is the node to relocate.",
+      "  • new_parent_node_id: null = root, omit = keep current parent (cycle B default — no longer moves to root).",
+      "  • Positioning: use before/after/to (preferred) or new_position (deprecated). Omit all = append at end.",
+      "",
+      "child_orders: reorder children under a parent with evenly-spaced keys.",
+      "  • Processed AFTER moves, BEFORE deletes.",
+      "  • order: array of node_ids in desired sequence. Nodes from other parents are implicitly re-parented.",
+      "  • Nodes under the parent but NOT in order keep their existing keys.",
       "",
       "deletes: removes the card and all its tree nodes.",
     ].join("\n"),
@@ -92,7 +107,8 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
       symlinks: z.array(batchSymlinkItemSchema).optional().describe("Symlinks to existing cards. Processed after creates."),
       updates: z.array(batchUpdateItemSchema).optional().describe("Card field updates. Processed after symlinks."),
       node_updates: z.array(batchNodeUpdateItemSchema).optional().describe("Tree node property updates (journal_limit). Pre-existing node_id only (no temp_id). Processed after updates, before moves. Duplicate node_id: applied in array order, last entry wins; id appears once per occurrence in result.node_updated. Deduplicate before calling unless intentional."),
-      moves: z.array(batchMoveItemSchema).optional().describe("Node relocations. Processed after node_updates."),
+      moves: z.array(batchMoveItemSchema).optional().describe("Node relocations. Processed after node_updates. Use before/after/to (preferred) or new_position (deprecated) for positioning. Omit new_parent_node_id to keep current parent."),
+      child_orders: z.array(batchChildOrderItemSchema).optional().describe("Reorder children under a parent. Processed after moves, before deletes."),
       deletes: z.array(batchDeleteItemSchema).optional().describe("Cards to delete (with all tree nodes). Processed last."),
     },
     async (args) => {
@@ -102,6 +118,7 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
         updates: args.updates,
         node_updates: args.node_updates,
         moves: args.moves,
+        child_orders: args.child_orders,
         deletes: args.deletes,
       });
       return {

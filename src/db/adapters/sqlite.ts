@@ -84,7 +84,6 @@ export class SqliteAdapter implements DatabaseAdapter {
   async transaction<T>(fn: (client: Queryable) => Promise<T>): Promise<T> {
     const txClient: Queryable = {
       query: (sql, vals) => this.query(sql, vals),
-      inTransaction: true,
     };
 
     this.db.exec("BEGIN");

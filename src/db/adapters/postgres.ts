@@ -22,7 +22,6 @@ export class PostgresAdapter implements DatabaseAdapter {
     const client = await this.pool.connect();
     const txClient: Queryable = {
       query: (sql, vals) => client.query(sql, vals),
-      inTransaction: true,
     };
     try {
       await client.query('BEGIN');

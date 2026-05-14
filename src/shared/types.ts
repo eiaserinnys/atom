@@ -126,11 +126,35 @@ export interface BatchUpdateItem {
 
 export interface BatchMoveItem {
   node_id: string;
-  /** Real node UUID — use this OR parent_temp_id, not both. */
+  /**
+   * Destination parent node.
+   * Cycle B semantics: undefined = keep current parent. null = move to root.
+   * Use this OR parent_temp_id, not both.
+   */
   new_parent_node_id?: string | null;
   /** temp_id of a create in this batch to use as the new parent. */
   parent_temp_id?: string;
+  /** @deprecated Use before/after/to instead. Still works but emits a warning. */
   new_position?: number;
+  /** Place before this sibling node_id. Mutually exclusive with after/to/new_position. */
+  before?: string;
+  /** Place after this sibling node_id. Mutually exclusive with before/to/new_position. */
+  after?: string;
+  /** Place at start or end of parent's children. Mutually exclusive with before/after/new_position. */
+  to?: "start" | "end";
+}
+
+/**
+ * Reorder all listed nodes under a parent. Nodes in `order` are assigned
+ * evenly-spaced keys; nodes currently under the parent but NOT in `order`
+ * keep their existing keys. If a node in `order` currently belongs to a
+ * different parent, it is implicitly re-parented (cross-parent move).
+ */
+export interface BatchChildOrderItem {
+  /** Target parent. null = root level. */
+  parent_node_id: string | null;
+  /** Node IDs in the desired order. Must contain at least one ID. */
+  order: string[];
 }
 
 export interface BatchDeleteItem {
@@ -184,6 +208,8 @@ export interface BatchOpInput {
   updates?: BatchUpdateItem[];
   node_updates?: BatchNodeUpdateItem[];
   moves?: BatchMoveItem[];
+  /** Reorder children under specified parents. Processed after moves, before deletes. */
+  child_orders?: BatchChildOrderItem[];
   deletes?: BatchDeleteItem[];
 }
 
@@ -217,6 +243,8 @@ export interface BatchOpResult {
    */
   node_updated: string[];
   moved: string[];
+  /** Parent node IDs (or null for root) whose children were reordered by child_orders. */
+  child_ordered: (string | null)[];
   deleted: string[];
 }
 

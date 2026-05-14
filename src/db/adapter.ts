@@ -5,7 +5,6 @@ export interface Queryable {
     queryText: string,
     values?: unknown[]
   ): Promise<QueryResult<T>>;
-  readonly inTransaction?: boolean;
 }
 
 export interface DatabaseAdapter extends Queryable {

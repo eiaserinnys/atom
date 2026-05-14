@@ -144,32 +144,19 @@ export async function deleteNodeById(
   return (result.rowCount ?? 0) > 0;
 }
 
+/**
+ * Move a node to a new parent and position. Cycle B simplified: this
+ * function only executes the UPDATE with pre-resolved values. All position
+ * resolution (before/after/to/deprecated-absolute/default-append) and
+ * parent resolution (undefined=keep-current) happen in the service layer
+ * via `resolvePositionKey` (tree.service.ts).
+ */
 export async function moveNode(
   db: Queryable,
   nodeId: string,
   new_parent_node_id: string | null,
-  new_position: number | undefined
+  resolvedKey: string
 ): Promise<TreeNode | null> {
-  // Same boundary tightening as insertNode (cycle A2).
-  if (new_position !== undefined && new_position < 0) {
-    throw new Error(`moveNode: new_position must be non-negative, got ${new_position}`);
-  }
-
-  let resolvedKey: string;
-  if (new_position !== undefined) {
-    resolvedKey = posToKey(new_position);
-  } else {
-    const maxResult = await db.query(
-      `SELECT COALESCE(MAX(position), '0000000000') AS max_pos
-       FROM tree_nodes
-       WHERE parent_node_id IS NOT DISTINCT FROM $1
-         AND id != $2`,
-      [new_parent_node_id, nodeId]
-    );
-    const maxNumeric = keyToPos(maxResult.rows[0]["max_pos"] as string);
-    resolvedKey = posToKey(maxNumeric + 100);
-  }
-
   const result = await db.query(
     `UPDATE tree_nodes
      SET parent_node_id = $1, position = $2

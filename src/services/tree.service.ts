@@ -12,10 +12,12 @@ import {
 import { selectCardById, updateCardSnapshot, updateCardSourceType } from "../db/queries/cards.js";
 import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
 import type { Card, TreeNode, TreeNodeWithCard } from "../shared/types.js";
+import type { Queryable } from "../db/queryable.js";
 import type { UnfurlCredentials } from "../unfurl/interface.js";
 import { adapterRegistry } from "../unfurl/registry.js";
 import { parseSnapshot } from "../unfurl/utils.js";
 import { eventBus } from "../events/eventBus.js";
+import { posToKey, keyToPos, keyBetween, rekeyEvenly, NORMAL_DIGIT_COUNT } from "../shared/lexorank.js";
 
 function serializeError(e: unknown): string {
   if (e instanceof Error) return `${e.name}: ${e.message}`;
@@ -300,20 +302,213 @@ export async function deleteNode(nodeId: string): Promise<boolean> {
   return deleted;
 }
 
+// ---------------------------------------------------------------------------
+// Relative position resolution (cycle B)
+// ---------------------------------------------------------------------------
+
+export interface MoveNodeOptions {
+  /** Destination parent. undefined = keep current, null = root. */
+  parent_node_id?: string | null;
+  /** @deprecated Use before/after/to. Absolute position (still works). */
+  position?: number;
+  /** Place before this sibling node_id. */
+  before?: string;
+  /** Place after this sibling node_id. */
+  after?: string;
+  /** Place at start or end of parent's children. */
+  to?: "start" | "end";
+}
+
+/**
+ * Resolve a relative or absolute position specifier into a normal-territory
+ * LexoRank key string. If keyBetween would produce a fractional key (the
+ * gap between two adjacent siblings is too narrow), this function rekeys
+ * all siblings under the parent to make room — the DB always stays in the
+ * 10-digit normal territory so `keyToPos` and the `position: number`
+ * response continue to work.
+ */
+export async function resolvePositionKey(
+  db: Queryable,
+  parentNodeId: string | null,
+  selfNodeId: string | null,
+  opts: { before?: string; after?: string; to?: "start" | "end"; position?: number }
+): Promise<{ key: string; warnings: string[] }> {
+  const warnings: string[] = [];
+
+  // Mutual exclusivity
+  const specifiers = [opts.before, opts.after, opts.to, opts.position].filter(
+    (v) => v !== undefined
+  );
+  if (specifiers.length > 1) {
+    throw new Error(
+      "move_node: only one of before, after, to, or position may be specified"
+    );
+  }
+
+  // Deprecated absolute position
+  if (opts.position !== undefined) {
+    if (opts.position < 0) {
+      throw new Error(
+        `move_node: position must be non-negative, got ${opts.position}`
+      );
+    }
+    warnings.push(
+      "position is deprecated; use before, after, or to instead"
+    );
+    return { key: posToKey(opts.position), warnings };
+  }
+
+  // Relative positioning
+  if (opts.before || opts.after || opts.to) {
+    const allSiblings = await selectChildren(db, parentNodeId);
+
+    // Validate before/after target BEFORE self-exclusion (otherwise a
+    // non-existent sibling can be masked by the empty-array shortcut).
+    if (opts.before) {
+      if (!allSiblings.some((s) => s.id === opts.before)) {
+        throw new Error(
+          `move_node: before node '${opts.before}' not found among siblings of parent`
+        );
+      }
+    }
+    if (opts.after) {
+      if (!allSiblings.some((s) => s.id === opts.after)) {
+        throw new Error(
+          `move_node: after node '${opts.after}' not found among siblings of parent`
+        );
+      }
+    }
+
+    const siblings = selfNodeId
+      ? allSiblings.filter((s) => s.id !== selfNodeId)
+      : allSiblings;
+
+    // Self was the only child — just assign a default key
+    if (siblings.length === 0) {
+      return { key: posToKey(100), warnings };
+    }
+
+    let insertionIndex: number;
+
+    if (opts.before) {
+      insertionIndex = siblings.findIndex((s) => s.id === opts.before);
+      // Target is self (before self) — treat as no-op position
+      if (insertionIndex < 0) {
+        const selfIdx = allSiblings.findIndex((s) => s.id === selfNodeId);
+        return { key: posToKey(allSiblings[selfIdx].position), warnings };
+      }
+    } else if (opts.after) {
+      const afterIdx = siblings.findIndex((s) => s.id === opts.after);
+      // Target is self (after self) — treat as no-op position
+      if (afterIdx < 0) {
+        const selfIdx = allSiblings.findIndex((s) => s.id === selfNodeId);
+        return { key: posToKey(allSiblings[selfIdx].position), warnings };
+      }
+      insertionIndex = afterIdx + 1;
+    } else if (opts.to === "start") {
+      insertionIndex = 0;
+    } else {
+      // to === "end"
+      insertionIndex = siblings.length;
+    }
+
+    const prevKey =
+      insertionIndex > 0
+        ? posToKey(siblings[insertionIndex - 1].position)
+        : null;
+    const nextKey =
+      insertionIndex < siblings.length
+        ? posToKey(siblings[insertionIndex].position)
+        : null;
+
+    let key: string;
+    try {
+      key = keyBetween(prevKey, nextKey);
+    } catch {
+      // Adjacent keys or zero-boundary — rekey all siblings to make room
+      key = await rekeyAndInsert(db, parentNodeId, siblings, insertionIndex);
+      return { key, warnings };
+    }
+
+    if (key.length > NORMAL_DIGIT_COUNT) {
+      // Fractional key would break keyToPos → rekey siblings
+      key = await rekeyAndInsert(db, parentNodeId, siblings, insertionIndex);
+    }
+
+    return { key, warnings };
+  }
+
+  // Default: append to end (same as pre-cycle-B behavior)
+  const maxResult = await db.query(
+    `SELECT COALESCE(MAX(position), '0000000000') AS max_pos
+     FROM tree_nodes
+     WHERE parent_node_id IS NOT DISTINCT FROM $1${selfNodeId ? " AND id != $2" : ""}`,
+    selfNodeId ? [parentNodeId, selfNodeId] : [parentNodeId]
+  );
+  const maxNumeric = keyToPos(maxResult.rows[0]["max_pos"] as string);
+  return { key: posToKey(maxNumeric + 100), warnings };
+}
+
+/**
+ * Rekey all siblings under a parent to make room for an insertion at
+ * `insertionIndex`. Returns the key assigned to the new insertion slot.
+ */
+async function rekeyAndInsert(
+  db: Queryable,
+  parentNodeId: string | null,
+  currentSiblings: TreeNode[],
+  insertionIndex: number
+): Promise<string> {
+  const totalCount = currentSiblings.length + 1;
+  const keys = rekeyEvenly(totalCount);
+
+  let keyIdx = 0;
+  for (let i = 0; i < currentSiblings.length; i++) {
+    if (keyIdx === insertionIndex) keyIdx++; // skip the slot for the new node
+    await db.query(
+      `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
+      [keys[keyIdx], currentSiblings[i].id]
+    );
+    keyIdx++;
+  }
+
+  return keys[insertionIndex];
+}
+
 export async function moveNode(
   nodeId: string,
-  new_parent_node_id: string | null,
-  new_position?: number
-): Promise<TreeNode | null> {
-  const node = await moveNodeQuery(getDb(), nodeId, new_parent_node_id, new_position);
+  opts: MoveNodeOptions
+): Promise<{ node: TreeNode | null; warnings: string[] }> {
+  const db = getDb();
+
+  // Resolve parent: undefined = keep current, null = root
+  let effectiveParent: string | null;
+  if (opts.parent_node_id === undefined) {
+    const currentNode = await selectNodeById(db, nodeId);
+    if (!currentNode) return { node: null, warnings: [] };
+    effectiveParent = currentNode.parent_node_id;
+  } else {
+    effectiveParent = opts.parent_node_id;
+  }
+
+  // Resolve position key
+  const { key, warnings } = await resolvePositionKey(db, effectiveParent, nodeId, {
+    before: opts.before,
+    after: opts.after,
+    to: opts.to,
+    position: opts.position,
+  });
+
+  const node = await moveNodeQuery(db, nodeId, effectiveParent, key);
   if (node) {
     eventBus.emit("atom:event", {
       type: "node:moved",
       nodeId,
-      newParentNodeId: new_parent_node_id,
+      newParentNodeId: effectiveParent,
     });
   }
-  return node;
+
+  return { node, warnings };
 }
 
 /**
