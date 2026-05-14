@@ -12,13 +12,6 @@ import type {
   BatchCreateItem,
 } from "../shared/types.js";
 import { eventBus } from "../events/eventBus.js";
-import { posToKey, keyToPos } from "../shared/lexorank.js";
-
-// Temporary position bases for the park-and-assign strategy in batch moves.
-// These must be within PostgreSQL INTEGER range (-2,147,483,648 to 2,147,483,647)
-// and far enough apart to avoid collisions between group and non-group parking.
-const GROUP_PARK_BASE = -2_000_000_000;
-const NONGROUP_PARK_BASE = -1_000_000_000;
 
 // ---------------------------------------------------------------------------
 // Topological sort for creates
@@ -224,18 +217,24 @@ export async function executeBatchOp(
     }
 
     // ── Moves ─────────────────────────────────────────────────────────────────
+    //
+    // Cycle A2: park-and-assign 4-phase logic removed. After A1's UNIQUE
+    // relaxation on (parent_node_id, position), explicit position
+    // collisions are allowed and resolved deterministically by the
+    // (position, id) tie-break in selectChildren. Callers needing
+    // automatic collision avoidance will use cycle B's `before/after`
+    // MCP interface; the absolute-position path here just writes what
+    // the caller asks for. Same-parent multi-moves degenerate to
+    // sequential moveNode calls.
+    //
+    // Incident c88f3fed closed by this simplification — the original
+    // "position conflict persists after 3 retries" failure mode is
+    // structurally impossible now (no UNIQUE, no retry loop).
     if (input.moves && input.moves.length > 0) {
       // Build temp_id → node_id map from this batch's creates
       const tempIdToNodeId = new Map<string, string>(
         result.created.map((c) => [c.temp_id, c.node_id])
       );
-
-      // Resolve parent_temp_id references and group by target parent
-      const resolvedMoves: Array<{
-        node_id: string;
-        parent_node_id: string | null;
-        new_position: number | undefined;
-      }> = [];
 
       for (const item of input.moves) {
         let newParentNodeId: string | null | undefined = item.new_parent_node_id;
@@ -248,123 +247,13 @@ export async function executeBatchOp(
           }
           newParentNodeId = resolved;
         }
-        resolvedMoves.push({
-          node_id: item.node_id,
-          parent_node_id: newParentNodeId ?? null,
-          new_position: item.new_position,
-        });
-      }
-
-      // Group moves by target parent to detect same-parent multi-moves
-      const movesByParent = new Map<string | null, typeof resolvedMoves>();
-      for (const m of resolvedMoves) {
-        const key = m.parent_node_id;
-        if (!movesByParent.has(key)) movesByParent.set(key, []);
-        movesByParent.get(key)!.push(m);
-      }
-
-      for (const [parentId, group] of movesByParent) {
-        if (group.length <= 1) {
-          // Single move — use existing moveNode (handles retry/renumber)
-          await moveNode(
-            client,
-            group[0].node_id,
-            parentId,
-            group[0].new_position
-          );
-        } else {
-          // Multi-move to same parent: park-and-assign strategy.
-          //
-          // Cycle A1 note: After migration 010 removed the (parent, position)
-          // UNIQUE constraint, the park step is no longer needed to avoid
-          // UNIQUE violations. The code is retained per cycle A1's mandate
-          // ("park-and-assign is kept on top of fractional keys; A2 removes").
-          // The DB column is now TEXT; every integer position parameter is
-          // funnelled through `posToKey` before reaching SQL.
-          //
-          // Phase 1: Park all group nodes at unique park-territory keys to
-          // clear them from the normal-position space.
-          for (let i = 0; i < group.length; i++) {
-            await client.query(
-              `UPDATE tree_nodes SET parent_node_id = $1, position = $2 WHERE id = $3`,
-              [parentId, posToKey(GROUP_PARK_BASE + i), group[i].node_id]
-            );
-          }
-
-          // Phase 2: Resolve undefined positions (append-to-end semantics)
-          // Track the running max so multiple undefined positions don't collide.
-          // `position >= '0000000000'` filters out park-territory keys ('!', '"')
-          // that we just parked above.
-          const maxResult = await client.query(
-            `SELECT COALESCE(MAX(position), '0000000000') AS max_pos FROM tree_nodes
-             WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position >= '0000000000'`,
-            [parentId]
-          );
-          let runningMax = keyToPos(maxResult.rows[0]["max_pos"] as string);
-          // Also consider explicitly provided positions
-          for (const item of group) {
-            if (
-              item.new_position !== undefined &&
-              item.new_position > runningMax
-            ) {
-              runningMax = item.new_position;
-            }
-          }
-          for (const item of group) {
-            if (item.new_position === undefined) {
-              runningMax += 100;
-              item.new_position = runningMax;
-            }
-          }
-
-          // Phase 3: Relocate non-group siblings if any requested positions
-          // conflict with them. Cycle A1: without UNIQUE this is no longer
-          // strictly required, but retained for cycle A2 removal symmetry.
-          const requestedPositionSet = new Set(
-            group.map((g) => g.new_position!)
-          );
-          const nonGroupSiblings = await client.query(
-            `SELECT id FROM tree_nodes
-             WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position >= '0000000000'
-             ORDER BY position ASC, id ASC`,
-            [parentId]
-          );
-          if (nonGroupSiblings.rows.length > 0) {
-            // Park non-group siblings at temporary positions, then
-            // reassign them to positions that don't collide with
-            // the group's requested positions.
-            for (let i = 0; i < nonGroupSiblings.rows.length; i++) {
-              await client.query(
-                `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
-                [posToKey(NONGROUP_PARK_BASE + i), nonGroupSiblings.rows[i]["id"]]
-              );
-            }
-            let pos = 100;
-            for (const row of nonGroupSiblings.rows) {
-              while (requestedPositionSet.has(pos)) pos += 100;
-              await client.query(
-                `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
-                [posToKey(pos), row["id"]]
-              );
-              pos += 100;
-            }
-          }
-
-          // Phase 4: Assign final positions to group nodes in ascending order.
-          // Both group nodes (parked) and non-group siblings (relocated) are
-          // now safe; integer ordering is preserved via posToKey's bijection.
-          group.sort((a, b) => a.new_position! - b.new_position!);
-          for (const item of group) {
-            await client.query(
-              `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
-              [posToKey(item.new_position!), item.node_id]
-            );
-          }
-        }
-
-        for (const item of group) {
-          result.moved.push(item.node_id);
-        }
+        await moveNode(
+          client,
+          item.node_id,
+          newParentNodeId ?? null,
+          item.new_position
+        );
+        result.moved.push(item.node_id);
       }
     }
 
