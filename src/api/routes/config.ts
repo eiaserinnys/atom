@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import pg from 'pg';
 import { setPendingRestart } from '../state.js';
 import { getDb } from '../../db/client.js';
+import { posToKey } from '../../shared/lexorank.js';
 import {
   listUsers,
   insertUser,
@@ -264,11 +265,18 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
           const node = queue.shift()!;
           const nodeId = node['id'] as string;
           if (inserted.has(nodeId)) continue;
+          // Cycle A1: position is now TEXT (zero-padded key). After SQLite
+          // migration 010 the source DB also stores TEXT, but the legacy
+          // path (older backups with INTEGER position) is handled by routing
+          // any number through posToKey. String values pass through verbatim.
+          const rawPos = node['position'];
+          const positionKey =
+            typeof rawPos === 'number' ? posToKey(rawPos) : (rawPos as string);
           await tx.query(
             `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink, created_at)
              VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (id) DO NOTHING`,
-            [nodeId, node['card_id'], node['parent_node_id'] ?? null, node['position'], Boolean(node['is_symlink']), node['created_at']]
+            [nodeId, node['card_id'], node['parent_node_id'] ?? null, positionKey, Boolean(node['is_symlink']), node['created_at']]
           );
           inserted.add(nodeId);
           const children = allNodes.filter((n) => n['parent_node_id'] === nodeId && !inserted.has(n['id'] as string));

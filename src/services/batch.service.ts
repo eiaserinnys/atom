@@ -12,6 +12,7 @@ import type {
   BatchCreateItem,
 } from "../shared/types.js";
 import { eventBus } from "../events/eventBus.js";
+import { posToKey, keyToPos } from "../shared/lexorank.js";
 
 // Temporary position bases for the park-and-assign strategy in batch moves.
 // These must be within PostgreSQL INTEGER range (-2,147,483,648 to 2,147,483,647)
@@ -273,23 +274,33 @@ export async function executeBatchOp(
           );
         } else {
           // Multi-move to same parent: park-and-assign strategy.
-          // Phase 1: Park all group nodes at unique negative positions
-          // to clear them from the positive position space.
+          //
+          // Cycle A1 note: After migration 010 removed the (parent, position)
+          // UNIQUE constraint, the park step is no longer needed to avoid
+          // UNIQUE violations. The code is retained per cycle A1's mandate
+          // ("park-and-assign is kept on top of fractional keys; A2 removes").
+          // The DB column is now TEXT; every integer position parameter is
+          // funnelled through `posToKey` before reaching SQL.
+          //
+          // Phase 1: Park all group nodes at unique park-territory keys to
+          // clear them from the normal-position space.
           for (let i = 0; i < group.length; i++) {
             await client.query(
               `UPDATE tree_nodes SET parent_node_id = $1, position = $2 WHERE id = $3`,
-              [parentId, GROUP_PARK_BASE + i, group[i].node_id]
+              [parentId, posToKey(GROUP_PARK_BASE + i), group[i].node_id]
             );
           }
 
           // Phase 2: Resolve undefined positions (append-to-end semantics)
           // Track the running max so multiple undefined positions don't collide.
+          // `position >= '0000000000'` filters out park-territory keys ('!', '"')
+          // that we just parked above.
           const maxResult = await client.query(
-            `SELECT COALESCE(MAX(position), 0) AS max_pos FROM tree_nodes
-             WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position >= 0`,
+            `SELECT COALESCE(MAX(position), '0000000000') AS max_pos FROM tree_nodes
+             WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position >= '0000000000'`,
             [parentId]
           );
-          let runningMax = maxResult.rows[0]["max_pos"] as number;
+          let runningMax = keyToPos(maxResult.rows[0]["max_pos"] as string);
           // Also consider explicitly provided positions
           for (const item of group) {
             if (
@@ -307,15 +318,15 @@ export async function executeBatchOp(
           }
 
           // Phase 3: Relocate non-group siblings if any requested positions
-          // conflict with them. Without this, a UNIQUE violation would occur
-          // when assigning final positions to group nodes.
+          // conflict with them. Cycle A1: without UNIQUE this is no longer
+          // strictly required, but retained for cycle A2 removal symmetry.
           const requestedPositionSet = new Set(
             group.map((g) => g.new_position!)
           );
           const nonGroupSiblings = await client.query(
             `SELECT id FROM tree_nodes
-             WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position >= 0
-             ORDER BY position ASC`,
+             WHERE parent_node_id IS NOT DISTINCT FROM $1 AND position >= '0000000000'
+             ORDER BY position ASC, id ASC`,
             [parentId]
           );
           if (nonGroupSiblings.rows.length > 0) {
@@ -325,7 +336,7 @@ export async function executeBatchOp(
             for (let i = 0; i < nonGroupSiblings.rows.length; i++) {
               await client.query(
                 `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
-                [NONGROUP_PARK_BASE + i, nonGroupSiblings.rows[i]["id"]]
+                [posToKey(NONGROUP_PARK_BASE + i), nonGroupSiblings.rows[i]["id"]]
               );
             }
             let pos = 100;
@@ -333,20 +344,20 @@ export async function executeBatchOp(
               while (requestedPositionSet.has(pos)) pos += 100;
               await client.query(
                 `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
-                [pos, row["id"]]
+                [posToKey(pos), row["id"]]
               );
               pos += 100;
             }
           }
 
           // Phase 4: Assign final positions to group nodes in ascending order.
-          // Both group nodes (parked at large negatives) and non-group siblings
-          // (relocated to avoid conflicts) are now safe from collisions.
+          // Both group nodes (parked) and non-group siblings (relocated) are
+          // now safe; integer ordering is preserved via posToKey's bijection.
           group.sort((a, b) => a.new_position! - b.new_position!);
           for (const item of group) {
             await client.query(
               `UPDATE tree_nodes SET position = $1 WHERE id = $2`,
-              [item.new_position, item.node_id]
+              [posToKey(item.new_position!), item.node_id]
             );
           }
         }
