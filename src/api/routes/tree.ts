@@ -105,16 +105,26 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PUT /tree/:nodeId/move
+  // Cycle B: parent_node_id omission = keep current parent (NOT root).
+  // before/after/to for relative positioning.
   app.put<{ Params: { nodeId: string } }>(
     "/tree/:nodeId/move",
     async (req, reply) => {
       const body = req.body as Record<string, unknown>;
-      const moved = await moveNode(
-        req.params.nodeId,
-        (body["parent_node_id"] as string | null) ?? null,
-        body["position"] as number | undefined
-      );
+      // Cycle B f995e015 fix: distinguish "key absent" (keep current) from "key = null" (root).
+      const parentNodeId: string | null | undefined =
+        "parent_node_id" in body
+          ? (body["parent_node_id"] as string | null)
+          : undefined;
+      const { node: moved, warnings } = await moveNode(req.params.nodeId, {
+        parent_node_id: parentNodeId,
+        position: body["position"] as number | undefined,
+        before: body["before"] as string | undefined,
+        after: body["after"] as string | undefined,
+        to: body["to"] as "start" | "end" | undefined,
+      });
       if (!moved) return reply.code(404).send({ error: "Node not found" });
+      if (warnings.length > 0) return { ...moved, _warnings: warnings };
       return moved;
     }
   );

@@ -266,7 +266,7 @@ describe("Event Bus — emit cases", () => {
     });
 
     const eventPromise = nextEvent();
-    await treeService.moveNode(child, rootB);
+    await treeService.moveNode(child, { parent_node_id: rootB });
     const event = await eventPromise;
 
     expect(event.type).toBe("node:moved");

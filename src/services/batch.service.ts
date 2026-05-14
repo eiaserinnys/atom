@@ -4,7 +4,9 @@ import {
   updateCardById,
   deleteCardById,
 } from "../db/queries/cards.js";
-import { insertNode, moveNode, updateNodeProperties } from "../db/queries/tree.js";
+import { insertNode, moveNode, selectNodeById, updateNodeProperties } from "../db/queries/tree.js";
+import { resolvePositionKey } from "./tree.service.js";
+import { rekeyEvenly } from "../shared/lexorank.js";
 import type {
   BatchOpInput,
   BatchOpResult,
@@ -86,6 +88,7 @@ export async function executeBatchOp(
     input = agentIdOrInput;
   }
 
+  const batchWarnings: string[] = [];
   const result = await getDb().transaction(async (client) => {
     const result: BatchOpResult = {
       created: [],
@@ -93,6 +96,7 @@ export async function executeBatchOp(
       updated: [],
       node_updated: [],
       moved: [],
+      child_ordered: [],
       deleted: [],
     };
 
@@ -218,18 +222,10 @@ export async function executeBatchOp(
 
     // ── Moves ─────────────────────────────────────────────────────────────────
     //
-    // Cycle A2: park-and-assign 4-phase logic removed. After A1's UNIQUE
-    // relaxation on (parent_node_id, position), explicit position
-    // collisions are allowed and resolved deterministically by the
-    // (position, id) tie-break in selectChildren. Callers needing
-    // automatic collision avoidance will use cycle B's `before/after`
-    // MCP interface; the absolute-position path here just writes what
-    // the caller asks for. Same-parent multi-moves degenerate to
-    // sequential moveNode calls.
-    //
-    // Incident c88f3fed closed by this simplification — the original
-    // "position conflict persists after 3 retries" failure mode is
-    // structurally impossible now (no UNIQUE, no retry loop).
+    // Cycle B: relative positioning (before/after/to) alongside deprecated
+    // absolute position. Parent undefined = keep current (f995e015 fix).
+    // resolvePositionKey handles all position resolution; moveNode (DB query)
+    // is a simple UPDATE with pre-resolved key.
     if (input.moves && input.moves.length > 0) {
       // Build temp_id → node_id map from this batch's creates
       const tempIdToNodeId = new Map<string, string>(
@@ -237,7 +233,8 @@ export async function executeBatchOp(
       );
 
       for (const item of input.moves) {
-        let newParentNodeId: string | null | undefined = item.new_parent_node_id;
+        // Resolve parent: undefined = keep current, null = root
+        let resolvedParent: string | null | undefined = item.new_parent_node_id;
         if (item.parent_temp_id !== undefined) {
           const resolved = tempIdToNodeId.get(item.parent_temp_id);
           if (resolved === undefined) {
@@ -245,15 +242,62 @@ export async function executeBatchOp(
               `Move: parent_temp_id "${item.parent_temp_id}" not found among batch creates`
             );
           }
-          newParentNodeId = resolved;
+          resolvedParent = resolved;
         }
-        await moveNode(
+
+        // If parent is still undefined (neither new_parent_node_id nor parent_temp_id),
+        // fetch current parent — cycle B "keep current" semantics (f995e015 fix).
+        let effectiveParent: string | null;
+        if (resolvedParent === undefined) {
+          const currentNode = await selectNodeById(client, item.node_id);
+          if (!currentNode) {
+            throw new Error(`Node not found: ${item.node_id}`);
+          }
+          effectiveParent = currentNode.parent_node_id;
+        } else {
+          effectiveParent = resolvedParent;
+        }
+
+        const { key, warnings: moveWarnings } = await resolvePositionKey(
           client,
+          effectiveParent,
           item.node_id,
-          newParentNodeId ?? null,
-          item.new_position
+          {
+            before: item.before,
+            after: item.after,
+            to: item.to,
+            position: item.new_position,
+          }
         );
+        if (moveWarnings.length > 0) {
+          batchWarnings.push(...moveWarnings);
+        }
+
+        await moveNode(client, item.node_id, effectiveParent, key);
         result.moved.push(item.node_id);
+      }
+    }
+
+    // ── Child orders ─────────────────────────────────────────────────────────
+    //
+    // Cycle B: reorder listed nodes under a parent with evenly-spaced keys.
+    // Nodes in `order` are re-parented if they come from a different parent
+    // (implicit cross-parent move). Nodes under the parent but NOT in `order`
+    // keep their existing keys (may interleave with new keys via tie-break).
+    if (input.child_orders && input.child_orders.length > 0) {
+      for (const co of input.child_orders) {
+        const keys = rekeyEvenly(co.order.length);
+        for (let i = 0; i < co.order.length; i++) {
+          const updateResult = await client.query(
+            `UPDATE tree_nodes SET parent_node_id = $1, position = $2
+             WHERE id = $3 RETURNING id`,
+            [co.parent_node_id, keys[i], co.order[i]]
+          );
+          if (updateResult.rows.length === 0) {
+            throw new Error(`child_orders: node not found: ${co.order[i]}`);
+          }
+        }
+        result.child_ordered.push(co.parent_node_id);
       }
     }
 
@@ -271,5 +315,9 @@ export async function executeBatchOp(
   // Emit a single batch event after the transaction commits
   eventBus.emit("atom:event", { type: "batch:completed", result });
 
+  // Attach deprecation warnings if any (cycle B — deprecated position usage)
+  if (batchWarnings.length > 0) {
+    return { ...result, _warnings: batchWarnings };
+  }
   return result;
 }

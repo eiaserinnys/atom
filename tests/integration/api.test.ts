@@ -389,7 +389,7 @@ describe("Tree operations", () => {
       parent_node_id: rootA,
     });
 
-    const moved = await treeService.moveNode(child, rootB, undefined);
+    const { node: moved } = await treeService.moveNode(child, { parent_node_id: rootB });
     expect(moved).not.toBeNull();
     expect(moved!.parent_node_id).toBe(rootB);
 

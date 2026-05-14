@@ -109,18 +109,44 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
   // move_node
   server.tool(
     "move_node",
-    "Move a tree node to a new parent and/or position. Note: parent_node_id is the DESTINATION parent (the node to move under), not a field called new_parent_node_id. Pass null to move to root level.",
+    [
+      "Move a tree node to a new parent and/or position.",
+      "",
+      "Positioning (mutually exclusive — pick ONE):",
+      "  • before: place immediately before this sibling node_id.",
+      "  • after: place immediately after this sibling node_id.",
+      "  • to: 'start' = first child, 'end' = last child of the parent.",
+      "  • position (DEPRECATED): absolute 0-based integer. Still works but emits a deprecation warning.",
+      "  • Omit all four: append at end (same as to='end').",
+      "",
+      "Parent (destination):",
+      "  • parent_node_id = UUID: move under that node.",
+      "  • parent_node_id = null: move to root level.",
+      "  • Omit parent_node_id: KEEP CURRENT PARENT (default). Useful for reordering within the same parent.",
+    ].join("\n"),
     {
       node_id: z.string().uuid().describe("The node to move."),
-      parent_node_id: z.string().uuid().nullable().optional().describe("Destination parent node. Null = move to root level."),
-      position: z.number().int().nonnegative().optional().describe("0-based position among siblings at the destination. Omit to append at end."),
+      parent_node_id: z.string().uuid().nullable().optional().describe("Destination parent. Null = root. Omit = keep current parent."),
+      before: z.string().uuid().optional().describe("Place before this sibling node_id."),
+      after: z.string().uuid().optional().describe("Place after this sibling node_id."),
+      to: z.enum(["start", "end"]).optional().describe("Place at start or end of parent's children."),
+      position: z.number().int().nonnegative().optional().describe("DEPRECATED — use before/after/to instead. Absolute 0-based position."),
     },
-    async ({ node_id, parent_node_id, position }) => {
-      const moved = await moveNode(node_id, parent_node_id ?? null, position);
+    async ({ node_id, parent_node_id, before, after, to, position }) => {
+      const { node: moved, warnings } = await moveNode(node_id, {
+        parent_node_id,
+        before,
+        after,
+        to,
+        position,
+      });
       if (!moved) {
         return { content: [{ type: "text", text: `Node not found: ${node_id}` }], isError: true };
       }
-      return { content: [{ type: "text", text: JSON.stringify(moved) }] };
+      const response = warnings.length > 0
+        ? { ...moved, _warnings: warnings }
+        : moved;
+      return { content: [{ type: "text", text: JSON.stringify(response) }] };
     }
   );
 
