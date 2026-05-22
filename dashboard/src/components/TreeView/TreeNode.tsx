@@ -28,7 +28,6 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
     enabled: isExpanded,
     ...(propsChildren !== undefined && {
       initialData: propsChildren,
-      initialDataUpdatedAt: Date.now(),
     }),
     staleTime: 30_000,
     gcTime: 0,

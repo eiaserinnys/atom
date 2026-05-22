@@ -146,34 +146,61 @@
 }
 
 @layer components {
-  .prose-atom {
+  .markdown-content {
     color: var(--foreground);
+    font-size: 1rem;
     line-height: 1.7;
+    letter-spacing: 0;
   }
-  .prose-atom h1, .prose-atom h2, .prose-atom h3, .prose-atom h4 {
+
+  .markdown-content h1,
+  .markdown-content h2,
+  .markdown-content h3,
+  .markdown-content h4,
+  .markdown-content h5,
+  .markdown-content h6 {
     color: var(--foreground);
-    margin-top: 1.25em;
-    margin-bottom: 0.5em;
+    font-weight: 600;
+    margin-top: 1.4em;
+    margin-bottom: 0.4em;
   }
-  /* Apple Typography: Display Hero — 56px/600/lh1.07/ls-0.28px */
-  .prose-atom h1 { font-size: 3.5rem; font-weight: 600; line-height: 1.07; letter-spacing: -0.28px; }
-  /* Apple Typography: Section Heading — 40px/600/lh1.10 */
-  .prose-atom h2 { font-size: 2.5rem; font-weight: 600; line-height: 1.10; letter-spacing: normal; }
-  /* Apple Typography: Tile Heading — 28px/400/lh1.14/ls0.196px */
-  .prose-atom h3 { font-size: 1.75rem; font-weight: 400; line-height: 1.14; letter-spacing: 0.196px; }
-  /* Apple Typography: Card Title — 21px/700/lh1.19/ls0.231px */
-  .prose-atom h4 { font-size: 1.31rem; font-weight: 700; line-height: 1.19; letter-spacing: 0.231px; }
-  .prose-atom p {
-    margin-bottom: 0.75em;
+
+  .markdown-content h1 {
+    font-size: 1.4em;
+    margin-top: 1rem;
   }
-  .prose-atom :first-child { margin-top: 0; }
-  .prose-atom p:last-child { margin-bottom: 0; }
-  .prose-atom ul, .prose-atom ol {
+
+  .markdown-content h1:first-child {
+    margin-top: 0;
+  }
+
+  .markdown-content h2 { font-size: 1.2em; }
+  .markdown-content h3 { font-size: 1.05em; }
+  .markdown-content h5 { font-size: 0.95em; }
+  .markdown-content h6 {
+    color: var(--muted-foreground);
+    font-size: 0.9em;
+  }
+
+  .markdown-content p {
+    margin-bottom: 0.8em;
+  }
+
+  .markdown-content ul,
+  .markdown-content ol {
     padding-left: 1.5em;
-    margin-bottom: 0.75em;
+    margin-bottom: 0.8em;
   }
-  .prose-atom li { margin-bottom: 0.25em; }
-  .prose-atom code {
+
+  .markdown-content ul { list-style: disc; }
+  .markdown-content ol { list-style: decimal; }
+  .markdown-content li { margin-bottom: 0.2em; }
+  .markdown-content li ul,
+  .markdown-content li ol {
+    margin-top: 0.2em;
+  }
+
+  .markdown-content code {
     background: var(--muted);
     border: 1px solid var(--border);
     border-radius: 3px;
@@ -182,52 +209,68 @@
     font-family: var(--font-mono);
     color: var(--foreground);
   }
-  .prose-atom pre {
-    background: var(--muted);
+
+  .markdown-content pre {
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 0.75em 1em;
+    padding: 0.75rem;
     overflow-x: auto;
-    margin-bottom: 0.75em;
+    margin-bottom: 1em;
   }
-  .prose-atom pre code {
-    background: none;
-    border: none;
+
+  .markdown-content pre code {
+    background: transparent;
+    border: 0;
     padding: 0;
     font-size: 0.875em;
   }
-  .prose-atom blockquote {
+
+  .markdown-content blockquote {
     border-left: 3px solid var(--border);
-    padding-left: 1em;
+    margin: 0 0 0.8em;
+    padding-left: 0.75rem;
     color: var(--muted-foreground);
-    margin: 0.75em 0;
   }
-  .prose-atom hr {
+
+  .markdown-content hr {
     border: none;
     border-top: 1px solid var(--border);
-    margin: 1em 0;
+    margin: 1rem 0;
   }
-  .prose-atom a {
-    color: var(--brand);   /* Apple Blue: #0071e3 (light) / #2997ff (dark) */
+
+  .markdown-content a {
+    color: var(--node-user);
+    text-decoration: none;
+  }
+
+  .markdown-content a:hover {
     text-decoration: underline;
-    text-underline-offset: 2px;
   }
-  .prose-atom table {
+
+  .markdown-content table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 0.75em;
-    font-size: 0.9em;
+    margin-bottom: 1.25em;
   }
-  .prose-atom th, .prose-atom td {
+
+  .markdown-content th,
+  .markdown-content td {
     border: 1px solid var(--border);
-    padding: 0.4em 0.75em;
+    padding: 0.5rem 0.75rem;
     text-align: left;
   }
-  .prose-atom th {
-    background: var(--muted);
+
+  .markdown-content th {
+    background: color-mix(in srgb, var(--muted) 50%, transparent);
     font-weight: 600;
   }
-  .prose-atom input[type="checkbox"] {
+
+  .markdown-content tbody tr:nth-child(even) td {
+    background: color-mix(in srgb, var(--muted) 20%, transparent);
+  }
+
+  .markdown-content input[type="checkbox"] {
     margin-right: 0.4em;
   }
 }

@@ -1,23 +1,6 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { systemApi } from '../api/client';
-
-interface SystemState {
-  pendingRestart: boolean;
-  reconnecting: boolean;
-  triggerRestart: () => void;
-  refreshStatus: () => void;
-}
-
-const SystemContext = createContext<SystemState>({
-  pendingRestart: false,
-  reconnecting: false,
-  triggerRestart: () => {},
-  refreshStatus: () => {},
-});
-
-export function useSystem() {
-  return useContext(SystemContext);
-}
+import { SystemContext } from './systemContext';
 
 export function SystemProvider({ children }: { children: ReactNode }) {
   const [pendingRestart, setPendingRestart] = useState(false);

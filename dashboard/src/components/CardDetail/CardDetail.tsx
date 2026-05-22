@@ -206,7 +206,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
                   title={t('card.click_to_edit')}
                 >
                   {card.content ? (
-                    <div className="prose prose-atom text-[15px] leading-relaxed">
+                    <div className="markdown-content">
                       <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>{card.content}</Markdown>
                     </div>
                   ) : (

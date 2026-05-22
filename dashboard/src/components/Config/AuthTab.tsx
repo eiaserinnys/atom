@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { configApi } from '../../api/client';
-import { useSystem } from '../../contexts/SystemContext';
+import { useSystem } from '../../contexts/systemContext';
 
 const ENV_KEYS = {
   google: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CALLBACK_URL'] as const,

@@ -166,6 +166,5 @@ export function useAtomEvents(selectedNodeId: string | null = null) {
       es.close();
     };
     // selectedNodeId는 compile invalidation 범위를 결정하므로 의존성에 포함
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryClient, selectedNodeId]);
 }

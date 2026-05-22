@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useSystem } from '../contexts/SystemContext';
+import { useSystem } from '../contexts/systemContext';
 
 export function ReconnectOverlay() {
   const { t } = useTranslation();

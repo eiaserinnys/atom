@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UserRole } from '../../hooks/useAuth';
 import { UserManagementTab } from './UserManagementTab';
@@ -15,18 +15,17 @@ interface Props {
   currentUserEmail: string;
 }
 
+type ConfigTab = 'users' | 'agents' | 'credentials' | 'language' | 'database' | 'auth';
+
 export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail }: Props) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'users' | 'agents' | 'credentials' | 'language' | 'database' | 'auth'>(
+  const [activeTab, setActiveTab] = useState<ConfigTab>(
     currentUserRole === 'admin' ? 'users' : 'agents'
   );
-
-  // role이 바뀌면 기본 탭 재설정
-  useEffect(() => {
-    if (currentUserRole !== 'admin' && (activeTab === 'users' || activeTab === 'database' || activeTab === 'auth')) {
-      setActiveTab('agents');
-    }
-  }, [currentUserRole, activeTab]);
+  const isAdmin = currentUserRole === 'admin';
+  const visibleTab: ConfigTab = isAdmin || !['users', 'database', 'auth'].includes(activeTab)
+    ? activeTab
+    : 'agents';
 
   if (!isOpen) return null;
 
@@ -52,10 +51,10 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
 
         {/* 탭 */}
         <div className="flex overflow-x-auto border-b border-border shrink-0">
-          {currentUserRole === 'admin' && (
+          {isAdmin && (
             <button
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                activeTab === 'users'
+                visibleTab === 'users'
                   ? 'border-brand text-brand'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
@@ -66,7 +65,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           )}
           <button
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-              activeTab === 'agents'
+              visibleTab === 'agents'
                 ? 'border-brand text-brand'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
@@ -76,7 +75,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           </button>
           <button
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-              activeTab === 'credentials'
+              visibleTab === 'credentials'
                 ? 'border-brand text-brand'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
@@ -86,7 +85,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           </button>
           <button
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-              activeTab === 'language'
+              visibleTab === 'language'
                 ? 'border-brand text-brand'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
@@ -94,10 +93,10 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           >
             {t('config.tab_language')}
           </button>
-          {currentUserRole === 'admin' && (
+          {isAdmin && (
             <button
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                activeTab === 'database'
+                visibleTab === 'database'
                   ? 'border-brand text-brand'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
@@ -106,10 +105,10 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
               {t('config.tab_database')}
             </button>
           )}
-          {currentUserRole === 'admin' && (
+          {isAdmin && (
             <button
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                activeTab === 'auth'
+                visibleTab === 'auth'
                   ? 'border-brand text-brand'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
@@ -122,14 +121,14 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
 
         {/* 탭 컨텐츠 */}
         <div className="flex-1 overflow-y-auto p-5">
-          {activeTab === 'users' && currentUserRole === 'admin' && (
+          {visibleTab === 'users' && isAdmin && (
             <UserManagementTab currentUserEmail={currentUserEmail} />
           )}
-          {activeTab === 'agents' && <AgentManagementTab />}
-          {activeTab === 'credentials' && <CredentialsTab />}
-          {activeTab === 'language' && <LanguageTab />}
-          {activeTab === 'database' && currentUserRole === 'admin' && <DatabaseTab />}
-          {activeTab === 'auth' && currentUserRole === 'admin' && <AuthTab />}
+          {visibleTab === 'agents' && <AgentManagementTab />}
+          {visibleTab === 'credentials' && <CredentialsTab />}
+          {visibleTab === 'language' && <LanguageTab />}
+          {visibleTab === 'database' && isAdmin && <DatabaseTab />}
+          {visibleTab === 'auth' && isAdmin && <AuthTab />}
         </div>
       </div>
     </div>

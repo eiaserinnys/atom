@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
@@ -30,8 +30,8 @@ const queryClient = new QueryClient({
 function AppInner() {
   const { t } = useTranslation();
   const auth = useAuth();
-  const initialSelectedNodeId = useRef<string | null>(
-    window.location.hash.length > 1 ? window.location.hash.slice(1) : null
+  const [initialSelectedNodeId] = useState<string | undefined>(
+    () => window.location.hash.length > 1 ? window.location.hash.slice(1) : undefined
   );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -122,7 +122,7 @@ function AppInner() {
           <MobileLayout
             selectedNodeId={selectedNodeId}
             onSelectNode={handleSelectNode}
-            initialSelectedNodeId={initialSelectedNodeId.current ?? undefined}
+            initialSelectedNodeId={initialSelectedNodeId}
           />
         ) : (
           <ThreePanelLayout
@@ -130,7 +130,7 @@ function AppInner() {
               <TreeView
                 selectedNodeId={selectedNodeId}
                 onSelect={handleSelectNode}
-                initialSelectedNodeId={initialSelectedNodeId.current ?? undefined}
+                initialSelectedNodeId={initialSelectedNodeId}
               />
             }
             center={<CompileView nodeId={selectedNodeId} />}

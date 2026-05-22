@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { configApi } from '../../api/client';
-import { useSystem } from '../../contexts/SystemContext';
+import { useSystem } from '../../contexts/systemContext';
 
 interface DbInfo {
   dbType: 'postgres' | 'sqlite';
