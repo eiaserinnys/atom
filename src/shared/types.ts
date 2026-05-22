@@ -254,15 +254,18 @@ export interface BatchOpResult {
 // Event types
 // ---------------------------------------------------------------------------
 
-export type AtomEvent =
-  | { type: 'card:created'; cardId: string; nodeId: string; parentNodeId: string | null; data: Card; actor: string | null }
+export type AtomPatchEvent =
+  | { type: 'card:created'; cardId: string; nodeId: string; parentNodeId: string | null; data: Card; node: TreeNodeWithCard; actor: string | null }
   | { type: 'card:updated'; cardId: string; data: Card; actor: string | null }
-  | { type: 'card:deleted'; cardId: string; actor: string | null }
-  | { type: 'node:created'; nodeId: string; cardId: string; parentNodeId: string | null }
-  | { type: 'node:updated'; nodeId: string }
-  | { type: 'node:deleted'; nodeId: string }
-  | { type: 'node:moved'; nodeId: string; newParentNodeId: string | null }
-  | { type: 'batch:completed'; result: BatchOpResult };
+  | { type: 'card:deleted'; cardId: string; nodeIds: string[]; parentNodeIds: (string | null)[]; actor: string | null }
+  | { type: 'node:created'; nodeId: string; cardId: string; parentNodeId: string | null; node: TreeNodeWithCard; actor: string | null }
+  | { type: 'node:updated'; nodeId: string; node: TreeNodeWithCard; actor: string | null }
+  | { type: 'node:deleted'; nodeId: string; cardId: string; parentNodeId: string | null; actor: string | null }
+  | { type: 'node:moved'; nodeId: string; oldParentNodeId: string | null; newParentNodeId: string | null; node: TreeNodeWithCard; affectedNodes: TreeNodeWithCard[]; actor: string | null };
+
+export type AtomEvent =
+  | AtomPatchEvent
+  | { type: 'batch:completed'; result: BatchOpResult; patches: AtomPatchEvent[] };
 
 // ---------------------------------------------------------------------------
 // Fastify request augmentation

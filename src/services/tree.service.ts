@@ -18,6 +18,7 @@ import { adapterRegistry } from "../unfurl/registry.js";
 import { parseSnapshot } from "../unfurl/utils.js";
 import { eventBus } from "../events/eventBus.js";
 import { posToKey, keyToPos, keyBetween, rekeyEvenly, NORMAL_DIGIT_COUNT } from "../shared/lexorank.js";
+import { selectChildrenWithCards, toTreeNodeWithCard } from "./tree-node-payload.js";
 
 function serializeError(e: unknown): string {
   if (e instanceof Error) return `${e.name}: ${e.message}`;
@@ -284,20 +285,31 @@ export async function createSymlink(
   parent_node_id: string | null,
   position?: number
 ): Promise<TreeNode> {
-  const node = await insertNode(getDb(), card_id, parent_node_id, position, true);
+  const db = getDb();
+  const node = await insertNode(db, card_id, parent_node_id, position, true);
   eventBus.emit("atom:event", {
     type: "node:created",
     nodeId: node.id,
     cardId: card_id,
     parentNodeId: parent_node_id,
+    node: await toTreeNodeWithCard(db, node),
+    actor: null,
   });
   return node;
 }
 
 export async function deleteNode(nodeId: string): Promise<boolean> {
-  const deleted = await deleteNodeById(getDb(), nodeId);
+  const db = getDb();
+  const node = await selectNodeById(db, nodeId);
+  const deleted = await deleteNodeById(db, nodeId);
   if (deleted) {
-    eventBus.emit("atom:event", { type: "node:deleted", nodeId });
+    eventBus.emit("atom:event", {
+      type: "node:deleted",
+      nodeId,
+      cardId: node?.card_id ?? "",
+      parentNodeId: node?.parent_node_id ?? null,
+      actor: null,
+    });
   }
   return deleted;
 }
@@ -480,13 +492,13 @@ export async function moveNode(
   opts: MoveNodeOptions
 ): Promise<{ node: TreeNode | null; warnings: string[] }> {
   const db = getDb();
+  const oldNode = await selectNodeById(db, nodeId);
+  if (!oldNode) return { node: null, warnings: [] };
 
   // Resolve parent: undefined = keep current, null = root
   let effectiveParent: string | null;
   if (opts.parent_node_id === undefined) {
-    const currentNode = await selectNodeById(db, nodeId);
-    if (!currentNode) return { node: null, warnings: [] };
-    effectiveParent = currentNode.parent_node_id;
+    effectiveParent = oldNode.parent_node_id;
   } else {
     effectiveParent = opts.parent_node_id;
   }
@@ -504,7 +516,11 @@ export async function moveNode(
     eventBus.emit("atom:event", {
       type: "node:moved",
       nodeId,
+      oldParentNodeId: oldNode.parent_node_id,
       newParentNodeId: effectiveParent,
+      node: await toTreeNodeWithCard(db, node),
+      affectedNodes: await selectChildrenWithCards(db, effectiveParent),
+      actor: null,
     });
   }
 
@@ -534,9 +550,15 @@ export async function updateNodeProperties(
   // `updated=false` when no provided field triggered an UPDATE. We trust
   // that flag rather than re-deriving it from `props` here, so adding a
   // new updatable column requires changes in exactly one place.
-  const { node, updated } = await updateNodePropertiesQuery(getDb(), nodeId, props);
+  const db = getDb();
+  const { node, updated } = await updateNodePropertiesQuery(db, nodeId, props);
   if (node && updated) {
-    eventBus.emit("atom:event", { type: "node:updated", nodeId });
+    eventBus.emit("atom:event", {
+      type: "node:updated",
+      nodeId,
+      node: await toTreeNodeWithCard(db, node),
+      actor: null,
+    });
   }
   return node;
 }

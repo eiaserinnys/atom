@@ -4,16 +4,19 @@ import {
   updateCardById,
   deleteCardById,
 } from "../db/queries/cards.js";
-import { insertNode, moveNode, selectNodeById, updateNodeProperties } from "../db/queries/tree.js";
+import { insertNode, moveNode, selectNodeById, selectNodesByCardId, updateNodeProperties } from "../db/queries/tree.js";
 import { resolvePositionKey } from "./tree.service.js";
 import { rekeyEvenly } from "../shared/lexorank.js";
 import type {
+  AtomPatchEvent,
   BatchOpInput,
   BatchOpResult,
   BatchCreatedItem,
   BatchCreateItem,
+  TreeNode,
 } from "../shared/types.js";
 import { eventBus } from "../events/eventBus.js";
+import { selectChildrenWithCards, toTreeNodeWithCard } from "./tree-node-payload.js";
 
 // ---------------------------------------------------------------------------
 // Topological sort for creates
@@ -89,7 +92,7 @@ export async function executeBatchOp(
   }
 
   const batchWarnings: string[] = [];
-  const result = await getDb().transaction(async (client) => {
+  const { result, patches } = await getDb().transaction(async (client) => {
     const result: BatchOpResult = {
       created: [],
       symlinked: [],
@@ -99,6 +102,7 @@ export async function executeBatchOp(
       child_ordered: [],
       deleted: [],
     };
+    const patches: AtomPatchEvent[] = [];
 
     // ── Creates ──────────────────────────────────────────────────────────────
     if (input.creates && input.creates.length > 0) {
@@ -146,6 +150,15 @@ export async function executeBatchOp(
           card_id: card.id,
           node_id: node.id,
         });
+        patches.push({
+          type: "card:created",
+          cardId: card.id,
+          nodeId: node.id,
+          parentNodeId,
+          data: card,
+          node: await toTreeNodeWithCard(client, node),
+          actor: agentId,
+        });
       }
     }
 
@@ -175,6 +188,14 @@ export async function executeBatchOp(
           true
         );
         result.symlinked.push(node.id);
+        patches.push({
+          type: "node:created",
+          nodeId: node.id,
+          cardId: item.card_id,
+          parentNodeId,
+          node: await toTreeNodeWithCard(client, node),
+          actor: agentId,
+        });
       }
     }
 
@@ -195,6 +216,12 @@ export async function executeBatchOp(
           );
         }
         result.updated.push(card_id);
+        patches.push({
+          type: "card:updated",
+          cardId: card_id,
+          data: updateResult.card,
+          actor: agentId,
+        });
       }
     }
 
@@ -216,6 +243,12 @@ export async function executeBatchOp(
         }
         if (updated) {
           result.node_updated.push(node_id);
+          patches.push({
+            type: "node:updated",
+            nodeId: node_id,
+            node: await toTreeNodeWithCard(client, node),
+            actor: agentId,
+          });
         }
       }
     }
@@ -233,6 +266,11 @@ export async function executeBatchOp(
       );
 
       for (const item of input.moves) {
+        const oldNode = await selectNodeById(client, item.node_id);
+        if (!oldNode) {
+          throw new Error(`Node not found: ${item.node_id}`);
+        }
+
         // Resolve parent: undefined = keep current, null = root
         let resolvedParent: string | null | undefined = item.new_parent_node_id;
         if (item.parent_temp_id !== undefined) {
@@ -249,11 +287,7 @@ export async function executeBatchOp(
         // fetch current parent — cycle B "keep current" semantics (f995e015 fix).
         let effectiveParent: string | null;
         if (resolvedParent === undefined) {
-          const currentNode = await selectNodeById(client, item.node_id);
-          if (!currentNode) {
-            throw new Error(`Node not found: ${item.node_id}`);
-          }
-          effectiveParent = currentNode.parent_node_id;
+          effectiveParent = oldNode.parent_node_id;
         } else {
           effectiveParent = resolvedParent;
         }
@@ -273,8 +307,20 @@ export async function executeBatchOp(
           batchWarnings.push(...moveWarnings);
         }
 
-        await moveNode(client, item.node_id, effectiveParent, key);
+        const movedNode = await moveNode(client, item.node_id, effectiveParent, key);
+        if (!movedNode) {
+          throw new Error(`Node not found: ${item.node_id}`);
+        }
         result.moved.push(item.node_id);
+        patches.push({
+          type: "node:moved",
+          nodeId: item.node_id,
+          oldParentNodeId: oldNode.parent_node_id,
+          newParentNodeId: effectiveParent,
+          node: await toTreeNodeWithCard(client, movedNode),
+          affectedNodes: await selectChildrenWithCards(client, effectiveParent),
+          actor: agentId,
+        });
       }
     }
 
@@ -286,16 +332,38 @@ export async function executeBatchOp(
     // keep their existing keys (may interleave with new keys via tie-break).
     if (input.child_orders && input.child_orders.length > 0) {
       for (const co of input.child_orders) {
+        const oldNodes = new Map<string, TreeNode>();
+        for (const nodeId of co.order) {
+          const oldNode = await selectNodeById(client, nodeId);
+          if (!oldNode) {
+            throw new Error(`child_orders: node not found: ${nodeId}`);
+          }
+          oldNodes.set(nodeId, oldNode);
+        }
+
         const keys = rekeyEvenly(co.order.length);
         for (let i = 0; i < co.order.length; i++) {
           const updateResult = await client.query(
             `UPDATE tree_nodes SET parent_node_id = $1, position = $2
-             WHERE id = $3 RETURNING id`,
+             WHERE id = $3 RETURNING *`,
             [co.parent_node_id, keys[i], co.order[i]]
           );
           if (updateResult.rows.length === 0) {
             throw new Error(`child_orders: node not found: ${co.order[i]}`);
           }
+          const movedNode = await selectNodeById(client, co.order[i]);
+          if (!movedNode) {
+            throw new Error(`child_orders: node not found: ${co.order[i]}`);
+          }
+          patches.push({
+            type: "node:moved",
+            nodeId: co.order[i],
+            oldParentNodeId: oldNodes.get(co.order[i])?.parent_node_id ?? null,
+            newParentNodeId: co.parent_node_id,
+            node: await toTreeNodeWithCard(client, movedNode),
+            affectedNodes: await selectChildrenWithCards(client, co.parent_node_id),
+            actor: agentId,
+          });
         }
         result.child_ordered.push(co.parent_node_id);
       }
@@ -304,16 +372,24 @@ export async function executeBatchOp(
     // ── Deletes ───────────────────────────────────────────────────────────────
     if (input.deletes && input.deletes.length > 0) {
       for (const item of input.deletes) {
+        const nodes = await selectNodesByCardId(client, item.card_id);
         await deleteCardById(client, item.card_id);
         result.deleted.push(item.card_id);
+        patches.push({
+          type: "card:deleted",
+          cardId: item.card_id,
+          nodeIds: nodes.map((node) => node.id),
+          parentNodeIds: nodes.map((node) => node.parent_node_id),
+          actor: agentId,
+        });
       }
     }
 
-    return result;
+    return { result, patches };
   });
 
   // Emit a single batch event after the transaction commits
-  eventBus.emit("atom:event", { type: "batch:completed", result });
+  eventBus.emit("atom:event", { type: "batch:completed", result, patches });
 
   // Attach deprecation warnings if any (cycle B — deprecated position usage)
   if (batchWarnings.length > 0) {

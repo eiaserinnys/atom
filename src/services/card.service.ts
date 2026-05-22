@@ -13,6 +13,7 @@ import type {
 } from "../shared/types.js";
 import { eventBus } from "../events/eventBus.js";
 import { deserializeArray, deserializeBoolean } from "../db/utils.js";
+import { toTreeNodeWithCard } from "./tree-node-payload.js";
 
 export async function createCard(
   agentIdOrInput: string | null | CreateCardInput,
@@ -47,6 +48,7 @@ export async function createCard(
     nodeId: node.id,
     parentNodeId: input.parent_node_id ?? null,
     data: card,
+    node: await toTreeNodeWithCard(getDb(), node),
     actor: agentId,
   });
 
@@ -106,10 +108,17 @@ export async function updateCard(
 }
 
 export async function deleteCard(id: string): Promise<boolean> {
+  const nodes = await selectNodesByCardId(getDb(), id);
   // Cascade deletes tree_nodes via FK
   const deleted = await deleteCardById(getDb(), id);
   if (deleted) {
-    eventBus.emit("atom:event", { type: "card:deleted", cardId: id, actor: null });
+    eventBus.emit("atom:event", {
+      type: "card:deleted",
+      cardId: id,
+      nodeIds: nodes.map((node) => node.id),
+      parentNodeIds: nodes.map((node) => node.parent_node_id),
+      actor: null,
+    });
   }
   return deleted;
 }

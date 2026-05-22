@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { applyChildrenPatch, shouldInvalidateCompile } from './treePatching';
+import { applyChildrenPatch, applyTreePatch, shouldInvalidateCompile } from './treePatching';
 import type { TreeNodeData, CardData } from '../api/client';
 import type { AtomEvent } from '../types/events';
 
@@ -25,7 +25,13 @@ function makeCard(id: string, title: string): CardData {
   };
 }
 
-function makeNode(id: string, cardId: string, parentNodeId: string | null = null, position = 100): TreeNodeData {
+function makeNode(
+  id: string,
+  cardId: string,
+  parentNodeId: string | null = null,
+  position = 100,
+  children?: TreeNodeData[]
+): TreeNodeData {
   return {
     id,
     card_id: cardId,
@@ -35,6 +41,7 @@ function makeNode(id: string, cardId: string, parentNodeId: string | null = null
     journal_limit: null,
     created_at: '2026-01-01T00:00:00Z',
     card: makeCard(cardId, `Card ${cardId}`),
+    ...(children !== undefined ? { children } : {}),
   };
 }
 
@@ -51,6 +58,10 @@ describe('applyChildrenPatch — card:created', () => {
       nodeId: 'n-new',
       parentNodeId: parent,
       data: newCard,
+      node: {
+        ...makeNode('n-new', 'c-new', parent, 150),
+        card: newCard,
+      },
       actor: null,
     };
 
@@ -61,6 +72,7 @@ describe('applyChildrenPatch — card:created', () => {
     expect(result[2].id).toBe('n-new');
     expect(result[2].card_id).toBe('c-new');
     expect(result[2].card).toEqual(newCard);
+    expect(result[2].position).toBe(150);
     // 기존 항목은 동일 참조 보존 (structural sharing)
     expect(result[0]).toBe(initial[0]);
     expect(result[1]).toBe(initial[1]);
@@ -75,6 +87,7 @@ describe('applyChildrenPatch — card:created', () => {
       nodeId: 'n-new',
       parentNodeId: 'other-parent',
       data: makeCard('c-new', 'New Card'),
+      node: makeNode('n-new', 'c-new', 'other-parent'),
       actor: null,
     };
 
@@ -92,6 +105,10 @@ describe('applyChildrenPatch — card:created', () => {
       nodeId: 'n-new',
       parentNodeId: parent,
       data: newCard,
+      node: {
+        ...makeNode('n-new', 'c-new', parent, 100),
+        card: newCard,
+      },
       actor: null,
     };
 
@@ -147,7 +164,13 @@ describe('applyChildrenPatch — card:deleted', () => {
     const toDelete = makeNode('n1', 'c1', parent);
     const keep = makeNode('n2', 'c2', parent);
     const initial = [toDelete, keep];
-    const event: AtomEvent = { type: 'card:deleted', cardId: 'c1', actor: null };
+    const event: AtomEvent = {
+      type: 'card:deleted',
+      cardId: 'c1',
+      nodeIds: ['n1'],
+      parentNodeIds: [parent],
+      actor: null,
+    };
 
     const result = applyChildrenPatch(initial, event, parent);
 
@@ -160,7 +183,13 @@ describe('applyChildrenPatch — card:deleted', () => {
   test('일치하는 card 없으면 동일 참조 반환', () => {
     const parent = 'parent-1';
     const initial = [makeNode('n1', 'c1', parent)];
-    const event: AtomEvent = { type: 'card:deleted', cardId: 'nonexistent', actor: null };
+    const event: AtomEvent = {
+      type: 'card:deleted',
+      cardId: 'nonexistent',
+      nodeIds: [],
+      parentNodeIds: [],
+      actor: null,
+    };
 
     const result = applyChildrenPatch(initial, event, parent);
 
@@ -170,13 +199,59 @@ describe('applyChildrenPatch — card:deleted', () => {
 
 // ─── applyChildrenPatch: node:deleted ───────────────────────────────────────
 
+describe('applyChildrenPatch — node:created', () => {
+  test('node payload가 있으면 해당 부모의 자식 목록에 삽입한다', () => {
+    const parent = 'parent-1';
+    const initial = [makeNode('n1', 'c1', parent, 100), makeNode('n3', 'c3', parent, 300)];
+    const symlink = { ...makeNode('n2', 'c2', parent, 200), is_symlink: true };
+    const event: AtomEvent = {
+      type: 'node:created',
+      nodeId: 'n2',
+      cardId: 'c2',
+      parentNodeId: parent,
+      node: symlink,
+      actor: null,
+    };
+
+    const result = applyChildrenPatch(initial, event, parent);
+
+    expect(result.map((n) => n.id)).toEqual(['n1', 'n2', 'n3']);
+    expect(result[1]).toEqual(symlink);
+  });
+
+  test('이미 있는 node:created 이벤트는 중복 삽입하지 않고 최신 node로 교체한다', () => {
+    const parent = 'parent-1';
+    const stale = makeNode('n1', 'c1', parent, 100);
+    const fresh = { ...stale, journal_limit: 3 };
+    const event: AtomEvent = {
+      type: 'node:created',
+      nodeId: 'n1',
+      cardId: 'c1',
+      parentNodeId: parent,
+      node: fresh,
+      actor: null,
+    };
+
+    const result = applyChildrenPatch([stale], event, parent);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].journal_limit).toBe(3);
+  });
+});
+
 describe('applyChildrenPatch — node:deleted', () => {
   test('일치하는 nodeId의 노드를 제거한다', () => {
     const parent = 'parent-1';
     const toDelete = makeNode('n1', 'c1', parent);
     const keep = makeNode('n2', 'c2', parent);
     const initial = [toDelete, keep];
-    const event: AtomEvent = { type: 'node:deleted', nodeId: 'n1' };
+    const event: AtomEvent = {
+      type: 'node:deleted',
+      nodeId: 'n1',
+      cardId: 'c1',
+      parentNodeId: parent,
+      actor: null,
+    };
 
     const result = applyChildrenPatch(initial, event, parent);
 
@@ -186,7 +261,13 @@ describe('applyChildrenPatch — node:deleted', () => {
 
   test('일치하는 node 없으면 동일 참조 반환', () => {
     const initial = [makeNode('n1', 'c1', null)];
-    const event: AtomEvent = { type: 'node:deleted', nodeId: 'nonexistent' };
+    const event: AtomEvent = {
+      type: 'node:deleted',
+      nodeId: 'nonexistent',
+      cardId: 'nonexistent-card',
+      parentNodeId: null,
+      actor: null,
+    };
 
     const result = applyChildrenPatch(initial, event, null);
 
@@ -205,7 +286,11 @@ describe('applyChildrenPatch — node:moved', () => {
     const event: AtomEvent = {
       type: 'node:moved',
       nodeId: 'n1',
+      oldParentNodeId: parent,
       newParentNodeId: 'other-parent',
+      node: { ...toMove, parent_node_id: 'other-parent', position: 200 },
+      affectedNodes: [{ ...toMove, parent_node_id: 'other-parent', position: 200 }],
+      actor: null,
     };
 
     const result = applyChildrenPatch(initial, event, parent);
@@ -217,11 +302,126 @@ describe('applyChildrenPatch — node:moved', () => {
 
   test('일치하는 node 없으면 동일 참조 반환', () => {
     const initial = [makeNode('n1', 'c1', 'parent-1')];
-    const event: AtomEvent = { type: 'node:moved', nodeId: 'nonexistent', newParentNodeId: 'other' };
+    const event: AtomEvent = {
+      type: 'node:moved',
+      nodeId: 'nonexistent',
+      oldParentNodeId: 'parent-1',
+      newParentNodeId: 'other',
+      node: makeNode('nonexistent', 'other-card', 'other'),
+      affectedNodes: [makeNode('nonexistent', 'other-card', 'other')],
+      actor: null,
+    };
 
     const result = applyChildrenPatch(initial, event, 'parent-1');
 
     expect(result).toBe(initial);
+  });
+
+  test('새 부모 배열에는 이동된 노드를 position 순서로 삽입한다', () => {
+    const parent = 'new-parent';
+    const initial = [makeNode('n1', 'c1', parent, 100), makeNode('n3', 'c3', parent, 300)];
+    const moved = makeNode('n2', 'c2', parent, 200);
+    const event: AtomEvent = {
+      type: 'node:moved',
+      nodeId: 'n2',
+      oldParentNodeId: 'old-parent',
+      newParentNodeId: parent,
+      node: moved,
+      affectedNodes: [moved],
+      actor: null,
+    };
+
+    const result = applyChildrenPatch(initial, event, parent);
+
+    expect(result.map((n) => n.id)).toEqual(['n1', 'n2', 'n3']);
+  });
+
+  test('affectedNodes가 있으면 새 부모의 sibling position도 함께 갱신한다', () => {
+    const parent = 'new-parent';
+    const staleA = makeNode('n1', 'c1', parent, 100);
+    const staleB = makeNode('n3', 'c3', parent, 101);
+    const moved = makeNode('n2', 'c2', parent, 500);
+    const event: AtomEvent = {
+      type: 'node:moved',
+      nodeId: 'n2',
+      oldParentNodeId: 'old-parent',
+      newParentNodeId: parent,
+      node: moved,
+      affectedNodes: [
+        { ...staleA, position: 333 },
+        moved,
+        { ...staleB, position: 666 },
+      ],
+      actor: null,
+    };
+
+    const result = applyChildrenPatch([staleA, staleB], event, parent);
+
+    expect(result.map((n) => n.id)).toEqual(['n1', 'n2', 'n3']);
+    expect(result.map((n) => n.position)).toEqual([333, 500, 666]);
+  });
+});
+
+// ─── applyChildrenPatch: node:updated ───────────────────────────────────────
+
+describe('applyChildrenPatch — node:updated', () => {
+  test('일치하는 node를 최신 node payload로 교체한다', () => {
+    const parent = 'parent-1';
+    const original = makeNode('n1', 'c1', parent);
+    const updated = { ...original, journal_limit: 7 };
+    const event: AtomEvent = {
+      type: 'node:updated',
+      nodeId: 'n1',
+      node: updated,
+      actor: null,
+    };
+
+    const result = applyChildrenPatch([original], event, parent);
+
+    expect(result[0].journal_limit).toBe(7);
+    expect(result[0]).not.toBe(original);
+  });
+});
+
+// ─── applyTreePatch: nested root children ───────────────────────────────────
+
+describe('applyTreePatch', () => {
+  test("['tree', null] 내부 root.children에도 card:created를 적용한다", () => {
+    const root = makeNode('root', 'root-card', null, 100, [
+      makeNode('child-1', 'child-card-1', 'root', 100),
+    ]);
+    const newChild = makeNode('child-2', 'child-card-2', 'root', 200);
+    const event: AtomEvent = {
+      type: 'card:created',
+      cardId: 'child-card-2',
+      nodeId: 'child-2',
+      parentNodeId: 'root',
+      data: newChild.card,
+      node: newChild,
+      actor: null,
+    };
+
+    const result = applyTreePatch([root], event, null);
+
+    expect(result[0].children?.map((n) => n.id)).toEqual(['child-1', 'child-2']);
+    expect(result[0]).not.toBe(root);
+  });
+
+  test('중첩된 root.children의 card:updated도 stale 상태로 남기지 않는다', () => {
+    const child = makeNode('child-1', 'child-card-1', 'root', 100);
+    const root = makeNode('root', 'root-card', null, 100, [child]);
+    const updatedCard = makeCard('child-card-1', 'Updated Child');
+    const event: AtomEvent = {
+      type: 'card:updated',
+      cardId: 'child-card-1',
+      data: updatedCard,
+      actor: null,
+    };
+
+    const result = applyTreePatch([root], event, null);
+
+    expect(result[0].children?.[0].card.title).toBe('Updated Child');
+    expect(result[0].children?.[0]).not.toBe(child);
   });
 });
 
@@ -231,7 +431,13 @@ describe('structural sharing', () => {
   test('변경 없는 이벤트는 동일 배열 참조를 반환한다', () => {
     const initial = [makeNode('n1', 'c1', null)];
     // 무관한 cardId의 card:deleted
-    const event: AtomEvent = { type: 'card:deleted', cardId: 'nonexistent', actor: null };
+    const event: AtomEvent = {
+      type: 'card:deleted',
+      cardId: 'nonexistent',
+      nodeIds: [],
+      parentNodeIds: [],
+      actor: null,
+    };
     const result = applyChildrenPatch(initial, event, null);
     expect(result).toBe(initial);
   });
@@ -288,6 +494,7 @@ describe('shouldInvalidateCompile', () => {
       nodeId: 'n-new',
       parentNodeId: 'parent-1',
       data: makeCard('c-new', 'New Card'),
+      node: makeNode('n-new', 'c-new', 'parent-1'),
       actor: null,
     };
     expect(shouldInvalidateCompile(event, 'node-xyz')).toBe(true);
@@ -295,12 +502,26 @@ describe('shouldInvalidateCompile', () => {
 
   test('selectedNodeId가 있고 node:deleted 이벤트면 true 반환 (기존 버그 수정 검증)', () => {
     // 기존 버그: node:deleted가 compile을 무효화하지 않아 삭제된 노드가 컴파일에 남음
-    const event: AtomEvent = { type: 'node:deleted', nodeId: 'n1' };
+    const event: AtomEvent = {
+      type: 'node:deleted',
+      nodeId: 'n1',
+      cardId: 'c1',
+      parentNodeId: null,
+      actor: null,
+    };
     expect(shouldInvalidateCompile(event, 'node-xyz')).toBe(true);
   });
 
   test('selectedNodeId가 있고 node:moved 이벤트면 true 반환', () => {
-    const event: AtomEvent = { type: 'node:moved', nodeId: 'n1', newParentNodeId: 'other' };
+    const event: AtomEvent = {
+      type: 'node:moved',
+      nodeId: 'n1',
+      oldParentNodeId: null,
+      newParentNodeId: 'other',
+      node: makeNode('n1', 'c1', 'other'),
+      affectedNodes: [makeNode('n1', 'c1', 'other')],
+      actor: null,
+    };
     expect(shouldInvalidateCompile(event, 'node-xyz')).toBe(true);
   });
 });

@@ -13,25 +13,34 @@ export function applyChildrenPatch(
   event: AtomEvent,
   parentNodeId: string | null
 ): TreeNodeData[] {
+  function withExistingChildren(next: TreeNodeData, existing?: TreeNodeData): TreeNodeData {
+    if (next.children !== undefined || existing?.children === undefined) return next;
+    return { ...next, children: existing.children };
+  }
+
+  function upsertNodes(nodes: TreeNodeData[]): TreeNodeData[] {
+    const relevantNodes = nodes.filter((node) => node.parent_node_id === parentNodeId);
+    if (relevantNodes.length === 0) return children;
+    const relevantIds = new Set(relevantNodes.map((node) => node.id));
+    const withoutNodes = children.filter((child) => !relevantIds.has(child.id));
+    const nextNodes = relevantNodes.map((node) => {
+      const existing = children.find((child) => child.id === node.id);
+      return withExistingChildren(node, existing);
+    });
+    return [...withoutNodes, ...nextNodes].sort(
+      (a, b) => (a.position - b.position) || a.id.localeCompare(b.id)
+    );
+  }
+
+  function upsertNode(node: TreeNodeData): TreeNodeData[] {
+    return upsertNodes([node]);
+  }
+
   switch (event.type) {
     case 'card:created': {
       // 이 배열의 부모 노드에 추가된 카드인지 확인
       if (event.parentNodeId !== parentNodeId) return children;
-      const newNode: TreeNodeData = {
-        id: event.nodeId,
-        card_id: event.cardId,
-        parent_node_id: event.parentNodeId,
-        // 서버가 부여하는 실제 position과 다를 수 있으나,
-        // 목록 끝에 추가해두면 후속 재페치(node:created fallback 등)로 보정된다.
-        position: children.length > 0
-          ? (children[children.length - 1].position ?? 0) + 100
-          : 100,
-        is_symlink: false,
-        journal_limit: null,
-        created_at: new Date().toISOString(),
-        card: event.data,
-      };
-      return [...children, newNode];
+      return upsertNode(event.node);
     }
 
     case 'card:updated': {
@@ -51,10 +60,8 @@ export function applyChildrenPatch(
     }
 
     case 'node:created': {
-      // node:created는 심링크 노드 생성 경로.
-      // card data 없이 nodeId/cardId만 있으므로 surgical insert 불가.
-      // 호출자(useAtomEvents)에서 invalidateQueries fallback으로 처리한다.
-      return children;
+      if (event.parentNodeId !== parentNodeId) return children;
+      return upsertNode(event.node);
     }
 
     case 'node:deleted': {
@@ -63,15 +70,46 @@ export function applyChildrenPatch(
     }
 
     case 'node:moved': {
-      // 이 배열에서 이동된 노드를 제거한다.
-      // 새 부모 위치 삽입은 position 정보 없어 invalidate fallback으로 처리한다.
+      if (event.newParentNodeId === parentNodeId) {
+        return upsertNodes(event.affectedNodes.length > 0 ? event.affectedNodes : [event.node]);
+      }
+      if (event.oldParentNodeId !== parentNodeId) return children;
       const filtered = children.filter(n => n.id !== event.nodeId);
       return filtered.length !== children.length ? filtered : children;
+    }
+
+    case 'node:updated': {
+      let changed = false;
+      const updated = children.map(n => {
+        if (n.id !== event.nodeId) return n;
+        changed = true;
+        return withExistingChildren(event.node, n);
+      });
+      return changed ? updated : children;
     }
 
     default:
       return children;
   }
+}
+
+export function applyTreePatch(
+  nodes: TreeNodeData[],
+  event: AtomEvent,
+  parentNodeId: string | null
+): TreeNodeData[] {
+  const patchedLevel = applyChildrenPatch(nodes, event, parentNodeId);
+  let changed = patchedLevel !== nodes;
+
+  const patchedTree = patchedLevel.map((node) => {
+    if (node.children === undefined) return node;
+    const patchedChildren = applyTreePatch(node.children, event, node.id);
+    if (patchedChildren === node.children) return node;
+    changed = true;
+    return { ...node, children: patchedChildren };
+  });
+
+  return changed ? patchedTree : nodes;
 }
 
 /**

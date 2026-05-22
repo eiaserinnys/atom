@@ -2,8 +2,8 @@
  * Integration tests for atom Event Bus + SSE endpoint.
  *
  * Tests:
- *  - Event emit cases (6): createCard, updateCard, deleteCard, createSymlink,
- *    deleteNode, moveNode each emit the correct AtomEvent.
+ *  - Event emit cases (7): createCard, updateCard, deleteCard, createSymlink,
+ *    deleteNode, moveNode, executeBatchOp each emit the correct AtomEvent.
  *  - SSE HTTP cases (2): GET /events responds with correct SSE headers;
  *    a mutation performed after connecting triggers an SSE message.
  *
@@ -18,6 +18,7 @@ import { setPool, closePool, runMigrations } from "../../src/db/client.js";
 import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import * as cardService from "../../src/services/card.service.js";
 import * as treeService from "../../src/services/tree.service.js";
+import * as batchService from "../../src/services/batch.service.js";
 import { eventBus } from "../../src/events/eventBus.js";
 import type { AtomEvent } from "../../src/events/eventBus.js";
 import { eventsRoutes } from "../../src/api/routes/events.js";
@@ -124,6 +125,8 @@ describe("Event Bus — emit cases", () => {
       expect(event.nodeId).toBe(node_id);
       expect(event.parentNodeId).toBeNull();
       expect(event.data.title).toBe("EventBus Card");
+      expect(event.node.id).toBe(node_id);
+      expect(event.node.card.id).toBe(card.id);
     }
   });
 
@@ -180,6 +183,9 @@ describe("Event Bus — emit cases", () => {
       expect(event.nodeId).toBe(symlink.id);
       expect(event.cardId).toBe(cardA.id);
       expect(event.parentNodeId).toBe(nodeB);
+      expect(event.node.id).toBe(symlink.id);
+      expect(event.node.is_symlink).toBe(true);
+      expect(event.node.card.id).toBe(cardA.id);
     }
   });
 
@@ -196,6 +202,8 @@ describe("Event Bus — emit cases", () => {
     expect(event.type).toBe("node:deleted");
     if (event.type === "node:deleted") {
       expect(event.nodeId).toBe(node_id);
+      expect(event.cardId).toBeDefined();
+      expect(event.parentNodeId).toBeNull();
     }
   });
 
@@ -212,6 +220,7 @@ describe("Event Bus — emit cases", () => {
     expect(event.type).toBe("node:updated");
     if (event.type === "node:updated") {
       expect(event.nodeId).toBe(node_id);
+      expect(event.node.journal_limit).toBe(5);
     }
   });
 
@@ -272,7 +281,36 @@ describe("Event Bus — emit cases", () => {
     expect(event.type).toBe("node:moved");
     if (event.type === "node:moved") {
       expect(event.nodeId).toBe(child);
+      expect(event.oldParentNodeId).toBe(rootA);
       expect(event.newParentNodeId).toBe(rootB);
+      expect(event.node.parent_node_id).toBe(rootB);
+      expect(event.affectedNodes.map((node) => node.id)).toContain(child);
+    }
+  });
+
+  it("executeBatchOp emits batch:completed with normalized patches", async () => {
+    const eventPromise = nextEvent();
+    const result = await batchService.executeBatchOp({
+      creates: [{
+        temp_id: "created-1",
+        card_type: "knowledge",
+        title: "Batch Patch Card",
+      }],
+    });
+    const event = await eventPromise;
+
+    expect(event.type).toBe("batch:completed");
+    if (event.type === "batch:completed") {
+      expect(event.result.created).toEqual(result.created);
+      expect(event.patches).toHaveLength(1);
+      const [patch] = event.patches;
+      expect(patch.type).toBe("card:created");
+      if (patch.type === "card:created") {
+        expect(patch.cardId).toBe(result.created[0].card_id);
+        expect(patch.nodeId).toBe(result.created[0].node_id);
+        expect(patch.node.id).toBe(result.created[0].node_id);
+        expect(patch.node.card.title).toBe("Batch Patch Card");
+      }
     }
   });
 });
