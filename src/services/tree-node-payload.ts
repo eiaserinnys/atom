@@ -41,5 +41,9 @@ export async function selectChildrenWithCards(
   parentNodeId: string | null
 ): Promise<TreeNodeWithCard[]> {
   const children = await selectChildren(db, parentNodeId);
-  return Promise.all(children.map((node) => toTreeNodeWithCard(db, node)));
+  const result: TreeNodeWithCard[] = [];
+  for (const node of children) {
+    result.push(await toTreeNodeWithCard(db, node));
+  }
+  return result;
 }

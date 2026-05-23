@@ -74,6 +74,7 @@ export interface SearchFilters {
   updated_after?: string;    // ISO 8601, updated_at >= this value
   updated_before?: string;   // ISO 8601, updated_at <= this value
   source_type?: string;      // exact match
+  strategy?: "auto" | "strict"; // auto: relax long plain queries only after strict returns 0
 }
 
 export interface SearchResult {
