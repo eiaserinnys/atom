@@ -78,6 +78,14 @@ export interface SearchResult {
   snippet: string;
 }
 
+export interface MoveNodePayload {
+  parent_node_id?: string | null;
+  position?: number;
+  before?: string;
+  after?: string;
+  to?: 'start' | 'end';
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     credentials: 'same-origin',
@@ -215,7 +223,7 @@ export const api = {
   },
 
   // PUT /tree/:nodeId/move → 204 No Content
-  moveNode(nodeId: string, data: { parent_node_id: string | null; position?: number }): Promise<void> {
+  moveNode(nodeId: string, data: MoveNodePayload): Promise<void> {
     return requestVoid(`/tree/${nodeId}/move`, {
       method: 'PUT',
       body: JSON.stringify(data),

@@ -21,6 +21,12 @@ import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu';
 import { CardFormModal } from '../CardFormModal/CardFormModal';
 import { DeleteConfirmModal } from '../DeleteConfirmModal/DeleteConfirmModal';
 import { MoveCardModal } from '../MoveCardModal/MoveCardModal';
+import {
+  buildAppendMovePayload,
+  buildMovePayload,
+  toApiMovePayload,
+  type TreeMovePayload,
+} from '../../utils/treeMoveIntent';
 
 interface TreeViewProps {
   selectedNodeId: string | null;
@@ -217,8 +223,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
   // 노드 이동 뮤테이션
   const moveMutation = useMutation({
-    mutationFn: (vars: { nodeId: string; parentNodeId: string | null; position?: number }) =>
-      api.moveNode(vars.nodeId, { parent_node_id: vars.parentNodeId, position: vars.position }),
+    mutationFn: (vars: TreeMovePayload) =>
+      api.moveNode(vars.nodeId, toApiMovePayload(vars)),
     onSuccess: () => invalidateTree(),
   });
 
@@ -282,23 +288,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
         const circular = isAncestorOf(active.id as string, targetNode.id, roots);
 
         if (!circular) {
-          let parentNodeId: string | null;
-          let position: number | undefined;
-
-          if (currentDropZone === 'into') {
-            parentNodeId = targetNode.id;
-            position = undefined; // 마지막 자식으로 append
-          } else if (currentDropZone === 'above') {
-            parentNodeId = targetNode.parent_node_id;
-            // target.position 자리에 직접 넣으면 target과 충돌한다.
-            // 서버는 100 간격으로 position을 관리하므로 position - 1은 항상 비어있다.
-            position = targetNode.position - 1;
-          } else { // below
-            parentNodeId = targetNode.parent_node_id;
-            position = targetNode.position + 1;
-          }
-
-          moveMutation.mutate({ nodeId: active.id as string, parentNodeId, position });
+          moveMutation.mutate(buildMovePayload(active.id as string, targetNode, currentDropZone));
         }
       }
     }
@@ -462,7 +452,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
               nodeToMove={modal.node}
               onConfirm={(targetParentNodeId) => {
                 moveMutation.mutate(
-                  { nodeId: modal.node.id, parentNodeId: targetParentNodeId, position: undefined },
+                  buildAppendMovePayload(modal.node.id, targetParentNodeId),
                   { onSuccess: () => setModal({ type: 'none' }) }
                 );
               }}
