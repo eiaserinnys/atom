@@ -1,23 +1,23 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { toApiMovePayload, type TreeMovePayload } from '../../utils/treeMoveIntent';
+import type { TreeMovePayload } from '../../utils/treeMoveIntent';
 import { invalidateTreeMutationQueries } from '../../query/invalidation';
-
-type CardType = 'structure' | 'knowledge';
-
-interface CreateCardVars {
-  cardType: CardType;
-  title: string;
-  content: string;
-  parentNodeId?: string | null;
-}
-
-interface EditCardVars {
-  cardId: string;
-  title: string;
-  content: string;
-}
+import {
+  applyCreateSuccess,
+  applyDeleteError,
+  applyDeleteSuccess,
+  applyEditSuccess,
+  applyMoveSuccess,
+  type TreeMutationSideEffects,
+} from './treeMutationEffects';
+import {
+  buildCreateCardPayload,
+  buildEditCardPayload,
+  buildMoveNodePayload,
+  type CreateCardVars,
+  type EditCardVars,
+} from './treeMutationPayloads';
 
 interface UseTreeMutationsArgs {
   selectedNodeId: string | null;
@@ -40,50 +40,59 @@ export function useTreeMutations({
     invalidateTreeMutationQueries(queryClient);
   }, [queryClient]);
 
+  const expandParent = useCallback((nodeId: string) => {
+    setExpandedNodes(prev => {
+      const next = new Set(prev);
+      next.add(nodeId);
+      return next;
+    });
+  }, [setExpandedNodes]);
+
+  const mutationEffects = useMemo<TreeMutationSideEffects>(() => ({
+    invalidateTree,
+    expandParent,
+    selectNode: onSelect,
+    closeModal,
+    clearDeleteError: () => setDeleteError(null),
+    setDeleteError,
+  }), [invalidateTree, expandParent, onSelect, closeModal, setDeleteError]);
+
   const createMutation = useMutation({
     mutationFn: (vars: CreateCardVars) =>
-      api.createCard({
-        card_type: vars.cardType,
-        title: vars.title,
-        content: vars.content || undefined,
-        parent_node_id: vars.parentNodeId ?? null,
-      }),
+      api.createCard(buildCreateCardPayload(vars)),
     onSuccess: (result, vars) => {
-      invalidateTree();
-      if (vars.parentNodeId) {
-        setExpandedNodes(prev => { const n = new Set(prev); n.add(vars.parentNodeId!); return n; });
-      }
-      onSelect(result.node_id);
-      closeModal();
+      applyCreateSuccess({
+        createdNodeId: result.node_id,
+        parentNodeId: vars.parentNodeId ?? null,
+      }, mutationEffects);
     },
   });
 
   const editMutation = useMutation({
     mutationFn: (vars: EditCardVars) =>
-      api.updateCard(vars.cardId, { title: vars.title, content: vars.content || undefined }),
+      api.updateCard(vars.cardId, buildEditCardPayload(vars)),
     onSuccess: () => {
-      invalidateTree();
-      closeModal();
+      applyEditSuccess(mutationEffects);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (nodeId: string) => api.deleteNode(nodeId),
     onSuccess: (_data, nodeId) => {
-      if (selectedNodeId === nodeId) onSelect(null);
-      invalidateTree();
-      closeModal();
-      setDeleteError(null);
+      applyDeleteSuccess({
+        deletedNodeId: nodeId,
+        selectedNodeId,
+      }, mutationEffects);
     },
     onError: (err) => {
-      setDeleteError(err instanceof Error ? err.message : '삭제 중 오류가 발생했습니다.');
+      applyDeleteError(err, mutationEffects);
     },
   });
 
   const moveMutation = useMutation({
     mutationFn: (vars: TreeMovePayload) =>
-      api.moveNode(vars.nodeId, toApiMovePayload(vars)),
-    onSuccess: () => invalidateTree(),
+      api.moveNode(vars.nodeId, buildMoveNodePayload(vars)),
+    onSuccess: () => applyMoveSuccess(mutationEffects),
   });
 
   return {
