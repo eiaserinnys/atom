@@ -1,302 +1,76 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
-import { Copy, Link2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { closeUnclosedCodeFences } from '../../utils/markdownUtils';
-import { api, type UnfurlEntry } from '../../api/client';
-import { readStoredCredentials } from '../../hooks/useLocalStorageCredentials';
-import { UnfurlSectionList } from '../UnfurlSection';
 import { parseCompileSections, type SectionMap } from '../../utils/parseCompileSections';
-import { EditableHeading } from './EditableHeading';
+import { CompileContent } from './CompileContent';
+import { CompileToc } from './CompileToc';
+import { CompileToolbar } from './CompileToolbar';
+import { useCompileDepth } from './useCompileDepth';
+import { useCompileQueries } from './useCompileQueries';
+import { useCompileToc } from './useCompileToc';
+import { useEditableHeadingComponents } from './useEditableHeadingComponents';
 
 interface CompileViewProps {
   nodeId: string | null;
 }
 
-interface TocEntry {
-  id: string;
-  text: string;
-  level: number;
-}
-
-const TOC_WIDTH = 200;
-
-const DEPTH_SLIDER_KEY = 'atom-compile-depth';
-const DEFAULT_SLIDER = 5;
-const INFINITY_SLIDER_VALUE = 10;
-
-function sliderToDepth(v: number): number {
-  return v === INFINITY_SLIDER_VALUE ? Infinity : v;
-}
-
 export function CompileView({ nodeId }: CompileViewProps) {
-  const { t } = useTranslation();
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
-
-  // Depth slider — 1~9 are literal depth values, 10 (INFINITY_SLIDER_VALUE) means Infinity
-  const [sliderValue, setSliderValue] = useState<number>(() => {
-    const stored = localStorage.getItem(DEPTH_SLIDER_KEY);
-    const parsed = stored ? parseInt(stored, 10) : NaN;
-    return isNaN(parsed) ? DEFAULT_SLIDER : Math.min(INFINITY_SLIDER_VALUE, Math.max(1, parsed));
-  });
-
-  const depth = sliderToDepth(sliderValue);
-
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = parseInt(e.target.value, 10);
-    setSliderValue(v);
-    localStorage.setItem(DEPTH_SLIDER_KEY, String(v));
-  };
-
-  // Standard compile (GET) — used when unfurl is disabled
-  const standardQuery = useQuery({
-    queryKey: ['compile', nodeId, depth],
-    queryFn: async () => {
-      const result = await api.compile(nodeId!, { depth, numbering: true, include_ids: true });
-      return { markdown: result.markdown };
-    },
-    enabled: !!nodeId && !unfurlEnabled,
-  });
-
-  // Unfurl compile (POST) — credentials는 설정 탭에서 관리, 실행 시점에 localStorage에서 직접 읽음
-  const unfurlQuery = useQuery({
-    queryKey: ['compile-unfurl', nodeId, depth],
-    queryFn: async () => {
-      return api.compileWithRefs(nodeId!, depth, 'cached', readStoredCredentials());
-    },
-    enabled: !!nodeId && unfurlEnabled,
-  });
-
-  const activeQuery = unfurlEnabled ? unfurlQuery : standardQuery;
-  const markdown = activeQuery.data?.markdown;
-  const processedMarkdown = markdown ? closeUnclosedCodeFences(markdown) : undefined;
-  const isLoading = activeQuery.isLoading;
-  const error = activeQuery.error;
-  const unfurls = unfurlEnabled ? (unfurlQuery.data?.unfurls ?? null) : null;
-
-  const contentRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [tocEntries, setTocEntries] = useState<TocEntry[]>([]);
-  const [tocVisible, setTocVisible] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
-
-  // Build TOC from rendered headings
-  useEffect(() => {
-    if (!contentRef.current || !markdown) return;
-
-    const timer = setTimeout(() => {
-      const el = contentRef.current;
-      if (!el) return;
-
-      const headings = el.querySelectorAll('h1, h2, h3, h4, h5, h6');
-      const entries: TocEntry[] = [];
-
-      headings.forEach((heading, idx) => {
-        const id = `compile-heading-${idx}`;
-        heading.id = id;
-        entries.push({
-          id,
-          text: heading.textContent ?? '',
-          level: parseInt(heading.tagName[1]!),
-        });
-      });
-
-      setTocEntries(entries);
-    }, 50);
-
-    return () => clearTimeout(timer);
-  }, [markdown]);
-
-  // Track active heading on scroll (RAF-throttled)
-  const rafRef = useRef(0);
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || tocEntries.length === 0) return;
-
-    const handleScroll = () => {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => {
-        const scrollTop = container.scrollTop;
-        let current: string | null = null;
-
-        for (const entry of tocEntries) {
-          const el = document.getElementById(entry.id);
-          if (el && el.offsetTop <= scrollTop + 60) {
-            current = entry.id;
-          }
-        }
-
-        setActiveId(current);
-      });
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [tocEntries]);
-
-  const scrollTo = useCallback((id: string) => {
-    const el = document.getElementById(id);
-    const container = scrollContainerRef.current;
-    if (!el || !container) return;
-    const containerRect = container.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    container.scrollTo({
-      top: container.scrollTop + (elRect.top - containerRect.top) - 16,
-      behavior: 'smooth',
-    });
-  }, []);
-
-  const minLevel = useMemo(
-    () => Math.min(...tocEntries.map((e) => e.level), 1),
-    [tocEntries]
+  const { sliderValue, depth, depthLabel, handleSliderChange } = useCompileDepth();
+  const { markdown, isLoading, error, unfurls } = useCompileQueries(nodeId, depth, unfurlEnabled);
+  const processedMarkdown = useMemo(
+    () => (markdown ? closeUnclosedCodeFences(markdown) : undefined),
+    [markdown]
   );
+  const {
+    contentRef,
+    scrollContainerRef,
+    tocEntries,
+    tocVisible,
+    setTocVisible,
+    activeId,
+    scrollTo,
+    minLevel,
+  } = useCompileToc(markdown);
 
   // 마크다운에서 섹션→카드ID 매핑 파싱 (편집 버튼 활성화용)
   const sectionMap: SectionMap = useMemo(
     () => (markdown ? parseCompileSections(markdown) : new Map()),
     [markdown]
   );
-
-  // EditableHeading 컴포넌트 팩토리 (nodeId prop 클로저)
-  const makeHeading = (level: number) =>
-    ({ children }: { children?: React.ReactNode }) => (
-      <EditableHeading level={level} sectionMap={sectionMap} compiledNodeId={nodeId!}>
-        {children}
-      </EditableHeading>
-    );
-  const headingComponents = nodeId
-    ? {
-        h1: makeHeading(1),
-        h2: makeHeading(2),
-        h3: makeHeading(3),
-        h4: makeHeading(4),
-        h5: makeHeading(5),
-        h6: makeHeading(6),
-      }
-    : {};
-
-  const depthLabel = sliderValue === INFINITY_SLIDER_VALUE ? '∞' : String(sliderValue);
+  const headingComponents = useEditableHeadingComponents(nodeId, sectionMap);
 
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
-      <div className="h-10 flex items-center px-4 border-b border-border bg-card text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground shrink-0">
-        {t('compile.header')}
-        {nodeId && (
-          <div className="ml-auto flex items-center gap-1">
-            {/* Depth slider */}
-            <div className="flex items-center gap-1">
-              <input
-                type="range"
-                min={1}
-                max={INFINITY_SLIDER_VALUE}
-                step={1}
-                value={sliderValue}
-                onChange={handleSliderChange}
-                className="w-16 accent-primary cursor-pointer"
-                title={t('compile.depth_label', { depth: depthLabel })}
-              />
-              <span className="text-xs font-mono text-muted-foreground w-4 text-center">
-                {depthLabel}
-              </span>
-            </div>
-            <span className="px-2 py-0.5 text-xs font-mono bg-muted border border-border rounded-md text-muted-foreground">
-              {nodeId.slice(0, 8)}
-            </span>
-            <button
-              onClick={() => navigator.clipboard.writeText(nodeId)}
-              className="p-1 rounded hover:bg-muted text-muted-foreground"
-              title={t('compile.copy_id')}
-            >
-              <Copy className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() => setUnfurlEnabled((v) => !v)}
-              className={`p-1 rounded text-muted-foreground transition-colors ${
-                unfurlEnabled ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
-              }`}
-              title={unfurlEnabled ? t('compile.unfurl_disable') : t('compile.unfurl_enable')}
-            >
-              <Link2 className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-      </div>
+      <CompileToolbar
+        nodeId={nodeId}
+        sliderValue={sliderValue}
+        depthLabel={depthLabel}
+        unfurlEnabled={unfurlEnabled}
+        onSliderChange={handleSliderChange}
+        onToggleUnfurl={() => setUnfurlEnabled((v) => !v)}
+      />
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* TOC hover zone — right edge */}
-        {tocEntries.length > 0 && (
-          <div
-            className="absolute top-0 right-0 bottom-0 z-10"
-            style={{ width: tocVisible ? TOC_WIDTH + 16 : 16 }}
-            onMouseEnter={() => setTocVisible(true)}
-            onMouseLeave={() => setTocVisible(false)}
-          >
-            {/* TOC panel */}
-            <div
-              className={`
-                absolute top-0 right-0 bottom-0 overflow-y-auto
-                bg-background/95 backdrop-blur-sm border-l border-border
-                transition-all duration-200 ease-out
-                ${tocVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2 pointer-events-none'}
-              `}
-              style={{ width: TOC_WIDTH }}
-            >
-              <div className="px-3 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                {t('compile.toc_title')}
-              </div>
-              <nav className="px-1 pb-3">
-                {tocEntries.map((entry) => (
-                  <button
-                    key={entry.id}
-                    onClick={() => scrollTo(entry.id)}
-                    className={`
-                      block w-full text-left px-2 py-1 rounded text-xs leading-snug truncate
-                      transition-colors duration-100
-                      ${activeId === entry.id
-                        ? 'text-foreground bg-muted font-medium'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}
-                    `}
-                    style={{ paddingLeft: `${(entry.level - minLevel) * 12 + 8}px` }}
-                    title={entry.text}
-                  >
-                    {entry.text}
-                  </button>
-                ))}
-              </nav>
-            </div>
-
-            {/* Hover indicator bar — visible when TOC is hidden */}
-            {!tocVisible && (
-              <div className="absolute top-1/3 right-1 w-1 h-1/3 rounded-full bg-muted-foreground/20" />
-            )}
-          </div>
-        )}
+        <CompileToc
+          tocEntries={tocEntries}
+          tocVisible={tocVisible}
+          activeId={activeId}
+          minLevel={minLevel}
+          onVisibleChange={setTocVisible}
+          onScrollTo={scrollTo}
+        />
 
         <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
-          <div className="p-4" ref={contentRef}>
-            {!nodeId && (
-              <div className="text-muted-foreground text-sm">{t('compile.no_selection')}</div>
-            )}
-            {isLoading && <div className="text-muted-foreground text-sm">{t('compile.loading')}</div>}
-            {error && <div className="text-node-error text-sm">{t('common.error')}: {(error as Error).message}</div>}
-            {markdown && !isLoading && (
-              <div className="markdown-content">
-                <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={headingComponents}>{processedMarkdown}</Markdown>
-              </div>
-            )}
-
-            {unfurls && Object.keys(unfurls).length > 0 && (
-              <UnfurlSectionList unfurls={unfurls as Record<string, UnfurlEntry>} />
-            )}
-          </div>
+          <CompileContent
+            contentRef={contentRef}
+            nodeId={nodeId}
+            isLoading={isLoading}
+            error={error}
+            markdown={markdown}
+            processedMarkdown={processedMarkdown}
+            headingComponents={headingComponents}
+            unfurls={unfurls}
+          />
         </div>
       </div>
     </div>
