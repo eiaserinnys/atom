@@ -183,6 +183,39 @@ describe("executeBatchOp — node_updates", () => {
     expect(row.rows[0]["journal_limit"]).toBe(15);
   });
 
+  it("updates symlink node journal_limit without redirecting to canonical", async () => {
+    const { card, node_id: canonicalNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Canonical",
+    });
+    const { node_id: symlinkParentId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Symlink parent",
+    });
+    const symlinkResult = await executeBatchOp({
+      symlinks: [{ card_id: card.id, parent_node_id: symlinkParentId }],
+    });
+    const symlinkNodeId = symlinkResult.symlinked[0]!;
+
+    const result = await executeBatchOp({
+      node_updates: [{ node_id: symlinkNodeId, journal_limit: 5 }],
+    });
+
+    expect(result.node_updated).toEqual([symlinkNodeId]);
+
+    const rows = await pool.query(
+      "SELECT id, journal_limit, is_symlink FROM tree_nodes WHERE id = ANY($1::uuid[]) ORDER BY is_symlink",
+      [[canonicalNodeId, symlinkNodeId]]
+    );
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows[0]["id"]).toBe(canonicalNodeId);
+    expect(rows.rows[0]["journal_limit"]).toBeNull();
+    expect(rows.rows[0]["is_symlink"]).toBe(false);
+    expect(rows.rows[1]["id"]).toBe(symlinkNodeId);
+    expect(rows.rows[1]["journal_limit"]).toBe(5);
+    expect(rows.rows[1]["is_symlink"]).toBe(true);
+  });
+
   it("throws and rolls back when node_id does not exist", async () => {
     const { card: existing, node_id } = await cardService.createCard({
       card_type: "knowledge",

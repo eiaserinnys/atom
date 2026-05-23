@@ -22,6 +22,7 @@ import * as batchService from "../../src/services/batch.service.js";
 import { eventBus } from "../../src/events/eventBus.js";
 import type { AtomEvent } from "../../src/events/eventBus.js";
 import { eventsRoutes } from "../../src/api/routes/events.js";
+import type { BatchNodeUpdateItem } from "../../src/shared/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = path.resolve(__dirname, "../../src/db/migrations");
@@ -311,6 +312,38 @@ describe("Event Bus — emit cases", () => {
         expect(patch.node.id).toBe(result.created[0].node_id);
         expect(patch.node.card.title).toBe("Batch Patch Card");
       }
+    }
+  });
+
+  it("executeBatchOp node_updates patches only actual updates", async () => {
+    const { node_id: updatedNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Batch patch updated",
+    });
+    const { node_id: noopNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Batch patch noop",
+    });
+
+    const eventPromise = nextEvent();
+    const result = await batchService.executeBatchOp({
+      node_updates: [
+        { node_id: updatedNodeId, journal_limit: 4 },
+        { node_id: noopNodeId } as unknown as BatchNodeUpdateItem,
+      ],
+    });
+    const event = await eventPromise;
+
+    expect(result.node_updated).toEqual([updatedNodeId]);
+    expect(event.type).toBe("batch:completed");
+    if (event.type === "batch:completed") {
+      const nodeUpdatedPatches = event.patches.filter(
+        (patch) => patch.type === "node:updated"
+      );
+      expect(nodeUpdatedPatches).toHaveLength(1);
+      const [patch] = nodeUpdatedPatches;
+      expect(patch.nodeId).toBe(updatedNodeId);
+      expect(patch.node.journal_limit).toBe(4);
     }
   });
 });

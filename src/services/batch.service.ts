@@ -4,7 +4,7 @@ import {
   updateCardById,
   deleteCardById,
 } from "../db/queries/cards.js";
-import { insertNode, selectNodesByCardId, updateNodeProperties } from "../db/queries/tree.js";
+import { insertNode, selectNodesByCardId } from "../db/queries/tree.js";
 import type {
   AtomPatchEvent,
   BatchOpInput,
@@ -15,6 +15,7 @@ import { eventBus } from "../events/eventBus.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
 import { processBatchMoves } from "./batch-move.service.js";
 import { processBatchChildOrders } from "./batch-child-order.service.js";
+import { processBatchNodeUpdates } from "./batch-node-update.service.js";
 
 // ---------------------------------------------------------------------------
 // Topological sort for creates
@@ -224,31 +225,16 @@ export async function executeBatchOp(
     }
 
     // ── Node updates ─────────────────────────────────────────────────────────
-    // Tree-node property updates (journal_limit). DB-query direct call on purpose:
-    // the aggregate `batch:completed` event covers batch consumers; we don't
-    // emit per-node `node:updated` here, matching the pattern of updates/moves/
-    // deletes/symlinks above which also skip per-item events.
+    // Tree-node property updates (journal_limit). The helper owns the batch
+    // no-op policy: a DB-layer no-op is neither a success result nor a patch.
     if (input.node_updates && input.node_updates.length > 0) {
-      for (const item of input.node_updates) {
-        const { node_id, ...props } = item;
-        // `updated` is the canonical partial-update signal from the DB layer
-        // (see `db/queries/tree.ts` updateNodeProperties). A no-op item must
-        // not be reported as a successful update — symmetric with the
-        // standalone update_node({node_id}) omit path which also stays silent.
-        const { node, updated } = await updateNodeProperties(client, node_id, props);
-        if (node === null) {
-          throw new Error(`Node not found: ${node_id}`);
-        }
-        if (updated) {
-          result.node_updated.push(node_id);
-          patches.push({
-            type: "node:updated",
-            nodeId: node_id,
-            node: await toTreeNodeWithCard(client, node),
-            actor: agentId,
-          });
-        }
-      }
+      await processBatchNodeUpdates({
+        db: client,
+        nodeUpdates: input.node_updates,
+        result,
+        patches,
+        actor: agentId,
+      });
     }
 
     // ── Moves ─────────────────────────────────────────────────────────────────
