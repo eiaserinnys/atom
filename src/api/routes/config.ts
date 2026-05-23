@@ -1,4 +1,4 @@
-import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyPluginAsync } from 'fastify';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
 import fs from 'fs';
@@ -7,6 +7,9 @@ import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
 import pg from 'pg';
 import { setPendingRestart } from '../state.js';
+import { mapPostgresConnectionError } from '../config/db-test.js';
+import { parseConfigEnvContent, updateConfigEnvContent } from '../config/env-file.js';
+import { agentToPublic, isAdminRemovalChange, requireRole, wouldRemoveLastAdmin } from '../config/policy.js';
 import { getDb } from '../../db/client.js';
 import { posToKey } from '../../shared/lexorank.js';
 import {
@@ -24,28 +27,6 @@ import {
   updateAgentSecret,
 } from '../../db/queries/agents.js';
 import type { UserRole } from '../../shared/types.js';
-import type { Agent } from '../../db/queries/agents.js';
-
-// Role hierarchy
-const ROLE_LEVEL: Record<UserRole, number> = { admin: 3, editor: 2, viewer: 1 };
-
-function requireRole(req: FastifyRequest, reply: FastifyReply, minRole: UserRole): boolean {
-  const user = req.jwtUser;
-  if (!user) {
-    reply.code(401).send({ error: 'Unauthorized' });
-    return false;
-  }
-  if ((ROLE_LEVEL[user.role] ?? 0) < ROLE_LEVEL[minRole]) {
-    reply.code(403).send({ error: 'Forbidden' });
-    return false;
-  }
-  return true;
-}
-
-function agentToPublic(agent: Agent) {
-  const { secret_hash: _secretHash, ...pub } = agent;
-  return pub;
-}
 
 export const configRoutes: FastifyPluginAsync = async (app) => {
   // ── Users ─────────────────────────────────────────────────────────────────
@@ -85,10 +66,9 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     const targetUser = await findUserById(db, id);
     if (!targetUser) return reply.code(404).send({ error: 'User not found' });
 
-    if (targetUser.role === 'admin') {
-      const demoting = role !== undefined && role !== 'admin';
-      const deactivating = is_active === false;
-      if ((demoting || deactivating) && (await countAdmins(db)) <= 1) {
+    const userChanges = { role, is_active };
+    if (isAdminRemovalChange(targetUser, userChanges)) {
+      if (wouldRemoveLastAdmin(targetUser, userChanges, await countAdmins(db))) {
         return reply.code(400).send({ error: 'Cannot remove the last admin' });
       }
     }
@@ -300,12 +280,6 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
   const __cfgDirname = path.dirname(fileURLToPath(import.meta.url));
   const envFilePath = path.join(__cfgDirname, '../../../.env');
 
-  const MASKED_KEY_PATTERNS = ['SECRET', 'PASSWORD', 'TOKEN'];
-  function isSensitiveKey(key: string): boolean {
-    const upper = key.toUpperCase();
-    return MASKED_KEY_PATTERNS.some((p) => upper.includes(p));
-  }
-
   // GET /api/config/env — admin only — returns .env key-value pairs (secrets masked)
   app.get('/api/config/env', async (req, reply) => {
     if (!requireRole(req, reply, 'admin')) return;
@@ -313,20 +287,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     try {
       if (!fs.existsSync(envFilePath)) return reply.send({});
       const content = fs.readFileSync(envFilePath, 'utf-8');
-      const result: Record<string, string> = {};
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const eqIdx = trimmed.indexOf('=');
-        if (eqIdx < 0) continue;
-        const key = trimmed.slice(0, eqIdx).trim();
-        const value = trimmed.slice(eqIdx + 1).trim();
-        if (isSensitiveKey(key)) {
-          result[key] = value ? '***' : '';
-        } else {
-          result[key] = value;
-        }
-      }
+      const result = parseConfigEnvContent(content);
       return reply.send(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -345,37 +306,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
 
     try {
       const content = fs.existsSync(envFilePath) ? fs.readFileSync(envFilePath, 'utf-8') : '';
-      const lines = content.split('\n');
-      const updates = new Map(entries.map((e) => [e.key, e.value]));
-      const handled = new Set<string>();
-
-      const newLines = lines.map((line) => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) return line;
-        const eqIdx = trimmed.indexOf('=');
-        if (eqIdx < 0) return line;
-        const key = trimmed.slice(0, eqIdx).trim();
-        if (updates.has(key)) {
-          const newValue = updates.get(key)!;
-          // Skip masked values ('***') to preserve existing secrets
-          if (isSensitiveKey(key) && newValue === '***') {
-            handled.add(key);
-            return line;
-          }
-          handled.add(key);
-          return `${key}=${newValue}`;
-        }
-        return line;
-      });
-
-      // Append new keys not found in existing file
-      for (const [key, value] of updates) {
-        if (!handled.has(key) && !(isSensitiveKey(key) && value === '***')) {
-          newLines.push(`${key}=${value}`);
-        }
-      }
-
-      fs.writeFileSync(envFilePath, newLines.join('\n'), 'utf-8');
+      fs.writeFileSync(envFilePath, updateConfigEnvContent(content, entries), 'utf-8');
       setPendingRestart(true);
       return reply.send({ ok: true });
     } catch (err) {
@@ -402,17 +333,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ ok: true });
     } catch (err: unknown) {
       await pool.end().catch(() => {});
-      const pgErr = err as { code?: string; message?: string };
-      let errorMsg: string;
-      if (pgErr.code === 'ECONNREFUSED' || pgErr.message?.includes('ECONNREFUSED')) {
-        errorMsg = 'Connection refused: check host and port';
-      } else if (pgErr.code === '28P01') {
-        errorMsg = 'Authentication failed: check username/password';
-      } else if (pgErr.code === '3D000') {
-        errorMsg = 'Database does not exist';
-      } else {
-        errorMsg = pgErr.message ?? String(err);
-      }
+      const errorMsg = mapPostgresConnectionError(err);
       return reply.send({ ok: false, error: errorMsg });
     }
   });

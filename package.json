@@ -14,9 +14,9 @@
     "dev": "tsx watch src/api/index.ts",
     "mcp": "node dist/mcp/server.js",
     "mcp:dev": "tsx src/mcp/server.ts",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest --runInBand",
-    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest tests/unit",
-    "test:integration": "node --experimental-vm-modules node_modules/.bin/jest tests/integration --runInBand",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/unit",
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/integration --runInBand",
     "migrate": "node dist/db/migrate.js",
     "test:e2e": "playwright test"
   },
