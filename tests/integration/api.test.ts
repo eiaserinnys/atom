@@ -510,6 +510,45 @@ describe("BM25 Search", () => {
     expect(titles).toContain("Oceanography Basics");
   });
 
+  it("relaxes long plain-language queries when strict BM25 returns zero", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "Search Cards BM25 Recovery",
+      content: "root_node_id filters websearch_to_tsquery query protocol",
+    });
+
+    const query =
+      "search_cards BM25 natural language missing words root_node_id filters";
+
+    const strictResults = await searchService.searchCards({
+      query,
+      strategy: "strict",
+    });
+    expect(strictResults.length).toBe(0);
+
+    const relaxedResults = await searchService.searchCards({ query });
+    expect(relaxedResults.length).toBeGreaterThan(0);
+    expect(relaxedResults.map((r) => r.title)).toContain("Search Cards BM25 Recovery");
+  });
+
+  it("keeps explicit phrase and exclusion queries strict", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "Explicit Search Syntax Guard",
+      content: "alpha beta root_node_id filters excluded",
+    });
+
+    const phraseResults = await searchService.searchCards({
+      query: '"alpha gamma" root_node_id filters',
+    });
+    expect(phraseResults.length).toBe(0);
+
+    const excludeResults = await searchService.searchCards({
+      query: "root_node_id filters -excluded",
+    });
+    expect(excludeResults.length).toBe(0);
+  });
+
   it("includes node_path breadcrumb in search results", async () => {
     const rootResult = await cardService.createCard({
       card_type: "structure",

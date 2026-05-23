@@ -337,6 +337,17 @@ describe("SSE endpoint — HTTP cases", () => {
   it("SSE delivers mutation event to connected client", (done) => {
     let cardId: string;
     let chunks = "";
+    let finished = false;
+    let mutationTimer: NodeJS.Timeout | undefined;
+    let safetyTimer: NodeJS.Timeout | undefined;
+    const finish = (err?: unknown) => {
+      if (finished) return;
+      finished = true;
+      if (mutationTimer) clearTimeout(mutationTimer);
+      if (safetyTimer) clearTimeout(safetyTimer);
+      if (err) done(err);
+      else done();
+    };
 
     const req = http.get(
       `http://127.0.0.1:${testPort}/events`,
@@ -354,14 +365,14 @@ describe("SSE endpoint — HTTP cases", () => {
           try {
             expect(chunks).toContain("card:created");
             expect(chunks).toContain(cardId);
-            done();
+            finish();
           } catch (err) {
-            done(err);
+            finish(err);
           }
         });
 
         // Trigger mutation after SSE connection is established
-        setTimeout(async () => {
+        mutationTimer = setTimeout(async () => {
           try {
             const { card } = await cardService.createCard({
               card_type: "knowledge",
@@ -369,7 +380,7 @@ describe("SSE endpoint — HTTP cases", () => {
             });
             cardId = card.id;
           } catch (err) {
-            done(err);
+            finish(err);
           }
         }, 100);
       }
@@ -378,12 +389,12 @@ describe("SSE endpoint — HTTP cases", () => {
     req.on("error", (err) => {
       // Ignore aborted error from req.destroy()
       if ((err as NodeJS.ErrnoException).code !== "ECONNRESET") {
-        done(err);
+        finish(err);
       }
     });
 
     // Safety timeout
-    setTimeout(() => {
+    safetyTimer = setTimeout(() => {
       req.destroy();
     }, 4000);
   });

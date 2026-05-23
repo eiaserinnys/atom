@@ -3,7 +3,7 @@ import { searchCards } from "../../services/search.service.js";
 import type { SearchFilters, CardType } from "../../shared/types.js";
 
 export async function searchRoutes(app: FastifyInstance): Promise<void> {
-  // GET /search?q=...&tags=a,b&card_type=knowledge&updated_after=...&updated_before=...&source_type=...
+  // GET /search?q=...&tags=a,b&card_type=knowledge&updated_after=...&updated_before=...&source_type=...&strategy=auto|strict
   app.get("/search", async (req, reply) => {
     const qs = req.query as Record<string, string>;
     if (!qs["q"]) return reply.code(400).send({ error: "q parameter required" });
@@ -31,6 +31,12 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "updated_before must be a valid ISO 8601 timestamp" });
     }
 
+    // Validate search strategy
+    const strategy = qs["strategy"];
+    if (strategy && strategy !== "auto" && strategy !== "strict") {
+      return reply.code(400).send({ error: "strategy must be one of: auto, strict" });
+    }
+
     // Parse tags: trim whitespace, drop empty strings
     const rawTags = qs["tags"]?.split(",").map((t) => t.trim()).filter(Boolean);
 
@@ -43,6 +49,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       updated_after: qs["updated_after"] || undefined,
       updated_before: qs["updated_before"] || undefined,
       source_type: qs["source_type"] || undefined,
+      strategy: strategy as SearchFilters["strategy"] | undefined,
     };
 
     const results = await searchCards(filters);
