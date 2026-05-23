@@ -9,6 +9,14 @@ const MIGRATIONS_DIR = path.resolve(__dirname, "../../src/db/migrations");
 
 let pool: PostgresAdapter | null = null;
 
+export function getIntegrationTestPool(): PostgresAdapter {
+  if (!pool) {
+    throw new Error("Integration test pool was not initialized");
+  }
+
+  return pool;
+}
+
 export function setupIntegrationTestDb(): void {
   beforeAll(async () => {
     const databaseUrl = process.env["TEST_DATABASE_URL"];
