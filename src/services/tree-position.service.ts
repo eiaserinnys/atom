@@ -100,14 +100,14 @@ async function resolveRelativePositionKey(
     ? allSiblings.filter((s) => s.id !== selfNodeId)
     : allSiblings;
 
-  // Self was the only child: assign the default key.
-  if (siblings.length === 0) {
-    return { key: posToKey(100), warnings: [] };
-  }
-
   const insertionIndex = resolveInsertionIndex(allSiblings, siblings, selfNodeId, opts);
   if (insertionIndex.type === "self") {
     return { key: posToKey(insertionIndex.position), warnings: [] };
+  }
+
+  // Destination has no siblings after excluding self: assign the default key.
+  if (siblings.length === 0) {
+    return { key: posToKey(100), warnings: [] };
   }
 
   const key = await keyForInsertion(db, parentNodeId, siblings, insertionIndex.index);

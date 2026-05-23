@@ -147,6 +147,26 @@ describe("move_node — relative positioning", () => {
     expect(children.find((n) => n.id === b)!.position).toBe(moved!.position);
   });
 
+  it("before self: sole child keeps its existing non-default position", async () => {
+    const { parentNodeId, childNodeIds } = await createParentWithChildren(1, 250);
+    const [only] = childNodeIds;
+
+    const beforeMove = await selectChildren(pool, parentNodeId);
+    expect(beforeMove.map((n) => n.id)).toEqual([only]);
+    expect(beforeMove[0].position).toBe(250);
+
+    const { node: moved } = await treeService.moveNode(only, {
+      parent_node_id: parentNodeId,
+      before: only,
+    });
+    expect(moved).not.toBeNull();
+
+    const children = await selectChildren(pool, parentNodeId);
+    expect(children.map((n) => n.id)).toEqual([only]);
+    expect(moved!.position).toBe(250);
+    expect(children[0].position).toBe(250);
+  });
+
   it("after self: keeps the existing sibling order", async () => {
     const { parentNodeId, childNodeIds } = await createParentWithChildren(3);
     const [a, b, c] = childNodeIds;
@@ -160,6 +180,26 @@ describe("move_node — relative positioning", () => {
     const children = await selectChildren(pool, parentNodeId);
     expect(children.map((n) => n.id)).toEqual([a, b, c]);
     expect(children.find((n) => n.id === b)!.position).toBe(moved!.position);
+  });
+
+  it("after self: sole child keeps its existing non-default position", async () => {
+    const { parentNodeId, childNodeIds } = await createParentWithChildren(1, 250);
+    const [only] = childNodeIds;
+
+    const beforeMove = await selectChildren(pool, parentNodeId);
+    expect(beforeMove.map((n) => n.id)).toEqual([only]);
+    expect(beforeMove[0].position).toBe(250);
+
+    const { node: moved } = await treeService.moveNode(only, {
+      parent_node_id: parentNodeId,
+      after: only,
+    });
+    expect(moved).not.toBeNull();
+
+    const children = await selectChildren(pool, parentNodeId);
+    expect(children.map((n) => n.id)).toEqual([only]);
+    expect(moved!.position).toBe(250);
+    expect(children[0].position).toBe(250);
   });
 
   it("before first child with position 0: triggers rekey", async () => {
