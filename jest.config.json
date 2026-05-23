@@ -8,6 +8,7 @@
         "tsconfig": {
           "module": "ESNext",
           "moduleResolution": "bundler",
+          "rootDir": ".",
           "isolatedModules": false
         }
       }
