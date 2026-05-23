@@ -19,6 +19,12 @@ import { useTreeDragAndDrop } from './useTreeDragAndDrop';
 import { useTreeMutations } from './useTreeMutations';
 import { useInitialNodePathRestore } from './useInitialNodePathRestore';
 import { rootTreeQueryKey } from '../../query/queryKeys';
+import {
+  buildContextMenuActionDescriptors,
+  buildModalConfirmAction,
+  type TreeContextMenuAction,
+  type TreeModalState,
+} from './treeViewActions';
 
 interface TreeViewProps {
   selectedNodeId: string | null;
@@ -32,14 +38,6 @@ interface ContextMenuState {
   node: TreeNodeData;
 }
 
-type ModalState =
-  | { type: 'none' }
-  | { type: 'create-root'; cardType: 'structure' | 'knowledge' }
-  | { type: 'create-child'; cardType: 'structure' | 'knowledge'; parentNode: TreeNodeData }
-  | { type: 'edit'; node: TreeNodeData }
-  | { type: 'delete'; node: TreeNodeData }
-  | { type: 'move'; node: TreeNodeData };
-
 export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: TreeViewProps) {
   const { t } = useTranslation();
   const { data: roots, isLoading, error } = useQuery({
@@ -49,7 +47,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [modal, setModal] = useState<ModalState>({ type: 'none' });
+  const [modal, setModal] = useState<TreeModalState>({ type: 'none' });
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const closeModal = useCallback(() => setModal({ type: 'none' }), []);
 
@@ -105,35 +103,32 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     setContextMenu({ x, y, node });
   }, []);
 
-  // 컨텍스트 메뉴 항목 구성
-  function buildContextMenuItems(node: TreeNodeData): ContextMenuItem[] {
-    const isStructure = node.card.card_type === 'structure';
-    const items: ContextMenuItem[] = [];
-
-    if (isStructure) {
-      items.push({
-        label: t('tree.context_create_child_structure'),
-        onClick: () => setModal({ type: 'create-child', cardType: 'structure', parentNode: node }),
-      });
-      items.push({
-        label: t('tree.context_create_child_knowledge'),
-        onClick: () => setModal({ type: 'create-child', cardType: 'knowledge', parentNode: node }),
-      });
+  const handleContextMenuAction = useCallback((action: TreeContextMenuAction) => {
+    if (action.type === 'create-child') {
+      setModal({ type: 'create-child', cardType: action.cardType, parentNode: action.parentNode });
+    } else if (action.type === 'move') {
+      setModal({ type: 'move', node: action.node });
+    } else if (action.type === 'edit') {
+      setModal({ type: 'edit', node: action.node });
+    } else if (action.type === 'delete') {
+      setModal({ type: 'delete', node: action.node });
     }
-    items.push({ label: t('tree.context_move'), onClick: () => setModal({ type: 'move', node }) });
-    items.push({ label: t('tree.context_rename'), onClick: () => setModal({ type: 'edit', node }) });
-    items.push({ label: t('tree.context_delete'), onClick: () => setModal({ type: 'delete', node }), danger: true });
-    return items;
-  }
+  }, []);
+
+  const buildContextMenuItems = useCallback((node: TreeNodeData): ContextMenuItem[] =>
+    buildContextMenuActionDescriptors(node).map((descriptor) => ({
+      label: t(descriptor.labelKey),
+      onClick: () => handleContextMenuAction(descriptor.action),
+      danger: descriptor.danger,
+    })), [handleContextMenuAction, t]);
 
   // 모달 확인 핸들러
   function handleModalConfirm(title: string, content: string) {
-    if (modal.type === 'create-root') {
-      createCard({ cardType: modal.cardType, title, content, parentNodeId: null });
-    } else if (modal.type === 'create-child') {
-      createCard({ cardType: modal.cardType, title, content, parentNodeId: modal.parentNode.id });
-    } else if (modal.type === 'edit') {
-      editCard({ cardId: modal.node.card.id, title, content });
+    const action = buildModalConfirmAction(modal, title, content);
+    if (action.type === 'create-card') {
+      createCard(action.vars);
+    } else if (action.type === 'edit-card') {
+      editCard(action.vars);
     }
   }
 
