@@ -3,20 +3,22 @@ import { SignJWT, jwtVerify } from 'jose';
 import crypto from 'crypto';
 import { findUserByEmail, insertUser, isEmailAllowed } from '../../db/queries/users.js';
 import { getDb } from '../../db/client.js';
-
-// Google OAuth
-const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
-
-// Slack OAuth
-const SLACK_AUTH_URL = 'https://slack.com/oauth/v2/authorize';
-const SLACK_TOKEN_URL = 'https://slack.com/api/oauth.v2.access';
-const SLACK_IDENTITY_URL = 'https://slack.com/api/users.identity';
-
-const JWT_COOKIE_NAME = 'atom_auth';
-const STATE_COOKIE_NAME = 'atom_oauth_state';
-const JWT_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 7 days
+import {
+  GOOGLE_TOKEN_URL,
+  GOOGLE_USERINFO_URL,
+  JWT_COOKIE_NAME,
+  JWT_EXPIRY_SECONDS,
+  SLACK_IDENTITY_URL,
+  SLACK_TOKEN_URL,
+  STATE_COOKIE_NAME,
+  buildBypassAuthStatus,
+  buildGoogleAuthRedirectUrl,
+  buildSlackAuthRedirectUrl,
+  getJwtCookieOptions,
+  getProviderAvailability,
+  getStateCookieOptions,
+  isSlackWorkspaceAllowed,
+} from './auth_helpers.js';
 
 /**
  * Issue a JWT cookie and redirect to frontend home.
@@ -41,13 +43,7 @@ async function issueJwtAndRedirect(
     .setExpirationTime(`${JWT_EXPIRY_SECONDS}s`)
     .sign(jwtSecret);
 
-  reply.setCookie(JWT_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env['NODE_ENV'] === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: JWT_EXPIRY_SECONDS,
-  });
+  reply.setCookie(JWT_COOKIE_NAME, token, getJwtCookieOptions(process.env['NODE_ENV']));
 
   return reply.redirect(frontendUrl || '/');
 }
@@ -79,22 +75,13 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const state = crypto.randomBytes(16).toString('hex');
-    reply.setCookie(STATE_COOKIE_NAME, state, {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 300,
-    });
+    reply.setCookie(STATE_COOKIE_NAME, state, getStateCookieOptions());
 
-    const params = new URLSearchParams({
-      client_id: googleClientId,
-      redirect_uri: googleCallbackUrl,
-      response_type: 'code',
-      scope: 'openid email profile',
+    return reply.redirect(buildGoogleAuthRedirectUrl({
+      clientId: googleClientId,
+      callbackUrl: googleCallbackUrl,
       state,
-    });
-
-    return reply.redirect(`${GOOGLE_AUTH_URL}?${params.toString()}`);
+    }));
   });
 
   // GET /api/auth/google/callback
@@ -166,21 +153,13 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const state = crypto.randomBytes(16).toString('hex');
-    reply.setCookie(STATE_COOKIE_NAME, state, {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 300,
-    });
+    reply.setCookie(STATE_COOKIE_NAME, state, getStateCookieOptions());
 
-    const params = new URLSearchParams({
-      client_id: slackClientId,
-      redirect_uri: slackCallbackUrl,
-      user_scope: 'identity.basic,identity.email,identity.avatar',
+    return reply.redirect(buildSlackAuthRedirectUrl({
+      clientId: slackClientId,
+      callbackUrl: slackCallbackUrl,
       state,
-    });
-
-    return reply.redirect(`${SLACK_AUTH_URL}?${params.toString()}`);
+    }));
   });
 
   // GET /api/auth/slack/callback
@@ -241,7 +220,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       }
 
       // Verify workspace if SLACK_ALLOWED_TEAM_ID is set
-      if (slackAllowedTeamId && identityData.team.id !== slackAllowedTeamId) {
+      if (!isSlackWorkspaceAllowed(identityData.team.id, slackAllowedTeamId)) {
         app.log.warn(
           { teamId: identityData.team.id, email: identityData.user.email },
           'Unauthorized Slack workspace access attempt',
@@ -267,16 +246,13 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
   // GET /api/auth/providers — return available OAuth providers
   app.get('/api/auth/providers', async (_req, reply) => {
-    return reply.send({
-      google: !!googleClientId,
-      slack: !!slackClientId,
-    });
+    return reply.send(getProviderAvailability({ googleClientId, slackClientId }));
   });
 
   // GET /api/auth/status — return current auth state
   app.get('/api/auth/status', async (req, reply) => {
     if (!authConfigured) {
-      return reply.send({ authenticated: true, id: 'bypass', email: 'bypass@local', name: 'Bypass Admin', role: 'admin' });
+      return reply.send(buildBypassAuthStatus());
     }
 
     const token = req.cookies[JWT_COOKIE_NAME];
