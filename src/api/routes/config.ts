@@ -9,9 +9,13 @@ import pg from 'pg';
 import { setPendingRestart } from '../state.js';
 import { mapPostgresConnectionError } from '../config/db-test.js';
 import { parseConfigEnvContent, updateConfigEnvContent } from '../config/env-file.js';
+import {
+  getMigrationPreconditionError,
+  parseSqliteJsonArrayField,
+  toMigrationPositionKey,
+} from '../config/migration.js';
 import { agentToPublic, isAdminRemovalChange, requireRole, wouldRemoveLastAdmin } from '../config/policy.js';
 import { getDb } from '../../db/client.js';
-import { posToKey } from '../../shared/lexorank.js';
 import {
   listUsers,
   insertUser,
@@ -177,15 +181,18 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     const db = getDb();
 
     // Preconditions
-    if (db.dbType !== 'postgres') {
-      return reply.code(400).send({ error: 'Current mode is not PostgreSQL. Switch to PostgreSQL first.' });
-    }
     const sqlitePath = process.env['SQLITE_PATH'] ?? path.join(process.cwd(), 'atom.db');
-    if (!fs.existsSync(sqlitePath)) {
-      return reply.code(400).send({ error: `SQLite file not found: ${sqlitePath}` });
-    }
-    if (fs.existsSync(sqlitePath + '.deprecated')) {
-      return reply.code(400).send({ error: 'Migration already completed (.deprecated file exists).' });
+    const sqliteFileExists = db.dbType === 'postgres' ? fs.existsSync(sqlitePath) : true;
+    const deprecatedFileExists =
+      db.dbType === 'postgres' && sqliteFileExists ? fs.existsSync(sqlitePath + '.deprecated') : false;
+    const preconditionError = getMigrationPreconditionError({
+      dbType: db.dbType,
+      sqlitePath,
+      sqliteFileExists,
+      deprecatedFileExists,
+    });
+    if (preconditionError) {
+      return reply.code(400).send({ error: preconditionError });
     }
 
     // Open SQLite read-only
@@ -218,8 +225,8 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
         // 3. cards
         const cards = sqliteDb.prepare('SELECT * FROM cards ORDER BY card_timestamp').all() as Record<string, unknown>[];
         for (const c of cards) {
-          const refs = typeof c['references'] === 'string' ? JSON.parse(c['references'] as string) : (c['references'] ?? []);
-          const tags = typeof c['tags'] === 'string' ? JSON.parse(c['tags'] as string) : (c['tags'] ?? []);
+          const refs = parseSqliteJsonArrayField(c['references']);
+          const tags = parseSqliteJsonArrayField(c['tags']);
           await tx.query(
             `INSERT INTO cards (id, card_type, title, content, "references", tags, card_timestamp, content_timestamp, source_type, source_ref, source_snapshot, source_checksum, source_checked_at, staleness, version, updated_at, created_by, updated_by)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
@@ -245,13 +252,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
           const node = queue.shift()!;
           const nodeId = node['id'] as string;
           if (inserted.has(nodeId)) continue;
-          // Cycle A1: position is now TEXT (zero-padded key). After SQLite
-          // migration 010 the source DB also stores TEXT, but the legacy
-          // path (older backups with INTEGER position) is handled by routing
-          // any number through posToKey. String values pass through verbatim.
-          const rawPos = node['position'];
-          const positionKey =
-            typeof rawPos === 'number' ? posToKey(rawPos) : (rawPos as string);
+          const positionKey = toMigrationPositionKey(node['position']);
           await tx.query(
             `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink, created_at)
              VALUES ($1, $2, $3, $4, $5, $6)
