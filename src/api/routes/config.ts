@@ -11,10 +11,10 @@ import { setPendingRestart } from '../state.js';
 import { mapPostgresConnectionError } from '../config/db-test.js';
 import { parseConfigEnvContent, updateConfigEnvContent } from '../config/env-file.js';
 import {
-  getMigrationPreconditionError,
-  parseSqliteJsonArrayField,
-  toMigrationPositionKey,
-} from '../config/migration.js';
+  migrateSqliteToPostgres,
+  type ConfigMigrationServiceDeps,
+  type SqliteMigrationDatabase,
+} from '../config/migration-service.js';
 import { agentToPublic, isAdminRemovalChange, requireRole, wouldRemoveLastAdmin } from '../config/policy.js';
 import { getDb } from '../../db/client.js';
 import type { DatabaseAdapter } from '../../db/adapter.js';
@@ -34,17 +34,8 @@ import {
 } from '../../db/queries/agents.js';
 import type { UserRole } from '../../shared/types.js';
 
-export type SqliteMigrationDatabase = {
-  prepare(sql: string): { all(): Record<string, unknown>[] };
-  close(): void;
-};
-
-export type MigrationRouteDeps = {
+export type MigrationRouteDeps = Omit<ConfigMigrationServiceDeps, 'db'> & {
   getDb(): DatabaseAdapter;
-  getSqlitePath(): string;
-  existsSync(filePath: string): boolean;
-  openSqliteReadonly(sqlitePath: string): SqliteMigrationDatabase;
-  renameSync(from: string, to: string): void;
 };
 
 const defaultMigrationRouteDeps: MigrationRouteDeps = {
@@ -60,103 +51,17 @@ export function createMigrateToPgHandler(
 ): (req: FastifyRequest, reply: FastifyReply) => Promise<unknown> {
   return async (req, reply) => {
     if (!requireRole(req, reply, 'admin')) return;
-    const db = deps.getDb();
-
-    // Preconditions
-    const sqlitePath = deps.getSqlitePath();
-    const sqliteFileExists = db.dbType === 'postgres' ? deps.existsSync(sqlitePath) : true;
-    const deprecatedFileExists =
-      db.dbType === 'postgres' && sqliteFileExists ? deps.existsSync(sqlitePath + '.deprecated') : false;
-    const preconditionError = getMigrationPreconditionError({
-      dbType: db.dbType,
-      sqlitePath,
-      sqliteFileExists,
-      deprecatedFileExists,
+    const result = await migrateSqliteToPostgres({
+      db: deps.getDb(),
+      getSqlitePath: deps.getSqlitePath,
+      existsSync: deps.existsSync,
+      openSqliteReadonly: deps.openSqliteReadonly,
+      renameSync: deps.renameSync,
     });
-    if (preconditionError) {
-      return reply.code(400).send({ error: preconditionError });
-    }
-
-    // Open SQLite read-only
-    const sqliteDb = deps.openSqliteReadonly(sqlitePath);
-
-    try {
-      await db.transaction(async (tx) => {
-        // 1. users
-        const users = sqliteDb.prepare('SELECT * FROM users ORDER BY created_at').all() as Record<string, unknown>[];
-        for (const u of users) {
-          await tx.query(
-            `INSERT INTO users (id, email, display_name, role, is_active, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT (id) DO NOTHING`,
-            [u['id'], u['email'], u['display_name'] ?? null, u['role'], Boolean(u['is_active']), u['created_at']]
-          );
-        }
-
-        // 2. agents
-        const agents = sqliteDb.prepare('SELECT * FROM agents ORDER BY created_at').all() as Record<string, unknown>[];
-        for (const a of agents) {
-          await tx.query(
-            `INSERT INTO agents (id, agent_id, secret_hash, display_name, is_active, created_by, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             ON CONFLICT (id) DO NOTHING`,
-            [a['id'], a['agent_id'], a['secret_hash'], a['display_name'] ?? null, Boolean(a['is_active']), a['created_by'] ?? null, a['created_at']]
-          );
-        }
-
-        // 3. cards
-        const cards = sqliteDb.prepare('SELECT * FROM cards ORDER BY card_timestamp').all() as Record<string, unknown>[];
-        for (const c of cards) {
-          const refs = parseSqliteJsonArrayField(c['references']);
-          const tags = parseSqliteJsonArrayField(c['tags']);
-          await tx.query(
-            `INSERT INTO cards (id, card_type, title, content, "references", tags, card_timestamp, content_timestamp, source_type, source_ref, source_snapshot, source_checksum, source_checked_at, staleness, version, updated_at, created_by, updated_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-             ON CONFLICT (id) DO NOTHING`,
-            [
-              c['id'], c['card_type'], c['title'], c['content'] ?? null,
-              refs, tags,
-              c['card_timestamp'], c['content_timestamp'] ?? null,
-              c['source_type'] ?? null, c['source_ref'] ?? null,
-              c['source_snapshot'] ?? null, c['source_checksum'] ?? null,
-              c['source_checked_at'] ?? null, c['staleness'] ?? 'unverified',
-              c['version'] ?? 1, c['updated_at'],
-              c['created_by'] ?? null, c['updated_by'] ?? null,
-            ]
-          );
-        }
-
-        // 4. tree_nodes (BFS order to satisfy FK constraints)
-        const allNodes = sqliteDb.prepare('SELECT * FROM tree_nodes ORDER BY created_at').all() as Record<string, unknown>[];
-        const inserted = new Set<string>();
-        const queue = allNodes.filter((n) => n['parent_node_id'] === null);
-        while (queue.length > 0) {
-          const node = queue.shift()!;
-          const nodeId = node['id'] as string;
-          if (inserted.has(nodeId)) continue;
-          const positionKey = toMigrationPositionKey(node['position']);
-          await tx.query(
-            `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT (id) DO NOTHING`,
-            [nodeId, node['card_id'], node['parent_node_id'] ?? null, positionKey, Boolean(node['is_symlink']), node['created_at']]
-          );
-          inserted.add(nodeId);
-          const children = allNodes.filter((n) => n['parent_node_id'] === nodeId && !inserted.has(n['id'] as string));
-          queue.push(...children);
-        }
-      });
-
-      // Rename SQLite file to .deprecated
-      sqliteDb.close();
-      deps.renameSync(sqlitePath, sqlitePath + '.deprecated');
-
+    if (result.ok) {
       return reply.send({ ok: true, message: 'Migration completed. SQLite file renamed to .deprecated.' });
-    } catch (err) {
-      sqliteDb.close();
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.code(500).send({ error: `Migration failed: ${message}` });
     }
+    return reply.code(result.statusCode).send({ error: result.error });
   };
 }
 
