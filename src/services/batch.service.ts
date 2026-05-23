@@ -1,5 +1,4 @@
 import { getDb } from "../db/client.js";
-import { updateCardById } from "../db/queries/cards.js";
 import type {
   AtomPatchEvent,
   BatchOpInput,
@@ -14,6 +13,7 @@ import { processBatchMoves } from "./batch-move.service.js";
 import { processBatchChildOrders } from "./batch-child-order.service.js";
 import { processBatchNodeUpdates } from "./batch-node-update.service.js";
 import { processBatchDeletes } from "./batch-delete.service.js";
+import { processBatchCardUpdates } from "./batch-card-update.service.js";
 
 export { topologicalSortCreates } from "./batch-create-symlink.service.js";
 
@@ -74,28 +74,13 @@ export async function executeBatchOp(
 
     // ── Updates ──────────────────────────────────────────────────────────────
     if (input.updates && input.updates.length > 0) {
-      for (const item of input.updates) {
-        const { card_id, expected_version, ...fields } = item;
-        const contentChanged = fields.content !== undefined;
-        const updateResult = await updateCardById(
-          client, card_id, fields, contentChanged, agentId ?? undefined, expected_version
-        );
-        if (updateResult === null) {
-          throw new Error(`Card not found: ${card_id}`);
-        }
-        if (updateResult.conflict) {
-          throw new Error(
-            `VersionConflict: card ${card_id} expected version ${expected_version}, actual ${updateResult.actualVersion}`
-          );
-        }
-        result.updated.push(card_id);
-        patches.push({
-          type: "card:updated",
-          cardId: card_id,
-          data: updateResult.card,
-          actor: agentId,
-        });
-      }
+      await processBatchCardUpdates({
+        db: client,
+        updates: input.updates,
+        result,
+        patches,
+        actor: agentId,
+      });
     }
 
     // ── Node updates ─────────────────────────────────────────────────────────
