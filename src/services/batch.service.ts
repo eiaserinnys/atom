@@ -1,9 +1,5 @@
 import { getDb } from "../db/client.js";
-import {
-  updateCardById,
-  deleteCardById,
-} from "../db/queries/cards.js";
-import { selectNodesByCardId } from "../db/queries/tree.js";
+import { updateCardById } from "../db/queries/cards.js";
 import type {
   AtomPatchEvent,
   BatchOpInput,
@@ -17,6 +13,7 @@ import {
 import { processBatchMoves } from "./batch-move.service.js";
 import { processBatchChildOrders } from "./batch-child-order.service.js";
 import { processBatchNodeUpdates } from "./batch-node-update.service.js";
+import { processBatchDeletes } from "./batch-delete.service.js";
 
 export { topologicalSortCreates } from "./batch-create-symlink.service.js";
 
@@ -148,18 +145,13 @@ export async function executeBatchOp(
 
     // ── Deletes ───────────────────────────────────────────────────────────────
     if (input.deletes && input.deletes.length > 0) {
-      for (const item of input.deletes) {
-        const nodes = await selectNodesByCardId(client, item.card_id);
-        await deleteCardById(client, item.card_id);
-        result.deleted.push(item.card_id);
-        patches.push({
-          type: "card:deleted",
-          cardId: item.card_id,
-          nodeIds: nodes.map((node) => node.id),
-          parentNodeIds: nodes.map((node) => node.parent_node_id),
-          actor: agentId,
-        });
-      }
+      await processBatchDeletes({
+        db: client,
+        deletes: input.deletes,
+        result,
+        patches,
+        actor: agentId,
+      });
     }
 
     return { result, patches };

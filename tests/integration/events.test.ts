@@ -315,6 +315,101 @@ describe("Event Bus — emit cases", () => {
     }
   });
 
+  it("executeBatchOp card:deleted patch uses pre-delete node ids and parents", async () => {
+    const { card, node_id: canonicalNodeId } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Batch deleted patch target",
+    });
+    const { node_id: symlinkParentNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Batch deleted patch symlink parent",
+    });
+    const symlinkNode = await treeService.createSymlink(
+      card.id,
+      symlinkParentNodeId
+    );
+    const nodesBeforeDelete = await cardService.getCardNodes(card.id);
+
+    expect(nodesBeforeDelete.map((node) => node.id)).toEqual([
+      canonicalNodeId,
+      symlinkNode.id,
+    ]);
+
+    const eventPromise = nextEvent();
+    const result = await batchService.executeBatchOp({
+      deletes: [{ card_id: card.id }],
+    });
+    const event = await eventPromise;
+
+    expect(result.deleted).toEqual([card.id]);
+    expect(await cardService.getCardNodes(card.id)).toHaveLength(0);
+
+    expect(event.type).toBe("batch:completed");
+    if (event.type === "batch:completed") {
+      expect(event.result.deleted).toEqual([card.id]);
+      expect(event.patches).toHaveLength(1);
+      const [patch] = event.patches;
+      expect(patch.type).toBe("card:deleted");
+      if (patch.type === "card:deleted") {
+        expect(patch.cardId).toBe(card.id);
+        expect(patch.nodeIds).toEqual(
+          nodesBeforeDelete.map((node) => node.id)
+        );
+        expect(patch.parentNodeIds).toEqual(
+          nodesBeforeDelete.map((node) => node.parent_node_id)
+        );
+        expect(patch.actor).toBeNull();
+      }
+    }
+  });
+
+  it("executeBatchOp appends delete patches after child_order patches", async () => {
+    const { card: deleteTarget } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Batch patch order delete target",
+    });
+    const { node_id: parentNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Batch patch order parent",
+    });
+    const { node_id: firstChildNodeId } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Batch patch order first child",
+      parent_node_id: parentNodeId,
+    });
+    const { node_id: secondChildNodeId } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Batch patch order second child",
+      parent_node_id: parentNodeId,
+    });
+
+    const eventPromise = nextEvent();
+    await batchService.executeBatchOp({
+      child_orders: [
+        {
+          parent_node_id: parentNodeId,
+          order: [secondChildNodeId, firstChildNodeId],
+        },
+      ],
+      deletes: [{ card_id: deleteTarget.id }],
+    });
+    const event = await eventPromise;
+
+    expect(event.type).toBe("batch:completed");
+    if (event.type === "batch:completed") {
+      expect(event.patches.map((patch) => patch.type)).toEqual([
+        "node:moved",
+        "node:moved",
+        "card:deleted",
+      ]);
+      const deletePatch = event.patches[2];
+      expect(deletePatch.type).toBe("card:deleted");
+      if (deletePatch.type === "card:deleted") {
+        expect(deletePatch.cardId).toBe(deleteTarget.id);
+      }
+    }
+  });
+
   it("executeBatchOp preserves create and symlink result and patch order", async () => {
     const { card: sourceA } = await cardService.createCard({
       card_type: "knowledge",
