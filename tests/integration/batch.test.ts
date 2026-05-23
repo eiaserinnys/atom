@@ -123,6 +123,31 @@ describe("executeBatchOp — creates", () => {
     expect(nodeRow.rows[0]["parent_node_id"]).toBe(rootEntry.node_id);
   });
 
+  it("does not create partial data when a create parent_temp_id is missing", async () => {
+    const before = await pool.query("SELECT COUNT(*) FROM cards");
+    const countBefore = parseInt(before.rows[0]["count"], 10);
+
+    await expect(
+      executeBatchOp({
+        creates: [
+          { temp_id: "ok", card_type: "structure", title: "Should not persist" },
+          {
+            temp_id: "bad",
+            parent_temp_id: "missing-parent",
+            card_type: "knowledge",
+            title: "Missing parent",
+          },
+        ],
+      })
+    ).rejects.toThrow(
+      'parent_temp_id "missing-parent" referenced by "bad" not found in creates'
+    );
+
+    const after = await pool.query("SELECT COUNT(*) FROM cards");
+    const countAfter = parseInt(after.rows[0]["count"], 10);
+    expect(countAfter).toBe(countBefore);
+  });
+
   it("returns correct temp_id mapping", async () => {
     const result = await executeBatchOp({
       creates: [
@@ -812,6 +837,32 @@ describe("executeBatchOp — symlinks", () => {
         ],
       })
     ).rejects.toThrow('parent_temp_id "nonexistent-temp-id" not found among batch creates');
+  });
+
+  it("rolls back creates when symlink parent_temp_id is missing", async () => {
+    const { card } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Rollback symlink source",
+    });
+    const before = await pool.query("SELECT COUNT(*) FROM tree_nodes");
+    const countBefore = parseInt(before.rows[0]["count"], 10);
+
+    await expect(
+      executeBatchOp({
+        creates: [
+          { temp_id: "created", card_type: "structure", title: "Should roll back" },
+        ],
+        symlinks: [
+          { card_id: card.id, parent_temp_id: "missing-created-parent" },
+        ],
+      })
+    ).rejects.toThrow(
+      'Symlink: parent_temp_id "missing-created-parent" not found among batch creates'
+    );
+
+    const after = await pool.query("SELECT COUNT(*) FROM tree_nodes");
+    const countAfter = parseInt(after.rows[0]["count"], 10);
+    expect(countAfter).toBe(countBefore);
   });
 });
 

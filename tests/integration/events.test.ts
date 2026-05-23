@@ -315,6 +315,92 @@ describe("Event Bus — emit cases", () => {
     }
   });
 
+  it("executeBatchOp preserves create and symlink result and patch order", async () => {
+    const { card: sourceA } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Patch symlink source A",
+    });
+    const { card: sourceB } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Patch symlink source B",
+    });
+
+    const eventPromise = nextEvent();
+    const result = await batchService.executeBatchOp({
+      creates: [
+        {
+          temp_id: "child",
+          parent_temp_id: "parent",
+          card_type: "knowledge",
+          title: "Patch Child",
+        },
+        {
+          temp_id: "parent",
+          card_type: "structure",
+          title: "Patch Parent",
+        },
+      ],
+      symlinks: [
+        { card_id: sourceA.id, parent_temp_id: "parent" },
+        { card_id: sourceB.id, parent_temp_id: "child" },
+      ],
+    });
+    const event = await eventPromise;
+
+    expect(result.created.map((item) => item.temp_id)).toEqual([
+      "parent",
+      "child",
+    ]);
+    expect(result.symlinked).toHaveLength(2);
+
+    expect(event.type).toBe("batch:completed");
+    if (event.type === "batch:completed") {
+      expect(event.result.created).toEqual(result.created);
+      expect(event.result.symlinked).toEqual(result.symlinked);
+      expect(event.patches.map((patch) => patch.type)).toEqual([
+        "card:created",
+        "card:created",
+        "node:created",
+        "node:created",
+      ]);
+
+      const [parentPatch, childPatch, symlinkAPatch, symlinkBPatch] = event.patches;
+      const parentNodeId = result.created[0].node_id;
+      const childNodeId = result.created[1].node_id;
+
+      expect(parentPatch.type).toBe("card:created");
+      if (parentPatch.type === "card:created") {
+        expect(parentPatch.nodeId).toBe(parentNodeId);
+        expect(parentPatch.parentNodeId).toBeNull();
+        expect(parentPatch.node.card.title).toBe("Patch Parent");
+      }
+
+      expect(childPatch.type).toBe("card:created");
+      if (childPatch.type === "card:created") {
+        expect(childPatch.nodeId).toBe(childNodeId);
+        expect(childPatch.parentNodeId).toBe(parentNodeId);
+        expect(childPatch.node.parent_node_id).toBe(parentNodeId);
+        expect(childPatch.node.card.title).toBe("Patch Child");
+      }
+
+      expect(symlinkAPatch.type).toBe("node:created");
+      if (symlinkAPatch.type === "node:created") {
+        expect(symlinkAPatch.nodeId).toBe(result.symlinked[0]);
+        expect(symlinkAPatch.cardId).toBe(sourceA.id);
+        expect(symlinkAPatch.parentNodeId).toBe(parentNodeId);
+        expect(symlinkAPatch.node.is_symlink).toBe(true);
+      }
+
+      expect(symlinkBPatch.type).toBe("node:created");
+      if (symlinkBPatch.type === "node:created") {
+        expect(symlinkBPatch.nodeId).toBe(result.symlinked[1]);
+        expect(symlinkBPatch.cardId).toBe(sourceB.id);
+        expect(symlinkBPatch.parentNodeId).toBe(childNodeId);
+        expect(symlinkBPatch.node.is_symlink).toBe(true);
+      }
+    }
+  });
+
   it("executeBatchOp node_updates patches only actual updates", async () => {
     const { node_id: updatedNodeId } = await cardService.createCard({
       card_type: "structure",
