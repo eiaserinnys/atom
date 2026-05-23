@@ -110,4 +110,16 @@ describe("batch_op — moves with before/after/to", () => {
     const children = await selectChildren(getPool(), parentNodeId);
     expect(children[0].id).toBe(c);
   });
+
+  it("batch move with deprecated new_position returns _warnings", async () => {
+    const { parentNodeId, childNodeIds } = await createParentWithChildren(2);
+    const [a] = childNodeIds;
+
+    const result = await executeBatchOp({
+      moves: [{ node_id: a, new_parent_node_id: parentNodeId, new_position: 50 }],
+    });
+
+    expect(result._warnings).toHaveLength(1);
+    expect(result._warnings![0]).toContain("deprecated");
+  });
 });
