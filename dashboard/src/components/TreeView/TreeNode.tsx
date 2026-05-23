@@ -5,6 +5,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { api, type TreeNodeData } from '../../api/client';
 import { useTreeDnd } from './TreeDndContext';
+import { childrenQueryKey } from '../../query/queryKeys';
 
 interface TreeNodeProps {
   node: TreeNodeData;
@@ -23,7 +24,7 @@ export function TreeNode({ node, selectedNodeId, onSelect, depth = 0, isExpanded
   // node.children이 undefined이면 첫 expand 시 lazy fetch
   const propsChildren = node.children;
   const { data: children = [], isFetched, isFetching, isError, error } = useQuery<TreeNodeData[]>({
-    queryKey: ['children', node.id],
+    queryKey: childrenQueryKey(node.id),
     queryFn: () => api.listChildren(node.id),
     enabled: isExpanded,
     ...(propsChildren !== undefined && {

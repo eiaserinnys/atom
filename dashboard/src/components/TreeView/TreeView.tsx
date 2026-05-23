@@ -17,6 +17,7 @@ import { MoveCardModal } from '../MoveCardModal/MoveCardModal';
 import { buildAppendMovePayload } from '../../utils/treeMoveIntent';
 import { useTreeDragAndDrop } from './useTreeDragAndDrop';
 import { useTreeMutations } from './useTreeMutations';
+import { rootTreeQueryKey } from '../../query/queryKeys';
 
 interface TreeViewProps {
   selectedNodeId: string | null;
@@ -41,7 +42,7 @@ type ModalState =
 export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: TreeViewProps) {
   const { t } = useTranslation();
   const { data: roots, isLoading, error } = useQuery({
-    queryKey: ['tree', null],
+    queryKey: rootTreeQueryKey(),
     queryFn: fetchRootsWithChildren,
   });
 

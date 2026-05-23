@@ -2,7 +2,7 @@ import { api, type TreeNodeData } from './client';
 
 /**
  * 루트 노드 목록을 가져오고 각 루트의 직계 자식을 함께 로드한다.
- * TreeView와 MoveCardModal이 동일한 query key(['tree', null])로 캐시를 공유한다.
+ * TreeView의 root tree query가 이 데이터를 사용한다.
  */
 export async function fetchRootsWithChildren(): Promise<TreeNodeData[]> {
   const roots = await api.getTree();
@@ -21,7 +21,7 @@ export async function fetchRootsWithChildren(): Promise<TreeNodeData[]> {
 /**
  * structure 노드만 재귀적으로 전체 트리를 로드한다.
  * MoveCardModal에서 깊은 depth의 structure 노드도 선택 가능하게 하기 위해 사용한다.
- * queryKey: ['structureTree'] — TreeView의 ['tree', null] 캐시와 분리.
+ * structure tree query는 TreeView의 root tree query와 분리한다.
  */
 async function expandStructureNode(
   node: TreeNodeData,

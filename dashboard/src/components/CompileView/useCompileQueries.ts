@@ -1,14 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { api, type UnfurlEntry } from '../../api/client';
 import { readStoredCredentials } from '../../hooks/useLocalStorageCredentials';
+import { standardCompileQueryKey, unfurlCompileQueryKey } from '../../query/queryKeys';
 
-export function standardCompileQueryKey(nodeId: string | null, depth: number) {
-  return ['compile', nodeId, depth] as const;
-}
-
-export function unfurlCompileQueryKey(nodeId: string | null, depth: number) {
-  return ['compile-unfurl', nodeId, depth] as const;
-}
+export { standardCompileQueryKey, unfurlCompileQueryKey } from '../../query/queryKeys';
 
 export function useCompileQueries(nodeId: string | null, depth: number, unfurlEnabled: boolean) {
   const standardQuery = useQuery({

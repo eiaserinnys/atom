@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { CardFormModal } from '../CardFormModal/CardFormModal';
 import type { SectionMap } from '../../utils/parseCompileSections';
+import { standardCompileNodeQueryKey } from '../../query/queryKeys';
 
 interface EditableHeadingProps {
   level: number;
@@ -57,7 +58,7 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
     mutationFn: (vars: { cardId: string; title: string; content: string }) =>
       api.updateCard(vars.cardId, { title: vars.title, content: vars.content || undefined }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['compile', compiledNodeId] });
+      queryClient.invalidateQueries({ queryKey: standardCompileNodeQueryKey(compiledNodeId) });
       setShowModal(false);
       setCardData(null);
     },

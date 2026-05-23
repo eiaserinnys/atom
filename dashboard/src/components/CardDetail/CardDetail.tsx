@@ -6,6 +6,7 @@ import i18n from '../../i18n';
 import { CardEditableFields } from './CardEditableFields';
 import { CardMetadata } from './CardMetadata';
 import { useCardDetailSaves } from './useCardDetailSaves';
+import { nodeQueryKey } from '../../query/queryKeys';
 
 interface CardDetailProps {
   nodeId: string | null;
@@ -24,7 +25,7 @@ export function CardDetail({ nodeId }: CardDetailProps) {
   const isDirty = editingTitle || editingContent || editingJournalLimit;
 
   const { data: node, isLoading, isError } = useQuery<TreeNodeData>({
-    queryKey: ['node', nodeId],
+    queryKey: nodeQueryKey(nodeId),
     queryFn: () => api.getNode(nodeId!),
     enabled: !!nodeId,
     retry: false,

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { type TreeNodeData } from '../../api/client';
 import { fetchFullStructureTree } from '../../api/treeQueries';
+import { structureTreeQueryKey } from '../../query/queryKeys';
 
 interface MoveCardModalProps {
   nodeToMove: TreeNodeData;
@@ -70,9 +71,9 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // fetchFullStructureTree: structure 노드만 재귀적으로 전체 트리 로드
-  // queryKey를 ['structureTree']로 분리하여 TreeView의 ['tree', null] 캐시를 오염시키지 않음
+  // 별도 structure tree query key로 TreeView의 root tree cache를 오염시키지 않음
   const { data: roots, isLoading: treeLoading } = useQuery({
-    queryKey: ['structureTree'],
+    queryKey: structureTreeQueryKey(),
     queryFn: fetchFullStructureTree,
     staleTime: 30_000,
   });

@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { applyAtomEventToCache } from './useAtomEvents';
 import type { CardData, TreeNodeData } from '../api/client';
 import type { AtomEvent } from '../types/events';
+import { childrenQueryKey, rootTreeQueryKey } from '../query/queryKeys';
 
 function makeCard(id: string, title: string): CardData {
   return {
@@ -51,8 +52,8 @@ describe('applyAtomEventToCache', () => {
       makeNode('child-1', 'child-card-1', 'root', 100),
     ]);
     const newChild = makeNode('child-2', 'child-card-2', 'root', 200);
-    queryClient.setQueryData(['tree', null], [root]);
-    queryClient.setQueryData(['children', 'root'], root.children);
+    queryClient.setQueryData(rootTreeQueryKey(), [root]);
+    queryClient.setQueryData(childrenQueryKey('root'), root.children);
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     const event: AtomEvent = {
@@ -79,8 +80,8 @@ describe('applyAtomEventToCache', () => {
 
     applyAtomEventToCache(queryClient, event, null);
 
-    const tree = queryClient.getQueryData<TreeNodeData[]>(['tree', null]);
-    const children = queryClient.getQueryData<TreeNodeData[]>(['children', 'root']);
+    const tree = queryClient.getQueryData<TreeNodeData[]>(rootTreeQueryKey());
+    const children = queryClient.getQueryData<TreeNodeData[]>(childrenQueryKey('root'));
     expect(tree?.[0].children?.map((n) => n.id)).toEqual(['child-1', 'child-2']);
     expect(children?.map((n) => n.id)).toEqual(['child-1', 'child-2']);
     expect(invalidateSpy).not.toHaveBeenCalled();
@@ -91,8 +92,8 @@ describe('applyAtomEventToCache', () => {
     const moving = makeNode('moving', 'moving-card', 'old-parent', 100);
     const oldSibling = makeNode('old-sibling', 'old-card', 'old-parent', 200);
     const newSibling = makeNode('new-sibling', 'new-card', 'new-parent', 200);
-    queryClient.setQueryData(['children', 'old-parent'], [moving, oldSibling]);
-    queryClient.setQueryData(['children', 'new-parent'], [newSibling]);
+    queryClient.setQueryData(childrenQueryKey('old-parent'), [moving, oldSibling]);
+    queryClient.setQueryData(childrenQueryKey('new-parent'), [newSibling]);
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     applyAtomEventToCache(queryClient, {
@@ -105,9 +106,9 @@ describe('applyAtomEventToCache', () => {
       actor: null,
     }, null);
 
-    expect(queryClient.getQueryData<TreeNodeData[]>(['children', 'old-parent'])?.map((n) => n.id))
+    expect(queryClient.getQueryData<TreeNodeData[]>(childrenQueryKey('old-parent'))?.map((n) => n.id))
       .toEqual(['old-sibling']);
-    expect(queryClient.getQueryData<TreeNodeData[]>(['children', 'new-parent'])?.map((n) => n.id))
+    expect(queryClient.getQueryData<TreeNodeData[]>(childrenQueryKey('new-parent'))?.map((n) => n.id))
       .toEqual(['moving', 'new-sibling']);
     expect(invalidateSpy).not.toHaveBeenCalled();
   });

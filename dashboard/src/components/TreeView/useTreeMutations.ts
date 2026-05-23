@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { toApiMovePayload, type TreeMovePayload } from '../../utils/treeMoveIntent';
+import { invalidateTreeMutationQueries } from '../../query/invalidation';
 
 type CardType = 'structure' | 'knowledge';
 
@@ -36,8 +37,7 @@ export function useTreeMutations({
   const queryClient = useQueryClient();
 
   const invalidateTree = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['tree'] });
-    queryClient.invalidateQueries({ queryKey: ['children'] });
+    invalidateTreeMutationQueries(queryClient);
   }, [queryClient]);
 
   const createMutation = useMutation({

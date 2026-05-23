@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { parseJournalLimitDraft } from './cardDetailLogic';
+import { nodeQueryKey } from '../../query/queryKeys';
 
 interface UseCardDetailSavesArgs {
   nodeId: string | null;
@@ -28,7 +29,7 @@ export function useCardDetailSaves({
   const [saving, setSaving] = useState(false);
 
   const invalidateNode = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
+    queryClient.invalidateQueries({ queryKey: nodeQueryKey(nodeId) });
   }, [nodeId, queryClient]);
 
   const showSaveError = useCallback((error: unknown) => {
