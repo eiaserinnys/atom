@@ -5,7 +5,7 @@ import {
   deleteCardById,
 } from "../db/queries/cards.js";
 import { insertNode, moveNode, selectNodeById, selectNodesByCardId, updateNodeProperties } from "../db/queries/tree.js";
-import { resolvePositionKey } from "./tree.service.js";
+import { resolvePositionKey } from "./tree-position.service.js";
 import { rekeyEvenly } from "../shared/lexorank.js";
 import type {
   AtomPatchEvent,
@@ -255,10 +255,8 @@ export async function executeBatchOp(
 
     // ── Moves ─────────────────────────────────────────────────────────────────
     //
-    // Cycle B: relative positioning (before/after/to) alongside deprecated
-    // absolute position. Parent undefined = keep current (f995e015 fix).
-    // resolvePositionKey handles all position resolution; moveNode (DB query)
-    // is a simple UPDATE with pre-resolved key.
+    // Relative positioning lives in tree-position.service; moveNode (DB query)
+    // is a simple UPDATE with pre-resolved parent/key.
     if (input.moves && input.moves.length > 0) {
       // Build temp_id → node_id map from this batch's creates
       const tempIdToNodeId = new Map<string, string>(
@@ -284,7 +282,7 @@ export async function executeBatchOp(
         }
 
         // If parent is still undefined (neither new_parent_node_id nor parent_temp_id),
-        // fetch current parent — cycle B "keep current" semantics (f995e015 fix).
+        // fetch current parent to preserve "keep current" semantics.
         let effectiveParent: string | null;
         if (resolvedParent === undefined) {
           effectiveParent = oldNode.parent_node_id;
@@ -326,7 +324,7 @@ export async function executeBatchOp(
 
     // ── Child orders ─────────────────────────────────────────────────────────
     //
-    // Cycle B: reorder listed nodes under a parent with evenly-spaced keys.
+    // Reorder listed nodes under a parent with evenly-spaced keys.
     // Nodes in `order` are re-parented if they come from a different parent
     // (implicit cross-parent move). Nodes under the parent but NOT in `order`
     // keep their existing keys (may interleave with new keys via tie-break).
@@ -391,7 +389,7 @@ export async function executeBatchOp(
   // Emit a single batch event after the transaction commits
   eventBus.emit("atom:event", { type: "batch:completed", result, patches });
 
-  // Attach deprecation warnings if any (cycle B — deprecated position usage)
+  // Attach deprecation warnings if deprecated position input was used.
   if (batchWarnings.length > 0) {
     return { ...result, _warnings: batchWarnings };
   }

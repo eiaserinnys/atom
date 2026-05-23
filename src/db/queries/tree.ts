@@ -6,12 +6,11 @@ import { posToKey, keyToPos } from "../../shared/lexorank.js";
 /**
  * Map a DB row to the public TreeNode shape.
  *
- * Cycle A1 stored `position` as TEXT (zero-padded 10-digit key); the
+ * Migration 010 stores `position` as TEXT (zero-padded 10-digit key); the
  * external response keeps it as `number` via `keyToPos` for backward
- * compatibility. Cycle A2 removed the `number` fallback that guarded
- * hypothetical driver coercion — both pg and better-sqlite3 return
- * TEXT columns as strings, so an unexpected `number` here would mean
- * a real bug upstream and we let `keyToPos` throw rather than coerce.
+ * compatibility. Both pg and better-sqlite3 return TEXT columns as strings,
+ * so an unexpected `number` here would mean a real bug upstream and we let
+ * `keyToPos` throw rather than coerce.
  */
 function rowToNode(row: Record<string, unknown>): TreeNode {
   return {
@@ -145,11 +144,11 @@ export async function deleteNodeById(
 }
 
 /**
- * Move a node to a new parent and position. Cycle B simplified: this
- * function only executes the UPDATE with pre-resolved values. All position
- * resolution (before/after/to/deprecated-absolute/default-append) and
- * parent resolution (undefined=keep-current) happen in the service layer
- * via `resolvePositionKey` (tree.service.ts).
+ * Move a node to a new parent and position. This function only executes the
+ * UPDATE with pre-resolved values. All position
+ * resolution (before/after/to/deprecated-absolute/default-append) happens in
+ * tree-position.service; parent resolution (undefined=keep-current) happens in
+ * the orchestrating service layer.
  */
 export async function moveNode(
   db: Queryable,

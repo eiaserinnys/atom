@@ -132,6 +132,36 @@ describe("move_node — relative positioning", () => {
     expect(children.map((n) => n.id)).toEqual([b, c, a]);
   });
 
+  it("before self: keeps the existing sibling order", async () => {
+    const { parentNodeId, childNodeIds } = await createParentWithChildren(3);
+    const [a, b, c] = childNodeIds;
+
+    const { node: moved } = await treeService.moveNode(b, {
+      parent_node_id: parentNodeId,
+      before: b,
+    });
+    expect(moved).not.toBeNull();
+
+    const children = await selectChildren(pool, parentNodeId);
+    expect(children.map((n) => n.id)).toEqual([a, b, c]);
+    expect(children.find((n) => n.id === b)!.position).toBe(moved!.position);
+  });
+
+  it("after self: keeps the existing sibling order", async () => {
+    const { parentNodeId, childNodeIds } = await createParentWithChildren(3);
+    const [a, b, c] = childNodeIds;
+
+    const { node: moved } = await treeService.moveNode(b, {
+      parent_node_id: parentNodeId,
+      after: b,
+    });
+    expect(moved).not.toBeNull();
+
+    const children = await selectChildren(pool, parentNodeId);
+    expect(children.map((n) => n.id)).toEqual([a, b, c]);
+    expect(children.find((n) => n.id === b)!.position).toBe(moved!.position);
+  });
+
   it("before first child with position 0: triggers rekey", async () => {
     // Create child at position 0
     const parentResult = await executeBatchOp({
