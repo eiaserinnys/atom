@@ -17,6 +17,7 @@ import { MoveCardModal } from '../MoveCardModal/MoveCardModal';
 import { buildAppendMovePayload } from '../../utils/treeMoveIntent';
 import { useTreeDragAndDrop } from './useTreeDragAndDrop';
 import { useTreeMutations } from './useTreeMutations';
+import { useInitialNodePathRestore } from './useInitialNodePathRestore';
 import { rootTreeQueryKey } from '../../query/queryKeys';
 
 interface TreeViewProps {
@@ -63,6 +64,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
 
   useEffect(() => {
     if (roots?.length) {
+      // Preserve legacy root auto-expand behavior after the roots query resolves.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setExpandedNodes(prev => {
         const next = new Set(prev);
         roots.forEach(r => next.add(r.id));
@@ -71,35 +74,13 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     }
   }, [roots]);
 
-  useEffect(() => {
-    const targetId = initialSelectedNodeId;
-    if (!targetId || !roots?.length) return;
-
-    const restorePath = async () => {
-      const path: string[] = [];
-      let currentId: string | null = targetId;
-      while (currentId) {
-        try {
-          const node = await api.getNode(currentId);
-          path.unshift(currentId);
-          currentId = node.parent_node_id ?? null;
-        } catch {
-          break;
-        }
-      }
-      if (path.length === 0) return;
-      setExpandedNodes(prev => {
-        const next = new Set(prev);
-        path.slice(0, -1).forEach(id => next.add(id));
-        return next;
-      });
-      onSelect(targetId);
-    };
-
-    restorePath();
-  // roots가 로드된 직후 1회만 실행
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roots]);
+  useInitialNodePathRestore({
+    initialSelectedNodeId,
+    roots,
+    getNode: api.getNode,
+    setExpandedNodes,
+    onSelect,
+  });
 
   const {
     deleteMutation,
