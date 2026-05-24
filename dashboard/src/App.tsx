@@ -90,7 +90,10 @@ function AppInner() {
         )}
         <div className="flex-1" />
         <div className="w-full max-w-[400px]">
-          <SearchBar onSelectNode={(id) => handleSelectNode(id)} />
+          <SearchBar
+            currentNodeId={selectedNodeId}
+            onSelectNode={(id) => handleSelectNode(id)}
+          />
         </div>
         {/* 모바일에서는 설정 버튼 숨김 (설정 탭으로 접근) */}
         {!isMobile && showConfigButton && (

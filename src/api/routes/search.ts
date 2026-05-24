@@ -3,7 +3,7 @@ import { searchCards } from "../../services/search.service.js";
 import type { SearchFilters, CardType } from "../../shared/types.js";
 
 export async function searchRoutes(app: FastifyInstance): Promise<void> {
-  // GET /search?q=...&tags=a,b&card_type=knowledge&updated_after=...&updated_before=...&source_type=...&strategy=auto|strict
+  // GET /search?q=...&rootNodeId=...&tags=a,b&card_type=knowledge&updated_after=...&updated_before=...&source_type=...&strategy=auto|strict
   app.get("/search", async (req, reply) => {
     const qs = req.query as Record<string, string>;
     if (!qs["q"]) return reply.code(400).send({ error: "q parameter required" });
@@ -43,7 +43,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
     const filters: SearchFilters = {
       query: qs["q"],
       limit,
-      root_node_id: qs["rootNodeId"] || undefined,
+      root_node_id: qs["rootNodeId"] || qs["root_node_id"] || undefined,
       tags: rawTags?.length ? rawTags : undefined,
       card_type: qs["card_type"] as CardType | undefined,
       updated_after: qs["updated_after"] || undefined,

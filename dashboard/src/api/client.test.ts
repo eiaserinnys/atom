@@ -131,4 +131,43 @@ describe('dashboard API client transport contracts', () => {
     expect(url.searchParams.get('max_chars')).toBe('120');
     expect(url.searchParams.get('exclude_nodes')).toBe('skip-1,skip-2');
   });
+
+  test('keeps text-only search URL compatible', async () => {
+    fetchMock.mockResolvedValueOnce(responseWithJson([]));
+
+    await api.search('plain text');
+
+    const requested = String(fetchMock.mock.calls[0]?.[0]);
+    const url = new URL(requested, 'https://atom.local');
+
+    expect(url.pathname).toBe('/search');
+    expect(url.searchParams.get('q')).toBe('plain text');
+    expect([...url.searchParams.keys()]).toEqual(['q']);
+  });
+
+  test('serializes search filters only when values are present', async () => {
+    fetchMock.mockResolvedValueOnce(responseWithJson([]));
+
+    await api.search('filtered', {
+      rootNodeId: 'node-1',
+      card_type: 'knowledge',
+      tags: ['alpha', 'beta'],
+      source_type: 'web',
+      updated_after: '2026-05-24T00:00:00.000Z',
+      updated_before: '2026-05-25T00:00:00.000Z',
+    });
+
+    const requested = String(fetchMock.mock.calls[0]?.[0]);
+    const url = new URL(requested, 'https://atom.local');
+
+    expect(url.pathname).toBe('/search');
+    expect(url.searchParams.get('q')).toBe('filtered');
+    expect(url.searchParams.get('rootNodeId')).toBe('node-1');
+    expect(url.searchParams.get('card_type')).toBe('knowledge');
+    expect(url.searchParams.get('tags')).toBe('alpha,beta');
+    expect(url.searchParams.get('source_type')).toBe('web');
+    expect(url.searchParams.get('updated_after')).toBe('2026-05-24T00:00:00.000Z');
+    expect(url.searchParams.get('updated_before')).toBe('2026-05-25T00:00:00.000Z');
+    expect(url.searchParams.has('strategy')).toBe(false);
+  });
 });

@@ -182,7 +182,18 @@
   },
   "searchbar": {
     "placeholder": "검색...",
-    "no_results": "결과 없음"
+    "no_results": "결과 없음",
+    "no_results_hint": "OR 검색어나 필터를 조정하세요.",
+    "filters": "필터",
+    "scope_current": "현재 노드",
+    "card_type": "카드 유형",
+    "type_all": "전체",
+    "type_structure": "구조",
+    "type_knowledge": "지식",
+    "tags": "태그",
+    "source_type": "출처",
+    "updated_after": "수정일 이후",
+    "updated_before": "수정일 이전"
   },
   "database": {
     "title": "데이터베이스",

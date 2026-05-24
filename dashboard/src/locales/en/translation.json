@@ -182,7 +182,18 @@
   },
   "searchbar": {
     "placeholder": "Search...",
-    "no_results": "No results"
+    "no_results": "No results",
+    "no_results_hint": "Try OR terms or filters.",
+    "filters": "Filters",
+    "scope_current": "Current node",
+    "card_type": "Card type",
+    "type_all": "All",
+    "type_structure": "Structure",
+    "type_knowledge": "Knowledge",
+    "tags": "Tags",
+    "source_type": "Source",
+    "updated_after": "Updated after",
+    "updated_before": "Updated before"
   },
   "database": {
     "title": "Database",

@@ -100,6 +100,23 @@ describe("BM25 Search", () => {
     expect(relaxedResults.map((r) => r.title)).toContain("Search Cards BM25 Recovery");
   });
 
+  it("expands short domain queries with synonyms when strict BM25 returns zero", async () => {
+    await cardService.createCard({
+      card_type: "knowledge",
+      title: "Responsive Layout Recovery",
+      content: "mobile responsive layout fallback",
+    });
+
+    const strictResults = await searchService.searchCards({
+      query: "treeview broken",
+      strategy: "strict",
+    });
+    expect(strictResults.length).toBe(0);
+
+    const expandedResults = await searchService.searchCards({ query: "treeview broken" });
+    expect(expandedResults.map((r) => r.title)).toContain("Responsive Layout Recovery");
+  });
+
   it("keeps explicit phrase and exclusion queries strict", async () => {
     await cardService.createCard({
       card_type: "knowledge",

@@ -69,11 +69,23 @@ export interface UnfurlEntry {
 
 export interface SearchResult {
   card_id: string;
-  node_id: string;
+  node_id: string | null;
   title: string;
   card_type: 'structure' | 'knowledge';
   is_symlink: boolean;
   snippet: string;
+  node_path: string[];
+}
+
+export interface SearchFilters {
+  limit?: number;
+  rootNodeId?: string;
+  tags?: string[];
+  card_type?: 'structure' | 'knowledge';
+  updated_after?: string;
+  updated_before?: string;
+  source_type?: string;
+  strategy?: 'auto' | 'strict';
 }
 
 export interface MoveNodePayload {
