@@ -9,7 +9,7 @@
     "./unfurl": "./dist/unfurl/interface.js"
   },
   "scripts": {
-    "build": "tsc && cp -r src/db/migrations dist/db/migrations && cp -r src/db/migrations-sqlite dist/db/migrations-sqlite",
+    "build": "tsc && node scripts/copy-migrations.cjs",
     "start": "node dist/api/index.js",
     "dev": "tsx watch src/api/index.ts",
     "mcp": "node dist/mcp/server.js",

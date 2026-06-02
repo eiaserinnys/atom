@@ -1,13 +1,10 @@
-import { selectChildren } from "../db/queries/tree.js";
 import type { Queryable } from "../db/queryable.js";
 import {
   keyBetween,
-  keyToPos,
   NORMAL_DIGIT_COUNT,
   posToKey,
   rekeyEvenly,
 } from "../shared/lexorank.js";
-import type { TreeNode } from "../shared/types.js";
 
 export interface MoveNodeOptions {
   /** Destination parent. undefined = keep current, null = root. */
@@ -32,6 +29,11 @@ interface PositionSpecifierOptions {
 interface ResolvedPositionKey {
   key: string;
   warnings: string[];
+}
+
+interface PositionSibling {
+  id: string;
+  key: string;
 }
 
 const DEPRECATED_POSITION_WARNING =
@@ -93,7 +95,7 @@ async function resolveRelativePositionKey(
   selfNodeId: string | null,
   opts: PositionSpecifierOptions
 ): Promise<ResolvedPositionKey> {
-  const allSiblings = await selectChildren(db, parentNodeId);
+  const allSiblings = await selectPositionSiblings(db, parentNodeId);
   validateRelativeTargets(allSiblings, opts);
 
   const siblings = selfNodeId
@@ -102,7 +104,7 @@ async function resolveRelativePositionKey(
 
   const insertionIndex = resolveInsertionIndex(allSiblings, siblings, selfNodeId, opts);
   if (insertionIndex.type === "self") {
-    return { key: posToKey(insertionIndex.position), warnings: [] };
+    return { key: insertionIndex.key, warnings: [] };
   }
 
   // Destination has no siblings after excluding self: assign the default key.
@@ -115,7 +117,7 @@ async function resolveRelativePositionKey(
 }
 
 function validateRelativeTargets(
-  allSiblings: TreeNode[],
+  allSiblings: PositionSibling[],
   opts: PositionSpecifierOptions
 ): void {
   // Validate before/after target BEFORE self-exclusion; otherwise a
@@ -138,11 +140,11 @@ function validateRelativeTargets(
 
 type InsertionIndex =
   | { type: "index"; index: number }
-  | { type: "self"; position: number };
+  | { type: "self"; key: string };
 
 function resolveInsertionIndex(
-  allSiblings: TreeNode[],
-  siblings: TreeNode[],
+  allSiblings: PositionSibling[],
+  siblings: PositionSibling[],
   selfNodeId: string | null,
   opts: PositionSpecifierOptions
 ): InsertionIndex {
@@ -150,7 +152,7 @@ function resolveInsertionIndex(
     const insertionIndex = siblings.findIndex((s) => s.id === opts.before);
     if (insertionIndex < 0) {
       const selfIdx = allSiblings.findIndex((s) => s.id === selfNodeId);
-      return { type: "self", position: allSiblings[selfIdx].position };
+      return { type: "self", key: allSiblings[selfIdx].key };
     }
     return { type: "index", index: insertionIndex };
   }
@@ -159,7 +161,7 @@ function resolveInsertionIndex(
     const afterIdx = siblings.findIndex((s) => s.id === opts.after);
     if (afterIdx < 0) {
       const selfIdx = allSiblings.findIndex((s) => s.id === selfNodeId);
-      return { type: "self", position: allSiblings[selfIdx].position };
+      return { type: "self", key: allSiblings[selfIdx].key };
     }
     return { type: "index", index: afterIdx + 1 };
   }
@@ -174,16 +176,16 @@ function resolveInsertionIndex(
 async function keyForInsertion(
   db: Queryable,
   parentNodeId: string | null,
-  siblings: TreeNode[],
+  siblings: PositionSibling[],
   insertionIndex: number
 ): Promise<string> {
   const prevKey =
     insertionIndex > 0
-      ? posToKey(siblings[insertionIndex - 1].position)
+      ? siblings[insertionIndex - 1].key
       : null;
   const nextKey =
     insertionIndex < siblings.length
-      ? posToKey(siblings[insertionIndex].position)
+      ? siblings[insertionIndex].key
       : null;
 
   try {
@@ -203,20 +205,30 @@ async function resolveAppendPositionKey(
   parentNodeId: string | null,
   selfNodeId: string | null
 ): Promise<ResolvedPositionKey> {
-  const maxResult = await db.query(
-    `SELECT COALESCE(MAX(position), '0000000000') AS max_pos
-     FROM tree_nodes
-     WHERE parent_node_id IS NOT DISTINCT FROM $1${selfNodeId ? " AND id != $2" : ""}`,
-    selfNodeId ? [parentNodeId, selfNodeId] : [parentNodeId]
-  );
-  const maxNumeric = keyToPos(maxResult.rows[0]["max_pos"] as string);
-  return { key: posToKey(maxNumeric + 100), warnings: [] };
+  const siblings = await selectPositionSiblings(db, parentNodeId, selfNodeId);
+  if (siblings.length === 0) {
+    return { key: posToKey(100), warnings: [] };
+  }
+
+  try {
+    const key = keyBetween(siblings[siblings.length - 1].key, null);
+    if (key.length <= NORMAL_DIGIT_COUNT) {
+      return { key, warnings: [] };
+    }
+  } catch {
+    // Non-normal leaked keys are repaired by rekeying the whole sibling set.
+  }
+
+  return {
+    key: await rekeyAndInsert(db, parentNodeId, siblings, siblings.length),
+    warnings: [],
+  };
 }
 
 async function rekeyAndInsert(
   db: Queryable,
   parentNodeId: string | null,
-  currentSiblings: TreeNode[],
+  currentSiblings: PositionSibling[],
   insertionIndex: number
 ): Promise<string> {
   const totalCount = currentSiblings.length + 1;
@@ -233,4 +245,21 @@ async function rekeyAndInsert(
   }
 
   return keys[insertionIndex];
+}
+
+async function selectPositionSiblings(
+  db: Queryable,
+  parentNodeId: string | null,
+  excludeNodeId?: string | null
+): Promise<PositionSibling[]> {
+  const result = await db.query(
+    `SELECT id, position FROM tree_nodes
+     WHERE parent_node_id IS NOT DISTINCT FROM $1${excludeNodeId ? " AND id != $2" : ""}
+     ORDER BY position ASC, id ASC`,
+    excludeNodeId ? [parentNodeId, excludeNodeId] : [parentNodeId]
+  );
+  return result.rows.map((row) => ({
+    id: row["id"] as string,
+    key: row["position"] as string,
+  }));
 }
