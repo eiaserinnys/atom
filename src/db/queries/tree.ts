@@ -1,7 +1,13 @@
 import type { TreeNode } from "../../shared/types.js";
 import type { Queryable } from "../queryable.js";
 import { deserializeBoolean } from "../utils.js";
-import { posToKey, keyToPos } from "../../shared/lexorank.js";
+import {
+  keyBetween,
+  keyToPos,
+  NORMAL_DIGIT_COUNT,
+  posToKey,
+  rekeyEvenly,
+} from "../../shared/lexorank.js";
 
 /**
  * Map a DB row to the public TreeNode shape.
@@ -42,18 +48,7 @@ export async function insertNode(
   if (position !== undefined) {
     resolvedKey = posToKey(position);
   } else {
-    // Default: append at end. MAX(position) on the full key space —
-    // cycle A2 removed the park-territory filter (`position >= '0000000000'`)
-    // because park keys are no longer produced. COALESCE handles the
-    // empty-parent case (no siblings yet).
-    const maxResult = await db.query(
-      `SELECT COALESCE(MAX(position), '0000000000') AS max_pos
-       FROM tree_nodes
-       WHERE parent_node_id IS NOT DISTINCT FROM $1`,
-      [parent_node_id]
-    );
-    const maxNumeric = keyToPos(maxResult.rows[0]["max_pos"] as string);
-    resolvedKey = posToKey(maxNumeric + 100);
+    resolvedKey = await resolveAppendKey(db, parent_node_id);
   }
 
   const id = crypto.randomUUID();
@@ -63,6 +58,55 @@ export async function insertNode(
     [id, card_id, parent_node_id, resolvedKey, is_symlink]
   );
   return rowToNode(result.rows[0]);
+}
+
+async function resolveAppendKey(
+  db: Queryable,
+  parent_node_id: string | null
+): Promise<string> {
+  const maxResult = await db.query(
+    `SELECT MAX(position) AS max_pos
+     FROM tree_nodes
+     WHERE parent_node_id IS NOT DISTINCT FROM $1`,
+    [parent_node_id]
+  );
+  const maxKey = (maxResult.rows[0]["max_pos"] as string | null) ?? null;
+  if (!maxKey) {
+    return posToKey(100);
+  }
+
+  try {
+    const key = keyBetween(maxKey, null);
+    if (key.length <= NORMAL_DIGIT_COUNT) {
+      return key;
+    }
+  } catch {
+    // Non-normal leaked keys are repaired by rekeying the whole sibling set.
+  }
+
+  return rekeySiblingsForAppend(db, parent_node_id);
+}
+
+async function rekeySiblingsForAppend(
+  db: Queryable,
+  parent_node_id: string | null
+): Promise<string> {
+  const siblings = await db.query(
+    `SELECT id FROM tree_nodes
+     WHERE parent_node_id IS NOT DISTINCT FROM $1
+     ORDER BY position ASC, id ASC`,
+    [parent_node_id]
+  );
+  const keys = rekeyEvenly(siblings.rows.length + 1);
+
+  for (let i = 0; i < siblings.rows.length; i++) {
+    await db.query(`UPDATE tree_nodes SET position = $1 WHERE id = $2`, [
+      keys[i],
+      siblings.rows[i]["id"],
+    ]);
+  }
+
+  return keys[siblings.rows.length];
 }
 
 export async function selectNodeById(
