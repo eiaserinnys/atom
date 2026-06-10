@@ -12,6 +12,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 
 # Build: tsc + copy migrations to dist
 RUN npm run build
