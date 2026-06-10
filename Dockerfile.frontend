@@ -9,8 +9,9 @@ ARG VITE_API_BASE_URL
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm (pinned: pnpm 11+ hard-fails on esbuild's "ignored build script"
+# under --frozen-lockfile; 10.14.0 is the verified-working version)
+RUN npm install -g pnpm@10.14.0
 
 # Copy dashboard package files
 COPY dashboard/package.json dashboard/pnpm-lock.yaml ./
