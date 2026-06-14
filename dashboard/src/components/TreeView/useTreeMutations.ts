@@ -1,8 +1,7 @@
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import type { TreeMovePayload } from '../../utils/treeMoveIntent';
-import { invalidateTreeMutationQueries } from '../../query/invalidation';
 import {
   applyCreateSuccess,
   applyDeleteError,
@@ -34,12 +33,6 @@ export function useTreeMutations({
   closeModal,
   setDeleteError,
 }: UseTreeMutationsArgs) {
-  const queryClient = useQueryClient();
-
-  const invalidateTree = useCallback(() => {
-    invalidateTreeMutationQueries(queryClient);
-  }, [queryClient]);
-
   const expandParent = useCallback((nodeId: string) => {
     setExpandedNodes(prev => {
       const next = new Set(prev);
@@ -49,13 +42,12 @@ export function useTreeMutations({
   }, [setExpandedNodes]);
 
   const mutationEffects = useMemo<TreeMutationSideEffects>(() => ({
-    invalidateTree,
     expandParent,
     selectNode: onSelect,
     closeModal,
     clearDeleteError: () => setDeleteError(null),
     setDeleteError,
-  }), [invalidateTree, expandParent, onSelect, closeModal, setDeleteError]);
+  }), [expandParent, onSelect, closeModal, setDeleteError]);
 
   const createMutation = useMutation({
     mutationFn: (vars: CreateCardVars) =>
@@ -92,7 +84,7 @@ export function useTreeMutations({
   const moveMutation = useMutation({
     mutationFn: (vars: TreeMovePayload) =>
       api.moveNode(vars.nodeId, buildMoveNodePayload(vars)),
-    onSuccess: () => applyMoveSuccess(mutationEffects),
+    onSuccess: () => applyMoveSuccess(),
   });
 
   return {

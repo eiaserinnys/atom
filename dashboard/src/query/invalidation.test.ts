@@ -1,27 +1,12 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, test, vi } from 'vitest';
-import {
-  invalidateSseReconnectQueries,
-  invalidateTreeMutationQueries,
-} from './invalidation';
+import { invalidateSseReconnectQueries } from './invalidation';
 
 function collectInvalidatedKeys(calls: Array<Parameters<QueryClient['invalidateQueries']>>) {
   return calls.map(([filters]) => filters?.queryKey);
 }
 
 describe('dashboard query invalidation helpers', () => {
-  test('preserves mutation invalidation scope for tree changes', () => {
-    const queryClient = new QueryClient();
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-
-    invalidateTreeMutationQueries(queryClient);
-
-    expect(collectInvalidatedKeys(invalidateSpy.mock.calls)).toEqual([
-      ['tree'],
-      ['children'],
-    ]);
-  });
-
   test('preserves SSE reconnect invalidation scope with selected node compile caches', () => {
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
