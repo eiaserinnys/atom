@@ -2,16 +2,10 @@ import type { QueryClient } from '@tanstack/react-query';
 import {
   allChildrenQueryKey,
   allNodeQueryKey,
-  allTreeQueryKey,
   rootTreeQueryKey,
   standardCompileNodeQueryKey,
   unfurlCompileNodeQueryKey,
 } from './queryKeys';
-
-export function invalidateTreeMutationQueries(queryClient: QueryClient): void {
-  queryClient.invalidateQueries({ queryKey: allTreeQueryKey() });
-  queryClient.invalidateQueries({ queryKey: allChildrenQueryKey() });
-}
 
 export function invalidateSelectedCompileQueries(
   queryClient: QueryClient,

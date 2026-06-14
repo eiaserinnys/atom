@@ -1,7 +1,6 @@
 const DELETE_ERROR_FALLBACK = '삭제 중 오류가 발생했습니다.';
 
 export interface TreeMutationSideEffects {
-  invalidateTree: () => void;
   expandParent: (nodeId: string) => void;
   selectNode: (nodeId: string | null) => void;
   closeModal: () => void;
@@ -23,7 +22,6 @@ export function applyCreateSuccess(
   input: CreateSuccessInput,
   effects: TreeMutationSideEffects
 ): void {
-  effects.invalidateTree();
   if (input.parentNodeId) {
     effects.expandParent(input.parentNodeId);
   }
@@ -32,7 +30,6 @@ export function applyCreateSuccess(
 }
 
 export function applyEditSuccess(effects: TreeMutationSideEffects): void {
-  effects.invalidateTree();
   effects.closeModal();
 }
 
@@ -43,7 +40,6 @@ export function applyDeleteSuccess(
   if (input.selectedNodeId === input.deletedNodeId) {
     effects.selectNode(null);
   }
-  effects.invalidateTree();
   effects.closeModal();
   effects.clearDeleteError();
 }
@@ -56,6 +52,6 @@ export function applyDeleteError(error: unknown, effects: TreeMutationSideEffect
   effects.setDeleteError(getDeleteErrorMessage(error));
 }
 
-export function applyMoveSuccess(effects: TreeMutationSideEffects): void {
-  effects.invalidateTree();
+export function applyMoveSuccess(): void {
+  // Data updates arrive through SSE. Caller-specific modal close stays in mutate options.
 }

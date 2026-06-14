@@ -3,12 +3,12 @@ import { describe, expect, test, vi } from 'vitest';
 import { applyAtomEventToCache } from './useAtomEvents';
 import type { CardData, TreeNodeData } from '../api/client';
 import type { AtomEvent } from '../types/events';
-import { childrenQueryKey, rootTreeQueryKey } from '../query/queryKeys';
+import { childrenQueryKey, rootTreeQueryKey, structureTreeQueryKey } from '../query/queryKeys';
 
-function makeCard(id: string, title: string): CardData {
+function makeCard(id: string, title: string, cardType: CardData['card_type'] = 'knowledge'): CardData {
   return {
     id,
-    card_type: 'knowledge',
+    card_type: cardType,
     title,
     content: null,
     references: [],
@@ -30,7 +30,8 @@ function makeNode(
   cardId: string,
   parentNodeId: string | null = null,
   position = 100,
-  children?: TreeNodeData[]
+  children?: TreeNodeData[],
+  cardType: CardData['card_type'] = 'knowledge'
 ): TreeNodeData {
   return {
     id,
@@ -40,7 +41,7 @@ function makeNode(
     is_symlink: false,
     journal_limit: null,
     created_at: '2026-01-01T00:00:00Z',
-    card: makeCard(cardId, `Card ${cardId}`),
+    card: makeCard(cardId, `Card ${cardId}`, cardType),
     ...(children !== undefined ? { children } : {}),
   };
 }
@@ -92,8 +93,10 @@ describe('applyAtomEventToCache', () => {
     const moving = makeNode('moving', 'moving-card', 'old-parent', 100);
     const oldSibling = makeNode('old-sibling', 'old-card', 'old-parent', 200);
     const newSibling = makeNode('new-sibling', 'new-card', 'new-parent', 200);
+    const unrelatedChildren = [makeNode('unrelated-child', 'unrelated-card', 'unrelated-parent', 100)];
     queryClient.setQueryData(childrenQueryKey('old-parent'), [moving, oldSibling]);
     queryClient.setQueryData(childrenQueryKey('new-parent'), [newSibling]);
+    queryClient.setQueryData(childrenQueryKey('unrelated-parent'), unrelatedChildren);
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     applyAtomEventToCache(queryClient, {
@@ -110,6 +113,78 @@ describe('applyAtomEventToCache', () => {
       .toEqual(['old-sibling']);
     expect(queryClient.getQueryData<TreeNodeData[]>(childrenQueryKey('new-parent'))?.map((n) => n.id))
       .toEqual(['moving', 'new-sibling']);
+    expect(queryClient.getQueryData<TreeNodeData[]>(childrenQueryKey('unrelated-parent')))
+      .toBe(unrelatedChildren);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  test('card:updated patches structure tree cache for structure nodes', () => {
+    const queryClient = new QueryClient();
+    const structureChild = makeNode('structure-child', 'structure-card', 'root', 100, [], 'structure');
+    const structureRoot = makeNode('root', 'root-card', null, 100, [structureChild], 'structure');
+    const updatedCard = makeCard('structure-card', 'Renamed structure', 'structure');
+    queryClient.setQueryData(structureTreeQueryKey(), [structureRoot]);
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    applyAtomEventToCache(queryClient, {
+      type: 'card:updated',
+      cardId: 'structure-card',
+      data: updatedCard,
+      actor: null,
+    }, null);
+
+    const structureTree = queryClient.getQueryData<TreeNodeData[]>(structureTreeQueryKey());
+    expect(structureTree?.[0].children?.[0].card.title).toBe('Renamed structure');
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  test('knowledge creates do not enter structure tree cache', () => {
+    const queryClient = new QueryClient();
+    const structureRoot = makeNode('root', 'root-card', null, 100, [], 'structure');
+    const structureTree = [structureRoot];
+    queryClient.setQueryData(structureTreeQueryKey(), structureTree);
+    const setQueryDataSpy = vi.spyOn(queryClient, 'setQueryData');
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    applyAtomEventToCache(queryClient, {
+      type: 'card:created',
+      cardId: 'knowledge-card',
+      nodeId: 'knowledge-node',
+      parentNodeId: 'root',
+      data: makeCard('knowledge-card', 'Knowledge'),
+      node: makeNode('knowledge-node', 'knowledge-card', 'root', 100),
+      actor: null,
+    }, null);
+
+    expect(queryClient.getQueryData<TreeNodeData[]>(structureTreeQueryKey())).toBe(structureTree);
+    expect(queryClient.getQueryData<TreeNodeData[]>(structureTreeQueryKey())?.[0].children).toEqual([]);
+    expect(setQueryDataSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  test('irrelevant parent create leaves cached tree data untouched', () => {
+    const queryClient = new QueryClient();
+    const rootTree = [makeNode('root', 'root-card', null, 100, [], 'structure')];
+    const unrelatedChildren = [makeNode('unrelated-child', 'unrelated-card', 'unrelated-parent', 100)];
+    queryClient.setQueryData(rootTreeQueryKey(), rootTree);
+    queryClient.setQueryData(childrenQueryKey('unrelated-parent'), unrelatedChildren);
+    const setQueryDataSpy = vi.spyOn(queryClient, 'setQueryData');
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    applyAtomEventToCache(queryClient, {
+      type: 'card:created',
+      cardId: 'new-card',
+      nodeId: 'new-node',
+      parentNodeId: 'missing-parent',
+      data: makeCard('new-card', 'New card'),
+      node: makeNode('new-node', 'new-card', 'missing-parent', 100),
+      actor: null,
+    }, null);
+
+    expect(queryClient.getQueryData<TreeNodeData[]>(rootTreeQueryKey())).toBe(rootTree);
+    expect(queryClient.getQueryData<TreeNodeData[]>(childrenQueryKey('unrelated-parent')))
+      .toBe(unrelatedChildren);
+    expect(setQueryDataSpy).not.toHaveBeenCalled();
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });

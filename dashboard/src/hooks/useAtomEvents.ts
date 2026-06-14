@@ -6,8 +6,10 @@ import { applyChildrenPatch, applyTreePatch, shouldInvalidateCompile } from '../
 import {
   allChildrenQueryKey,
   allNodeQueryKey,
+  childrenQueryKey,
   nodeQueryKey,
   rootTreeQueryKey,
+  structureTreeQueryKey,
 } from '../query/queryKeys';
 import {
   invalidateSelectedCompileQueries,
@@ -18,14 +20,95 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const BATCH_DEBOUNCE_MS = 16; // 약 1 렌더 프레임
 
 /**
- * Root tree cache와 모든 children cache에 patch를 적용한다.
+ * Cached tree arrays에 patch를 적용한다. 변경이 없으면 setQueryData를 호출하지 않는다.
  */
-function applyToAllTreeCaches(queryClient: QueryClient, event: AtomPatchEvent): void {
-  queryClient.setQueryData<TreeNodeData[]>(
-    rootTreeQueryKey(),
-    (old) => old ? applyTreePatch(old, event, null) : old
-  );
+function patchTreeQuery(
+  queryClient: QueryClient,
+  queryKey: readonly unknown[],
+  event: AtomPatchEvent
+): void {
+  const old = queryClient.getQueryData<TreeNodeData[]>(queryKey);
+  if (!old) return;
+  const patched = applyTreePatch(old, event, null);
+  if (patched !== old) {
+    queryClient.setQueryData(queryKey, patched);
+  }
+}
 
+function toStructureTreeEvent(event: AtomPatchEvent): AtomPatchEvent | null {
+  switch (event.type) {
+    case 'card:created':
+    case 'node:created':
+      return event.node.card.card_type === 'structure' ? event : null;
+    case 'card:updated':
+      return event.data.card_type === 'structure' ? event : null;
+    case 'node:updated':
+      return event.node.card.card_type === 'structure' ? event : null;
+    case 'node:moved': {
+      const affectedNodes = event.affectedNodes.filter((node) => node.card.card_type === 'structure');
+      if (event.node.card.card_type !== 'structure' && affectedNodes.length === 0) return null;
+      return { ...event, affectedNodes };
+    }
+    case 'card:deleted':
+    case 'node:deleted':
+      return event;
+  }
+}
+
+function patchTreeCollectionCaches(queryClient: QueryClient, event: AtomPatchEvent): void {
+  patchTreeQuery(queryClient, rootTreeQueryKey(), event);
+
+  const structureEvent = toStructureTreeEvent(event);
+  if (structureEvent) {
+    patchTreeQuery(queryClient, structureTreeQueryKey(), structureEvent);
+  }
+}
+
+function patchChildrenQuery(
+  queryClient: QueryClient,
+  parentNodeId: string | null,
+  event: AtomPatchEvent
+): void {
+  if (parentNodeId === null) return;
+  const key = childrenQueryKey(parentNodeId);
+  const old = queryClient.getQueryData<TreeNodeData[]>(key);
+  if (!old) return;
+  const patched = applyChildrenPatch(old, event, parentNodeId);
+  if (patched !== old) {
+    queryClient.setQueryData(key, patched);
+  }
+}
+
+function patchKnownChildrenQueries(queryClient: QueryClient, event: AtomPatchEvent): void {
+  const parentNodeIds = new Set<string | null>();
+  switch (event.type) {
+    case 'card:created':
+    case 'node:created':
+      parentNodeIds.add(event.parentNodeId);
+      break;
+    case 'node:updated':
+      parentNodeIds.add(event.node.parent_node_id);
+      break;
+    case 'node:deleted':
+      parentNodeIds.add(event.parentNodeId);
+      break;
+    case 'node:moved':
+      parentNodeIds.add(event.oldParentNodeId);
+      parentNodeIds.add(event.newParentNodeId);
+      break;
+    case 'card:deleted':
+      event.parentNodeIds.forEach((parentNodeId) => parentNodeIds.add(parentNodeId));
+      break;
+    case 'card:updated':
+      return;
+  }
+
+  for (const parentNodeId of parentNodeIds) {
+    patchChildrenQuery(queryClient, parentNodeId, event);
+  }
+}
+
+function patchAllCachedChildrenQueries(queryClient: QueryClient, event: AtomPatchEvent): void {
   const allChildrenCaches = queryClient.getQueriesData<TreeNodeData[]>({
     queryKey: allChildrenQueryKey(),
   });
@@ -36,6 +119,49 @@ function applyToAllTreeCaches(queryClient: QueryClient, event: AtomPatchEvent): 
     if (patched !== data) {
       queryClient.setQueryData(key, patched);
     }
+  }
+}
+
+function patchChildrenCaches(queryClient: QueryClient, event: AtomPatchEvent): void {
+  if (event.type === 'card:updated') {
+    patchAllCachedChildrenQueries(queryClient, event);
+    return;
+  }
+  patchKnownChildrenQueries(queryClient, event);
+}
+
+function patchNodeCaches(queryClient: QueryClient, event: AtomPatchEvent): void {
+  switch (event.type) {
+    case 'card:updated': {
+      const allNodeCaches = queryClient.getQueriesData<TreeNodeData>({ queryKey: allNodeQueryKey() });
+      for (const [key, data] of allNodeCaches) {
+        if (data?.card_id === event.cardId) {
+          queryClient.setQueryData(key, { ...data, card: event.data });
+        }
+      }
+      break;
+    }
+    case 'card:deleted': {
+      const allNodeCaches = queryClient.getQueriesData<TreeNodeData>({ queryKey: allNodeQueryKey() });
+      for (const [key, data] of allNodeCaches) {
+        if (data?.card_id === event.cardId) {
+          queryClient.removeQueries({ queryKey: key });
+        }
+      }
+      break;
+    }
+    case 'node:updated':
+    case 'node:moved':
+      if (queryClient.getQueryData(nodeQueryKey(event.nodeId)) !== undefined) {
+        queryClient.setQueryData(nodeQueryKey(event.nodeId), event.node);
+      }
+      break;
+    case 'node:deleted':
+      queryClient.removeQueries({ queryKey: nodeQueryKey(event.nodeId) });
+      break;
+    case 'card:created':
+    case 'node:created':
+      break;
   }
 }
 
@@ -55,60 +181,49 @@ export function applyAtomEventToCache(
 ): void {
   switch (payload.type) {
     case 'card:created':
-      applyToAllTreeCaches(queryClient, payload);
+      patchTreeCollectionCaches(queryClient, payload);
+      patchChildrenCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
     case 'card:updated':
-      {
-        const allNodeCaches = queryClient.getQueriesData<TreeNodeData>({ queryKey: allNodeQueryKey() });
-        for (const [key, data] of allNodeCaches) {
-          if (data?.card_id === payload.cardId) {
-            queryClient.setQueryData(key, { ...data, card: payload.data });
-          }
-        }
-      }
-      applyToAllTreeCaches(queryClient, payload);
+      patchNodeCaches(queryClient, payload);
+      patchTreeCollectionCaches(queryClient, payload);
+      patchChildrenCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
     case 'card:deleted':
-      applyToAllTreeCaches(queryClient, payload);
-      {
-        const allNodeCaches = queryClient.getQueriesData<TreeNodeData>({ queryKey: allNodeQueryKey() });
-        for (const [key, data] of allNodeCaches) {
-          if (data?.card_id === payload.cardId) {
-            queryClient.removeQueries({ queryKey: key });
-          }
-        }
-      }
+      patchTreeCollectionCaches(queryClient, payload);
+      patchChildrenCaches(queryClient, payload);
+      patchNodeCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
     case 'node:created':
-      applyToAllTreeCaches(queryClient, payload);
+      patchTreeCollectionCaches(queryClient, payload);
+      patchChildrenCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
     case 'node:updated':
-      if (queryClient.getQueryData(nodeQueryKey(payload.nodeId)) !== undefined) {
-        queryClient.setQueryData(nodeQueryKey(payload.nodeId), payload.node);
-      }
-      applyToAllTreeCaches(queryClient, payload);
+      patchNodeCaches(queryClient, payload);
+      patchTreeCollectionCaches(queryClient, payload);
+      patchChildrenCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
     case 'node:deleted':
-      applyToAllTreeCaches(queryClient, payload);
-      queryClient.removeQueries({ queryKey: nodeQueryKey(payload.nodeId) });
+      patchTreeCollectionCaches(queryClient, payload);
+      patchChildrenCaches(queryClient, payload);
+      patchNodeCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
     case 'node:moved':
-      applyToAllTreeCaches(queryClient, payload);
-      if (queryClient.getQueryData(nodeQueryKey(payload.nodeId)) !== undefined) {
-        queryClient.setQueryData(nodeQueryKey(payload.nodeId), payload.node);
-      }
+      patchNodeCaches(queryClient, payload);
+      patchTreeCollectionCaches(queryClient, payload);
+      patchChildrenCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 

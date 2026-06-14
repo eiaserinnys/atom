@@ -12,7 +12,6 @@ import {
 function recordEffects() {
   const calls: string[] = [];
   const effects: TreeMutationSideEffects = {
-    invalidateTree: () => calls.push('invalidateTree'),
     expandParent: (nodeId) => calls.push(`expandParent:${nodeId}`),
     selectNode: (nodeId) => calls.push(`selectNode:${nodeId ?? 'null'}`),
     closeModal: () => calls.push('closeModal'),
@@ -23,13 +22,12 @@ function recordEffects() {
 }
 
 describe('tree mutation side effects', () => {
-  test('create success invalidates, expands child parent, selects created node, and closes modal', () => {
+  test('create success expands child parent, selects created node, and closes modal', () => {
     const { calls, effects } = recordEffects();
 
     applyCreateSuccess({ createdNodeId: 'new-node', parentNodeId: 'parent-1' }, effects);
 
     expect(calls).toEqual([
-      'invalidateTree',
       'expandParent:parent-1',
       'selectNode:new-node',
       'closeModal',
@@ -42,28 +40,26 @@ describe('tree mutation side effects', () => {
     applyCreateSuccess({ createdNodeId: 'root-node', parentNodeId: null }, effects);
 
     expect(calls).toEqual([
-      'invalidateTree',
       'selectNode:root-node',
       'closeModal',
     ]);
   });
 
-  test('edit success invalidates and closes modal', () => {
+  test('edit success closes modal without invalidating the full tree', () => {
     const { calls, effects } = recordEffects();
 
     applyEditSuccess(effects);
 
-    expect(calls).toEqual(['invalidateTree', 'closeModal']);
+    expect(calls).toEqual(['closeModal']);
   });
 
-  test('selected delete success clears selection, invalidates, closes modal, and clears delete error', () => {
+  test('selected delete success clears selection, closes modal, and clears delete error', () => {
     const { calls, effects } = recordEffects();
 
     applyDeleteSuccess({ deletedNodeId: 'node-1', selectedNodeId: 'node-1' }, effects);
 
     expect(calls).toEqual([
       'selectNode:null',
-      'invalidateTree',
       'closeModal',
       'clearDeleteError',
     ]);
@@ -75,7 +71,6 @@ describe('tree mutation side effects', () => {
     applyDeleteSuccess({ deletedNodeId: 'node-1', selectedNodeId: 'node-2' }, effects);
 
     expect(calls).toEqual([
-      'invalidateTree',
       'closeModal',
       'clearDeleteError',
     ]);
@@ -91,11 +86,11 @@ describe('tree mutation side effects', () => {
     expect(calls).toEqual(['setDeleteError:cannot delete']);
   });
 
-  test('move success only invalidates; modal close remains a caller onSuccess concern', () => {
-    const { calls, effects } = recordEffects();
+  test('move success leaves data updates to SSE; modal close remains a caller onSuccess concern', () => {
+    const { calls } = recordEffects();
 
-    applyMoveSuccess(effects);
+    applyMoveSuccess();
 
-    expect(calls).toEqual(['invalidateTree']);
+    expect(calls).toEqual([]);
   });
 });
