@@ -5,6 +5,37 @@ import { findActiveAgents } from "../../db/queries/agents.js";
 import { getDb } from "../../db/client.js";
 import bcrypt from "bcryptjs";
 import type { Staleness, UpdateCardInput } from "../../shared/types.js";
+import { parseCompileLimit } from "./compile-limit.js";
+
+interface AgentCompileHandlerDeps {
+  compileSubtree: typeof compileSubtree;
+}
+
+export function createAgentCompileHandler(deps: AgentCompileHandlerDeps) {
+  return async (
+    req: FastifyRequest<{ Params: { nodeId: string } }>,
+    reply: FastifyReply
+  ) => {
+    const qs = req.query as Record<string, string>;
+    const parsedLimit = parseCompileLimit(qs["limit"]);
+    if (!parsedLimit.ok) {
+      return reply.code(400).send({ error: parsedLimit.error });
+    }
+
+    const depth = qs["depth"] !== undefined ? parseInt(qs["depth"]) : 2;
+    const titlesOnly = qs["titles_only"] === "true";
+    const includeIds = qs["include_ids"] === "true";
+    const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
+    const maxChars = maxCharsRaw !== undefined && !isNaN(maxCharsRaw) ? maxCharsRaw : undefined;
+    const result = await deps.compileSubtree(req.params.nodeId, depth, {
+      titlesOnly: titlesOnly || undefined,
+      includeIds: includeIds || undefined,
+      maxChars,
+      limit: parsedLimit.value,
+    });
+    return { markdown: result.markdown };
+  };
+}
 
 async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   const secret = req.headers["x-api-key"] as string | undefined;
@@ -92,20 +123,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { nodeId: string } }>(
     "/api/tree/:nodeId/compile",
     { preHandler: agentKeyPreHandler },
-    async (req, reply) => {
-      const qs = req.query as Record<string, string>;
-      const depth = qs["depth"] !== undefined ? parseInt(qs["depth"]) : 2;
-      const titlesOnly = qs["titles_only"] === "true";
-      const includeIds = qs["include_ids"] === "true";
-      const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
-      const maxChars = maxCharsRaw !== undefined && !isNaN(maxCharsRaw) ? maxCharsRaw : undefined;
-      const result = await compileSubtree(req.params.nodeId, depth, {
-        titlesOnly: titlesOnly || undefined,
-        includeIds: includeIds || undefined,
-        maxChars,
-      });
-      return { markdown: result.markdown };
-    }
+    createAgentCompileHandler({ compileSubtree })
   );
 
 }
