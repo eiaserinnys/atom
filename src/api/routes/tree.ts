@@ -8,6 +8,7 @@ import {
   moveNode,
   updateNodeProperties,
 } from "../../services/tree.service.js";
+import { parseCompileLimit } from "./compile-limit.js";
 
 export async function treeRoutes(app: FastifyInstance): Promise<void> {
   // GET /tree  — root nodes (parent_node_id = null)
@@ -59,14 +60,17 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       const excludeNodes = excludeNodesRaw
         ? new Set(excludeNodesRaw.split(",").map((s) => s.trim()))
         : undefined;
-      const limit = qs["limit"] !== undefined ? parseInt(qs["limit"]) : undefined;
+      const parsedLimit = parseCompileLimit(qs["limit"]);
+      if (!parsedLimit.ok) {
+        return reply.code(400).send({ error: parsedLimit.error });
+      }
       const result = await compileSubtree(req.params.nodeId, depth, {
         includeIds,
         titlesOnly: titlesOnly || undefined,
         numbering: numbering || undefined,
         maxChars: maxChars,
         excludeNodes: excludeNodes,
-        limit,
+        limit: parsedLimit.value,
       });
       return { markdown: result.markdown };
     }

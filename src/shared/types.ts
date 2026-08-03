@@ -9,7 +9,8 @@ export interface Card {
   content: string | null;
   references: string[];
   tags: string[];
-  card_timestamp: string;
+  /** PostgreSQL (`pg`) returns TIMESTAMPTZ as Date; SQLite returns TEXT. */
+  card_timestamp: string | Date | null;
   content_timestamp: string | null;
   source_type: string | null;
   source_ref: string | null;

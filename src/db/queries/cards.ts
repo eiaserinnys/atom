@@ -10,7 +10,7 @@ function rowToCard(row: Record<string, unknown>): Card {
     content: (row["content"] as string | null) ?? null,
     references: deserializeArray(row["references"]),
     tags: deserializeArray(row["tags"]),
-    card_timestamp: row["card_timestamp"] as string,
+    card_timestamp: row["card_timestamp"] as Card["card_timestamp"],
     content_timestamp: (row["content_timestamp"] as string | null) ?? null,
     source_type: (row["source_type"] as string | null) ?? null,
     source_ref: (row["source_ref"] as string | null) ?? null,

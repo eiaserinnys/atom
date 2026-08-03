@@ -36,10 +36,8 @@ function buildMetaComment(
   isSymlink?: boolean
 ): string {
   const parts = [`node:${nodeId}`, `card:${card.id}`, `depth:${depth}`];
-  if (card.card_timestamp) {
-    const ts = typeof card.card_timestamp === "string"
-      ? card.card_timestamp
-      : new Date(card.card_timestamp).toISOString();
+  const ts = formatCardTimestamp(card.card_timestamp);
+  if (ts) {
     parts.push(`created:${ts.slice(0, 10)}`);
   }
   if (card.staleness === "stale" || card.staleness === "outdated") {
@@ -58,6 +56,36 @@ function buildMetaComment(
     parts.push("symlink:true");
   }
   return `<!-- ${parts.join(" ")} -->`;
+}
+
+function timestampMilliseconds(value: unknown): number | null {
+  if (value instanceof Date) {
+    const milliseconds = value.getTime();
+    return Number.isNaN(milliseconds) ? null : milliseconds;
+  }
+  if (typeof value === "string" && value.length > 0) {
+    const milliseconds = Date.parse(value);
+    return Number.isNaN(milliseconds) ? null : milliseconds;
+  }
+  return null;
+}
+
+function formatCardTimestamp(value: unknown): string | null {
+  if (typeof value === "string") {
+    return value || null;
+  }
+  const milliseconds = timestampMilliseconds(value);
+  return milliseconds === null ? null : new Date(milliseconds).toISOString();
+}
+
+function compareCardTimestampDescending(cardA: Card, cardB: Card): number {
+  const timestampA = timestampMilliseconds(cardA.card_timestamp);
+  const timestampB = timestampMilliseconds(cardB.card_timestamp);
+
+  if (timestampA === null) return timestampB === null ? 0 : 1;
+  if (timestampB === null) return -1;
+  if (timestampA === timestampB) return 0;
+  return timestampA > timestampB ? -1 : 1;
 }
 
 /**
@@ -204,9 +232,7 @@ export function compileNode(
       .sort((a, b) => {
         const cardA = getCard(getNodeCard(a.id).card_id);
         const cardB = getCard(getNodeCard(b.id).card_id);
-        const tsA = cardA.card_timestamp ?? "";
-        const tsB = cardB.card_timestamp ?? "";
-        return tsB.localeCompare(tsA);
+        return compareCardTimestampDescending(cardA, cardB);
       })
       .slice(0, options.limit);
   }
