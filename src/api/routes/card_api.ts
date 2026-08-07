@@ -24,12 +24,13 @@ export function createAgentCompileHandler(deps: AgentCompileHandlerDeps) {
 
     const depth = qs["depth"] !== undefined ? parseInt(qs["depth"]) : 2;
     const titlesOnly = qs["titles_only"] === "true";
-    const includeIds = qs["include_ids"] === "true";
+    const includeIds: boolean | undefined =
+      qs["include_ids"] === undefined ? undefined : qs["include_ids"] === "true";
     const maxCharsRaw = qs["max_chars"] !== undefined ? parseInt(qs["max_chars"]) : undefined;
     const maxChars = maxCharsRaw !== undefined && !isNaN(maxCharsRaw) ? maxCharsRaw : undefined;
     const result = await deps.compileSubtree(req.params.nodeId, depth, {
-      titlesOnly: titlesOnly || undefined,
-      includeIds: includeIds || undefined,
+      titlesOnly,
+      includeIds,
       maxChars,
       limit: parsedLimit.value,
     });
