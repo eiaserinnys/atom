@@ -7,6 +7,11 @@ export interface TreeOutlineRow {
   /** 1 = direct child of the requested parent. */
   level: number;
   node: TreeOutlineNode;
+  /**
+   * Card body prefix (`contentPrefixChars` characters at most); present only
+   * when `contentPrefixChars` > 0, null when the card has no body.
+   */
+  content?: string | null;
 }
 
 /**
@@ -27,15 +32,26 @@ export interface TreeOutlineRow {
  *
  * Rows are ordered by level, then sibling order (position, id), so a parent
  * always precedes its children.
+ *
+ * `contentPrefixChars` = 0 leaves card bodies unread. Above 0 each row also
+ * carries the first `contentPrefixChars` characters of the card body; the
+ * length is inlined as a literal so the placeholder order stays as above.
  */
 export async function selectTreeOutlineRows(
   db: Queryable,
   parentNodeId: string | null,
-  depth: number
+  depth: number,
+  contentPrefixChars: number
 ): Promise<TreeOutlineRow[]> {
+  if (!Number.isSafeInteger(contentPrefixChars) || contentPrefixChars < 0) {
+    throw new Error(`tree outline: content prefix length must be a non-negative integer, got ${contentPrefixChars}`);
+  }
+  const withContent = contentPrefixChars > 0;
   const params: unknown[] = parentNodeId === null ? [depth] : [parentNodeId, depth];
   const anchor = parentNodeId === null ? "tn.parent_node_id IS NULL" : "tn.parent_node_id = $1";
   const depthParam = `$${params.length}`;
+  const contentColumn = withContent ? `,
+            SUBSTR(c.content, 1, ${contentPrefixChars}) AS content_prefix` : "";
 
   const result = await db.query(
     `WITH RECURSIVE
@@ -67,7 +83,7 @@ export async function selectTreeOutlineRows(
      )
      SELECT o.id, o.card_id, o.parent_node_id, o.position, o.is_symlink,
             c.title, c.card_type, o.level,
-            cnt.child_count, cnt.descendant_count
+            cnt.child_count, cnt.descendant_count${contentColumn}
      FROM outline o
      JOIN cards c ON c.id = o.card_id
      JOIN counts cnt ON cnt.root_id = o.id
@@ -90,5 +106,6 @@ export async function selectTreeOutlineRows(
       descendant_count: Number(row["descendant_count"]),
       children: [],
     },
+    ...(withContent ? { content: (row["content_prefix"] as string | null) ?? null } : {}),
   }));
 }

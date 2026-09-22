@@ -174,12 +174,13 @@ npm run mcp:dev    # tsx watch
 
 `GET /api/tree/outline` (agent key, `x-api-key`) and `GET /tree/outline` (dashboard session) return the shape of a subtree without card bodies: direct children expanded to `depth` levels, and for every returned node its direct-child count and total descendant count (unlimited depth). Use it instead of `compile?titles_only=true` when you only need structure metadata.
 
-**No card bodies, and not N+1** — one recursive CTE serves the whole outline (plus a node lookup when `node_id` is given).
+**No card bodies, and not N+1** — one recursive CTE serves the whole outline (plus a node lookup when `node_id` is given). An optional short plain-text `excerpt` per node comes from the same query, so one outline call is enough to judge what a subtree holds.
 
 | Query | Description |
 |-------|-------------|
 | `node_id` | Node UUID. Omit for the virtual root (`parent_node_id IS NULL`). A symlink resolves to its canonical node's children. |
 | `depth` | `1`–`3` (default `2`) — how many levels `children` is filled. Anything else is `400`. |
+| `excerpt_chars` | `0`–`400` (default `0`). Above `0`, every node (children included) gets `excerpt`: the card body as plain text — fenced code blocks, table delimiter rows and horizontal rules dropped, the symbols `` ` * _ > # | `` removed, whitespace collapsed — cut to that many characters with `…` appended when cut; `null` when the card has no body. A symlink node carries its target card's excerpt. `0` omits the field and does not read card bodies at all. Anything else is `400`. |
 
 Unknown `node_id` → `404`. Below the depth limit a node has `children: []` and is summarized by `child_count` / `descendant_count`. Symlink nodes are leaves (counts `0`, never expanded). `canonical_node_id` is the node whose children were listed (differs from `node_id` only for a symlink; `null` for the virtual root).
 
@@ -211,6 +212,22 @@ Unknown `node_id` → `404`. Below the depth limit a node has `children: []` and
       "id": "420f…", "card_id": "066d…", "parent_node_id": "544f…", "position": 800,
       "is_symlink": true, "title": "모듈 깊이", "card_type": "knowledge",
       "child_count": 0, "descendant_count": 0, "children": []
+    }
+  ]
+}
+```
+
+```jsonc
+// GET /api/tree/outline?node_id=9064…&depth=1&excerpt_chars=60
+{
+  "node_id": "9064…", "canonical_node_id": "9064…", "depth": 1,
+  "nodes": [
+    {
+      "id": "a4c9…", "card_id": "4d73…", "parent_node_id": "9064…", "position": 400,
+      "is_symlink": false, "title": "정본은 하나", "card_type": "knowledge",
+      "child_count": 1, "descendant_count": 1,
+      "excerpt": "3. 정본은 하나 모든 정보는 정확히 하나의 정본(canonical source)을 가진다. 소유자가 모호하…",
+      "children": []
     }
   ]
 }
@@ -249,4 +266,4 @@ Run tests with `npm test` (requires Docker for integration tests).
 
 **Unfurl pipeline.** When `source_ref` contains an external URL (e.g. a Trello card), `compile_subtree` can expand it inline. Adapters fetch and cache snapshots in `unfurl_snapshots`; cached mode reuses DB data, fresh mode always hits the source. The dashboard exposes a toggle with per-provider credentials input.
 
-**Multi-agent auth.** Named agents register with bcrypt-hashed API keys in the `agents` table. Each request carries `x-api-key`; the audit log records `agent_id` alongside every mutation. The dashboard shows `agent_id` in card detail and compile metadata.
+**Multi-agent auth.** Named agents register with bcrypt-hashed API keys in the `agents` table. Each request carries `x-api-key`; the audit log records `agent_id` alongside every mutation. The dashboard shows `agent_id` in card detail and compile metadata. A key runs bcrypt only on its first request per process: verified keys are cached by sha256 digest, and every request still reads the active agents and honors a cached key only while its agent is active with the same `secret_hash` — so reissuing or deactivating an agent rejects the old key on its next request.

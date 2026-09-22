@@ -46,6 +46,12 @@ export interface TreeNodeWithCard extends TreeNode {
  * subtree is summarized by `child_count` (direct children) and
  * `descendant_count` (every tree_node below, unlimited depth). Symlink nodes
  * are leaves: counts are 0 and they are never expanded.
+ *
+ * `excerpt` is present only when the request asked for one
+ * (`excerpt_chars` > 0): a plain-text preview of the card body cut to that
+ * many characters ("…" appended when cut), null when the card has no body.
+ * Symlink nodes carry their target card's excerpt. The full body is never
+ * part of the outline.
  */
 export interface TreeOutlineNode {
   id: string;
@@ -57,6 +63,7 @@ export interface TreeOutlineNode {
   card_type: CardType;
   child_count: number;
   descendant_count: number;
+  excerpt?: string | null;
   children: TreeOutlineNode[];
 }
 

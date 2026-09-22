@@ -14,6 +14,7 @@ import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bf
 import type { TreeNode, TreeNodeWithCard, TreeOutline, TreeOutlineNode } from "../shared/types.js";
 import type { Queryable } from "../db/queryable.js";
 import { selectTreeOutlineRows } from "../db/queries/tree-outline.js";
+import { EXCERPT_SOURCE_CHARS, toOutlineExcerpt } from "./outline-excerpt.js";
 import type { UnfurlCredentials } from "../unfurl/interface.js";
 import { eventBus } from "../events/eventBus.js";
 import { selectChildrenWithCards, toTreeNodeWithCard } from "./tree-node-payload.js";
@@ -250,10 +251,14 @@ export async function updateNodeProperties(
  * `depth` levels. One outline query regardless of subtree size (plus the
  * node / canonical lookup when `nodeId` is given). Returns null when `nodeId`
  * does not exist.
+ *
+ * `excerptChars` > 0 adds a plain-text `excerpt` of each card body, cut to
+ * that many characters; 0 leaves card bodies unread and the field absent.
  */
 export async function getTreeOutline(
   nodeId: string | null,
-  depth: number
+  depth: number,
+  excerptChars: number
 ): Promise<TreeOutline | null> {
   const db = getDb();
   let canonicalNodeId: string | null = null;
@@ -262,10 +267,18 @@ export async function getTreeOutline(
     if (canonicalNodeId === null) return null;
   }
 
-  const rows = await selectTreeOutlineRows(db, canonicalNodeId, depth);
+  const rows = await selectTreeOutlineRows(
+    db,
+    canonicalNodeId,
+    depth,
+    excerptChars > 0 ? EXCERPT_SOURCE_CHARS : 0
+  );
   const byId = new Map<string, TreeOutlineNode>();
   const nodes: TreeOutlineNode[] = [];
-  for (const { level, node } of rows) {
+  for (const { level, node, content } of rows) {
+    if (excerptChars > 0) {
+      node.excerpt = toOutlineExcerpt(content ?? null, excerptChars);
+    }
     byId.set(node.id, node);
     if (level === 1) {
       nodes.push(node);

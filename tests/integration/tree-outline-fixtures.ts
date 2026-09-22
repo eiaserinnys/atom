@@ -59,14 +59,15 @@ export interface OutlineFixture {
 export async function seedCard(
   title: string,
   parent: string | null,
-  card_type: "structure" | "knowledge" = "knowledge"
+  card_type: "structure" | "knowledge" = "knowledge",
+  content: string | null = `BODY-${title}`
 ): Promise<{ nodeId: string; cardId: string }> {
   const db = getDb();
   const cardId = crypto.randomUUID();
   await db.query(
     `INSERT INTO cards (id, card_type, title, content, tags, "references")
      VALUES ($1, $2, $3, $4, $5, $6)`,
-    [cardId, card_type, title, `BODY-${title}`, serializeArray([]), serializeArray([])]
+    [cardId, card_type, title, content, serializeArray([]), serializeArray([])]
   );
   return { nodeId: await seedNode(cardId, parent, false), cardId };
 }
@@ -148,3 +149,21 @@ export function expectNoBodies(outline: TreeOutline): void {
   };
   walk(outline.nodes);
 }
+
+/** (title, excerpt) for every outline node, parents before their children. */
+export function excerptsOf(nodes: TreeOutlineNode[]): Array<[string, string | null | undefined]> {
+  return nodes.flatMap((n) => [[n.title, n.excerpt] as [string, string | null | undefined], ...excerptsOf(n.children)]);
+}
+
+/** A body long enough to be cut at any allowed excerpt_chars, with a marker only its tail carries. */
+export const LONG_BODY = `# Long card\n\n${"word ".repeat(120)}\n\`\`\`ts\nconst hidden = 1;\n\`\`\`\n${"more ".repeat(60)}TAIL-MARKER`;
+
+/** Expected excerpts under R at depth 2 when every body is short. */
+export const EXPECTED_EXCERPTS_UNDER_R_DEPTH_2: Array<[string, string]> = [
+  ["A", "BODY-A"],
+  ["A1", "BODY-A1"],
+  ["A2", "BODY-A2"],
+  ["B", "BODY-B"],
+  // Symlink nodes carry their target card, so its body.
+  ["X", "BODY-X"],
+];
