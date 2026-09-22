@@ -147,7 +147,7 @@ npm run mcp        # built
 npm run mcp:dev    # tsx watch
 ```
 
-## REST API (17 endpoints)
+## REST API (18 endpoints)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -160,6 +160,7 @@ npm run mcp:dev    # tsx watch
 | GET | `/tree/:nodeId` | Single node with card |
 | GET | `/tree/:nodeId/children` | Direct children (agent key auth supported) |
 | GET | `/tree/:nodeId/compile` | BFS markdown (`?depth=N`, default 2) |
+| GET | `/tree/outline` | Body-free structural outline — children + counts (also `/api/tree/outline` with agent key auth, see below) |
 | POST | `/tree/symlink` | Create symlink |
 | PUT | `/tree/:nodeId/move` | Move node |
 | DELETE | `/tree/:nodeId` | Delete node (card preserved) |
@@ -168,6 +169,52 @@ npm run mcp:dev    # tsx watch
 | POST | `/mcp` | Streamable HTTP MCP endpoint |
 | POST | `/batch` | Batch operation (atomic transaction) |
 | GET | `/events` | SSE real-time event stream |
+
+### Tree outline
+
+`GET /api/tree/outline` (agent key, `x-api-key`) and `GET /tree/outline` (dashboard session) return the shape of a subtree without card bodies: direct children expanded to `depth` levels, and for every returned node its direct-child count and total descendant count (unlimited depth). Use it instead of `compile?titles_only=true` when you only need structure metadata.
+
+**No card bodies, and not N+1** — one recursive CTE serves the whole outline (plus a node lookup when `node_id` is given).
+
+| Query | Description |
+|-------|-------------|
+| `node_id` | Node UUID. Omit for the virtual root (`parent_node_id IS NULL`). A symlink resolves to its canonical node's children. |
+| `depth` | `1`–`3` (default `2`) — how many levels `children` is filled. Anything else is `400`. |
+
+Unknown `node_id` → `404`. Below the depth limit a node has `children: []` and is summarized by `child_count` / `descendant_count`. Symlink nodes are leaves (counts `0`, never expanded). `canonical_node_id` is the node whose children were listed (differs from `node_id` only for a symlink; `null` for the virtual root).
+
+```jsonc
+// GET /api/tree/outline?node_id=544f…&depth=2
+{
+  "node_id": "544f…",
+  "canonical_node_id": "544f…",
+  "depth": 2,
+  "nodes": [
+    {
+      "id": "9064…", "card_id": "b5df…", "parent_node_id": "544f…", "position": 300,
+      "is_symlink": false, "title": "설계 원칙", "card_type": "structure",
+      "child_count": 2, "descendant_count": 3,
+      "children": [
+        {
+          "id": "a4c9…", "card_id": "4d73…", "parent_node_id": "9064…", "position": 400,
+          "is_symlink": false, "title": "정본은 하나", "card_type": "knowledge",
+          "child_count": 1, "descendant_count": 1, "children": []
+        },
+        {
+          "id": "7c30…", "card_id": "8b9c…", "parent_node_id": "9064…", "position": 600,
+          "is_symlink": false, "title": "명시적 실패", "card_type": "knowledge",
+          "child_count": 0, "descendant_count": 0, "children": []
+        }
+      ]
+    },
+    {
+      "id": "420f…", "card_id": "066d…", "parent_node_id": "544f…", "position": 800,
+      "is_symlink": true, "title": "모듈 깊이", "card_type": "knowledge",
+      "child_count": 0, "descendant_count": 0, "children": []
+    }
+  ]
+}
+```
 
 Auth endpoints: `GET /api/auth/google`, `GET /api/auth/google/callback`, `GET /api/auth/slack`, `GET /api/auth/slack/callback`, `GET /api/auth/status`, `POST /api/auth/logout`
 
