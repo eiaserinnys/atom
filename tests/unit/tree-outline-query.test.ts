@@ -25,11 +25,12 @@ describe("selectTreeOutlineRows body access", () => {
     expect(statements[0]!.sql).not.toMatch(/content/i);
   });
 
-  it("selects a bounded content prefix when an excerpt is requested", async () => {
+  it("selects a bounded content prefix for level-1 rows only when an excerpt is requested", async () => {
     const { db, statements } = capturingDb();
     await selectTreeOutlineRows(db, "0b6a3b3c-5d7e-4f10-9a2b-3c4d5e6f7a8b", 2, 4000);
     expect(statements).toHaveLength(1);
-    expect(statements[0]!.sql).toMatch(/SUBSTR\(c\.content, 1, 4000\)/);
+    expect(statements[0]!.sql).toMatch(/CASE WHEN o\.level = 1 THEN SUBSTR\(c\.content, 1, 4000\) END/);
+    expect(statements[0]!.sql.match(/content/g)).toHaveLength(2); // c.content + its alias only
     // The prefix length is inlined, so the placeholder list is unchanged.
     expect(statements[0]!.params).toEqual(["0b6a3b3c-5d7e-4f10-9a2b-3c4d5e6f7a8b", 2]);
   });

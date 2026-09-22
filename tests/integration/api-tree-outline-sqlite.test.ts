@@ -14,9 +14,11 @@ import { closeDb, runMigrations, setDb } from "../../src/db/client.js";
 import { SqliteAdapter } from "../../src/db/adapters/sqlite.js";
 import * as treeService from "../../src/services/tree.service.js";
 import {
-  EXPECTED_EXCERPTS_UNDER_R_DEPTH_2,
-  excerptsOf,
+  BODIES_BELOW_FIRST_LEVEL_UNDER_R,
+  EXPECTED_FIRST_LEVEL_EXCERPTS_UNDER_R,
+  expectExcerptOnFirstLevelOnly,
   expectedUnderR,
+  firstLevelExcerpts,
   expectNoBodies,
   LONG_BODY,
   seedCard,
@@ -77,11 +79,12 @@ describe("tree outline on SQLite", () => {
 });
 
 describe("tree outline excerpts on SQLite", () => {
-  it("adds a plain-text excerpt to every node, depth-2 children included", async () => {
-    const outline = await treeService.getTreeOutline(fx.R, 2, 200);
-    expect(excerptsOf(outline!.nodes)).toEqual(EXPECTED_EXCERPTS_UNDER_R_DEPTH_2);
+  it.each([1, 2, 3] as const)("depth=%i: excerpt on level-1 nodes only", async (depth) => {
+    const outline = await treeService.getTreeOutline(fx.R, depth, 200);
+    expect(firstLevelExcerpts(outline!)).toEqual(EXPECTED_FIRST_LEVEL_EXCERPTS_UNDER_R);
+    expectExcerptOnFirstLevelOnly(outline!, BODIES_BELOW_FIRST_LEVEL_UNDER_R);
     // Structure is unchanged by the excerpt.
-    expect(shapeOf(outline!.nodes)).toEqual(expectedUnderR(2));
+    expect(shapeOf(outline!.nodes)).toEqual(expectedUnderR(depth));
   });
 
   it("cuts a long body and never ships it whole", async () => {

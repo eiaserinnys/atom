@@ -174,13 +174,13 @@ npm run mcp:dev    # tsx watch
 
 `GET /api/tree/outline` (agent key, `x-api-key`) and `GET /tree/outline` (dashboard session) return the shape of a subtree without card bodies: direct children expanded to `depth` levels, and for every returned node its direct-child count and total descendant count (unlimited depth). Use it instead of `compile?titles_only=true` when you only need structure metadata.
 
-**No card bodies, and not N+1** — one recursive CTE serves the whole outline (plus a node lookup when `node_id` is given). An optional short plain-text `excerpt` per node comes from the same query, so one outline call is enough to judge what a subtree holds.
+**No card bodies, and not N+1** — one recursive CTE serves the whole outline (plus a node lookup when `node_id` is given). An optional short plain-text `excerpt` of each direct child comes from the same query, so one outline call is enough to judge what a subtree holds.
 
 | Query | Description |
 |-------|-------------|
 | `node_id` | Node UUID. Omit for the virtual root (`parent_node_id IS NULL`). A symlink resolves to its canonical node's children. |
 | `depth` | `1`–`3` (default `2`) — how many levels `children` is filled. Anything else is `400`. |
-| `excerpt_chars` | `0`–`400` (default `0`). Above `0`, every node (children included) gets `excerpt`: the card body as plain text — fenced code blocks, table delimiter rows and horizontal rules dropped, the symbols `` ` * _ > # | `` removed, whitespace collapsed — cut to that many characters with `…` appended when cut; `null` when the card has no body. A symlink node carries its target card's excerpt. `0` omits the field and does not read card bodies at all. Anything else is `400`. |
+| `excerpt_chars` | `0`–`400` (default `0`). Above `0`, **level-1 nodes only** (the entries of `nodes`, i.e. direct children of `node_id`) get `excerpt`: the card body as plain text — fenced code blocks, table delimiter rows and horizontal rules dropped, the symbols `` ` * _ > # | `` removed, whitespace collapsed — cut to that many characters with `…` appended when cut; `null` when the card has no body, `""` when the body is only markup. Nodes inside `children` (level 2–3) never carry `excerpt` and their bodies are not read. A symlink node carries its target card's excerpt. `0` omits the field and does not read card bodies at all. Anything else is `400`. |
 
 Unknown `node_id` → `404`. Below the depth limit a node has `children: []` and is summarized by `child_count` / `descendant_count`. Symlink nodes are leaves (counts `0`, never expanded). `canonical_node_id` is the node whose children were listed (differs from `node_id` only for a symlink; `null` for the virtual root).
 

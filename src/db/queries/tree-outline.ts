@@ -9,7 +9,8 @@ export interface TreeOutlineRow {
   node: TreeOutlineNode;
   /**
    * Card body prefix (`contentPrefixChars` characters at most); present only
-   * when `contentPrefixChars` > 0, null when the card has no body.
+   * on level-1 rows when `contentPrefixChars` > 0, null when the card has no
+   * body.
    */
   content?: string | null;
 }
@@ -33,9 +34,11 @@ export interface TreeOutlineRow {
  * Rows are ordered by level, then sibling order (position, id), so a parent
  * always precedes its children.
  *
- * `contentPrefixChars` = 0 leaves card bodies unread. Above 0 each row also
- * carries the first `contentPrefixChars` characters of the card body; the
- * length is inlined as a literal so the placeholder order stays as above.
+ * `contentPrefixChars` = 0 leaves card bodies unread. Above 0 each level-1
+ * row (direct child of the requested parent) also carries the first
+ * `contentPrefixChars` characters of its card body; deeper rows still read
+ * no body. The length is inlined as a literal so the placeholder order stays
+ * as above.
  */
 export async function selectTreeOutlineRows(
   db: Queryable,
@@ -50,8 +53,10 @@ export async function selectTreeOutlineRows(
   const params: unknown[] = parentNodeId === null ? [depth] : [parentNodeId, depth];
   const anchor = parentNodeId === null ? "tn.parent_node_id IS NULL" : "tn.parent_node_id = $1";
   const depthParam = `$${params.length}`;
-  const contentColumn = withContent ? `,
-            SUBSTR(c.content, 1, ${contentPrefixChars}) AS content_prefix` : "";
+  const contentColumn = withContent
+    ? `,
+            CASE WHEN o.level = 1 THEN SUBSTR(c.content, 1, ${contentPrefixChars}) END AS content_prefix`
+    : "";
 
   const result = await db.query(
     `WITH RECURSIVE
@@ -92,20 +97,25 @@ export async function selectTreeOutlineRows(
   );
 
   // pg returns COUNT/SUM (bigint) as strings; better-sqlite3 returns numbers.
-  return result.rows.map((row: Record<string, unknown>) => ({
-    level: Number(row["level"]),
-    node: {
-      id: row["id"] as string,
-      card_id: row["card_id"] as string,
-      parent_node_id: (row["parent_node_id"] as string | null) ?? null,
-      position: keyToPos(row["position"] as string),
-      is_symlink: deserializeBoolean(row["is_symlink"]),
-      title: row["title"] as string,
-      card_type: row["card_type"] as CardType,
-      child_count: Number(row["child_count"]),
-      descendant_count: Number(row["descendant_count"]),
-      children: [],
-    },
-    ...(withContent ? { content: (row["content_prefix"] as string | null) ?? null } : {}),
-  }));
+  return result.rows.map((row: Record<string, unknown>) => {
+    const level = Number(row["level"]);
+    return {
+      level,
+      node: {
+        id: row["id"] as string,
+        card_id: row["card_id"] as string,
+        parent_node_id: (row["parent_node_id"] as string | null) ?? null,
+        position: keyToPos(row["position"] as string),
+        is_symlink: deserializeBoolean(row["is_symlink"]),
+        title: row["title"] as string,
+        card_type: row["card_type"] as CardType,
+        child_count: Number(row["child_count"]),
+        descendant_count: Number(row["descendant_count"]),
+        children: [],
+      },
+      ...(withContent && level === 1
+        ? { content: (row["content_prefix"] as string | null) ?? null }
+        : {}),
+    };
+  });
 }

@@ -9,9 +9,11 @@ import bcrypt from "bcryptjs";
 
 import { getIntegrationTestPool, setupIntegrationTestDb } from "./integration-harness.js";
 import {
-  EXPECTED_EXCERPTS_UNDER_R_DEPTH_2,
-  excerptsOf,
+  BODIES_BELOW_FIRST_LEVEL_UNDER_R,
+  EXPECTED_FIRST_LEVEL_EXCERPTS_UNDER_R,
+  expectExcerptOnFirstLevelOnly,
   expectedUnderR,
+  firstLevelExcerpts,
   expectNoBodies,
   LONG_BODY,
   seedCard,
@@ -204,10 +206,20 @@ describe("GET /api/tree/outline?excerpt_chars", () => {
     expectNoBodies(zero);
   });
 
-  it("excerpt_chars=200 adds an excerpt to every node, depth-2 children included", async () => {
-    const body = await outline(`?node_id=${fx.R}&depth=2&excerpt_chars=200`);
-    expect(excerptsOf(body.nodes)).toEqual(EXPECTED_EXCERPTS_UNDER_R_DEPTH_2);
-    expect(shapeOf(body.nodes)).toEqual(expectedUnderR(2));
+  it.each([1, 2, 3] as const)("depth=%i: excerpt on level-1 nodes only, children stay body-free", async (depth) => {
+    const body = await outline(`?node_id=${fx.R}&depth=${depth}&excerpt_chars=200`);
+    expect(firstLevelExcerpts(body)).toEqual(EXPECTED_FIRST_LEVEL_EXCERPTS_UNDER_R);
+    expectExcerptOnFirstLevelOnly(body, BODIES_BELOW_FIRST_LEVEL_UNDER_R);
+    expect(shapeOf(body.nodes)).toEqual(expectedUnderR(depth));
+  });
+
+  it("excerpts the virtual root's level-1 nodes", async () => {
+    const body = await outline("?depth=2&excerpt_chars=200");
+    expect(firstLevelExcerpts(body)).toEqual([
+      ["R", "BODY-R"],
+      ["X", "BODY-X"],
+    ]);
+    expectExcerptOnFirstLevelOnly(body, ["BODY-A", "BODY-B", "BODY-X1", "BODY-X2"]);
   });
 
   it.each([

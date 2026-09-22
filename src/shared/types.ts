@@ -47,11 +47,12 @@ export interface TreeNodeWithCard extends TreeNode {
  * `descendant_count` (every tree_node below, unlimited depth). Symlink nodes
  * are leaves: counts are 0 and they are never expanded.
  *
- * `excerpt` is present only when the request asked for one
+ * `excerpt` is present only on level-1 nodes (direct children of the
+ * requested node) and only when the request asked for one
  * (`excerpt_chars` > 0): a plain-text preview of the card body cut to that
  * many characters ("…" appended when cut), null when the card has no body.
- * Symlink nodes carry their target card's excerpt. The full body is never
- * part of the outline.
+ * Nodes inside `children` never carry it. Symlink nodes carry their target
+ * card's excerpt. The full body is never part of the outline.
  */
 export interface TreeOutlineNode {
   id: string;

@@ -8,8 +8,8 @@ import type { TreeOutline } from "../../shared/types.js";
  * Query:
  *   node_id        UUID, omitted = virtual root (parent_node_id IS NULL)
  *   depth          1..3, default 2 — how many levels `children` is filled
- *   excerpt_chars  0..400, default 0 — plain-text body excerpt per node
- *                  (0 = no `excerpt` field, card bodies are not read)
+ *   excerpt_chars  0..400, default 0 — plain-text body excerpt on each
+ *                  level-1 node (0 = no `excerpt` field, bodies not read)
  */
 const OUTLINE_DEFAULT_DEPTH = 2;
 const DEPTH_PATTERN = /^[1-3]$/;

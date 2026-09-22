@@ -252,8 +252,10 @@ export async function updateNodeProperties(
  * node / canonical lookup when `nodeId` is given). Returns null when `nodeId`
  * does not exist.
  *
- * `excerptChars` > 0 adds a plain-text `excerpt` of each card body, cut to
- * that many characters; 0 leaves card bodies unread and the field absent.
+ * `excerptChars` > 0 adds a plain-text `excerpt` of the card body, cut to
+ * that many characters, to each level-1 node (direct children of `nodeId`);
+ * nodes inside `children` never get one. 0 leaves card bodies unread and the
+ * field absent everywhere.
  */
 export async function getTreeOutline(
   nodeId: string | null,
@@ -276,7 +278,7 @@ export async function getTreeOutline(
   const byId = new Map<string, TreeOutlineNode>();
   const nodes: TreeOutlineNode[] = [];
   for (const { level, node, content } of rows) {
-    if (excerptChars > 0) {
+    if (excerptChars > 0 && level === 1) {
       node.excerpt = toOutlineExcerpt(content ?? null, excerptChars);
     }
     byId.set(node.id, node);
