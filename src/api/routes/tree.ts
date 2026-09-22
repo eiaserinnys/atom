@@ -7,8 +7,10 @@ import {
   deleteNode,
   moveNode,
   updateNodeProperties,
+  getTreeOutline,
 } from "../../services/tree.service.js";
 import { parseCompileLimit } from "./compile-limit.js";
+import { createTreeOutlineHandler } from "./tree-outline.js";
 
 export async function treeRoutes(app: FastifyInstance): Promise<void> {
   // GET /tree  — root nodes (parent_node_id = null)
@@ -18,6 +20,10 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
   app.get("/tree", async (req, reply) => {
     return listChildren(null);
   });
+
+  // GET /tree/outline — body-free structural outline (same handler as
+  // GET /api/tree/outline). Static segment, so it wins over /tree/:nodeId.
+  app.get("/tree/outline", createTreeOutlineHandler({ getTreeOutline }));
 
   // GET /tree/:nodeId
   app.get<{ Params: { nodeId: string } }>(

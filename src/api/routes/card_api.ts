@@ -1,11 +1,12 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
-import { listChildren, compileSubtree } from "../../services/tree.service.js";
+import { listChildren, compileSubtree, getTreeOutline } from "../../services/tree.service.js";
 import { findActiveAgents } from "../../db/queries/agents.js";
 import { getDb } from "../../db/client.js";
 import bcrypt from "bcryptjs";
 import type { Staleness, UpdateCardInput } from "../../shared/types.js";
 import { parseCompileLimit } from "./compile-limit.js";
+import { createTreeOutlineHandler } from "./tree-outline.js";
 
 interface AgentCompileHandlerDeps {
   compileSubtree: typeof compileSubtree;
@@ -108,6 +109,13 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
     async (_req, _reply) => {
       return listChildren(null);
     }
+  );
+
+  // GET /api/tree/outline — body-free structural outline (agent key auth)
+  app.get(
+    "/api/tree/outline",
+    { preHandler: agentKeyPreHandler },
+    createTreeOutlineHandler({ getTreeOutline })
   );
 
   // GET /api/tree/:nodeId/children — list children of a node (agent key auth)
