@@ -38,6 +38,25 @@ describe("toOutlineExcerpt", () => {
     expect(toOutlineExcerpt(body, 3)).toBe("😀😀😀…");
   });
 
+  it("handles CRLF delimiter rows", () => {
+    expect(toOutlineExcerpt("| k | v |\r\n|---|---|\r\n| x | y |", 200)).toBe("k v x y");
+  });
+
+  // Delimiter-like lines that fail late used to backtrack super-linearly and
+  // block the event loop: each input below took ~2-3s with the old pattern
+  // (and grows exponentially / cubically with one more cell or more spaces).
+  // Sized so a regression fails in seconds instead of hanging the suite; the
+  // linear pattern takes well under a millisecond, so the bound cannot flake.
+  it.each([
+    ["empty cells after a delimiter start", `Intro\n| --- ${"|   ".repeat(12)}| x |\nmore`],
+    ["pipes after a rule", `---${"| ".repeat(24)}x`],
+    ["spaces after a delimiter cell", `---|${" ".repeat(1600)}x`],
+  ])("stays fast on adversarial input: %s", (_label, body) => {
+    const start = performance.now();
+    toOutlineExcerpt(body, 400);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
   it("returns an empty string when the body is only markup", () => {
     expect(toOutlineExcerpt("```\ncode only\n```", 200)).toBe("");
   });

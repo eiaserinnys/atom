@@ -13,7 +13,11 @@
 export const EXCERPT_SOURCE_CHARS = 4000;
 
 const FENCED_BLOCK = /^[ \t]*(`{3,}|~{3,})[^\n]*\n?[\s\S]*?(?:^[ \t]*\1[ \t]*$|(?![\s\S]))/gm;
-const RULE_OR_TABLE_DELIMITER = /^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-*:?[ \t]*)*\|?[ \t]*$/gm;
+// A line made only of | : - and blanks that contains "---": a table
+// delimiter row or a horizontal rule. One character class, so matching stays
+// linear — a cell-by-cell pattern backtracked super-linearly on lines that
+// look like a delimiter and fail late.
+const RULE_OR_TABLE_DELIMITER = /^(?=[^\r\n]*---)[ \t\r|:-]+$/gm;
 const MARKDOWN_SYMBOLS = /[`*_>#|]/g;
 
 export function toOutlineExcerpt(content: string | null, maxChars: number): string | null {
