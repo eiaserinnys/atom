@@ -7,6 +7,12 @@ export interface TreeOutlineRow {
   /** 1 = direct child of the requested parent. */
   level: number;
   node: TreeOutlineNode;
+  /**
+   * Card body prefix (`contentPrefixChars` characters at most); present only
+   * on level-1 rows when `contentPrefixChars` > 0, null when the card has no
+   * body.
+   */
+  content?: string | null;
 }
 
 /**
@@ -27,15 +33,30 @@ export interface TreeOutlineRow {
  *
  * Rows are ordered by level, then sibling order (position, id), so a parent
  * always precedes its children.
+ *
+ * `contentPrefixChars` = 0 leaves card bodies unread. Above 0 each level-1
+ * row (direct child of the requested parent) also carries the first
+ * `contentPrefixChars` characters of its card body; deeper rows still read
+ * no body. The length is inlined as a literal so the placeholder order stays
+ * as above.
  */
 export async function selectTreeOutlineRows(
   db: Queryable,
   parentNodeId: string | null,
-  depth: number
+  depth: number,
+  contentPrefixChars: number
 ): Promise<TreeOutlineRow[]> {
+  if (!Number.isSafeInteger(contentPrefixChars) || contentPrefixChars < 0) {
+    throw new Error(`tree outline: content prefix length must be a non-negative integer, got ${contentPrefixChars}`);
+  }
+  const withContent = contentPrefixChars > 0;
   const params: unknown[] = parentNodeId === null ? [depth] : [parentNodeId, depth];
   const anchor = parentNodeId === null ? "tn.parent_node_id IS NULL" : "tn.parent_node_id = $1";
   const depthParam = `$${params.length}`;
+  const contentColumn = withContent
+    ? `,
+            CASE WHEN o.level = 1 THEN SUBSTR(c.content, 1, ${contentPrefixChars}) END AS content_prefix`
+    : "";
 
   const result = await db.query(
     `WITH RECURSIVE
@@ -67,7 +88,7 @@ export async function selectTreeOutlineRows(
      )
      SELECT o.id, o.card_id, o.parent_node_id, o.position, o.is_symlink,
             c.title, c.card_type, o.level,
-            cnt.child_count, cnt.descendant_count
+            cnt.child_count, cnt.descendant_count${contentColumn}
      FROM outline o
      JOIN cards c ON c.id = o.card_id
      JOIN counts cnt ON cnt.root_id = o.id
@@ -76,19 +97,25 @@ export async function selectTreeOutlineRows(
   );
 
   // pg returns COUNT/SUM (bigint) as strings; better-sqlite3 returns numbers.
-  return result.rows.map((row: Record<string, unknown>) => ({
-    level: Number(row["level"]),
-    node: {
-      id: row["id"] as string,
-      card_id: row["card_id"] as string,
-      parent_node_id: (row["parent_node_id"] as string | null) ?? null,
-      position: keyToPos(row["position"] as string),
-      is_symlink: deserializeBoolean(row["is_symlink"]),
-      title: row["title"] as string,
-      card_type: row["card_type"] as CardType,
-      child_count: Number(row["child_count"]),
-      descendant_count: Number(row["descendant_count"]),
-      children: [],
-    },
-  }));
+  return result.rows.map((row: Record<string, unknown>) => {
+    const level = Number(row["level"]);
+    return {
+      level,
+      node: {
+        id: row["id"] as string,
+        card_id: row["card_id"] as string,
+        parent_node_id: (row["parent_node_id"] as string | null) ?? null,
+        position: keyToPos(row["position"] as string),
+        is_symlink: deserializeBoolean(row["is_symlink"]),
+        title: row["title"] as string,
+        card_type: row["card_type"] as CardType,
+        child_count: Number(row["child_count"]),
+        descendant_count: Number(row["descendant_count"]),
+        children: [],
+      },
+      ...(withContent && level === 1
+        ? { content: (row["content_prefix"] as string | null) ?? null }
+        : {}),
+    };
+  });
 }

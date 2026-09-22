@@ -59,14 +59,15 @@ export interface OutlineFixture {
 export async function seedCard(
   title: string,
   parent: string | null,
-  card_type: "structure" | "knowledge" = "knowledge"
+  card_type: "structure" | "knowledge" = "knowledge",
+  content: string | null = `BODY-${title}`
 ): Promise<{ nodeId: string; cardId: string }> {
   const db = getDb();
   const cardId = crypto.randomUUID();
   await db.query(
     `INSERT INTO cards (id, card_type, title, content, tags, "references")
      VALUES ($1, $2, $3, $4, $5, $6)`,
-    [cardId, card_type, title, `BODY-${title}`, serializeArray([]), serializeArray([])]
+    [cardId, card_type, title, content, serializeArray([]), serializeArray([])]
   );
   return { nodeId: await seedNode(cardId, parent, false), cardId };
 }
@@ -125,26 +126,62 @@ export function expectedUnderR(depth: 1 | 2 | 3): OutlineShape[] {
   return [a, leaf("B", 0, 0), leaf("X", 0, 0, true)];
 }
 
+const BODY_FREE_NODE_KEYS = [
+  "card_id",
+  "card_type",
+  "child_count",
+  "children",
+  "descendant_count",
+  "id",
+  "is_symlink",
+  "parent_node_id",
+  "position",
+  "title",
+];
+
+function expectBodyFreeNodes(nodes: TreeOutlineNode[]): void {
+  for (const n of nodes) {
+    expect(Object.keys(n).sort()).toEqual(BODY_FREE_NODE_KEYS);
+    expectBodyFreeNodes(n.children);
+  }
+}
+
 /** Recursively assert that no outline node carries a card body. */
 export function expectNoBodies(outline: TreeOutline): void {
-  const serialized = JSON.stringify(outline);
-  expect(serialized).not.toContain("BODY-");
-  const walk = (nodes: TreeOutlineNode[]): void => {
-    for (const n of nodes) {
-      expect(Object.keys(n).sort()).toEqual([
-        "card_id",
-        "card_type",
-        "child_count",
-        "children",
-        "descendant_count",
-        "id",
-        "is_symlink",
-        "parent_node_id",
-        "position",
-        "title",
-      ]);
-      walk(n.children);
-    }
-  };
-  walk(outline.nodes);
+  expect(JSON.stringify(outline)).not.toContain("BODY-");
+  expectBodyFreeNodes(outline.nodes);
 }
+
+/**
+ * Level-1 nodes carry `excerpt`; nodes inside `children` keep the body-free
+ * key set and none of their bodies appear anywhere in the response.
+ */
+export function expectExcerptOnFirstLevelOnly(outline: TreeOutline, childBodies: string[]): void {
+  for (const n of outline.nodes) {
+    expect(Object.keys(n).sort()).toEqual([...BODY_FREE_NODE_KEYS, "excerpt"].sort());
+    expectBodyFreeNodes(n.children);
+  }
+  const serialized = JSON.stringify(outline);
+  for (const body of childBodies) {
+    expect(serialized).not.toContain(body);
+  }
+}
+
+/** (title, excerpt) of the level-1 nodes. */
+export function firstLevelExcerpts(outline: TreeOutline): Array<[string, string | null | undefined]> {
+  return outline.nodes.map((n) => [n.title, n.excerpt]);
+}
+
+/** A body long enough to be cut at any allowed excerpt_chars, with a marker only its tail carries. */
+export const LONG_BODY = `# Long card\n\n${"word ".repeat(120)}\n\`\`\`ts\nconst hidden = 1;\n\`\`\`\n${"more ".repeat(60)}TAIL-MARKER`;
+
+/** Expected level-1 excerpts under R (every body is short). */
+export const EXPECTED_FIRST_LEVEL_EXCERPTS_UNDER_R: Array<[string, string]> = [
+  ["A", "BODY-A"],
+  ["B", "BODY-B"],
+  // Symlink nodes carry their target card, so its body.
+  ["X", "BODY-X"],
+];
+
+/** Bodies of R's descendants below level 1 — never part of an outline. */
+export const BODIES_BELOW_FIRST_LEVEL_UNDER_R = ["BODY-A1", "BODY-A1a", "BODY-A1ai", "BODY-A2"];

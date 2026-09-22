@@ -9,8 +9,13 @@ import bcrypt from "bcryptjs";
 
 import { getIntegrationTestPool, setupIntegrationTestDb } from "./integration-harness.js";
 import {
+  BODIES_BELOW_FIRST_LEVEL_UNDER_R,
+  EXPECTED_FIRST_LEVEL_EXCERPTS_UNDER_R,
+  expectExcerptOnFirstLevelOnly,
   expectedUnderR,
+  firstLevelExcerpts,
   expectNoBodies,
+  LONG_BODY,
   seedCard,
   seedOutlineFixture,
   shapeOf,
@@ -167,7 +172,7 @@ describe("GET /api/tree/outline", () => {
       setDb(counting);
       queries = 0;
       try {
-        await treeService.getTreeOutline(nodeId, 3);
+        await treeService.getTreeOutline(nodeId, 3, 0);
       } finally {
         setDb(pool);
       }
@@ -190,6 +195,65 @@ describe("GET /api/tree/outline", () => {
     expect(small.root).toBe(1);
     expect(small.node).toBeLessThanOrEqual(2);
     expect(small.symlink).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("GET /api/tree/outline?excerpt_chars", () => {
+  it("excerpt_chars=0 keeps the body-free contract byte for byte", async () => {
+    const plain = await outline(`?node_id=${fx.R}&depth=3`);
+    const zero = await outline(`?node_id=${fx.R}&depth=3&excerpt_chars=0`);
+    expect(zero).toEqual(plain);
+    expectNoBodies(zero);
+  });
+
+  it.each([1, 2, 3] as const)("depth=%i: excerpt on level-1 nodes only, children stay body-free", async (depth) => {
+    const body = await outline(`?node_id=${fx.R}&depth=${depth}&excerpt_chars=200`);
+    expect(firstLevelExcerpts(body)).toEqual(EXPECTED_FIRST_LEVEL_EXCERPTS_UNDER_R);
+    expectExcerptOnFirstLevelOnly(body, BODIES_BELOW_FIRST_LEVEL_UNDER_R);
+    expect(shapeOf(body.nodes)).toEqual(expectedUnderR(depth));
+  });
+
+  it("excerpts the virtual root's level-1 nodes", async () => {
+    const body = await outline("?depth=2&excerpt_chars=200");
+    expect(firstLevelExcerpts(body)).toEqual([
+      ["R", "BODY-R"],
+      ["X", "BODY-X"],
+    ]);
+    expectExcerptOnFirstLevelOnly(body, ["BODY-A", "BODY-B", "BODY-X1", "BODY-X2"]);
+  });
+
+  it.each([
+    [200, `Long card ${"word ".repeat(38).trimEnd()}…`],
+    [400, `Long card ${"word ".repeat(78).trimEnd()}…`],
+  ])("excerpt_chars=%i cuts a long body and never ships it whole", async (chars, expected) => {
+    const long = await seedCard("Long", fx.B, "knowledge", LONG_BODY);
+    const body = await outline(`?node_id=${fx.B}&depth=1&excerpt_chars=${chars}`);
+    expect(body.nodes.find((n) => n.id === long.nodeId)!.excerpt).toBe(expected);
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain("TAIL-MARKER");
+    expect(serialized).not.toContain("hidden");
+  });
+
+  it("returns a null excerpt for a card without content", async () => {
+    const empty = await seedCard("Empty", fx.B, "knowledge", null);
+    const body = await outline(`?node_id=${fx.B}&depth=1&excerpt_chars=200`);
+    expect(body.nodes.find((n) => n.id === empty.nodeId)!.excerpt).toBeNull();
+  });
+
+  it.each(["401", "-1"])("rejects excerpt_chars=%s with 400", async (chars) => {
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/tree/outline?node_id=${fx.R}&excerpt_chars=${chars}`,
+      headers: { "x-api-key": API_KEY },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("the dashboard route serves the same excerpts", async () => {
+    const agent = await outline(`?node_id=${fx.R}&depth=2&excerpt_chars=200`);
+    const res = await app.inject({ method: "GET", url: `/tree/outline?node_id=${fx.R}&depth=2&excerpt_chars=200` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(agent);
   });
 });
 
