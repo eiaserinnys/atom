@@ -73,6 +73,15 @@ describe("tree outline on SQLite", () => {
     expect(outline!.nodes.map((n) => n.id)).toEqual([fx.X1, fx.X2]);
   });
 
+  it("excerpts the canonical node's children for a symlink node_id", async () => {
+    const outline = await treeService.getTreeOutline(fx.S, 2, 200);
+    expect(firstLevelExcerpts(outline!)).toEqual([
+      ["X1", "BODY-X1"],
+      ["X2", "BODY-X2"],
+    ]);
+    expectExcerptOnFirstLevelOnly(outline!, []);
+  });
+
   it("returns null for an unknown node", async () => {
     expect(await treeService.getTreeOutline("6f1f7c2e-8a3b-4c5d-9e0f-112233445566", 2, 0)).toBeNull();
   });

@@ -278,8 +278,9 @@ export async function getTreeOutline(
   const byId = new Map<string, TreeOutlineNode>();
   const nodes: TreeOutlineNode[] = [];
   for (const { level, node, content } of rows) {
-    if (excerptChars > 0 && level === 1) {
-      node.excerpt = toOutlineExcerpt(content ?? null, excerptChars);
+    // The query decides which rows carry a body prefix (level 1 only).
+    if (content !== undefined) {
+      node.excerpt = toOutlineExcerpt(content, excerptChars);
     }
     byId.set(node.id, node);
     if (level === 1) {
