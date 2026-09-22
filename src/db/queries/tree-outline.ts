@@ -19,10 +19,11 @@ export interface TreeOutlineRow {
  *   parent chain.
  * - `counts`: per outline node, direct children and all descendants.
  *
- * Each recursive step joins `tree_nodes` on `parent_node_id`
- * (idx_tree_nodes_parent / idx_tree_nodes_parent_pos_id). Written in the
- * Postgres dialect; SqliteAdapter translates `IS NOT DISTINCT FROM $1` and the
- * placeholders, so each placeholder appears exactly once, in order.
+ * The anchor is an explicit `IS NULL` / `= $1` rather than
+ * `IS NOT DISTINCT FROM`, which Postgres cannot serve from an index. Each
+ * recursive step joins `tree_nodes` on `parent_node_id`
+ * (idx_tree_nodes_parent). Placeholders appear once each, in textual order,
+ * so SqliteAdapter's positional `?` translation binds them correctly.
  *
  * Rows are ordered by level, then sibling order (position, id), so a parent
  * always precedes its children.
@@ -32,17 +33,21 @@ export async function selectTreeOutlineRows(
   parentNodeId: string | null,
   depth: number
 ): Promise<TreeOutlineRow[]> {
+  const params: unknown[] = parentNodeId === null ? [depth] : [parentNodeId, depth];
+  const anchor = parentNodeId === null ? "tn.parent_node_id IS NULL" : "tn.parent_node_id = $1";
+  const depthParam = `$${params.length}`;
+
   const result = await db.query(
     `WITH RECURSIVE
-     outline(id, parent_node_id, is_symlink, level) AS (
-       SELECT tn.id, tn.parent_node_id, tn.is_symlink, 1
+     outline(id, card_id, parent_node_id, position, is_symlink, level) AS (
+       SELECT tn.id, tn.card_id, tn.parent_node_id, tn.position, tn.is_symlink, 1
        FROM tree_nodes tn
-       WHERE tn.parent_node_id IS NOT DISTINCT FROM $1
+       WHERE ${anchor}
        UNION ALL
-       SELECT tn.id, tn.parent_node_id, tn.is_symlink, o.level + 1
+       SELECT tn.id, tn.card_id, tn.parent_node_id, tn.position, tn.is_symlink, o.level + 1
        FROM outline o
        JOIN tree_nodes tn ON tn.parent_node_id = o.id
-       WHERE o.level < $2 AND o.is_symlink = FALSE
+       WHERE o.level < ${depthParam} AND o.is_symlink = FALSE
      ),
      reach(root_id, node_id, parent_id, is_symlink) AS (
        SELECT o.id, o.id, o.parent_node_id, o.is_symlink
@@ -60,15 +65,14 @@ export async function selectTreeOutlineRows(
        FROM reach
        GROUP BY root_id
      )
-     SELECT tn.id, tn.card_id, tn.parent_node_id, tn.position, tn.is_symlink,
+     SELECT o.id, o.card_id, o.parent_node_id, o.position, o.is_symlink,
             c.title, c.card_type, o.level,
             cnt.child_count, cnt.descendant_count
      FROM outline o
-     JOIN tree_nodes tn ON tn.id = o.id
-     JOIN cards c ON c.id = tn.card_id
+     JOIN cards c ON c.id = o.card_id
      JOIN counts cnt ON cnt.root_id = o.id
-     ORDER BY o.level ASC, tn.position ASC, tn.id ASC`,
-    [parentNodeId, depth]
+     ORDER BY o.level ASC, o.position ASC, o.id ASC`,
+    params
   );
 
   // pg returns COUNT/SUM (bigint) as strings; better-sqlite3 returns numbers.
