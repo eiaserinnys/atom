@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
 import pg from 'pg';
 import { setPendingRestart } from '../state.js';
+import { agentKeyVerifier } from '../agent-key-auth.js';
 import { mapPostgresConnectionError } from '../config/db-test.js';
 import { parseConfigEnvContent, updateConfigEnvContent } from '../config/env-file.js';
 import {
@@ -149,6 +150,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
         display_name,
         created_by: req.jwtUser!.id === 'bypass' ? undefined : req.jwtUser!.id,
       });
+      agentKeyVerifier.clear();
       return reply.code(201).send({
         ...agentToPublic(agent),
         secret: plainSecret,
@@ -167,6 +169,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       const secretHash = await bcrypt.hash(plainSecret, 10);
       const agent = await updateAgentSecret(getDb(), id, secretHash);
       if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+      agentKeyVerifier.clear();
 
       return reply.send({
         ...agentToPublic(agent),
@@ -190,6 +193,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     }
     const agent = await updateAgentActive(db, id, is_active);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+    agentKeyVerifier.clear();
     return reply.send(agentToPublic(agent));
   });
 

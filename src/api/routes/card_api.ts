@@ -1,9 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
 import { listChildren, compileSubtree, getTreeOutline } from "../../services/tree.service.js";
-import { findActiveAgents } from "../../db/queries/agents.js";
-import { getDb } from "../../db/client.js";
-import bcrypt from "bcryptjs";
+import { agentKeyPreHandler } from "../agent-key-auth.js";
 import type { Staleness, UpdateCardInput } from "../../shared/types.js";
 import { parseCompileLimit } from "./compile-limit.js";
 import { createTreeOutlineHandler } from "./tree-outline.js";
@@ -37,20 +35,6 @@ export function createAgentCompileHandler(deps: AgentCompileHandlerDeps) {
     });
     return { markdown: result.markdown };
   };
-}
-
-async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const secret = req.headers["x-api-key"] as string | undefined;
-  if (!secret) {
-    return reply.code(401).send({ error: "x-api-key header required" });
-  }
-  const agents = await findActiveAgents(getDb());
-  const agent = (await Promise.all(
-    agents.map(async (a) => (await bcrypt.compare(secret, a.secret_hash)) ? a : null)
-  )).find(Boolean) ?? null;
-  if (!agent) {
-    return reply.code(401).send({ error: "Unauthorized" });
-  }
 }
 
 export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
