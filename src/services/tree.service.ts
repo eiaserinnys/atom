@@ -11,7 +11,9 @@ import {
 } from "../db/queries/tree.js";
 import { selectCardById } from "../db/queries/cards.js";
 import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
-import type { TreeNode, TreeNodeWithCard } from "../shared/types.js";
+import type { TreeNode, TreeNodeWithCard, TreeOutline, TreeOutlineNode } from "../shared/types.js";
+import type { Queryable } from "../db/queryable.js";
+import { selectTreeOutlineRows } from "../db/queries/tree-outline.js";
 import type { UnfurlCredentials } from "../unfurl/interface.js";
 import { eventBus } from "../events/eventBus.js";
 import { selectChildrenWithCards, toTreeNodeWithCard } from "./tree-node-payload.js";
@@ -23,6 +25,22 @@ import {
   type CompileUnfurls,
 } from "./compile-unfurl.service.js";
 import { loadTreeCompileContext } from "./tree-compile-context.service.js";
+
+/**
+ * Resolve the node whose children are listed "under" `nodeId`: a symlink
+ * lists its canonical node's children (an orphan symlink falls back to
+ * itself). Returns null when `nodeId` does not exist.
+ */
+async function resolveChildParentNodeId(
+  db: Queryable,
+  nodeId: string
+): Promise<string | null> {
+  const node = await selectNodeById(db, nodeId);
+  if (!node) return null;
+  if (!node.is_symlink) return node.id;
+  const canonical = await selectCanonicalNodeByCardId(db, node.card_id);
+  return canonical?.id ?? node.id;
+}
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
   const db = getDb();
@@ -39,16 +57,11 @@ export async function listChildren(
   const db = getDb();
 
   // symlink 해석: 부모가 symlink이면 canonical node의 자식을 반환
-  let effectiveParentId = parentNodeId;
-  if (parentNodeId !== null) {
-    const parentNode = await selectNodeById(db, parentNodeId);
-    if (parentNode?.is_symlink) {
-      const canonicalNode = await selectCanonicalNodeByCardId(db, parentNode.card_id);
-      if (canonicalNode) {
-        effectiveParentId = canonicalNode.id;
-      }
-    }
-  }
+  // (부모 노드가 없으면 요청 id 그대로 조회 → 빈 목록)
+  const effectiveParentId =
+    parentNodeId === null
+      ? null
+      : (await resolveChildParentNodeId(db, parentNodeId)) ?? parentNodeId;
 
   const nodes = await selectChildren(db, effectiveParentId);
   const results: TreeNodeWithCard[] = [];
@@ -230,4 +243,41 @@ export async function updateNodeProperties(
     });
   }
   return node;
+}
+
+/**
+ * Body-free structural outline under `nodeId` (null = virtual root), expanded
+ * `depth` levels. One outline query regardless of subtree size (plus the
+ * node / canonical lookup when `nodeId` is given). Returns null when `nodeId`
+ * does not exist.
+ */
+export async function getTreeOutline(
+  nodeId: string | null,
+  depth: number
+): Promise<TreeOutline | null> {
+  const db = getDb();
+  let canonicalNodeId: string | null = null;
+  if (nodeId !== null) {
+    canonicalNodeId = await resolveChildParentNodeId(db, nodeId);
+    if (canonicalNodeId === null) return null;
+  }
+
+  const rows = await selectTreeOutlineRows(db, canonicalNodeId, depth);
+  const byId = new Map<string, TreeOutlineNode>();
+  const nodes: TreeOutlineNode[] = [];
+  for (const { level, node } of rows) {
+    byId.set(node.id, node);
+    if (level === 1) {
+      nodes.push(node);
+      continue;
+    }
+    // Rows come ordered by level, so the parent is already mapped.
+    const parent = node.parent_node_id === null ? undefined : byId.get(node.parent_node_id);
+    if (!parent) {
+      throw new Error(`tree outline: parent ${node.parent_node_id} of node ${node.id} missing from outline`);
+    }
+    parent.children.push(node);
+  }
+
+  return { node_id: nodeId, canonical_node_id: canonicalNodeId, depth, nodes };
 }

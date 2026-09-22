@@ -39,6 +39,36 @@ export interface TreeNodeWithCard extends TreeNode {
   canonical_path?: string;
 }
 
+/**
+ * Body-free structural summary of one tree node (GET /api/tree/outline).
+ *
+ * `children` is filled only up to the requested depth; below that the
+ * subtree is summarized by `child_count` (direct children) and
+ * `descendant_count` (every tree_node below, unlimited depth). Symlink nodes
+ * are leaves: counts are 0 and they are never expanded.
+ */
+export interface TreeOutlineNode {
+  id: string;
+  card_id: string;
+  parent_node_id: string | null;
+  position: number;
+  is_symlink: boolean;
+  title: string;
+  card_type: CardType;
+  child_count: number;
+  descendant_count: number;
+  children: TreeOutlineNode[];
+}
+
+export interface TreeOutline {
+  /** Requested node id (null = virtual root). */
+  node_id: string | null;
+  /** Node whose children were listed: the canonical node when `node_id` is a symlink, null for the virtual root. */
+  canonical_node_id: string | null;
+  depth: number;
+  nodes: TreeOutlineNode[];
+}
+
 export interface CreateCardInput {
   card_type: CardType;
   title: string;
