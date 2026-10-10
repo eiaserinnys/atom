@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PointerSensor,
   useSensor,
@@ -112,7 +112,10 @@ export function useTreeDragAndDrop({ roots, onMove }: UseTreeDragAndDropArgs) {
     resetDragState();
   }
 
-  const dndState: TreeDndState = { activeId, overId, dropZone };
+  const dndState: TreeDndState = useMemo(
+    () => ({ activeId, overId, dropZone }),
+    [activeId, overId, dropZone]
+  );
 
   return {
     activeDragNode,

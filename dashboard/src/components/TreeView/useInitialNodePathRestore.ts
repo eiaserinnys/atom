@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 
 interface NodeParent {
   parent_node_id: string | null;
@@ -74,10 +74,15 @@ export function useInitialNodePathRestore({
   setExpandedNodes,
   onSelect,
 }: UseInitialNodePathRestoreInput): void {
+  const restoreStarted = useRef(false);
+
   useEffect(() => {
+    if (restoreStarted.current || !initialSelectedNodeId || !roots?.length) return;
+
+    restoreStarted.current = true;
     void restoreInitialNodePath({
       targetId: initialSelectedNodeId,
-      rootsLoaded: Boolean(roots?.length),
+      rootsLoaded: true,
       getNode,
       expandAncestors: (nodeIds) => {
         setExpandedNodes(prev => {
@@ -88,7 +93,5 @@ export function useInitialNodePathRestore({
       },
       selectNode: onSelect,
     });
-  // Preserve the legacy TreeView behavior: initial restore is tied to roots query updates.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roots]);
+  }, [initialSelectedNodeId, roots, getNode, setExpandedNodes, onSelect]);
 }

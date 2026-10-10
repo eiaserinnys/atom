@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -49,6 +49,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [modal, setModal] = useState<TreeModalState>({ type: 'none' });
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const previousRootIds = useRef<Set<string>>(new Set());
   const closeModal = useCallback(() => setModal({ type: 'none' }), []);
 
   const toggleExpand = useCallback((nodeId: string) => {
@@ -61,15 +62,26 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   }, []);
 
   useEffect(() => {
-    if (roots?.length) {
-      // Preserve legacy root auto-expand behavior after the roots query resolves.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setExpandedNodes(prev => {
-        const next = new Set(prev);
-        roots.forEach(r => next.add(r.id));
-        return next;
-      });
-    }
+    if (roots === undefined) return;
+
+    const previousIds = previousRootIds.current;
+    const newRootIds = roots
+      .filter(root => !previousIds.has(root.id))
+      .map(root => root.id);
+    previousRootIds.current = new Set(roots.map(root => root.id));
+
+    if (newRootIds.length === 0) return;
+
+    // Preserve legacy auto-expand for roots when they first appear.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setExpandedNodes(prev => {
+      const idsToExpand = newRootIds.filter(id => !prev.has(id));
+      if (idsToExpand.length === 0) return prev;
+
+      const next = new Set(prev);
+      idsToExpand.forEach(id => next.add(id));
+      return next;
+    });
   }, [roots]);
 
   useInitialNodePathRestore({
