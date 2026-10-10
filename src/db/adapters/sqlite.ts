@@ -58,7 +58,9 @@ export class SqliteAdapter implements DatabaseAdapter {
     values?: unknown[]
   ): Promise<QueryResult<T>> {
     const translated = translateQuery(queryText);
-    const params = values ?? [];
+    const params = (values ?? []).map((value) =>
+      typeof value === "boolean" ? (value ? 1 : 0) : value
+    );
 
     if (isReadQuery(queryText)) {
       const rows = this.db.prepare(translated).all(...params) as T[];
