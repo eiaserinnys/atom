@@ -13,6 +13,8 @@ import { buildMovePayload, type TreeMovePayload } from '../../utils/treeMoveInte
 import type { DropZone, TreeDndState } from './TreeDndContext';
 import { calcDropZone, isAncestorOf } from './treeDndLogic';
 
+const pointerSensorOptions = { activationConstraint: { distance: 5 } };
+
 interface UseTreeDragAndDropArgs {
   roots: TreeNodeData[] | undefined;
   onMove: (payload: TreeMovePayload) => void;
@@ -37,7 +39,7 @@ export function useTreeDragAndDrop({ roots, onMove }: UseTreeDragAndDropArgs) {
   }, [activeId]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, pointerSensorOptions)
   );
 
   function resetDragState() {
