@@ -43,6 +43,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   const { data: roots, isLoading, error } = useQuery({
     queryKey: rootTreeQueryKey(),
     queryFn: fetchRootsWithChildren,
+    refetchOnWindowFocus: false,
   });
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());

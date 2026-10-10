@@ -31,6 +31,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, depth = 0, isExpand
       initialData: propsChildren,
     }),
     staleTime: 30_000,
+    refetchOnWindowFocus: false,
     gcTime: 0,
   });
 
