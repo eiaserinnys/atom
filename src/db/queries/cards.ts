@@ -33,7 +33,7 @@ export async function insertCard(
   const id = crypto.randomUUID();
   const result = await db.query(
     `INSERT INTO cards (id, card_type, title, content, tags, "references", content_timestamp, source_type, source_ref, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       id,
@@ -45,6 +45,7 @@ export async function insertCard(
       input.content_timestamp ?? null,
       input.source_type ?? null,
       input.source_ref ?? null,
+      agentId ?? null,
       agentId ?? null,
     ]
   );
