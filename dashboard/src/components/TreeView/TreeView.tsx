@@ -93,6 +93,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
   });
 
   const {
+    editMutation,
     deleteMutation,
     moveMutation,
     createCard,
@@ -107,6 +108,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     closeModal,
     setDeleteError,
   });
+  const { reset: resetEditMutation } = editMutation;
 
   const treeDrag = useTreeDragAndDrop({ roots, onMove: moveNode });
 
@@ -121,11 +123,12 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     } else if (action.type === 'move') {
       setModal({ type: 'move', node: action.node });
     } else if (action.type === 'edit') {
+      resetEditMutation();
       setModal({ type: 'edit', node: action.node });
     } else if (action.type === 'delete') {
       setModal({ type: 'delete', node: action.node });
     }
-  }, []);
+  }, [resetEditMutation]);
 
   const buildContextMenuItems = useCallback((node: TreeNodeData): ContextMenuItem[] =>
     buildContextMenuActionDescriptors(node).map((descriptor) => ({
@@ -235,6 +238,11 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
               onConfirm={handleModalConfirm}
               onClose={closeModal}
               isLoading={isFormMutating}
+              errorMessage={modal.type === 'edit' && editMutation.isError
+                ? editMutation.error?.message
+                  ? `${t('card.save_failed')}: ${editMutation.error.message}`
+                  : t('card.save_failed')
+                : undefined}
             />
           )}
 

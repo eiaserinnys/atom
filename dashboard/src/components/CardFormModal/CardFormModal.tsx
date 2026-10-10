@@ -9,6 +9,7 @@ interface CardFormModalProps {
   onConfirm: (title: string, content: string) => void;
   onClose: () => void;
   isLoading?: boolean;
+  errorMessage?: string;
 }
 
 export function CardFormModal({
@@ -19,6 +20,7 @@ export function CardFormModal({
   onConfirm,
   onClose,
   isLoading = false,
+  errorMessage,
 }: CardFormModalProps) {
   const { t } = useTranslation();
   const [title, setTitle] = useState(initialTitle);
@@ -78,6 +80,10 @@ export function CardFormModal({
             placeholder={t('cardform.content_placeholder')}
           />
         </div>
+
+        {errorMessage && (
+          <div className="text-sm text-node-error" role="alert">{errorMessage}</div>
+        )}
 
         <div className="flex justify-end gap-2">
           <button
