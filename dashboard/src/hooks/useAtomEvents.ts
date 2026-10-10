@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { AtomEvent, AtomPatchEvent } from '../types/events';
 import type { TreeNodeData } from '../api/client';
@@ -237,10 +237,15 @@ export function applyAtomEventToCache(
 
 export function useAtomEvents(selectedNodeId: string | null = null) {
   const queryClient = useQueryClient();
+  const selectedNodeIdRef = useRef(selectedNodeId);
   const pendingEvents = useRef<AtomEvent[]>([]);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // SSE 연결이 한 번이라도 끊어졌으면 재연결 시 전체 재페치로 동기화
   const wasDisconnected = useRef(false);
+
+  useLayoutEffect(() => {
+    selectedNodeIdRef.current = selectedNodeId;
+  }, [selectedNodeId]);
 
   useEffect(() => {
     const es = new EventSource(`${BASE_URL}/events`, { withCredentials: true });
@@ -248,7 +253,7 @@ export function useAtomEvents(selectedNodeId: string | null = null) {
     es.onopen = () => {
       if (wasDisconnected.current) {
         // 재연결: 놓친 이벤트가 있을 수 있으므로 전체 재페치로 동기화
-        invalidateSseReconnectQueries(queryClient, selectedNodeId);
+        invalidateSseReconnectQueries(queryClient, selectedNodeIdRef.current);
         wasDisconnected.current = false;
       }
     };
@@ -263,8 +268,9 @@ export function useAtomEvents(selectedNodeId: string | null = null) {
         flushTimer.current = setTimeout(() => {
           const events = pendingEvents.current.splice(0);
           events.forEach((payload) => {
-            applyAtomEventToCache(queryClient, payload, selectedNodeId);
+            applyAtomEventToCache(queryClient, payload, selectedNodeIdRef.current);
           });
+          flushTimer.current = null;
         }, BATCH_DEBOUNCE_MS);
       } catch {
         console.warn('[useAtomEvents] 이벤트 파싱 실패:', event.data);
@@ -278,8 +284,11 @@ export function useAtomEvents(selectedNodeId: string | null = null) {
 
     return () => {
       if (flushTimer.current) clearTimeout(flushTimer.current);
+      flushTimer.current = null;
+      pendingEvents.current = [];
       es.close();
+      wasDisconnected.current = false;
     };
-    // selectedNodeId는 compile invalidation 범위를 결정하므로 의존성에 포함
-  }, [queryClient, selectedNodeId]);
+    // 선택 전환은 수신 중인 batch와 연결 수명을 끊지 않는다.
+  }, [queryClient]);
 }
