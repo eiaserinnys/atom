@@ -10,7 +10,7 @@ import pg from 'pg';
 import { setPendingRestart } from '../state.js';
 import { agentKeyVerifier } from '../agent-key-auth.js';
 import { mapPostgresConnectionError } from '../config/db-test.js';
-import { parseConfigEnvContent, updateConfigEnvContent } from '../config/env-file.js';
+import { isDbOwnedConfigEnvKey, parseConfigEnvContent, updateConfigEnvContent } from '../config/env-file.js';
 import {
   migrateSqliteToPostgres,
   type ConfigMigrationServiceDeps,
@@ -239,8 +239,11 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     if (!requireRole(req, reply, 'admin')) return;
 
     const entries = req.body;
-    if (!Array.isArray(entries) || entries.some((e) => !e.key)) {
+    if (!Array.isArray(entries) || entries.some((e) => !e || typeof e.key !== 'string' || typeof e.value !== 'string' || !e.key)) {
       return reply.code(400).send({ error: 'Body must be an array of { key, value }' });
+    }
+    if (entries.some((entry) => isDbOwnedConfigEnvKey(entry.key))) {
+      return reply.code(400).send({ error: { code: 'OPENAI_KEY_DB_ONLY' } });
     }
 
     try {

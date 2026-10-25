@@ -10,6 +10,10 @@ export function isSensitiveEnvKey(key: string): boolean {
   return MASKED_KEY_PATTERNS.some((pattern) => upper.includes(pattern));
 }
 
+export function isDbOwnedConfigEnvKey(key: string): boolean {
+  return key.toUpperCase() === "OPENAI_API_KEY";
+}
+
 export function parseConfigEnvContent(content: string): Record<string, string> {
   const result: Record<string, string> = {};
   for (const line of content.split("\n")) {
@@ -19,6 +23,7 @@ export function parseConfigEnvContent(content: string): Record<string, string> {
     if (eqIdx < 0) continue;
     const key = trimmed.slice(0, eqIdx).trim();
     const value = trimmed.slice(eqIdx + 1).trim();
+    if (isDbOwnedConfigEnvKey(key)) continue;
     result[key] = isSensitiveEnvKey(key) && value ? "***" : value;
   }
   return result;
@@ -28,6 +33,9 @@ export function updateConfigEnvContent(
   content: string,
   entries: ConfigEnvEntry[],
 ): string {
+  if (entries.some((entry) => isDbOwnedConfigEnvKey(entry.key))) {
+    throw new Error("OPENAI_KEY_DB_ONLY");
+  }
   const lines = content.split("\n");
   const updates = new Map(entries.map((entry) => [entry.key, entry.value]));
   const handled = new Set<string>();

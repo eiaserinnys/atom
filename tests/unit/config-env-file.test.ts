@@ -57,4 +57,14 @@ describe("config env file helpers", () => {
       ])
     ).toBe("\nALLOWED_EMAIL=owner@example.com");
   });
+
+  it("omits the DB-owned OpenAI key and refuses writes through the legacy env route", () => {
+    const content = "API_PORT=3000\nOPENAI_API_KEY=test-value\nGOOGLE_CLIENT_SECRET=secret";
+    const parsed = parseConfigEnvContent(content);
+    expect(Object.keys(parsed)).toEqual(["API_PORT", "GOOGLE_CLIENT_SECRET"]);
+    expect(JSON.stringify(parsed).includes("test-value")).toBe(false);
+    expect(() => updateConfigEnvContent(content, [
+      { key: "openai_api_key", value: "test-value" },
+    ])).toThrow("OPENAI_KEY_DB_ONLY");
+  });
 });

@@ -24,7 +24,32 @@
     "tab_credentials": "External Auth",
     "tab_language": "Language",
     "tab_database": "Database",
-    "tab_auth": "Auth"
+    "tab_auth": "Auth",
+    "tab_openai": "OpenAI"
+  },
+  "openai": {
+    "key": "API key",
+    "configured": "Configured",
+    "not_configured": "Not configured",
+    "saved_at": "Saved",
+    "embeddings": "Embeddings",
+    "progress": "{{completed}} / {{total}}",
+    "running": "Generating",
+    "idle": "Idle",
+    "paused_no_key": "Key required",
+    "paused_auth": "Check API key",
+    "paused_rate_limited": "Rate limited",
+    "saved": "Saved",
+    "deleted": "Deleted",
+    "request_failed": "Could not update settings.",
+    "load_failed": "Could not load status.",
+    "error_OPENAI_AUTH": "Authentication error",
+    "error_OPENAI_RATE_LIMIT": "Rate limit",
+    "error_OPENAI_UPSTREAM": "OpenAI error",
+    "error_OPENAI_NETWORK": "Connection error",
+    "error_OPENAI_REQUEST": "Request error",
+    "error_OPENAI_BAD_RESPONSE": "Invalid response",
+    "error_EMBEDDING_STORAGE": "Storage error"
   },
   "users": {
     "title": "Users",

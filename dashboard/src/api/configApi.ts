@@ -1,5 +1,6 @@
 import { request } from './request';
 import type { Agent, User, UserRole } from './types';
+import type { OpenAIConfigResponse } from '../../../src/shared/embeddings';
 
 export const configApi = {
   listUsers(): Promise<User[]> {
@@ -32,6 +33,18 @@ export const configApi = {
 
   getEnv(): Promise<Record<string, string>> {
     return request('/api/config/env');
+  },
+
+  getOpenAIConfig(): Promise<OpenAIConfigResponse> {
+    return request('/api/config/openai');
+  },
+
+  putOpenAIKey(api_key: string): Promise<{ key: { configured: boolean; last_saved_at: string | null } }> {
+    return request('/api/config/openai/key', { method: 'PUT', body: JSON.stringify({ api_key }) });
+  },
+
+  deleteOpenAIKey(): Promise<{ key: { configured: boolean; last_saved_at: string | null } }> {
+    return request('/api/config/openai/key', { method: 'DELETE' });
   },
 
   putEnv(entries: { key: string; value: string }[]): Promise<{ ok: boolean }> {

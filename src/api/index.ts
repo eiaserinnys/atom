@@ -16,17 +16,27 @@ import { authMiddleware } from "./middleware/auth.js";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { createPageAccessCorsOptions } from "./page_access.js";
-import { runMigrations, getDb } from "../db/client.js";
+import { runMigrations, getDb, closeDb } from "../db/client.js";
 import { config } from "dotenv";
 import { loadAdapters } from "../unfurl/loader.js";
 import { adapterRegistry } from "../unfurl/registry.js";
 import { userExists, insertUser } from "../db/queries/users.js";
 import { findAgentByAgentId, insertAgent } from "../db/queries/agents.js";
 import bcrypt from "bcryptjs";
+import { FlatEmbeddingIndex } from "../services/embeddings/flat-index.js";
+import { createEmbeddingSync } from "../services/embeddings/sync.js";
+import { createNeighborService } from "../services/embeddings/neighbors.js";
+import { createOpenAIConfigRoutes } from "./routes/openai-config.js";
+import { createNeighborsRoutes } from "./routes/neighbors.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 config({ path: path.join(__dirname, "../../.env"), override: true });
+
+const db = getDb();
+const embeddingIndex = new FlatEmbeddingIndex();
+const embeddingSync = createEmbeddingSync({ db, index: embeddingIndex });
+const neighborService = createNeighborService(db, embeddingIndex);
 
 const app = Fastify({ logger: true });
 
@@ -55,6 +65,13 @@ app.register(configRoutes);
 app.register(unfurlRoutes);
 app.register(cardApiRoutes);
 app.register(systemRoutes);
+app.register(createOpenAIConfigRoutes({ db, sync: embeddingSync }));
+app.register(createNeighborsRoutes(neighborService));
+app.addHook("onClose", async () => {
+  await embeddingSync.stop();
+  await neighborService.waitForLoad();
+  await closeDb();
+});
 
 const port = parseInt(process.env["API_PORT"] ?? "");
 if (isNaN(port)) {
@@ -93,6 +110,7 @@ const start = async (): Promise<void> => {
   await seedMigration();
   await loadAdapters(adapterRegistry);
   await app.listen({ port, host: "0.0.0.0" });
+  embeddingSync.start();
 };
 
 start().catch((err) => {

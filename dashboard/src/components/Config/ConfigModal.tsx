@@ -8,6 +8,7 @@ import { CredentialsTab } from './CredentialsTab';
 import { LanguageTab } from './LanguageTab';
 import { DatabaseTab } from './DatabaseTab';
 import { AuthTab } from './AuthTab';
+import { OpenAITab } from './OpenAITab';
 
 interface Props {
   isOpen: boolean;
@@ -16,7 +17,7 @@ interface Props {
   currentUserEmail: string;
 }
 
-type ConfigTab = 'users' | 'agents' | 'credentials' | 'language' | 'database' | 'auth';
+type ConfigTab = 'users' | 'agents' | 'credentials' | 'language' | 'database' | 'auth' | 'openai';
 
 export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail }: Props) {
   const { t } = useTranslation();
@@ -24,7 +25,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
     currentUserRole === 'admin' ? 'users' : 'agents'
   );
   const isAdmin = currentUserRole === 'admin';
-  const visibleTab: ConfigTab = isAdmin || !['users', 'database', 'auth'].includes(activeTab)
+  const visibleTab: ConfigTab = isAdmin || !['users', 'database', 'auth', 'openai'].includes(activeTab)
     ? activeTab
     : 'agents';
 
@@ -118,6 +119,18 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
               {t('config.tab_auth')}
             </button>
           )}
+          {isAdmin && (
+            <button
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                visibleTab === 'openai'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setActiveTab('openai')}
+            >
+              {t('config.tab_openai')}
+            </button>
+          )}
         </div>
 
         {/* 탭 컨텐츠 */}
@@ -130,6 +143,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
           {visibleTab === 'language' && <LanguageTab />}
           {visibleTab === 'database' && isAdmin && <DatabaseTab />}
           {visibleTab === 'auth' && isAdmin && <AuthTab />}
+          {visibleTab === 'openai' && isAdmin && <OpenAITab />}
         </div>
       </div>
     </div>
