@@ -206,6 +206,7 @@
     "tab_compile": "Compiler",
     "tab_detail": "Détail",
     "tab_settings": "Paramètres",
-    "settings_back": "← Paramètres"
+    "settings_back": "← Paramètres",
+    "tab_search": "Recherche"
   }
 }

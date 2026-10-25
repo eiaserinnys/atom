@@ -56,7 +56,7 @@ export function createMotionPlayer(root, callbacks, samples) {
 
   // ------------------------------------------------------------------ 2. 자리 잡기
   const M = { colW: 196, gap: 64, rowH: 64, pitch: 78, lowPitch: 78, chipH: 20, bandGap: 8, groupGap: 4, padX: 24, padTop: 50, headerH: 38, pileH: 24, pendCap: 14, cell: 5, laneY: -9 };
-  const ui = { showLow: true, expanded: new Set(), follow: true };
+  const ui = { showLow: false, expanded: new Set(), follow: true };
   const colX = (hop) => hop * (M.colW + M.gap);
   // 열은 홉. 한 열 안에서 위 띠는 살아 있는 것(열린 구조, 맞은 카드, 선정)과 아직 판정 전인 것,
   // 아래 띠는 닫히거나 낮은 것. 넘치는 것은 부모별 더미(+N)로 접는다.
@@ -182,7 +182,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     const p = key ? L.piles.get(key) : L.pos.get(n.ref);
     return { x: p.x, y: p.y, a: key ? 0 : 1, alive: isAlive(n) ? 1 : 0, dim: isDim(n) ? 1 : 0, sel: n.selected ? 1 : 0, judge: n.judging ? 1 : 0, score: n.score != null ? 1 : 0, port: n.type !== "structure" ? 0 : n.verdict === "open" ? 1 : n.verdict === "pending" ? 0.45 : 0, read: n.reading > 0 || n.climbing ? 1 : 0, soft: n.byRoot ? 1 : 0 };
   }
-  function snapNode(v) { const t = v.next || v.t; v.t = t; v.next = null; v.x = t.x; v.y = t.y; v.vx = v.vy = 0; v.a = t.a; v.alive = t.alive; v.dim = t.dim; v.sel = t.sel; v.judge = t.judge; v.scoreA = t.score; v.port = t.port; v.read = t.read; v.wipe = 1; v.born = 0; v.selAt = 0; }
+  function snapNode(v) { const t = v.t; v.next = null; v.x = t.x; v.y = t.y; v.vx = v.vy = 0; v.a = t.a; v.alive = t.alive; v.dim = t.dim; v.sel = t.sel; v.judge = t.judge; v.scoreA = t.score; v.port = t.port; v.read = t.read; v.wipe = 1; v.born = 0; v.selAt = 0; }
 
   // 모델이 바뀔 때마다 부른다. animate가 거짓이면 그 자리로 바로 옮긴다(되감기, 건너뛰기, 모션 줄임)
   function sync(now, animate, delta) {
@@ -200,8 +200,8 @@ export function createMotionPlayer(root, callbacks, samples) {
         view.nodes.set(n.ref, v);
       } else if (animate && scoredAt.has(n.ref)) { v.next = tg; v.hold = now + Math.min(240, scoredAt.get(n.ref) * 12); }
       else if (v.next && now < v.hold) v.next = tg;
-      else v.t = tg;
-      if (!animate) snapNode(v);
+      else { v.t = tg; v.next = null; }
+      if (!animate) { v.t = tg; v.next = null; snapNode(v); }
     }
     for (const ref of [...view.nodes.keys()]) { const n = model.nodes.get(ref); if (!n || n.dormant) view.nodes.delete(ref); }
     // 더미
@@ -329,7 +329,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     // 입구만 있는 넓은 배치는 판 가운데에 둔다
     const free = vw - L.width - badgeRoom();
     const minX = L.wide && free > 2 * M.padX ? -free / 2 : -M.padX; const maxX = Math.max(minX, L.width + M.padX + badgeRoom() - vw);
-    const minY = -M.padTop; const maxY = Math.max(minY, L.height + 44 - vh);
+    const minY = -M.padTop; const maxY = Math.max(minY, L.height + 64 - vh);
     return { minX, maxX, minY, maxY, vw, vh };
   }
   const rubber = (over, dim) => (over * dim * 0.55) / (dim + 0.55 * Math.abs(over));
@@ -379,7 +379,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   function fitAll(instant = false) {
     const isAuto = instant === true;
-    const L = view.L; const w = L.width + 2 * M.padX + badgeRoom(); const h = L.height + M.padTop + 26;
+    const L = view.L; const w = L.width + 2 * M.padX + badgeRoom(); const h = L.height + M.padTop + 54;
     const minZ = W < 480 ? 0.76 : 0.72;
     const z = clamp(Math.min(W / w, (H - M.headerH) / h), minZ, 1);
     setFollow(false);

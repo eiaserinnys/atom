@@ -35,6 +35,13 @@ function AppInner() {
   const [centerMode, setCenterMode] = useState<CenterMode>(request ? 'search' : 'compile');
   const [searchResults, setSearchResults] = useState<MotionNode[]>([]);
   const [selectionVerdict, setSelectionVerdict] = useState<MotionNode | null>(null);
+  const verdict = selectionVerdict ?? searchResults.find(n => n.nodeId === selectedNodeId) ?? null;
+  const handleSearchResults = useCallback((nodes: MotionNode[]) => {
+    const nextVerdict = verdict ? nodes.find(n => n.nodeId === verdict.nodeId) ?? null : null;
+    setSearchResults(nodes);
+    setSelectionVerdict(nextVerdict);
+    if (verdict?.sample && !nextVerdict) setSelectedNodeId(null);
+  }, [verdict]);
   const isMobile = useMobile();
   const handleSelectNode = useCallback((nodeId: string | null) => {
     setSelectedNodeId(nodeId); setSelectionVerdict(null);
@@ -46,10 +53,12 @@ function AppInner() {
     if (!verdict.sample) { const url = new URL(location.href); url.hash = nodeId; window.history.replaceState(null, '', url); }
   }, []);
   const submitSearch = useCallback((query: string, options: { rootNodeId?: string }) => {
+    setSelectionVerdict(null);
+    setSearchResults([]);
+    if (verdict?.sample) setSelectedNodeId(null);
     setCenterMode('search');
     setRequest(previous => ({ query, rootNodeId: options.rootNodeId, requestId: (previous?.requestId ?? 0) + 1 }));
-  }, []);
-  const verdict = selectionVerdict ?? searchResults.find(n => n.nodeId === selectedNodeId) ?? null;
+  }, [verdict]);
   // Sample node IDs are scoped to the preset; never send them to mutation or compile APIs.
   const actualNodeId = verdict?.sample && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(selectedNodeId ?? '') ? null : selectedNodeId;
   useAtomEvents(actualNodeId);
@@ -69,10 +78,10 @@ function AppInner() {
     </header>
     {!isMobile && showConfigButton && <ConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} />}
     <main className="flex-1 min-h-0 overflow-hidden">
-      {isMobile ? <MobileLayout selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onResults={setSearchResults} /> :
+      {isMobile ? <MobileLayout selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onResults={handleSearchResults} /> :
         <ThreePanelLayout onLayoutWidthsChange={setWidths}
           left={<TreeView selectedNodeId={actualNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} />}
-          center={<CenterWorkspace nodeId={actualNodeId} mode={centerMode} onModeChange={setCenterMode} request={request} onSelectNode={selectSearchNode} onResults={setSearchResults} />}
+          center={<CenterWorkspace nodeId={actualNodeId} mode={centerMode} onModeChange={setCenterMode} request={request} onSelectNode={selectSearchNode} onResults={handleSearchResults} />}
           right={<CardDetail nodeId={actualNodeId} verdict={verdict} />} />}
     </main>
   </div></SystemProvider>;
