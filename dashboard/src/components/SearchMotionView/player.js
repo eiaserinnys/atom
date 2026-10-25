@@ -600,15 +600,18 @@ export function createMotionPlayer(root, callbacks, samples) {
     const portPad = n.type === "structure" ? 4 : 0;
     if (text) {
       const bold = alive > 0.5; const f = wfont(bold ? 650 : 500, 14);
-      const scoreW = n.score != null || n.byHit || n.judging ? 36 : 4;
-      const key = (bold ? "b" : "r") + scoreW;
-      if (!v.fit || v.fitKey !== key) { v.fit = fitText(n.title, w - (tx - x) - 8 - scoreW - portPad, f); v.fitKey = key; }
+      const scoreFont = wfont(bold ? 600 : 500, 13);
+      ctx.font = scoreFont;
+      const scoreW = n.score != null ? ctx.measureText(n.score.toFixed(2)).width + 8 : n.byHit || n.judging ? 36 : 4;
+      const availableWidth = w - (tx - x) - 8 - scoreW - portPad;
+      const key = `${f}/${availableWidth}`;
+      if (!v.fit || v.fitKey !== key) { v.fit = fitText(n.title, availableWidth, f); v.fitKey = key; }
       ctx.font = f; ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.fillStyle = isRoot ? css(T.shell) : css(mix(T.ink, T.lowText, dim));
       ctx.fillText(v.fit, tx, cy);
       const sx = x + w - 9 - portPad;
       if (n.score != null && v.scoreA > 0.02) {
-        ctx.globalAlpha = v.a * v.scoreA; ctx.font = wfont(bold ? 600 : 500, 13); ctx.textAlign = "right";
+        ctx.globalAlpha = v.a * v.scoreA; ctx.font = scoreFont; ctx.textAlign = "right";
         ctx.fillStyle = css(mix(T.ink2, T.lowText, dim)); ctx.fillText(n.score.toFixed(2), sx, cy + (1 - v.scoreA) * 5); ctx.globalAlpha = v.a;
       } else if (n.byHit) {
         ctx.strokeStyle = css(T.path); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(sx - 5, cy + 5); ctx.lineTo(sx - 5, cy - 5); ctx.moveTo(sx - 9, cy - 1); ctx.lineTo(sx - 5, cy - 5); ctx.lineTo(sx - 1, cy - 1); ctx.stroke();
@@ -897,7 +900,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     while (player.applied < player.received) applyEvent(model, player.events[player.applied++]);
     ui.expanded = expanded; view.askInfo = model.asking;
     sync(performance.now(), false, null);
-    player.fast = false; player.playing = false; setFollow(true);
+    player.fast = !player.serverDone; player.playing = !player.serverDone; setFollow(true);
     fitAll(true);
     if (dashboard) {
       dashboard.syncSearchOutcome(model, sentText, verdictOf);
