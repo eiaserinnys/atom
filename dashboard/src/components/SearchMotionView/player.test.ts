@@ -27,3 +27,23 @@ test('skip stays checked while a live stream is arriving and applies the remaini
     expect(skip.checked).toBe(false);
   } finally { player.dispose(); }
 });
+
+test('renders restored thin rows and shows low candidates by default at desktop width', () => {
+  const rects: number[][] = [];
+  const context = new Proxy({}, { get: (_target, key) => key === 'measureText' ? (text: string) => ({ width: text.length * 7 }) : key === 'rect' ? (...args: number[]) => { rects.push(args); } : key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {} });
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D);
+  vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1200, 800));
+  const host = document.createElement('div'); host.innerHTML = markup; document.body.append(host);
+  const player = createMotionPlayer(host, { onSelect: vi.fn(), onResults: vi.fn(), onMore: vi.fn(), onCancel: vi.fn() }, samples);
+  try {
+    frames.shift()?.(performance.now());
+    expect.soft(host.querySelector<HTMLInputElement>('[data-motion-id=t-low]')!.checked).toBe(true);
+    const nodeHeights = rects.filter(([, , width]) => width === 196).map(([, , , height]) => height);
+    expect.soft(nodeHeights).toContain(30);
+    expect.soft(nodeHeights).not.toContain(64);
+  } finally { player.dispose(); }
+});
