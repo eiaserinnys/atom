@@ -36,7 +36,7 @@ function StructureNodeItem({ node, excludeIds, selectedId, onSelect, depth = 0 }
       <button
         disabled={isExcluded}
         onClick={() => !isExcluded && onSelect(node.id)}
-        className={`w-full text-left flex items-center gap-1.5 px-2 py-1 rounded text-sm transition-colors ${
+        className={`w-full text-left flex items-center gap-1.5 px-2 py-1 rounded-none text-sm transition-colors ${
           isExcluded
             ? 'opacity-40 cursor-not-allowed text-muted-foreground'
             : isSelected
@@ -45,7 +45,7 @@ function StructureNodeItem({ node, excludeIds, selectedId, onSelect, depth = 0 }
         }`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
       >
-        <span className="text-xs">📁</span>
+        <span className="text-[13px]">📁</span>
         <span className="truncate">{node.card.title}</span>
       </button>
       {structureChildren.length > 0 && (
@@ -94,12 +94,12 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-card border border-border rounded-lg shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4 max-h-[70vh]">
+      <div className="bg-card border border-border rounded-none shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4 max-h-[70vh]">
         <h2 className="text-base font-semibold text-foreground">{t('move_modal.title')}</h2>
 
-        <p className="text-xs text-muted-foreground">{t('move_modal.select_hint')}</p>
+        <p className="text-[13px] text-muted-foreground">{t('move_modal.select_hint')}</p>
 
-        <div className="flex-1 overflow-y-auto border border-border rounded px-1 py-1 min-h-[120px]">
+        <div className="flex-1 overflow-y-auto border border-border rounded-none px-1 py-1 min-h-[120px]">
           {treeLoading && (
             <div className="p-3 text-sm text-muted-foreground">{t('common.loading')}</div>
           )}
@@ -121,14 +121,14 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors"
+            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-none hover:bg-muted transition-colors"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={() => selectedId && onConfirm(selectedId)}
             disabled={!selectedId || isLoading}
-            className="px-3 py-1.5 text-sm bg-primary hover:opacity-90 text-primary-foreground rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm bg-primary hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isLoading ? t('common.loading') : t('move_modal.confirm_btn')}
           </button>

@@ -87,23 +87,23 @@ export function AgentManagementTab() {
     <div className="flex flex-col gap-5">
       {/* 시크릿 1회 표시 배너 */}
       {lastCreatedSecret && (
-        <div className="flex flex-col gap-2 bg-brand/8 border border-brand/25 rounded-md px-3 py-3">
-          <div className="text-xs font-semibold text-brand">
+        <div className="flex flex-col gap-2 bg-brand/8 border border-brand/25 rounded-none px-3 py-3">
+          <div className="text-[13px] font-semibold text-brand">
             {t('agents.new_key_warning')}
           </div>
           <div className="flex items-center gap-2">
-            <code className="flex-1 text-xs bg-card border border-border rounded px-2 py-1.5 font-mono text-foreground break-all">
+            <code className="flex-1 text-[13px] bg-card border border-border rounded-none px-2 py-1.5 font-mono text-foreground break-all">
               {lastCreatedSecret}
             </code>
             <button
-              className="text-xs rounded px-2.5 py-1 border border-brand/40 bg-transparent text-brand cursor-pointer hover:bg-brand/10 font-sans whitespace-nowrap"
+              className="text-[13px] rounded-none px-2.5 py-1 border border-brand/40 bg-transparent text-brand cursor-pointer hover:bg-brand/10 font-sans whitespace-nowrap"
               onClick={handleCopy}
             >
               {copied ? t('common.copied') : t('common.copy')}
             </button>
           </div>
           <button
-            className="self-start text-xs rounded px-2.5 py-1 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
+            className="self-start text-[13px] rounded-none px-2.5 py-1 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
             onClick={clearSecret}
           >
             {t('agents.acknowledged')}
@@ -113,38 +113,38 @@ export function AgentManagementTab() {
 
       {/* 새 에이전트 생성 */}
       <div className="flex flex-col gap-2">
-        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
           {t('agents.create_section')}
         </div>
         <div className="flex flex-col gap-2">
           <input
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
+            className="w-full bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
             placeholder={t('agents.name_placeholder')}
             value={newAgentId}
             onChange={(e) => setNewAgentId(e.target.value)}
           />
           <input
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
+            className="w-full bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
             placeholder={t('agents.display_name_placeholder')}
             value={newDisplayName}
             onChange={(e) => setNewDisplayName(e.target.value)}
           />
           <button
-            className="self-start bg-brand text-white border-none rounded px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+            className="self-start bg-brand text-primary-foreground border-none rounded-none px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleCreate}
             disabled={creating}
           >
             {creating ? t('agents.creating') : t('agents.generate_btn')}
           </button>
           {createError && (
-            <div className="text-node-error text-xs">{createError}</div>
+            <div className="text-node-error text-[13px]">{createError}</div>
           )}
         </div>
       </div>
 
       {/* 에이전트 목록 */}
       <div className="flex flex-col gap-2">
-        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
           {t('agents.list_section')}
         </div>
         {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
@@ -155,17 +155,17 @@ export function AgentManagementTab() {
           {agents.map((agent) => (
             <div
               key={agent.id}
-              className="flex flex-col gap-1 bg-card border border-border rounded px-3 py-2"
+              className="flex flex-col gap-1 bg-card border border-border rounded-none px-3 py-2"
             >
               <div className="flex items-center gap-2 flex-wrap">
                 <code className="text-sm text-foreground font-mono flex-1 min-w-0 truncate">
                   {agent.agent_id}
                 </code>
                 {agent.display_name && (
-                  <span className="text-xs text-muted-foreground">{agent.display_name}</span>
+                  <span className="text-[13px] text-muted-foreground">{agent.display_name}</span>
                 )}
                 <span
-                  className={`text-xs rounded px-1.5 py-px border ${
+                  className={`text-[13px] rounded-none px-1.5 py-px border ${
                     agent.is_active
                       ? 'text-node-response border-node-response/40 bg-node-response/10'
                       : 'text-muted-foreground border-border bg-muted'
@@ -176,23 +176,23 @@ export function AgentManagementTab() {
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  className="text-xs rounded px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
+                  className="text-[13px] rounded-none px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
                   onClick={() => handleReissue(agent.id)}
                 >
                   {t('agents.reissue')}
                 </button>
                 <button
-                  className="text-xs rounded px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
+                  className="text-[13px] rounded-none px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
                   onClick={() => handleToggleActive(agent.id, !agent.is_active)}
                 >
                   {agent.is_active ? t('agents.deactivate') : t('agents.activate')}
                 </button>
               </div>
               {reissueErrors[agent.id] && (
-                <div className="text-node-error text-xs">{reissueErrors[agent.id]}</div>
+                <div className="text-node-error text-[13px]">{reissueErrors[agent.id]}</div>
               )}
               {updateErrors[agent.id] && (
-                <div className="text-node-error text-xs">{updateErrors[agent.id]}</div>
+                <div className="text-node-error text-[13px]">{updateErrors[agent.id]}</div>
               )}
             </div>
           ))}

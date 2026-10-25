@@ -30,7 +30,7 @@ export function DeleteConfirmModal({
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-card border border-border rounded-lg shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+      <div className="bg-card border border-border rounded-none shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
         <h2 className="text-base font-semibold text-foreground">{t('delete_modal.title')}</h2>
 
         <div className="text-sm text-foreground">
@@ -38,19 +38,19 @@ export function DeleteConfirmModal({
         </div>
 
         {isStructure && (
-          <div className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded px-3 py-2">
+          <div className="text-[13px] text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-none px-3 py-2">
             {t('delete_modal.sub_items_warning')}
           </div>
         )}
 
         {errorMessage && (
-          <div className="text-xs text-node-error">{errorMessage}</div>
+          <div className="text-[13px] text-node-error">{errorMessage}</div>
         )}
 
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors"
+            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-none hover:bg-muted transition-colors"
             disabled={isLoading}
           >
             {t('common.cancel')}
@@ -58,7 +58,7 @@ export function DeleteConfirmModal({
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="px-3 py-1.5 text-sm bg-node-error hover:opacity-90 text-white rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm bg-node-error hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isLoading ? t('delete_modal.deleting') : t('delete_modal.confirm_btn')}
           </button>

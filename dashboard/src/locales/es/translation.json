@@ -206,6 +206,7 @@
     "tab_compile": "Compilar",
     "tab_detail": "Detalle",
     "tab_settings": "Ajustes",
-    "settings_back": "← Ajustes"
+    "settings_back": "← Ajustes",
+    "tab_search": "Buscar"
   }
 }

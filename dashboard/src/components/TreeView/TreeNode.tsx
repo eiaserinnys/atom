@@ -12,13 +12,14 @@ interface TreeNodeProps {
   selectedNodeId: string | null;
   onSelect: (nodeId: string | null) => void;
   depth?: number;
+  searchRanks?: Record<string, number>;
   isExpanded: boolean;
   expandedNodes: Set<string>;
   onToggle: (nodeId: string) => void;
   onContextMenu?: (x: number, y: number, node: TreeNodeData) => void;
 }
 
-function TreeNodeComponent({ node, selectedNodeId, onSelect, depth = 0, isExpanded, expandedNodes, onToggle, onContextMenu }: TreeNodeProps) {
+function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, depth = 0, isExpanded, expandedNodes, onToggle, onContextMenu }: TreeNodeProps) {
   const { t } = useTranslation();
   // node.children이 있으면 TreeView가 미리 로드한 상태 → initialData로 사용
   // node.children이 undefined이면 첫 expand 시 lazy fetch
@@ -95,14 +96,14 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, depth = 0, isExpand
     <div className="select-none" data-testid={`tree-node-${node.id}`}>
       {/* 위쪽 드롭 인디케이터 */}
       {currentDropZone === 'above' && (
-        <div className="h-0.5 bg-brand mx-1 rounded-full" />
+        <div className="h-0.5 bg-brand mx-1 rounded-none" />
       )}
 
       <div
         ref={combinedRef}
         {...attributes}
         {...listeners}
-        className={`relative flex items-center gap-1 py-0.5 pr-2 cursor-pointer rounded mx-1 transition-colors min-h-[26px] ${
+        className={`relative flex items-center gap-1 py-0.5 pr-2 cursor-pointer rounded-none mx-1 transition-colors min-h-[26px] ${
           isDragging
             ? 'opacity-40'
             : isSelected
@@ -120,7 +121,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, depth = 0, isExpand
       >
         {/* 토글 화살표: 클릭만 담당 (DnD listeners는 outer div로 이동) */}
         <span
-          className="w-4 text-center text-[10px] text-muted-foreground cursor-grab shrink-0"
+          className="w-4 text-center text-[13px] text-muted-foreground cursor-grab shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             if (!loading && hasChildren) handleToggle(e);
@@ -128,31 +129,32 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, depth = 0, isExpand
         >
           {loading ? '⏳' : hasChildren ? (isExpanded ? '▾' : '▸') : ' '}
         </span>
-        <span className="text-xs shrink-0" title={isStructure ? 'structure' : 'knowledge'}>
+        <span className="text-[13px] shrink-0" title={isStructure ? 'structure' : 'knowledge'}>
           {isStructure ? '📁' : '📄'}
         </span>
         {node.is_symlink && (
-          <span className="text-[10px] text-muted-foreground shrink-0" title="symlink">↗</span>
+          <span className="text-[13px] text-muted-foreground shrink-0" title="symlink">↗</span>
         )}
         <span className="flex-1 min-w-0 text-sm truncate">
           {node.card.title}
         </span>
         {node.is_symlink && node.canonical_path && (
           <span
-            className="ml-2 shrink-0 text-[10px] text-muted-foreground bg-muted border border-border rounded px-1.5 py-0.5 max-w-[180px] truncate leading-none"
+            className="ml-2 shrink-0 text-[13px] text-muted-foreground bg-muted border border-border rounded-none px-1.5 py-0.5 max-w-[180px] truncate leading-none"
             title={node.canonical_path}
           >
             {node.canonical_path}
           </span>
         )}
+        {searchRanks[node.id] && <span className="font-mono text-[13px] font-semibold bg-brand text-brand-foreground px-1">#{searchRanks[node.id]}</span>}
         {isError && (
-          <span className="ml-1 text-xs cursor-help shrink-0" title={error?.message ?? t('common.error')}>⚠️</span>
+          <span className="ml-1 text-[13px] cursor-help shrink-0" title={error?.message ?? t('common.error')}>⚠️</span>
         )}
       </div>
 
       {/* 아래쪽 드롭 인디케이터 */}
       {currentDropZone === 'below' && (
-        <div className="h-0.5 bg-brand mx-1 rounded-full" />
+        <div className="h-0.5 bg-brand mx-1 rounded-none" />
       )}
 
       {hasChildren && isExpanded && !loading && (
@@ -163,6 +165,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, depth = 0, isExpand
               node={child}
               selectedNodeId={selectedNodeId}
               onSelect={onSelect}
+              searchRanks={searchRanks}
               depth={depth + 1}
               isExpanded={expandedNodes.has(child.id)}
               expandedNodes={expandedNodes}

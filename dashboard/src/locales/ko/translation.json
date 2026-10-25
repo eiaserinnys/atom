@@ -242,6 +242,7 @@
     "tab_compile": "컴파일",
     "tab_detail": "상세",
     "tab_settings": "설정",
-    "settings_back": "← 설정"
+    "settings_back": "← 설정",
+    "tab_search": "검색 모션"
   }
 }

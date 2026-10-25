@@ -206,6 +206,7 @@
     "tab_compile": "Компилировать",
     "tab_detail": "Детали",
     "tab_settings": "Настройки",
-    "settings_back": "← Настройки"
+    "settings_back": "← Настройки",
+    "tab_search": "Поиск"
   }
 }

@@ -9,7 +9,7 @@ export function CredentialsTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="text-xs text-muted-foreground">
+      <div className="text-[13px] text-muted-foreground">
         {t('credentials.desc')}
       </div>
 
@@ -23,13 +23,13 @@ export function CredentialsTab() {
 
       {adapters.map((adapter) => (
         <div key={adapter.sourceType} className="flex flex-col gap-2">
-          <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
             {adapter.sourceType}
           </div>
-          <div className="flex flex-col gap-2 bg-card border border-border rounded px-3 py-3">
+          <div className="flex flex-col gap-2 bg-card border border-border rounded-none px-3 py-3">
             {adapter.credentialFields.map((field) => (
               <div key={field.key} className="flex items-center gap-2">
-                <label className="text-xs text-muted-foreground w-24 shrink-0">
+                <label className="text-[13px] text-muted-foreground w-24 shrink-0">
                   {field.label}
                 </label>
                 <input
@@ -39,7 +39,7 @@ export function CredentialsTab() {
                   onChange={(e) =>
                     updateCredential(adapter.sourceType, field.key, e.target.value)
                   }
-                  className="flex-1 text-sm bg-background border border-border rounded px-2.5 py-1.5 text-foreground outline-none focus:border-brand font-sans"
+                  className="flex-1 text-sm bg-background border border-border rounded-none px-2.5 py-1.5 text-foreground outline-none focus:border-brand font-sans"
                 />
               </div>
             ))}

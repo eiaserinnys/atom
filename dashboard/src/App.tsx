@@ -1,14 +1,14 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
+import { ThreePanelLayout, type LayoutWidths } from './components/Layout/ThreePanelLayout';
 import { MobileLayout } from './components/Layout/MobileLayout';
+import { CenterWorkspace } from './components/Layout/CenterWorkspace';
+import type { CenterMode } from './components/Layout/CenterTabs';
 import { TreeView } from './components/TreeView/TreeView';
-import { CompileView } from './components/CompileView/CompileView';
 import { CardDetail } from './components/CardDetail/CardDetail';
 import { SearchBar } from './components/SearchBar/SearchBar';
 import { ThemeToggle } from './components/ThemeToggle';
-import { configApi } from './api/client';
 import { ConfigModal } from './components/Config/ConfigModal';
 import { RestartBanner } from './components/RestartBanner';
 import { ReconnectOverlay } from './components/ReconnectOverlay';
@@ -17,141 +17,74 @@ import { useAtomEvents } from './hooks/useAtomEvents';
 import { useMobile } from './hooks/useMobile';
 import { SystemProvider } from './contexts/SystemContext';
 import { LoginPage } from './pages/LoginPage';
+import type { MotionNode } from './components/SearchMotionView/types';
+import type { SearchRequest } from './components/SearchMotionView/stream';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60,
-      retry: 1,
-    },
-  },
-});
-
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000, retry: 1 } } });
 function AppInner() {
   const { t } = useTranslation();
   const auth = useAuth();
-  const [initialSelectedNodeId] = useState<string | undefined>(
-    () => window.location.hash.length > 1 ? window.location.hash.slice(1) : undefined
-  );
+  const [initialSelectedNodeId] = useState(() => window.location.hash.slice(1) || undefined);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [dbType, setDbType] = useState<'postgres' | 'sqlite' | null>(null);
-
-  useEffect(() => {
-    if (!auth.authenticated) return;
-    configApi.getDbInfo()
-      .then((data) => { if (data?.dbType) setDbType(data.dbType as 'postgres' | 'sqlite'); })
-      .catch(() => {});
-  }, [auth.authenticated]);
-
-  const handleSelectNode = useCallback((nodeId: string | null) => {
-    setSelectedNodeId(nodeId);
-    if (nodeId) {
-      window.history.replaceState(null, '', '#' + nodeId);
-    } else {
-      window.history.replaceState(null, '', window.location.pathname);
-    }
-  }, []);
-
-  useAtomEvents(selectedNodeId);
-
+  const [widths, setWidths] = useState<LayoutWidths | null>(null);
+  const [request, setRequest] = useState<SearchRequest | null>(() => {
+    const query = new URLSearchParams(location.search).get('q');
+    return query ? { query, requestId: 1 } : null;
+  });
+  const [centerMode, setCenterMode] = useState<CenterMode>(request ? 'search' : 'compile');
+  const [searchResults, setSearchResults] = useState<MotionNode[]>([]);
+  const [selectionVerdict, setSelectionVerdict] = useState<MotionNode | null>(null);
+  const verdict = selectionVerdict ?? searchResults.find(n => n.nodeId === selectedNodeId) ?? null;
+  const handleSearchResults = useCallback((nodes: MotionNode[]) => {
+    const nextVerdict = verdict ? nodes.find(n => n.nodeId === verdict.nodeId) ?? null : null;
+    setSearchResults(nodes);
+    setSelectionVerdict(nextVerdict);
+    if (verdict?.sample && !nextVerdict) setSelectedNodeId(null);
+  }, [verdict]);
   const isMobile = useMobile();
-
+  const handleSelectNode = useCallback((nodeId: string | null) => {
+    setSelectedNodeId(nodeId); setSelectionVerdict(null);
+    const url = new URL(location.href); url.hash = nodeId ?? '';
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }, []);
+  const selectSearchNode = useCallback((nodeId: string, verdict: MotionNode) => {
+    setSelectedNodeId(nodeId); setSelectionVerdict(verdict);
+    if (!verdict.sample) { const url = new URL(location.href); url.hash = nodeId; window.history.replaceState(null, '', url); }
+  }, []);
+  const submitSearch = useCallback((query: string, options: { rootNodeId?: string }) => {
+    setSelectionVerdict(null);
+    setSearchResults([]);
+    if (verdict?.sample) setSelectedNodeId(null);
+    setCenterMode('search');
+    setRequest(previous => ({ query, rootNodeId: options.rootNodeId, requestId: (previous?.requestId ?? 0) + 1 }));
+  }, [verdict]);
+  // Sample node IDs are scoped to the preset; never send them to mutation or compile APIs.
+  const actualNodeId = verdict?.sample && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(selectedNodeId ?? '') ? null : selectedNodeId;
+  useAtomEvents(actualNodeId);
   if (auth.loading) return null;
   if (!auth.authenticated) return <LoginPage />;
-
   const showConfigButton = auth.role && auth.role !== 'viewer';
-
-  return (
-    // SystemProvider를 인증 후 영역에 마운트 — 인증 전 /api/system/status 폴링으로 인한 401 루프 방지
-    <SystemProvider>
-    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
-      <RestartBanner />
-      <ReconnectOverlay />
-      {/* Top bar — 항상 다크 글라스 (라이트/다크 무관) */}
-      <div
-        className="h-12 flex items-center gap-4 px-4 shrink-0"
-        style={{
-          background: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'saturate(180%) blur(20px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-        }}
-      >
-        <span className="text-sm font-semibold text-white tracking-[-0.28px] font-sans shrink-0">
-          atom
-        </span>
-        {dbType && (
-          <span
-            className="text-[11px] font-medium text-white/70 bg-white/[0.12] rounded-[5px] px-2 py-0.5 shrink-0 leading-none"
-            title={dbType === 'postgres' ? 'PostgreSQL' : 'SQLite'}
-          >
-            {dbType === 'postgres' ? 'postgre' : 'sqlite'}
-          </span>
-        )}
-        <div className="flex-1" />
-        <div className="w-full max-w-[400px]">
-          <SearchBar
-            currentNodeId={selectedNodeId}
-            onSelectNode={(id) => handleSelectNode(id)}
-          />
-        </div>
-        {/* 모바일에서는 설정 버튼 숨김 (설정 탭으로 접근) */}
-        {!isMobile && showConfigButton && (
-          <button
-            className="text-white/70 hover:text-white bg-transparent hover:bg-white/10 border-none cursor-pointer text-lg leading-none px-2 py-1 rounded-md transition-colors"
-            onClick={() => setIsConfigOpen(true)}
-            title={t('app.settings')}
-            aria-label={t('app.settings')}
-          >
-            ⚙️
-          </button>
-        )}
+  return <SystemProvider><div className="h-dvh flex flex-col bg-background text-foreground overflow-hidden">
+    <RestartBanner /><ReconnectOverlay />
+    <header className="index-header">
+      <div className="index-brand" style={{ width: isMobile ? undefined : widths?.leftPx ?? '25%' }}>atom</div>
+      <div className="index-search" data-header-search><SearchBar currentNodeId={actualNodeId} onSelectNode={handleSelectNode} onSubmitJevSearch={submitSearch} /></div>
+      <div className="index-actions" style={{ width: isMobile ? undefined : widths?.rightPx ?? '30%' }}>
+        {!isMobile && <><button className="index-action" onClick={() => setCenterMode(centerMode === 'search' ? 'compile' : 'search')}>{centerMode === 'search' ? '컴파일' : '검색 모션'}</button>
+          {showConfigButton && <button className="index-action" onClick={() => setIsConfigOpen(true)} aria-label={t('app.settings')}>⚙</button>}</>}
         <ThemeToggle />
       </div>
-
-      {/* 모바일에서는 ConfigModal 마운트 자체를 방지 (MobileSettingsPage로 대체) */}
-      {!isMobile && showConfigButton && (
-        <ConfigModal
-          isOpen={isConfigOpen}
-          onClose={() => setIsConfigOpen(false)}
-          currentUserRole={auth.role!}
-          currentUserEmail={auth.email ?? ''}
-        />
-      )}
-
-      {/* 레이아웃: 모바일 = 하단 탭바, 데스크탑 = 3패널 */}
-      <div className="flex-1 overflow-hidden">
-        {isMobile ? (
-          <MobileLayout
-            selectedNodeId={selectedNodeId}
-            onSelectNode={handleSelectNode}
-            initialSelectedNodeId={initialSelectedNodeId}
-          />
-        ) : (
-          <ThreePanelLayout
-            left={
-              <TreeView
-                selectedNodeId={selectedNodeId}
-                onSelect={handleSelectNode}
-                initialSelectedNodeId={initialSelectedNodeId}
-              />
-            }
-            center={<CompileView nodeId={selectedNodeId} />}
-            right={<CardDetail nodeId={selectedNodeId} />}
-          />
-        )}
-      </div>
-    </div>
-    </SystemProvider>
-  );
+    </header>
+    {!isMobile && showConfigButton && <ConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} />}
+    <main className="flex-1 min-h-0 overflow-hidden">
+      {isMobile ? <MobileLayout selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onResults={handleSearchResults} /> :
+        <ThreePanelLayout onLayoutWidthsChange={setWidths}
+          left={<TreeView selectedNodeId={actualNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} />}
+          center={<CenterWorkspace nodeId={actualNodeId} mode={centerMode} onModeChange={setCenterMode} request={request} onSelectNode={selectSearchNode} onResults={handleSearchResults} />}
+          right={<CardDetail nodeId={actualNodeId} verdict={verdict} />} />}
+    </main>
+  </div></SystemProvider>;
 }
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AppInner />
-    </QueryClientProvider>
-  );
-}
-
+function App() { return <QueryClientProvider client={queryClient}><AppInner /></QueryClientProvider>; }
 export default App;

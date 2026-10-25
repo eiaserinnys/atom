@@ -206,6 +206,7 @@
     "tab_compile": "编译",
     "tab_detail": "详情",
     "tab_settings": "设置",
-    "settings_back": "← 设置"
+    "settings_back": "← 设置",
+    "tab_search": "搜索"
   }
 }

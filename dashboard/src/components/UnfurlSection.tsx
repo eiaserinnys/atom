@@ -13,7 +13,7 @@ export function UnfurlSection({ unfurlData, sourceType, error }: UnfurlSectionPr
   const { t } = useTranslation();
   if (error || !unfurlData) {
     return (
-      <div className="text-xs text-node-error mt-1">
+      <div className="text-[13px] text-node-error mt-1">
         ⚠️ {t('unfurl.failure')}{error ? `: ${error}` : ''}
       </div>
     );
@@ -24,7 +24,7 @@ export function UnfurlSection({ unfurlData, sourceType, error }: UnfurlSectionPr
   }
 
   return (
-    <pre className="text-xs bg-muted border border-border rounded p-2 overflow-x-auto">
+    <pre className="text-[13px] bg-muted border border-border rounded-none p-2 overflow-x-auto">
       {JSON.stringify(unfurlData, null, 2)}
     </pre>
   );
@@ -41,7 +41,7 @@ export function UnfurlSectionList({ unfurls }: UnfurlSectionListProps) {
 
   return (
     <div className="space-y-2 mt-3">
-      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+      <div className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider">
         {t('unfurl.section_title')} ({entries.length})
       </div>
       {entries.map(([cardId, entry]) => (

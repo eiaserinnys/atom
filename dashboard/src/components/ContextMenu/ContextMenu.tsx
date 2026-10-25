@@ -43,7 +43,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       ref={menuRef}
       data-testid="context-menu"
       style={{ top: adjustedY, left: adjustedX }}
-      className="fixed z-[100] min-w-[140px] max-w-[200px] bg-card border border-border rounded shadow-card py-1"
+      className="fixed z-[100] min-w-[140px] max-w-[200px] bg-card border border-border rounded-none shadow-card py-1"
     >
       {items.map((item, i) => (
         <button

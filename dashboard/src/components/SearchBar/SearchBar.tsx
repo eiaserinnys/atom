@@ -12,6 +12,7 @@ import {
 interface SearchBarProps {
   onSelectNode: (nodeId: string) => void;
   currentNodeId?: string | null;
+  onSubmitJevSearch?: (query: string, options: { rootNodeId?: string }) => void;
 }
 
 type SearchFilterState = Omit<SearchFilterDraft, 'currentNodeId'>;
@@ -25,7 +26,7 @@ const EMPTY_FILTERS: SearchFilterState = {
   updatedBefore: '',
 };
 
-export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
+export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: SearchBarProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -34,7 +35,9 @@ export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterDraft, setFilterDraft] = useState<SearchFilterState>(EMPTY_FILTERS);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLFormElement>(null);
+  const composingRef = useRef(false);
+  const requestVersion = useRef(0);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -50,15 +53,17 @@ export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
     buildSearchFilters({ ...draft, currentNodeId });
 
   const runSearch = async (nextQuery: string, draft: SearchFilterState = filterDraft) => {
+    const version = ++requestVersion.current;
     setLoading(true);
     try {
       const res = await api.search(nextQuery, makeFilters(draft));
+      if (version !== requestVersion.current) return;
       setResults(res);
       setOpen(true);
     } catch {
-      setResults([]);
+      if (version === requestVersion.current) setResults([]);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   };
 
@@ -95,25 +100,41 @@ export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
     setResults([]);
   };
 
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); requestVersion.current += 1; }, []);
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (composingRef.current || !query.trim()) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const filters = makeFilters();
+    const { rootNodeId, ...bm25 } = filters;
+    if (hasSearchFilters(bm25) || !onSubmitJevSearch) { void runSearch(query.trim()); return; }
+    requestVersion.current += 1; setLoading(false); setOpen(false);
+    onSubmitJevSearch(query.trim(), { rootNodeId });
+  };
+
   const activeFilters = hasSearchFilters(makeFilters());
   const shouldShowPanel = open && (filtersOpen || results.length > 0 || (!loading && Boolean(query.trim())));
 
   return (
-    <div className="relative w-full" ref={containerRef}>
-      <div className="flex items-center bg-white/10 border border-white/20 rounded-[11px] px-2.5 gap-1.5">
-        <Search size={16} className="text-white/60 shrink-0" aria-hidden="true" />
+    <form className="relative h-full w-full" ref={containerRef} onSubmit={submit}>
+      <div className="flex h-full w-full items-center bg-background px-3.5 gap-2.5 focus-within:ring-1 focus-within:ring-brand">
+        <Search size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
         <input
-          className="min-w-0 flex-1 bg-transparent border-none outline-none text-white text-[15px] font-sans py-2 placeholder:text-white/40"
+          className="min-w-0 flex-1 bg-transparent border-none outline-none text-foreground text-[14px] font-sans py-2 placeholder:text-muted-foreground"
           type="text"
           placeholder={t('searchbar.placeholder')}
           value={query}
           onChange={handleChange}
+          aria-label={t('searchbar.placeholder')}
+          onCompositionStart={() => { composingRef.current = true; }}
+          onCompositionEnd={() => { composingRef.current = false; }}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.nativeEvent.isComposing || composingRef.current)) e.preventDefault(); if (e.key === 'Escape') setOpen(false); }}
           onFocus={() => (results.length > 0 || query.trim() || filtersOpen) && setOpen(true)}
         />
         {loading && <span className="text-muted-foreground text-base">⋯</span>}
         <button
           type="button"
-          className={`relative grid size-7 place-items-center rounded-md border-none bg-transparent text-white/70 transition-colors hover:bg-white/10 hover:text-white ${filtersOpen || activeFilters ? 'bg-white/15 text-white' : ''}`}
+          className={`relative grid size-7 place-items-center rounded-none border-none bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${filtersOpen || activeFilters ? 'bg-muted text-foreground' : ''}`}
           title={t('searchbar.filters', { defaultValue: 'Filters' })}
           aria-label={t('searchbar.filters', { defaultValue: 'Filters' })}
           aria-pressed={filtersOpen}
@@ -124,15 +145,16 @@ export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
           }}
         >
           <SlidersHorizontal size={15} aria-hidden="true" />
-          {activeFilters && <span className="absolute right-1 top-1 size-1.5 rounded-full bg-brand" />}
+          {activeFilters && <span className="absolute right-1 top-1 size-1.5 rounded-none bg-brand" />}
         </button>
+        <button type="submit" className="index-action bg-foreground text-background">검색</button>
       </div>
 
       {shouldShowPanel && (
-        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-md shadow-card z-[100] max-h-[26rem] overflow-y-auto">
+        <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-card border border-border rounded-none shadow-card z-[100] max-h-[26rem] overflow-y-auto">
           {filtersOpen && (
             <div className="border-b border-border p-2.5">
-              <label className="flex items-center gap-2 text-xs text-foreground">
+              <label className="flex items-center gap-2 text-[13px] text-foreground">
                 <input
                   type="checkbox"
                   className="size-3.5 accent-brand"
@@ -144,7 +166,7 @@ export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
               </label>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <select
-                  className="min-w-0 rounded-md border border-border bg-input px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  className="min-w-0 rounded-none border border-border bg-input px-2 py-1.5 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-ring"
                   aria-label={t('searchbar.card_type', { defaultValue: 'Card type' })}
                   value={filterDraft.cardType}
                   onChange={(e) => updateFilters({ cardType: e.target.value as SearchFilterState['cardType'] })}
@@ -154,32 +176,32 @@ export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
                   <option value="knowledge">{t('searchbar.type_knowledge', { defaultValue: 'Knowledge' })}</option>
                 </select>
                 <input
-                  className="min-w-0 rounded-md border border-border bg-input px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+                  className="min-w-0 rounded-none border border-border bg-input px-2 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
                   type="text"
                   placeholder={t('searchbar.tags', { defaultValue: 'Tags' })}
                   value={filterDraft.tagsText}
                   onChange={(e) => updateFilters({ tagsText: e.target.value })}
                 />
                 <input
-                  className="min-w-0 rounded-md border border-border bg-input px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+                  className="min-w-0 rounded-none border border-border bg-input px-2 py-1.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
                   type="text"
                   placeholder={t('searchbar.source_type', { defaultValue: 'Source' })}
                   value={filterDraft.sourceType}
                   onChange={(e) => updateFilters({ sourceType: e.target.value })}
                 />
-                <label className="min-w-0 text-[11px] text-muted-foreground">
+                <label className="min-w-0 text-[13px] text-muted-foreground">
                   <span>{t('searchbar.updated_after', { defaultValue: 'Updated after' })}</span>
                   <input
-                    className="mt-1 w-full min-w-0 rounded-md border border-border bg-input px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                    className="mt-1 w-full min-w-0 rounded-none border border-border bg-input px-2 py-1.5 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-ring"
                     type="datetime-local"
                     value={filterDraft.updatedAfter}
                     onChange={(e) => updateFilters({ updatedAfter: e.target.value })}
                   />
                 </label>
-                <label className="min-w-0 text-[11px] text-muted-foreground">
+                <label className="min-w-0 text-[13px] text-muted-foreground">
                   <span>{t('searchbar.updated_before', { defaultValue: 'Updated before' })}</span>
                   <input
-                    className="mt-1 w-full min-w-0 rounded-md border border-border bg-input px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
+                    className="mt-1 w-full min-w-0 rounded-none border border-border bg-input px-2 py-1.5 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-ring"
                     type="datetime-local"
                     value={filterDraft.updatedBefore}
                     onChange={(e) => updateFilters({ updatedBefore: e.target.value })}
@@ -194,31 +216,32 @@ export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
               {results.map((r) => {
                 const breadcrumb = formatBreadcrumb(r.node_path);
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={r.node_id ?? r.card_id}
-                    className={`flex items-start gap-2 px-3 py-2 transition-colors hover:bg-muted ${r.node_id ? 'cursor-pointer' : 'cursor-default opacity-70'}`}
-                    onMouseDown={() => handleSelect(r)}
+                    className={`w-full text-left flex items-start gap-2 px-3 py-2 transition-colors hover:bg-muted ${r.node_id ? 'cursor-pointer' : 'cursor-default opacity-70'}`}
+                    onClick={() => handleSelect(r)}
                   >
-                    <span className="text-xs shrink-0 mt-px">
+                    <span className="text-[13px] shrink-0 mt-px">
                       {r.card_type === 'structure' ? '📁' : '📄'}
                     </span>
-                    {r.is_symlink && <span className="text-[10px] text-muted-foreground shrink-0 mt-[3px]">↗</span>}
+                    {r.is_symlink && <span className="text-[13px] text-muted-foreground shrink-0 mt-[3px]">↗</span>}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-foreground font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                         {r.title}
                       </div>
                       {breadcrumb && (
-                        <div className="text-[11px] text-brand mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                        <div className="text-[13px] text-brand mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
                           {breadcrumb}
                         </div>
                       )}
                       {r.snippet && (
-                        <div className="text-[11px] text-muted-foreground mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                        <div className="text-[13px] text-muted-foreground mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
                           {r.snippet}
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -227,13 +250,13 @@ export function SearchBar({ onSelectNode, currentNodeId }: SearchBarProps) {
           {results.length === 0 && !loading && query && (
             <div className="p-3 text-sm text-muted-foreground text-center">
               <div>{t('searchbar.no_results')}</div>
-              <div className="mt-1 text-[11px]">
+              <div className="mt-1 text-[13px]">
                 {t('searchbar.no_results_hint', { defaultValue: 'Try OR terms or filters.' })}
               </div>
             </div>
           )}
         </div>
       )}
-    </div>
+    </form>
   );
 }

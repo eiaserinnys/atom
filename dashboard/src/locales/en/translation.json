@@ -242,6 +242,7 @@
     "tab_compile": "Compile",
     "tab_detail": "Detail",
     "tab_settings": "Settings",
-    "settings_back": "← Settings"
+    "settings_back": "← Settings",
+    "tab_search": "Search"
   }
 }

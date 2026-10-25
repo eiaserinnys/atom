@@ -93,11 +93,11 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
           <button
             onClick={handleEditClick}
             disabled={loadingCard}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
             title={t('card.edit_title')}
           >
             {loadingCard ? (
-              <span className="text-[10px]">…</span>
+              <span className="text-[13px]">…</span>
             ) : (
               <Pencil className="w-3 h-3" />
             )}
