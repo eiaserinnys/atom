@@ -162,7 +162,7 @@
     "title": "Eliminar tarjeta",
     "desc": "¿Eliminar \"{{name}}\"?",
     "confirm_text": "¿Eliminar \"{{name}}\"?",
-    "sub_items_warning": "⚠️ Los elementos hijo también serán eliminados.",
+    "sub_items_warning": "Los elementos hijo también serán eliminados.",
     "confirm_btn": "Eliminar",
     "deleting": "Eliminando…"
   },

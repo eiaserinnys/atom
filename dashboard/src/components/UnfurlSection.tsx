@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { AlertTriangle } from 'lucide-react';
 import type { UnfurlEntry } from '../api/client';
 import type { TrelloCardUnfurlData } from '../types/unfurl';
 import { TrelloCardView } from './TrelloCardView';
@@ -13,8 +14,8 @@ export function UnfurlSection({ unfurlData, sourceType, error }: UnfurlSectionPr
   const { t } = useTranslation();
   if (error || !unfurlData) {
     return (
-      <div className="text-[13px] text-node-error mt-1">
-        ⚠️ {t('unfurl.failure')}{error ? `: ${error}` : ''}
+      <div className="text-[13px] text-[var(--amber)] mt-1">
+        <AlertTriangle className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('unfurl.failure')}{error ? `: ${error}` : ''}
       </div>
     );
   }

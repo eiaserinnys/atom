@@ -163,7 +163,7 @@
     "title": "Delete Card",
     "desc": "Delete \"{{name}}\"?",
     "confirm_text": "Delete \"{{name}}\"?",
-    "sub_items_warning": "⚠️ Child items will also be deleted.",
+    "sub_items_warning": "Child items will also be deleted.",
     "confirm_btn": "Delete",
     "deleting": "Deleting…"
   },

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CheckCircle2, Folder, XCircle } from 'lucide-react';
 import { configApi } from '../../api/client';
 import { useSystem } from '../../contexts/systemContext';
 
@@ -107,10 +108,10 @@ export function DatabaseTab() {
         <div className="flex items-center gap-2 bg-card border border-border rounded-none px-3 py-3">
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-none text-[13px] font-medium ${
             isPostgres
-              ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-              : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+              ? 'bg-brand/10 text-brand border border-brand/30'
+              : 'bg-[var(--amber-soft)] text-[var(--amber)] border border-[var(--amber)]/30'
           }`}>
-            <span>{isPostgres ? '🟢' : '🟡'}</span>
+            <span className="w-2 h-2 bg-current inline-block" />
             {isPostgres ? 'PostgreSQL' : 'SQLite'}
           </span>
         </div>
@@ -150,8 +151,10 @@ export function DatabaseTab() {
               )}
             </div>
             {testResult && (
-              <div className={`text-[13px] ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
-                {testResult.ok ? `✅ ${t('database.test_success')}` : `❌ ${t('database.test_failed')}: ${testResult.error}`}
+              <div className={`text-[13px] ${testResult.ok ? 'text-brand' : 'text-[var(--danger)]'}`}>
+                {testResult.ok
+                  ? <><CheckCircle2 className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('database.test_success')}</>
+                  : <><XCircle className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('database.test_failed')}: {testResult.error}</>}
               </div>
             )}
           </div>
@@ -171,9 +174,9 @@ export function DatabaseTab() {
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">{t('database.file_status')}:</span>
             {info.deprecatedFileExists ? (
-              <span className="text-green-400 text-[13px]">✅ {t('database.file_migrated')}</span>
+              <span className="text-brand text-[13px]"><CheckCircle2 className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('database.file_migrated')}</span>
             ) : info.sqliteFileExists ? (
-              <span className="text-yellow-400 text-[13px]">📁 {t('database.file_exists')}</span>
+              <span className="text-[var(--amber)] text-[13px]"><Folder className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('database.file_exists')}</span>
             ) : (
               <span className="text-muted-foreground text-[13px]">{t('database.file_none')}</span>
             )}
@@ -211,10 +214,12 @@ export function DatabaseTab() {
             {migrateResult && (
               <div className={`text-[13px] px-3 py-2 rounded-none ${
                 migrateResult.ok
-                  ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                  ? 'bg-brand/10 text-brand border border-brand/30'
+                  : 'bg-muted text-[var(--danger)] border border-[var(--danger)]/30'
               }`}>
-                {migrateResult.ok ? '✅ ' : '❌ '}{migrateResult.message}
+                {migrateResult.ok
+                  ? <><CheckCircle2 className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{migrateResult.message}</>
+                  : <><XCircle className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{migrateResult.message}</>}
               </div>
             )}
           </div>

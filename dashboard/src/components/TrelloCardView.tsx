@@ -1,4 +1,5 @@
 import type { TrelloCardUnfurlData } from '../types/unfurl';
+import { Calendar, CheckCircle2, User } from 'lucide-react';
 
 interface TrelloCardViewProps {
   data: TrelloCardUnfurlData;
@@ -55,11 +56,14 @@ export function TrelloCardView({ data }: TrelloCardViewProps) {
 
       <div className="flex flex-wrap gap-3 text-[13px] text-muted-foreground">
         {data.members.length > 0 && (
-          <span>👤 {data.members.map((m) => m.fullName).join(', ')}</span>
+          <span><User className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{data.members.map((m) => m.fullName).join(', ')}</span>
         )}
         {dueDateStr && (
-          <span className={data.dueComplete ? 'text-green-500' : ''}>
-            {data.dueComplete ? '✅' : '📅'} {dueDateStr}
+          <span className={data.dueComplete ? 'text-brand' : ''}>
+            {data.dueComplete
+              ? <CheckCircle2 className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />
+              : <Calendar className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />}
+            {dueDateStr}
           </span>
         )}
       </div>

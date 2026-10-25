@@ -162,7 +162,7 @@
     "title": "Karte löschen",
     "desc": "\"{{name}}\" löschen?",
     "confirm_text": "\"{{name}}\" löschen?",
-    "sub_items_warning": "⚠️ Untergeordnete Elemente werden ebenfalls gelöscht.",
+    "sub_items_warning": "Untergeordnete Elemente werden ebenfalls gelöscht.",
     "confirm_btn": "Löschen",
     "deleting": "Löschen…"
   },

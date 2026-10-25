@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { AlertTriangle } from 'lucide-react';
 
 interface DeleteConfirmModalProps {
   title: string;
@@ -38,7 +39,8 @@ export function DeleteConfirmModal({
         </div>
 
         {isStructure && (
-          <div className="text-[13px] text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-none px-3 py-2">
+          <div className="flex items-center gap-2 text-[13px] text-[var(--amber)] bg-[var(--amber-soft)] border border-[var(--amber)]/30 rounded-none px-3 py-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
             {t('delete_modal.sub_items_warning')}
           </div>
         )}

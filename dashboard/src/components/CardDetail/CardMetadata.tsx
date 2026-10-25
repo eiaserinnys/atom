@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import { Pencil } from 'lucide-react';
 import type { CardData, TreeNodeData } from '../../api/client';
 import { formatJournalLimitLabel, isHttpSourceRef } from './cardDetailLogic';
 
@@ -119,7 +120,7 @@ export function CardMetadata({
             title={t('card.click_to_edit')}
           >
             {journalLimitLabel ?? <span className="text-muted-foreground">—</span>}
-            <span className="text-[13px] text-muted-foreground ml-1 opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
+            <Pencil className="w-3.5 h-3.5 inline-block align-text-bottom text-muted-foreground ml-1 opacity-0 group-hover:opacity-100 transition-opacity" strokeWidth={1.75} />
           </span>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { X } from 'lucide-react';
 import type { UserRole } from '../../hooks/useAuth';
 import { UserManagementTab } from './UserManagementTab';
 import { AgentManagementTab } from './AgentManagementTab';
@@ -45,7 +46,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
             onClick={onClose}
             aria-label={t('common.close')}
           >
-            ✕
+            <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
 

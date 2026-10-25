@@ -5,7 +5,7 @@ import {
   DndContext,
   DragOverlay,
 } from '@dnd-kit/core';
-import { LogOut, Plus } from 'lucide-react';
+import { FileText, Folder, LogOut, Plus } from 'lucide-react';
 import { api, type TreeNodeData } from '../../api/client';
 import { fetchRootsWithChildren } from '../../api/treeQueries';
 import { TreeNode } from './TreeNode';
@@ -296,9 +296,9 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
       <DragOverlay>
         {treeDrag.activeDragNode ? (
           <div className="flex items-center gap-1 px-3 py-0.5 bg-card border border-border rounded-none shadow-card text-sm text-foreground opacity-90 pointer-events-none">
-            <span className="text-[13px]">
-              {treeDrag.activeDragNode.card.card_type === 'structure' ? '📁' : '📄'}
-            </span>
+            {treeDrag.activeDragNode.card.card_type === 'structure'
+              ? <Folder className="w-3.5 h-3.5 text-[var(--blue)] shrink-0" strokeWidth={1.75} />
+              : <FileText className="w-3.5 h-3.5 text-brand shrink-0" strokeWidth={1.75} />}
             <span className="overflow-hidden text-ellipsis whitespace-nowrap max-w-[200px]">
               {treeDrag.activeDragNode.card.title}
             </span>
