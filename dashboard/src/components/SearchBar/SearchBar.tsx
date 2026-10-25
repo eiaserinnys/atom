@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { FileText, Folder, Search, SlidersHorizontal } from 'lucide-react';
 import { api, type SearchResult } from '../../api/client';
 import {
   buildSearchFilters,
@@ -222,9 +222,9 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
                     className={`w-full text-left flex items-start gap-2 px-3 py-2 transition-colors hover:bg-muted ${r.node_id ? 'cursor-pointer' : 'cursor-default opacity-70'}`}
                     onClick={() => handleSelect(r)}
                   >
-                    <span className="text-[13px] shrink-0 mt-px">
-                      {r.card_type === 'structure' ? '📁' : '📄'}
-                    </span>
+                    {r.card_type === 'structure'
+                      ? <Folder className="w-3.5 h-3.5 text-[var(--blue)] shrink-0 mt-0.5" strokeWidth={1.75} />
+                      : <FileText className="w-3.5 h-3.5 text-brand shrink-0 mt-0.5" strokeWidth={1.75} />}
                     {r.is_symlink && <span className="text-[13px] text-muted-foreground shrink-0 mt-[3px]">↗</span>}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-foreground font-medium overflow-hidden text-ellipsis whitespace-nowrap">

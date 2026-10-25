@@ -162,7 +162,7 @@
     "title": "カードを削除",
     "desc": "\"{{name}}\" を削除しますか？",
     "confirm_text": "\"{{name}}\" を削除しますか？",
-    "sub_items_warning": "⚠️ 子項目も一緒に削除されます。",
+    "sub_items_warning": "子項目も一緒に削除されます。",
     "confirm_btn": "削除",
     "deleting": "削除中…"
   },

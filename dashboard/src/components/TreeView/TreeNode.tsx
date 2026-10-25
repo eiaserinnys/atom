@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { AlertTriangle, ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Loader2 } from 'lucide-react';
 import { api, type TreeNodeData } from '../../api/client';
 import { useTreeDnd } from './TreeDndContext';
 import { childrenQueryKey } from '../../query/queryKeys';
@@ -121,16 +122,20 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
       >
         {/* 토글 화살표: 클릭만 담당 (DnD listeners는 outer div로 이동) */}
         <span
-          className="w-4 text-center text-[13px] text-muted-foreground cursor-grab shrink-0"
+          className="w-4 flex items-center justify-center text-muted-foreground cursor-grab shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             if (!loading && hasChildren) handleToggle(e);
           }}
         >
-          {loading ? '⏳' : hasChildren ? (isExpanded ? '▾' : '▸') : ' '}
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" strokeWidth={1.75} /> : hasChildren ? (isExpanded ? <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.75} /> : <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.75} />) : ' '}
         </span>
-        <span className="text-[13px] shrink-0" title={isStructure ? 'structure' : 'knowledge'}>
-          {isStructure ? '📁' : '📄'}
+        <span className="inline-flex items-center justify-center shrink-0" title={isStructure ? 'structure' : 'knowledge'}>
+          {isStructure
+            ? isExpanded
+              ? <FolderOpen className="w-3.5 h-3.5 text-[var(--blue)]" strokeWidth={1.75} />
+              : <Folder className="w-3.5 h-3.5 text-[var(--blue)]" strokeWidth={1.75} />
+            : <FileText className="w-3.5 h-3.5 text-brand" strokeWidth={1.75} />}
         </span>
         {node.is_symlink && (
           <span className="text-[13px] text-muted-foreground shrink-0" title="symlink">↗</span>
@@ -148,7 +153,9 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
         )}
         {searchRanks[node.id] && <span className="font-mono text-[13px] font-semibold bg-brand text-brand-foreground px-1">#{searchRanks[node.id]}</span>}
         {isError && (
-          <span className="ml-1 text-[13px] cursor-help shrink-0" title={error?.message ?? t('common.error')}>⚠️</span>
+          <span className="ml-1 inline-flex items-center cursor-help shrink-0 text-[var(--amber)]" title={error?.message ?? t('common.error')}>
+            <AlertTriangle className="w-3.5 h-3.5" strokeWidth={1.75} />
+          </span>
         )}
       </div>
 

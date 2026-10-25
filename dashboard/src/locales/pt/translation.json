@@ -162,7 +162,7 @@
     "title": "Excluir cartão",
     "desc": "Excluir \"{{name}}\"?",
     "confirm_text": "Excluir \"{{name}}\"?",
-    "sub_items_warning": "⚠️ Itens filho também serão excluídos.",
+    "sub_items_warning": "Itens filho também serão excluídos.",
     "confirm_btn": "Excluir",
     "deleting": "Excluindo…"
   },

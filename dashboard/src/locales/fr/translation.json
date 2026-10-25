@@ -162,7 +162,7 @@
     "title": "Supprimer la carte",
     "desc": "Supprimer \"{{name}}\" ?",
     "confirm_text": "Supprimer \"{{name}}\" ?",
-    "sub_items_warning": "⚠️ Les éléments enfants seront également supprimés.",
+    "sub_items_warning": "Les éléments enfants seront également supprimés.",
     "confirm_btn": "Supprimer",
     "deleting": "Suppression…"
   },

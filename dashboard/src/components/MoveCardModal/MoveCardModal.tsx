@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Folder } from 'lucide-react';
 import { type TreeNodeData } from '../../api/client';
 import { fetchFullStructureTree } from '../../api/treeQueries';
 import { structureTreeQueryKey } from '../../query/queryKeys';
@@ -45,7 +46,7 @@ function StructureNodeItem({ node, excludeIds, selectedId, onSelect, depth = 0 }
         }`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
       >
-        <span className="text-[13px]">📁</span>
+        <Folder className="w-3.5 h-3.5 text-[var(--blue)] shrink-0" strokeWidth={1.75} />
         <span className="truncate">{node.card.title}</span>
       </button>
       {structureChildren.length > 0 && (

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Settings } from 'lucide-react';
 import { ThreePanelLayout, type LayoutWidths } from './components/Layout/ThreePanelLayout';
 import { MobileLayout } from './components/Layout/MobileLayout';
 import { CenterWorkspace } from './components/Layout/CenterWorkspace';
@@ -71,8 +72,9 @@ function AppInner() {
       <div className="index-brand" style={{ width: isMobile ? undefined : widths?.leftPx ?? '25%' }}>atom</div>
       <div className="index-search" data-header-search><SearchBar currentNodeId={actualNodeId} onSelectNode={handleSelectNode} onSubmitJevSearch={submitSearch} /></div>
       <div className="index-actions" style={{ width: isMobile ? undefined : widths?.rightPx ?? '30%' }}>
-        {!isMobile && <><button className="index-action" onClick={() => setCenterMode(centerMode === 'search' ? 'compile' : 'search')}>{centerMode === 'search' ? '컴파일' : '검색 모션'}</button>
-          {showConfigButton && <button className="index-action" onClick={() => setIsConfigOpen(true)} aria-label={t('app.settings')}>⚙</button>}</>}
+        {!isMobile && showConfigButton && <button className="index-action w-8 h-8 !p-0 text-muted-foreground hover:text-foreground transition-colors shrink-0" onClick={() => setIsConfigOpen(true)} aria-label={t('app.settings')}>
+          <Settings className="w-4 h-4" strokeWidth={1.75} />
+        </button>}
         <ThemeToggle />
       </div>
     </header>
