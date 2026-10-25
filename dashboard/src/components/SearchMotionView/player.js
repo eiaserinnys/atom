@@ -55,8 +55,8 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
 
   // ------------------------------------------------------------------ 2. 자리 잡기
-  const M = { colW: 196, gap: 64, rowH: 64, pitch: 78, lowPitch: 78, chipH: 20, bandGap: 8, groupGap: 4, padX: 24, padTop: 50, headerH: 38, pileH: 24, pendCap: 14, cell: 5, laneY: -9 };
-  const ui = { showLow: false, expanded: new Set(), follow: true };
+  const M = { colW: 196, gap: 64, rowH: 30, pitch: 38, lowPitch: 35, chipH: 22, bandGap: 14, groupGap: 6, padX: 24, padTop: 14, headerH: 42, pileH: 26, pendCap: 14, cell: 5, laneY: -9 };
+  const ui = { showLow: true, expanded: new Set(), follow: true };
   const colX = (hop) => hop * (M.colW + M.gap);
   // 열은 홉. 한 열 안에서 위 띠는 살아 있는 것(열린 구조, 맞은 카드, 선정)과 아직 판정 전인 것,
   // 아래 띠는 닫히거나 낮은 것. 넘치는 것은 부모별 더미(+N)로 접는다.
@@ -779,7 +779,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     const padX = W < 680 ? 16 : 24;
     const changed = colW !== M.colW || gap !== M.gap || padX !== M.padX || W !== lastW; lastW = W;
     if (changed) {
-      M.colW = colW; M.gap = gap; M.padX = padX; M.rowH = W < 680 ? 62 : 64; M.pitch = M.rowH + (W < 680 ? 12 : 14); M.lowPitch = M.pitch; M.padTop = W < 680 ? 46 : 50;
+      M.colW = colW; M.gap = gap; M.padX = padX;
       for (const v of view.nodes.values()) v.fit = null;
       sync(performance.now(), false, null);
       if (W > 0 && player.serverDone && player.applied >= player.events.length) {
