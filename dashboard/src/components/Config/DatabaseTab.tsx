@@ -97,15 +97,15 @@ export function DatabaseTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="text-xs text-muted-foreground">{t('database.desc')}</div>
+      <div className="text-[13px] text-muted-foreground">{t('database.desc')}</div>
 
       {/* DB Mode */}
       <div className="flex flex-col gap-2">
-        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
           {t('database.mode_label')}
         </div>
-        <div className="flex items-center gap-2 bg-card border border-border rounded px-3 py-3">
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+        <div className="flex items-center gap-2 bg-card border border-border rounded-none px-3 py-3">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-none text-[13px] font-medium ${
             isPostgres
               ? 'bg-green-500/10 text-green-400 border border-green-500/20'
               : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
@@ -119,13 +119,13 @@ export function DatabaseTab() {
       {/* Connection test (shown when in SQLite mode — to switch to PG) */}
       {!isPostgres && (
         <div className="flex flex-col gap-2">
-          <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
             {t('database.connection_string')}
           </div>
-          <div className="flex flex-col gap-3 bg-card border border-border rounded px-3 py-3">
+          <div className="flex flex-col gap-3 bg-card border border-border rounded-none px-3 py-3">
             <input
               type="text"
-              className="w-full px-3 py-1.5 text-sm rounded border border-border bg-background text-foreground"
+              className="w-full px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground"
               placeholder="postgresql://user:pass@host:5432/dbname"
               value={connUrl}
               onChange={(e) => { setConnUrl(e.target.value); setTestResult(null); }}
@@ -133,7 +133,7 @@ export function DatabaseTab() {
             />
             <div className="flex gap-2">
               <button
-                className="px-3 py-1.5 text-xs font-medium rounded bg-brand text-white hover:opacity-90 disabled:opacity-50"
+                className="px-3 py-1.5 text-[13px] font-medium rounded-none bg-brand text-primary-foreground hover:opacity-90 disabled:opacity-50"
                 onClick={handleTestConnection}
                 disabled={!connUrl || testing || pendingRestart}
               >
@@ -141,7 +141,7 @@ export function DatabaseTab() {
               </button>
               {testResult?.ok && (
                 <button
-                  className="px-3 py-1.5 text-xs font-medium rounded bg-green-600 text-white hover:opacity-90 disabled:opacity-50"
+                  className="px-3 py-1.5 text-[13px] font-medium rounded-none bg-green-600 text-primary-foreground hover:opacity-90 disabled:opacity-50"
                   onClick={handleSaveUrl}
                   disabled={savingUrl || pendingRestart}
                 >
@@ -150,7 +150,7 @@ export function DatabaseTab() {
               )}
             </div>
             {testResult && (
-              <div className={`text-xs ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+              <div className={`text-[13px] ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
                 {testResult.ok ? `✅ ${t('database.test_success')}` : `❌ ${t('database.test_failed')}: ${testResult.error}`}
               </div>
             )}
@@ -160,22 +160,22 @@ export function DatabaseTab() {
 
       {/* SQLite file info */}
       <div className="flex flex-col gap-2">
-        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
           {t('database.file_label')}
         </div>
-        <div className="flex flex-col gap-1.5 bg-card border border-border rounded px-3 py-3">
+        <div className="flex flex-col gap-1.5 bg-card border border-border rounded-none px-3 py-3">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">{t('database.file_path')}</span>
-            <code className="text-xs bg-background px-1.5 py-0.5 rounded text-foreground">{info.sqliteFile}</code>
+            <code className="text-[13px] bg-background px-1.5 py-0.5 rounded-none text-foreground">{info.sqliteFile}</code>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">{t('database.file_status')}:</span>
             {info.deprecatedFileExists ? (
-              <span className="text-green-400 text-xs">✅ {t('database.file_migrated')}</span>
+              <span className="text-green-400 text-[13px]">✅ {t('database.file_migrated')}</span>
             ) : info.sqliteFileExists ? (
-              <span className="text-yellow-400 text-xs">📁 {t('database.file_exists')}</span>
+              <span className="text-yellow-400 text-[13px]">📁 {t('database.file_exists')}</span>
             ) : (
-              <span className="text-muted-foreground text-xs">{t('database.file_none')}</span>
+              <span className="text-muted-foreground text-[13px]">{t('database.file_none')}</span>
             )}
           </div>
         </div>
@@ -184,21 +184,21 @@ export function DatabaseTab() {
       {/* Migration */}
       {isPostgres && (
         <div className="flex flex-col gap-2">
-          <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
             {t('database.migration_label')}
           </div>
-          <div className="flex flex-col gap-3 bg-card border border-border rounded px-3 py-3">
+          <div className="flex flex-col gap-3 bg-card border border-border rounded-none px-3 py-3">
             {info.deprecatedFileExists ? (
-              <div className="text-xs text-muted-foreground">{t('database.migration_done')}</div>
+              <div className="text-[13px] text-muted-foreground">{t('database.migration_done')}</div>
             ) : !info.sqliteFileExists ? (
-              <div className="text-xs text-muted-foreground">{t('database.migration_no_file')}</div>
+              <div className="text-[13px] text-muted-foreground">{t('database.migration_no_file')}</div>
             ) : (
               <>
-                <div className="text-xs text-muted-foreground">{t('database.migration_desc')}</div>
+                <div className="text-[13px] text-muted-foreground">{t('database.migration_desc')}</div>
                 <button
-                  className={`self-start px-4 py-2 rounded text-sm font-medium transition-colors ${
+                  className={`self-start px-4 py-2 rounded-none text-sm font-medium transition-colors ${
                     canMigrate && !migrating
-                      ? 'bg-brand text-white hover:opacity-90 cursor-pointer'
+                      ? 'bg-brand text-primary-foreground hover:opacity-90 cursor-pointer'
                       : 'bg-muted text-muted-foreground cursor-not-allowed'
                   }`}
                   disabled={!canMigrate || migrating}
@@ -209,7 +209,7 @@ export function DatabaseTab() {
               </>
             )}
             {migrateResult && (
-              <div className={`text-xs px-3 py-2 rounded ${
+              <div className={`text-[13px] px-3 py-2 rounded-none ${
                 migrateResult.ok
                   ? 'bg-green-500/10 text-green-400 border border-green-500/20'
                   : 'bg-red-500/10 text-red-400 border border-red-500/20'

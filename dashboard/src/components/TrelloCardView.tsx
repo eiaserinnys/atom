@@ -24,7 +24,7 @@ export function TrelloCardView({ data }: TrelloCardViewProps) {
     : null;
 
   return (
-    <div className="rounded-md border border-border bg-card p-3 text-sm space-y-2">
+    <div className="rounded-none border border-border bg-card p-3 text-sm space-y-2">
       <a
         href={data.url}
         target="_blank"
@@ -39,7 +39,7 @@ export function TrelloCardView({ data }: TrelloCardViewProps) {
           {data.labels.map((label, i) => (
             <span
               key={i}
-              className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium text-white ${TRELLO_LABEL_COLORS[label.color] ?? 'bg-muted-foreground'}`}
+              className={`inline-block px-2 py-0.5 rounded-none text-[13px] font-medium text-primary-foreground ${TRELLO_LABEL_COLORS[label.color] ?? 'bg-muted-foreground'}`}
             >
               {label.name || label.color}
             </span>
@@ -48,12 +48,12 @@ export function TrelloCardView({ data }: TrelloCardViewProps) {
       )}
 
       {data.desc && (
-        <p className="text-muted-foreground text-xs leading-snug whitespace-pre-wrap line-clamp-3">
+        <p className="text-muted-foreground text-[13px] leading-snug whitespace-pre-wrap line-clamp-3">
           {data.desc}
         </p>
       )}
 
-      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+      <div className="flex flex-wrap gap-3 text-[13px] text-muted-foreground">
         {data.members.length > 0 && (
           <span>👤 {data.members.map((m) => m.fullName).join(', ')}</span>
         )}
@@ -71,13 +71,13 @@ export function TrelloCardView({ data }: TrelloCardViewProps) {
             const done = cl.items.filter((it) => it.state === 'complete').length;
             return (
               <div key={i}>
-                <div className="flex items-center justify-between text-xs font-medium text-foreground mb-1">
+                <div className="flex items-center justify-between text-[13px] font-medium text-foreground mb-1">
                   <span>{cl.name}</span>
                   <span className="text-muted-foreground">{done}/{total}</span>
                 </div>
-                <div className="h-1 rounded-full bg-muted overflow-hidden">
+                <div className="h-1 rounded-none bg-muted overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-primary transition-all"
+                    className="h-full rounded-none bg-primary transition-all"
                     style={{ width: total > 0 ? `${(done / total) * 100}%` : '0%' }}
                   />
                 </div>

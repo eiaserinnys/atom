@@ -42,7 +42,7 @@ export function CompileToc({
         `}
         style={{ width: TOC_WIDTH }}
       >
-        <div className="px-3 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="px-3 py-3 text-[13px] font-semibold text-muted-foreground uppercase tracking-wider">
           {t('compile.toc_title')}
         </div>
         <nav className="px-1 pb-3">
@@ -51,7 +51,7 @@ export function CompileToc({
               key={entry.id}
               onClick={() => onScrollTo(entry.id)}
               className={`
-                block w-full text-left px-2 py-1 rounded text-xs leading-snug truncate
+                block w-full text-left px-2 py-1 rounded-none text-[13px] leading-snug truncate
                 transition-colors duration-100
                 ${activeId === entry.id
                   ? 'text-foreground bg-muted font-medium'
@@ -67,7 +67,7 @@ export function CompileToc({
       </div>
 
       {!tocVisible && (
-        <div className="absolute top-1/3 right-1 w-1 h-1/3 rounded-full bg-muted-foreground/20" />
+        <div className="absolute top-1/3 right-1 w-1 h-1/3 rounded-none bg-muted-foreground/20" />
       )}
     </div>
   );

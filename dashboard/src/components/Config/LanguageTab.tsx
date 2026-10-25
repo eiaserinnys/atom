@@ -12,7 +12,7 @@ export function LanguageTab() {
         {SUPPORTED_LANGS.map((code) => (
           <button
             key={code}
-            className={`px-3 py-2 text-sm rounded border transition-colors cursor-pointer ${
+            className={`px-3 py-2 text-sm rounded-none border transition-colors cursor-pointer ${
               language === code
                 ? 'border-node-user text-node-user bg-node-user/10'
                 : 'border-border text-foreground hover:bg-muted'

@@ -17,6 +17,8 @@ import { MoveCardModal } from '../MoveCardModal/MoveCardModal';
 import { buildAppendMovePayload } from '../../utils/treeMoveIntent';
 import { useTreeDragAndDrop } from './useTreeDragAndDrop';
 import { useTreeMutations } from './useTreeMutations';
+import type { MotionNode } from '../SearchMotionView/types';
+import { resolveNodePath } from './useInitialNodePathRestore';
 import { useInitialNodePathRestore } from './useInitialNodePathRestore';
 import { rootTreeQueryKey } from '../../query/queryKeys';
 import {
@@ -30,6 +32,7 @@ interface TreeViewProps {
   selectedNodeId: string | null;
   onSelect: (nodeId: string | null) => void;
   initialSelectedNodeId?: string;
+  searchResults?: MotionNode[];
 }
 
 interface ContextMenuState {
@@ -38,7 +41,7 @@ interface ContextMenuState {
   node: TreeNodeData;
 }
 
-export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: TreeViewProps) {
+export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, searchResults = [] }: TreeViewProps) {
   const { t } = useTranslation();
   const { data: roots, isLoading, error } = useQuery({
     queryKey: rootTreeQueryKey(),
@@ -92,6 +95,18 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
     setExpandedNodes,
     onSelect,
   });
+
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    let cancelled = false;
+    void resolveNodePath(api.getNode, selectedNodeId).then(path => {
+      if (cancelled || !path.length) return;
+      setExpandedNodes(previous => new Set([...previous, ...path.slice(0, -1)]));
+      requestAnimationFrame(() => document.querySelector(`[data-testid="tree-node-${selectedNodeId}"]`)?.scrollIntoView?.({ block: 'nearest' }));
+    });
+    return () => { cancelled = true; };
+  }, [selectedNodeId]);
+  const searchRanks = Object.fromEntries(searchResults.filter(n => n.selected && n.nodeId).map(n => [n.nodeId!, n.rank]));
 
   const {
     editMutation,
@@ -164,13 +179,13 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
         <div className="h-full flex flex-col bg-background border-r border-border">
           {/* 헤더 */}
           <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-card shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-[0.5px] text-muted-foreground">
+            <span className="text-[13px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">
               {t('tree.header')}
             </span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setModal({ type: 'create-root', cardType: 'structure' })}
-                className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                className="flex items-center gap-0.5 px-1.5 py-1 text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-none transition-colors"
                 title={t('tree.create_root_structure')}
               >
                 <Plus className="w-3 h-3" />
@@ -178,7 +193,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
               </button>
               <button
                 onClick={() => setModal({ type: 'create-root', cardType: 'knowledge' })}
-                className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                className="flex items-center gap-0.5 px-1.5 py-1 text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-none transition-colors"
                 title={t('tree.create_root_knowledge')}
               >
                 <Plus className="w-3 h-3" />
@@ -196,7 +211,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
                 <TreeNode
                   key={root.id}
                   node={root}
-                  selectedNodeId={selectedNodeId}
+                  searchRanks={searchRanks}
+              selectedNodeId={selectedNodeId}
                   onSelect={onSelect}
                   isExpanded={expandedNodes.has(root.id)}
                   expandedNodes={expandedNodes}
@@ -211,7 +227,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
           <div className="shrink-0 border-t border-border px-2 py-2">
             <button
               onClick={() => api.logout().then(() => { window.location.href = '/'; })}
-              className="flex items-center gap-2 w-full px-3 py-2 text-xs text-muted-foreground rounded hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+              className="flex items-center gap-2 w-full px-3 py-2 text-[13px] text-muted-foreground rounded-none hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
               title={t('app.logout')}
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -279,8 +295,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId }: Tr
       {/* 드래그 오버레이 (드래그 중 유령 표시) */}
       <DragOverlay>
         {treeDrag.activeDragNode ? (
-          <div className="flex items-center gap-1 px-3 py-0.5 bg-card border border-border rounded shadow-card text-sm text-foreground opacity-90 pointer-events-none">
-            <span className="text-xs">
+          <div className="flex items-center gap-1 px-3 py-0.5 bg-card border border-border rounded-none shadow-card text-sm text-foreground opacity-90 pointer-events-none">
+            <span className="text-[13px]">
               {treeDrag.activeDragNode.card.card_type === 'structure' ? '📁' : '📄'}
             </span>
             <span className="overflow-hidden text-ellipsis whitespace-nowrap max-w-[200px]">

@@ -54,29 +54,29 @@ export function CardFormModal({
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white dark:bg-card border border-border rounded-[14px] shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-2xl mx-6 px-6 py-6 flex flex-col gap-5">
+      <div className="bg-card border border-border rounded-none shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-2xl mx-6 px-6 py-6 flex flex-col gap-5">
         <h2 className="text-base font-semibold text-foreground">{heading}</h2>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">{t('cardform.title_label')}</label>
+          <label className="text-[13px] text-muted-foreground">{t('cardform.title_label')}</label>
           <input
             ref={titleRef}
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleConfirm(); }}
-            className="bg-white dark:bg-[#1c1c1e] border border-[#d2d2d7] dark:border-[#333336] rounded-[8px] px-[14px] py-[10px] text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow"
+            className="bg-input border border-border rounded-none px-[14px] py-[10px] text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow"
             placeholder={t('cardform.title_placeholder')}
           />
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">{t('cardform.content_label')}</label>
+          <label className="text-[13px] text-muted-foreground">{t('cardform.content_label')}</label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={9}
-            className="bg-white dark:bg-[#1c1c1e] border border-[#d2d2d7] dark:border-[#333336] rounded-[8px] px-[14px] py-[10px] text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow resize-none"
+            className="bg-input border border-border rounded-none px-[14px] py-[10px] text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand focus:shadow-focus-ring transition-shadow resize-none"
             placeholder={t('cardform.content_placeholder')}
           />
         </div>
@@ -88,7 +88,7 @@ export function CardFormModal({
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-[8px] hover:bg-muted transition-colors"
+            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-none hover:bg-muted transition-colors"
             disabled={isLoading}
           >
             {t('common.cancel')}
@@ -96,7 +96,7 @@ export function CardFormModal({
           <button
             onClick={handleConfirm}
             disabled={!title.trim() || isLoading}
-            className="px-3 py-1.5 text-sm bg-primary hover:opacity-90 text-primary-foreground rounded-[8px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm bg-primary hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isLoading ? t('cardform.saving') : mode === 'create' ? t('cardform.creating') : t('common.save')}
           </button>

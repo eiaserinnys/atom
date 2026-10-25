@@ -11,9 +11,10 @@ import { useEditableHeadingComponents } from './useEditableHeadingComponents';
 
 interface CompileViewProps {
   nodeId: string | null;
+  headerTabs?: React.ReactNode;
 }
 
-export function CompileView({ nodeId }: CompileViewProps) {
+export function CompileView({ nodeId, headerTabs }: CompileViewProps) {
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
   const { sliderValue, depth, depthLabel, handleSliderChange } = useCompileDepth();
   const { markdown, isLoading, error, unfurls } = useCompileQueries(nodeId, depth, unfurlEnabled);
@@ -42,6 +43,7 @@ export function CompileView({ nodeId }: CompileViewProps) {
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
       <CompileToolbar
+        headerTabs={headerTabs}
         nodeId={nodeId}
         sliderValue={sliderValue}
         depthLabel={depthLabel}

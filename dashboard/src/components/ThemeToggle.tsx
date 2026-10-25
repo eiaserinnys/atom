@@ -7,7 +7,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+      className="w-8 h-8 flex items-center justify-center rounded-none text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
       title={theme === 'dark' ? t('app.theme_to_light') : t('app.theme_to_dark')}
     >
       {theme === 'dark' ? '☀️' : '🌙'}

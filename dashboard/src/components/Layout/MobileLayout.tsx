@@ -3,70 +3,37 @@ import { useAuth } from '../../hooks/useAuth';
 import { TreeView } from '../TreeView/TreeView';
 import { CompileView } from '../CompileView/CompileView';
 import { CardDetail } from '../CardDetail/CardDetail';
+import { LazySearchMotionView as SearchMotionView } from '../SearchMotionView/LazySearchMotionView';
+import type { MotionNode } from '../SearchMotionView/types';
+import type { SearchRequest } from '../SearchMotionView/stream';
 import { MobileSettingsPage } from '../Config/MobileSettingsPage';
 import { MobileTabBar, type MobileTab } from './MobileTabBar';
-
 interface Props {
   selectedNodeId: string | null;
-  onSelectNode: (nodeId: string | null) => void;
+  onSelectNode(nodeId: string | null): void;
   initialSelectedNodeId?: string;
+  request: SearchRequest | null;
+  searchResults: MotionNode[];
+  verdict: MotionNode | null;
+  onSearchSelect(nodeId: string, verdict: MotionNode): void;
+  onResults(nodes: MotionNode[]): void;
 }
-
-export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNodeId }: Props) {
+export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNodeId, request, searchResults, verdict, onSearchSelect, onResults }: Props) {
   const auth = useAuth();
-  const [activeTab, setActiveTab] = useState<MobileTab>('tree');
-
-  const showSettings = auth.role !== null && auth.role !== 'viewer';
-
-  const handleSelectNode = useCallback(
-    (nodeId: string | null) => {
-      onSelectNode(nodeId);
-      if (nodeId) setActiveTab('compile'); // 노드 선택 시 컴파일 탭으로 자동 전환
-    },
-    [onSelectNode]
-  );
-
-  return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* tree/compile/detail: unmount 방지 (display:none) */}
-      <div
-        style={{ display: activeTab === 'tree' ? 'flex' : 'none' }}
-        className="flex-1 flex-col overflow-hidden pb-14"
-      >
-        <TreeView
-          selectedNodeId={selectedNodeId}
-          onSelect={handleSelectNode}
-          initialSelectedNodeId={initialSelectedNodeId}
-        />
-      </div>
-      <div
-        style={{ display: activeTab === 'compile' ? 'flex' : 'none' }}
-        className="flex-1 flex-col overflow-hidden pb-14"
-      >
-        <CompileView nodeId={selectedNodeId} />
-      </div>
-      <div
-        style={{ display: activeTab === 'detail' ? 'flex' : 'none' }}
-        className="flex-1 flex-col overflow-hidden pb-14"
-      >
-        <CardDetail nodeId={selectedNodeId} />
-      </div>
-
-      {/* settings: lazy mount (activeTab === 'settings' 시에만 마운트, API 즉시 발화 방지) */}
-      {activeTab === 'settings' && (
-        <div className="flex-1 overflow-y-auto pb-14">
-          <MobileSettingsPage
-            currentUserRole={auth.role!}
-            currentUserEmail={auth.email ?? ''}
-          />
-        </div>
-      )}
-
-      <MobileTabBar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        showSettings={showSettings}
-      />
+  const [activeTab, setActiveTab] = useState<MobileTab>(request ? 'search' : 'tree');
+  const [previousRequest, setPreviousRequest] = useState(request);
+  if (request !== previousRequest) { setPreviousRequest(request); if (request) setActiveTab('search'); }
+  const [searchVisited, setSearchVisited] = useState(Boolean(request));
+  if (activeTab === 'search' && !searchVisited) setSearchVisited(true);
+  const handleSelectNode = useCallback((nodeId: string | null) => { onSelectNode(nodeId); if (nodeId) setActiveTab('compile'); }, [onSelectNode]);
+  return <div className="flex h-full flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+    <div className="flex-1 min-h-0 overflow-hidden">
+      <div hidden={activeTab !== 'tree'} className="h-full"><TreeView selectedNodeId={selectedNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} /></div>
+      <div hidden={activeTab !== 'compile'} className="h-full"><CompileView nodeId={selectedNodeId} /></div>
+      <div hidden={activeTab !== 'search'} className="h-full">{searchVisited && <SearchMotionView request={request} onResults={onResults} onSelectNode={(id, node) => { onSearchSelect(id, node); setActiveTab('detail'); }} />}</div>
+      <div hidden={activeTab !== 'detail'} className="h-full"><CardDetail nodeId={selectedNodeId} verdict={verdict} /></div>
+      {activeTab === 'settings' && <div className="h-full overflow-y-auto"><MobileSettingsPage currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} /></div>}
     </div>
-  );
+    <MobileTabBar activeTab={activeTab} onTabChange={setActiveTab} showSettings={auth.role !== null && auth.role !== 'viewer'} />
+  </div>;
 }

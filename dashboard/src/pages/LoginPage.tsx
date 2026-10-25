@@ -21,7 +21,7 @@ export function LoginPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="flex flex-col items-center gap-3 px-12 py-10 bg-card border border-border rounded-xl min-w-[280px]">
+      <div className="flex flex-col items-center gap-3 px-12 py-10 bg-card border border-border rounded-none min-w-[280px]">
         <h1 className="m-0 text-2xl font-semibold text-foreground font-sans">{t('login.title')}</h1>
         <p className="m-0 text-sm text-muted-foreground font-sans">{t('login.desc')}</p>
 
@@ -29,7 +29,7 @@ export function LoginPage() {
           {providers?.slack && (
             <a
               href={`${BASE_URL}/api/auth/slack`}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-input border border-border rounded-lg text-foreground text-sm font-sans no-underline cursor-pointer transition-colors hover:bg-muted"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-input border border-border rounded-none text-foreground text-sm font-sans no-underline cursor-pointer transition-colors hover:bg-muted"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="currentColor"/>
@@ -41,7 +41,7 @@ export function LoginPage() {
           {providers?.google && (
             <a
               href={`${BASE_URL}/api/auth/google`}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-input border border-border rounded-lg text-foreground text-sm font-sans no-underline cursor-pointer transition-colors hover:bg-muted"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-input border border-border rounded-none text-foreground text-sm font-sans no-underline cursor-pointer transition-colors hover:bg-muted"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -61,7 +61,7 @@ export function LoginPage() {
 
           {providers === null && (
             <div className="flex justify-center py-2">
-              <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-none animate-spin" />
             </div>
           )}
         </div>

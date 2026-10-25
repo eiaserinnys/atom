@@ -78,25 +78,25 @@ export function UserManagementTab({ currentUserEmail }: Props) {
     <div className="flex flex-col gap-5">
       {/* 새 사용자 추가 */}
       <div className="flex flex-col gap-2">
-        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
           {t('users.add_section')}
         </div>
         <div className="flex flex-col gap-2">
           <input
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
+            className="w-full bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
             placeholder={t('users.invite_placeholder')}
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
           />
           <input
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
+            className="w-full bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
             placeholder={t('users.display_name_placeholder')}
             value={newDisplayName}
             onChange={(e) => setNewDisplayName(e.target.value)}
           />
           <div className="flex gap-2 items-center">
             <select
-              className="bg-card border border-border rounded px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
+              className="bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as UserRole)}
             >
@@ -105,7 +105,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
               <option value="viewer">viewer</option>
             </select>
             <button
-              className="bg-brand text-white border-none rounded px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-brand text-primary-foreground border-none rounded-none px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleAdd}
               disabled={adding}
             >
@@ -113,14 +113,14 @@ export function UserManagementTab({ currentUserEmail }: Props) {
             </button>
           </div>
           {addError && (
-            <div className="text-node-error text-xs">{addError}</div>
+            <div className="text-node-error text-[13px]">{addError}</div>
           )}
         </div>
       </div>
 
       {/* 사용자 목록 */}
       <div className="flex flex-col gap-2">
-        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
           {t('users.list_section')}
         </div>
         {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
@@ -133,15 +133,15 @@ export function UserManagementTab({ currentUserEmail }: Props) {
             return (
               <div
                 key={user.id}
-                className="flex flex-col gap-1 bg-card border border-border rounded px-3 py-2"
+                className="flex flex-col gap-1 bg-card border border-border rounded-none px-3 py-2"
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm text-foreground font-medium flex-1 min-w-0 truncate">
                     {user.display_name ?? user.email}
                   </span>
-                  <span className="text-xs text-muted-foreground">{user.email}</span>
+                  <span className="text-[13px] text-muted-foreground">{user.email}</span>
                   <span
-                    className={`text-xs rounded px-1.5 py-px border ${
+                    className={`text-[13px] rounded-none px-1.5 py-px border ${
                       user.is_active
                         ? 'text-node-response border-node-response/40 bg-node-response/10'
                         : 'text-muted-foreground border-border bg-muted'
@@ -152,7 +152,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <select
-                    className="bg-card border border-border rounded px-2 py-0.5 text-foreground text-xs outline-none focus:border-brand font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-card border border-border rounded-none px-2 py-0.5 text-foreground text-[13px] outline-none focus:border-brand font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                     value={user.role}
                     disabled={isSelf}
                     title={isSelf ? t('users.self_role_tooltip') : undefined}
@@ -165,7 +165,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                     ))}
                   </select>
                   <button
-                    className="text-xs rounded px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed font-sans"
+                    className="text-[13px] rounded-none px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed font-sans"
                     disabled={isSelf}
                     title={isSelf ? t('users.self_account_tooltip') : undefined}
                     onClick={() => handleToggleActive(user.id, !user.is_active)}
@@ -174,7 +174,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                   </button>
                 </div>
                 {updateErrors[user.id] && (
-                  <div className="text-node-error text-xs">{updateErrors[user.id]}</div>
+                  <div className="text-node-error text-[13px]">{updateErrors[user.id]}</div>
                 )}
               </div>
             );
