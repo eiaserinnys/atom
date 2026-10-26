@@ -97,7 +97,8 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
         depth,
         {},
         resolveRefs,
-        credentials
+        credentials,
+        req.jwtUser?.role === "admin" || req.jwtUser?.role === "editor"
       );
       return result;
     }
