@@ -1,5 +1,7 @@
 {
   "visual_search": {
+    "same_branch": "같은 가지 {{count}}",
+    "other_branch": "다른 가지 {{count}}",
     "title": "시각적 검색",
     "loading": "시각적 검색 불러오는 중…",
     "chapters": "탐색 기록",

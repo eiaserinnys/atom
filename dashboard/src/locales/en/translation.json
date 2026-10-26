@@ -1,5 +1,7 @@
 {
   "visual_search": {
+    "same_branch": "Same branch {{count}}",
+    "other_branch": "Other branches {{count}}",
     "title": "Visual search",
     "loading": "Loading visual search…",
     "chapters": "Exploration history",

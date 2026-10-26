@@ -79,7 +79,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   // 열은 홉. 한 열 안에서 위 띠는 살아 있는 것(열린 구조, 맞은 카드, 선정)과 아직 판정 전인 것,
   // 아래 띠는 닫히거나 낮은 것. 넘치는 것은 부모별 더미(+N)로 접는다.
   function layout(m) {
-    const pos = new Map(); const piles = new Map(); const hidden = new Map(); const cols = []; const dorm = new Map();
+    const pos = new Map(); const piles = new Map(); const hidden = new Map(); const cols = []; const dorm = new Map(); const bands = [];
     const byHop = new Map();
     const push = (n) => { if (n.dormant) { dorm.set(n.parent, (dorm.get(n.parent) || 0) + 1); return; } if (!byHop.has(n.hop)) byHop.set(n.hop, []); byHop.get(n.hop).push(n); };
     const root = m.nodes.get(ROOT); if (root) push(root);
@@ -112,7 +112,13 @@ export function createMotionPlayer(root, callbacks, samples) {
           const source = group[0].fromRef && pos.get(group[0].fromRef);
           y = Math.max(y, source?.y ?? 0);
           group.sort((a, b) => Number(a.sameBranch) - Number(b.sameBranch) || (b.similarity ?? 0) - (a.similarity ?? 0) || a.order - b.order);
-          for (const n of group) { pos.set(n.ref, { x, y }); y += M.pitch + reserve(n); }
+          for (const sameBranch of [false, true]) {
+            const rows = group.filter(n => Boolean(n.sameBranch) === sameBranch);
+            if (!rows.length) continue;
+            bands.push({ x, y, sameBranch, count: rows.length });
+            y += M.chipH / Math.min(1, cam?.z ?? 1);
+            for (const n of rows) { pos.set(n.ref, { x, y }); y += M.pitch + reserve(n); }
+          }
           y += M.bandGap;
         }
         cols.push({ hop, x, height: y, w: M.colW }); height = Math.max(height, y); continue;
@@ -187,7 +193,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     const wide = K > 1 && lastHop <= 0;
     const last = cols[cols.length - 1];
-    return { cols, pos, piles, hidden, dorm, wide, width: wide ? K * stride - 16 : last ? last.x + columnWidth() : 0, height };
+    return { cols, pos, piles, hidden, dorm, bands, wide, width: wide ? K * stride - 16 : last ? last.x + columnWidth() : 0, height };
   }
 
   // ------------------------------------------------------------------ 3. 보이는 상태 (스프링, 효과)
@@ -592,6 +598,10 @@ export function createMotionPlayer(root, callbacks, samples) {
     // 더미
     for (const p of view.piles.values()) { if (now < p.born || p.x > x1 || p.x < x0 || p.y + p.info.h < y0 || p.y > y1) continue; drawPile(p, now, text); }
     // 후보
+    if (text) for (const band of view.L.bands) {
+      ctx.globalAlpha = 1; ctx.font = wfont(500, 13); ctx.fillStyle = css(T.ink2); ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      ctx.fillText(tr(band.sameBranch ? 'visual_search.same_branch' : 'visual_search.other_branch', { count: band.count }), band.x + 8, band.y + 11 / Math.min(1, z));
+    }
     for (const n of model.nodes.values()) {
       if (n.similarity == null || n.fromRef || !n.displayColumn || n.displayColumn.startsWith('initial:')) continue;
       const v = view.nodes.get(n.ref); if (!v || v.a < 0.4) continue;
@@ -1239,10 +1249,15 @@ export function createMotionPlayer(root, callbacks, samples) {
     const fingerprint = JSON.stringify([chapters, cursor]);
     if (strip.dataset.projection === fingerprint) return;
     strip.dataset.projection = fingerprint; strip.replaceChildren();
-    for (const chapter of chapters) {
+    const titles = new Map(history.project(timeline.frames.length).projection.cards.map(card => [card.cardId, card.title]));
+    for (const [number, chapter] of chapters.entries()) {
       const button = document.createElement('button'); button.type = 'button';
       const index = timeline.frames.findLastIndex(frame => chapter.frameIds.includes(frame.id)) + 1;
-      button.textContent = translateLabel(chapter.label);
+      const operations = chapter.operationIds.map(id => timeline.operations.find(op => op.id === id)).filter(Boolean);
+      const label = titles.get(operations[0]?.fromCardId) ?? translateLabel(chapter.label).replace(/^0 /, '');
+      const ordinal = document.createElement('span'); ordinal.className = 'chapter-number'; ordinal.textContent = String(number); button.append(ordinal);
+      for (const operation of operations) { const icon = document.createElement('span'); icon.innerHTML = motionIcon(operation.kind); button.append(icon); }
+      const title = document.createElement('span'); title.textContent = label; button.append(title); button.title = label;
       button.dataset.frame = String(index); button.setAttribute('aria-current', String(cursor === index));
       strip.append(button);
     }

@@ -22,7 +22,8 @@
 .search-motion .motion-bar strong {font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .search-motion .summary-readout {font:13px var(--font-mono);color:var(--muted-foreground);margin-left:auto;}
 .search-motion .seg {display:flex;max-width:100%;overflow-x:auto;border:1px solid var(--border);}
-.search-motion .seg button {height:28px;padding:0 10px;border-right:1px solid var(--border);white-space:nowrap;}
+.search-motion .seg button {display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-right:1px solid var(--border);white-space:nowrap;}
+.search-motion .chapter-number {font-family:var(--font-mono);color:var(--muted-foreground);}
 .search-motion .seg button:last-child {border:0;}
 .search-motion .seg button[aria-current=true] {background:var(--foreground);color:var(--background);font-weight:600;}
 .search-motion .nb-actions {position:absolute;display:flex;gap:var(--motion-action-gap);z-index:6;}
