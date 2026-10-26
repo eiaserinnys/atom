@@ -2,7 +2,7 @@
 // to preserve the reviewed drawing and playback behavior; the pure reducer is model.js.
 import { createModel, applyEvent } from "./model.js";
 import { createExplorationSession } from './exploration-session.js';
-import { fitZoom, nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
+import { fitZoom, operationGroups, nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
 import { motionIcon } from './motion-icons.js';
 
 export function createMotionPlayer(root, callbacks, samples) {
@@ -80,7 +80,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   // 열은 홉. 한 열 안에서 위 띠는 살아 있는 것(열린 구조, 맞은 카드, 선정)과 아직 판정 전인 것,
   // 아래 띠는 닫히거나 낮은 것. 넘치는 것은 부모별 더미(+N)로 접는다.
   function layout(m) {
-    const pos = new Map(); const piles = new Map(); const hidden = new Map(); const cols = []; const dorm = new Map(); const bands = [];
+    const pos = new Map(); const piles = new Map(); const hidden = new Map(); const cols = []; const dorm = new Map(); const bands = []; const groupSlots = new Map();
     const byHop = new Map();
     const push = (n) => { if (n.dormant) { dorm.set(n.parent, (dorm.get(n.parent) || 0) + 1); return; } if (!byHop.has(n.hop)) byHop.set(n.hop, []); byHop.get(n.hop).push(n); };
     const root = m.nodes.get(ROOT); if (root) push(root);
@@ -108,8 +108,9 @@ export function createMotionPlayer(root, callbacks, samples) {
       const nodes = byHop.get(hop) || [];
       if (m.columnLabels?.has(hop)) {
         let y = 0;
-        const groups = Map.groupBy(nodes, n => n.displayColumn);
-        for (const group of groups.values()) {
+        const groups = operationGroups(nodes, m.exploration?.operations ?? []);
+        for (const [slot, group] of groups.entries()) {
+          groupSlots.set(group[0].displayColumn, slot);
           const source = group[0].fromRef && pos.get(group[0].fromRef);
           y = Math.max(y, source?.y ?? 0);
           const operation = m.exploration?.operations.find(op => op.id === group[0].displayColumn);
@@ -200,7 +201,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     const wide = K > 1 && lastHop <= 0;
     const last = cols[cols.length - 1];
-    return { cols, pos, piles, hidden, dorm, bands, wide, width: wide ? K * stride - 16 : last ? last.x + M.colW : 0, height };
+    return { cols, pos, piles, hidden, dorm, bands, groupSlots, wide, width: wide ? K * stride - 16 : last ? last.x + M.colW : 0, height };
   }
 
   // ------------------------------------------------------------------ 3. 보이는 상태 (스프링, 효과)
@@ -537,11 +538,13 @@ export function createMotionPlayer(root, callbacks, samples) {
       const a = anchorOut(e.from); const b = anchorIn(e.to); if (!a || !b) continue;
       const alpha = Math.min(a.a, b.a); if (alpha < 0.03) continue;
       if (e.kind === 'expansion') {
-        const trunk = a.x + 14;
+        const slot = view.L.groupSlots.get(model.nodes.get(e.to).displayColumn) ?? 0;
+        const offset = 14 + slot * M.groupGap; const trunk = a.x + offset;
         ctx.globalAlpha = alpha * 0.65; ctx.strokeStyle = css(T.thin); ctx.lineWidth = 1.1;
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(trunk, a.y);
         if (model.nodes.get(e.to).hop - model.nodes.get(e.from).hop > 1) {
-          ctx.lineTo(trunk, M.laneY); ctx.lineTo(b.x - 14, M.laneY); ctx.lineTo(b.x - 14, b.y);
+          const lane = M.laneY - slot * M.groupGap;
+          ctx.lineTo(trunk, lane); ctx.lineTo(b.x - offset, lane); ctx.lineTo(b.x - offset, b.y);
         } else ctx.lineTo(trunk, b.y);
         ctx.lineTo(b.x, b.y); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - 6, b.y - 3); ctx.lineTo(b.x - 6, b.y + 3); ctx.fillStyle = css(T.thin); ctx.fill();

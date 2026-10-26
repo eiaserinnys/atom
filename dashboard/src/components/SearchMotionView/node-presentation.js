@@ -26,3 +26,9 @@ export function nodeTextLayout(path, zoom, height = 48) {
 export function fitZoom(availableWidth, availableHeight, width, height, automatic) {
   return Math.max(automatic ? .5 : .25, Math.min(1, availableWidth / width, availableHeight / height));
 }
+
+export function operationGroups(nodes, operations) {
+  const order = new Map(operations.map((operation, index) => [operation.id, index]));
+  return [...Map.groupBy(nodes, node => node.displayColumn).values()]
+    .sort((a, b) => (order.get(a[0].displayColumn) ?? Infinity) - (order.get(b[0].displayColumn) ?? Infinity));
+}
