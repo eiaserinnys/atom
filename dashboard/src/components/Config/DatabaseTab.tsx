@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Folder, XCircle } from 'lucide-react';
 import { configApi } from '../../api/client';
@@ -25,6 +25,7 @@ export function DatabaseTab() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
   const [savingUrl, setSavingUrl] = useState(false);
+  const migrationDialogRef = useRef<HTMLDivElement>(null);
 
   const fetchInfo = useCallback(async () => {
     setLoading(true);
@@ -40,6 +41,12 @@ export function DatabaseTab() {
   }, []);
 
   useEffect(() => { void fetchInfo(); }, [fetchInfo]);
+
+  useEffect(() => {
+    if (showMigrationConfirm) {
+      migrationDialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    }
+  }, [showMigrationConfirm]);
 
   const handleMigrate = async () => {
     setMigrating(true);
@@ -96,23 +103,18 @@ export function DatabaseTab() {
   const canMigrate = isPostgres && info.sqliteFileExists && !info.deprecatedFileExists;
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-foreground">{t('database.mode_label')}</h3>
-        <div className="flex items-center gap-2 border border-border bg-card px-3 py-3">
-          <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${isPostgres ? 'text-brand' : 'text-muted-foreground'}`}>
-            <span className="h-2 w-2 bg-current" />
-            {isPostgres ? 'PostgreSQL' : 'SQLite'}
-          </span>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <p className="text-sm text-foreground">
+        {t('database.mode_label')}: {isPostgres ? 'PostgreSQL' : 'SQLite'}
+      </p>
 
       {!isPostgres && (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-foreground">{t('database.connection_string')}</h3>
-          <div className="flex flex-col gap-3 border border-border bg-card px-3 py-3">
+        <section>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">{t('database.connection_string')}</h3>
+          <div className="flex flex-col gap-3">
             <input
               type="text"
+              aria-label={t('database.connection_string')}
               className={`w-full ${CONFIG_CONTROL_CLASS}`}
               placeholder="postgresql://user:pass@host:5432/dbname"
               value={connUrl}
@@ -140,33 +142,35 @@ export function DatabaseTab() {
               </div>
             )}
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-foreground">{t('database.file_label')}</h3>
-        <div className="flex flex-col gap-1.5 border border-border bg-card px-3 py-3">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">{t('database.file_label')}</h3>
+        <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-start gap-2 text-sm">
             <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t('database.file_path')}</span>
             <code className="min-w-0 break-words text-[13px] text-foreground [overflow-wrap:anywhere]">{info.sqliteFile}</code>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t('database.file_status')}:</span>
-            {info.deprecatedFileExists ? (
-              <span className="text-brand text-[13px]"><CheckCircle2 className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.file_migrated')}</span>
-            ) : info.sqliteFileExists ? (
-              <span className="text-[var(--amber)] text-[13px]"><Folder className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.file_exists')}</span>
-            ) : (
-              <span className="text-muted-foreground text-[13px]">{t('database.file_none')}</span>
-            )}
-          </div>
+          {isPostgres && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t('database.file_status')}:</span>
+              {info.deprecatedFileExists ? (
+                <span className="text-brand text-[13px]"><CheckCircle2 className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.file_migrated')}</span>
+              ) : info.sqliteFileExists ? (
+                <span className="text-[var(--amber)] text-[13px]"><Folder className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.file_exists')}</span>
+              ) : (
+                <span className="text-muted-foreground text-[13px]">{t('database.file_none')}</span>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
       {isPostgres && (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-foreground">{t('database.migration_label')}</h3>
-          <div className="flex flex-col gap-3 border border-border bg-card px-3 py-3">
+        <section>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">{t('database.migration_label')}</h3>
+          <div className="flex flex-col gap-3">
             {info.deprecatedFileExists ? (
               <div className="text-[13px] text-muted-foreground">{t('database.migration_done')}</div>
             ) : !info.sqliteFileExists ? (
@@ -192,7 +196,7 @@ export function DatabaseTab() {
               </div>
             )}
           </div>
-        </div>
+        </section>
       )}
 
       {showMigrationConfirm && (
@@ -200,14 +204,17 @@ export function DatabaseTab() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 dark:bg-black/70"
           role="presentation"
           onKeyDown={(event) => {
-            if (event.key === 'Escape') setShowMigrationConfirm(false);
-            if (event.key === 'Enter') void handleMigrate();
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              setShowMigrationConfirm(false);
+            }
           }}
           onClick={(event) => {
             if (event.target === event.currentTarget) setShowMigrationConfirm(false);
           }}
         >
-          <div role="dialog" aria-modal="true" aria-labelledby="database-migration-title" className="flex w-full max-w-sm flex-col gap-4 border border-border bg-card p-6">
+          <div ref={migrationDialogRef} role="dialog" aria-modal="true" aria-labelledby="database-migration-title" className="flex w-full max-w-sm flex-col gap-4 border border-border bg-card p-6">
             <h2 id="database-migration-title" className="text-base font-semibold text-foreground">{t('database.migration_label')}</h2>
             <p className="whitespace-pre-line text-sm text-foreground">{t('database.migration_confirm')}</p>
             <div className="flex justify-end gap-2">

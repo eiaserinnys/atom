@@ -47,6 +47,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
   }, [handleClose, isOpen]);
 
   const handleTabSelect = (tab: ConfigTab) => {
+    if (tab === activeTab) return;
     setAuthFooter(null);
     setActiveTab(tab);
   };

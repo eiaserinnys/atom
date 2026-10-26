@@ -65,7 +65,7 @@ function AppInner() {
   useAtomEvents(actualNodeId);
   if (auth.loading) return null;
   if (!auth.authenticated) return <LoginPage />;
-  const showConfigButton = auth.role && auth.role !== 'viewer';
+  const showConfigButton = auth.role !== null;
   return <SystemProvider><div className="h-dvh flex flex-col bg-background text-foreground overflow-hidden">
     <RestartBanner /><ReconnectOverlay />
     <header className="index-header">

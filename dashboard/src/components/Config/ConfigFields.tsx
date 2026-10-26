@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from "react";
 
-export const CONFIG_CONTROL_CLASS = "px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground";
+export const CONFIG_CONTROL_CLASS = "px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground disabled:opacity-50 disabled:cursor-not-allowed";
 
 interface ConfigFieldProps {
   label: string;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfig } from '../../hooks/useConfig';
-import { ConfigActionButton, CONFIG_CONTROL_CLASS } from './ConfigFields';
+import { ConfigActionButton, ConfigField } from './ConfigFields';
 
 export function AgentManagementTab() {
   const { t } = useTranslation();
@@ -85,7 +85,7 @@ export function AgentManagementTab() {
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="space-y-6">
       {lastCreatedSecret && (
         <div className="flex flex-col gap-2 bg-brand/8 border border-brand/25 rounded-none px-3 py-3">
           <div className="text-[13px] font-semibold text-brand">
@@ -107,36 +107,34 @@ export function AgentManagementTab() {
         </div>
       )}
 
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-foreground">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t('agents.create_section')}
         </h3>
-        <div className="flex flex-col gap-2">
-          <input
-            className={`w-full ${CONFIG_CONTROL_CLASS}`}
-            placeholder={t('agents.name_placeholder')}
-            value={newAgentId}
-            onChange={(e) => setNewAgentId(e.target.value)}
-          />
-          <input
-            className={`w-full ${CONFIG_CONTROL_CLASS}`}
-            placeholder={t('agents.display_name_placeholder')}
-            value={newDisplayName}
-            onChange={(e) => setNewDisplayName(e.target.value)}
-          />
-          <div className="self-start">
-            <ConfigActionButton onClick={handleCreate} disabled={creating}>
-              {creating ? t('agents.creating') : t('agents.generate_btn')}
-            </ConfigActionButton>
-          </div>
-          {createError && (
-            <div className="text-node-error text-[13px]">{createError}</div>
-          )}
+        <ConfigField
+          label={t('agents.name_label')}
+          placeholder={t('agents.name_placeholder')}
+          value={newAgentId}
+          onChange={setNewAgentId}
+        />
+        <ConfigField
+          label={t('agents.display_name_label')}
+          placeholder={t('agents.display_name_placeholder')}
+          value={newDisplayName}
+          onChange={setNewDisplayName}
+        />
+        <div className="self-start">
+          <ConfigActionButton onClick={handleCreate} disabled={creating}>
+            {creating ? t('agents.creating') : t('agents.generate_btn')}
+          </ConfigActionButton>
         </div>
-      </div>
+        {createError && (
+          <div className="mt-2 text-node-error text-[13px]">{createError}</div>
+        )}
+      </section>
 
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-foreground">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t('agents.list_section')}
         </h3>
         {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
@@ -183,7 +181,7 @@ export function AgentManagementTab() {
             </div>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

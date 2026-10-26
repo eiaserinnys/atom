@@ -101,6 +101,7 @@ afterEach(() => {
   act(() => root.unmount());
   host.replaceChildren();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -284,7 +285,7 @@ describe('OpenAI settings tab', () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     const input = host.querySelector('input')!;
     const button = [...host.querySelectorAll('footer button')].find(row => row.textContent === 'system.restart_now') as HTMLButtonElement;
-    expect(input.className).toBe('w-full px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground');
+    expect(input.className).toBe('w-full px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground disabled:opacity-50 disabled:cursor-not-allowed');
     expect(button.className).toContain('px-4 py-2 text-sm font-medium rounded-none bg-brand text-primary-foreground');
     expect(input.disabled).toBe(true);
     expect(button.disabled).toBe(false);
@@ -356,6 +357,22 @@ describe('settings frame and footer', () => {
     ]);
     expect(footer.textContent).toContain('system.restart_required');
   });
+
+  test('keeps Auth Save enabled when the active tab is selected again', async () => {
+    await render(<ConfigModal isOpen onClose={vi.fn()} currentUserRole="admin" currentUserEmail="admin@example.test" />);
+    const authTab = [...host.querySelectorAll('nav button')].find(button => button.textContent === 'config.tab_auth')!;
+    click(authTab);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    const input = host.querySelector('input') as HTMLInputElement;
+    const save = [...host.querySelectorAll('footer button')].find(button => button.textContent === 'auth.save') as HTMLButtonElement;
+    setInput(input, 'changed-client-id');
+    expect(save.disabled).toBe(false);
+
+    click(authTab);
+    expect(input.value).toBe('changed-client-id');
+    expect(save.disabled).toBe(false);
+  });
 });
 
 describe('mobile settings navigation', () => {
@@ -387,5 +404,43 @@ describe('database migration confirmation', () => {
     expect([...host.querySelectorAll('[role="dialog"] button')].map(button => button.textContent)).toEqual([
       'common.cancel', 'common.confirm',
     ]);
+  });
+
+  test('does not migrate when Enter is pressed on Cancel', async () => {
+    const fetchRequest = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    } as Response);
+    await render(<DatabaseTab />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    const migrate = [...host.querySelectorAll('button')].find(button => button.textContent === 'database.migration_btn')!;
+    click(migrate);
+    const cancel = [...host.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === 'common.cancel')! as HTMLButtonElement;
+    cancel.focus();
+    act(() => cancel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(fetchRequest).not.toHaveBeenCalled();
+  });
+
+  test('focuses Cancel and keeps settings open when Escape dismisses confirmation', async () => {
+    const onClose = vi.fn();
+    await render(<ConfigModal isOpen onClose={onClose} currentUserRole="admin" currentUserEmail="admin@example.test" />);
+    const databaseTab = [...host.querySelectorAll('nav button')].find(button => button.textContent === 'config.tab_database')!;
+    click(databaseTab);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    const migrate = [...host.querySelectorAll('button')].find(button => button.textContent === 'database.migration_btn')!;
+    click(migrate);
+    const confirmation = host.querySelector('[aria-labelledby="database-migration-title"]')!;
+    const cancel = [...confirmation.querySelectorAll('button')].find(button => button.textContent === 'common.cancel')! as HTMLButtonElement;
+    const cancelHadFocus = document.activeElement === cancel;
+    act(() => cancel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+
+    expect(host.querySelector('[role="dialog"][aria-label="config.settings"]')).not.toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(host.querySelector('[aria-labelledby="database-migration-title"]')).toBeNull();
+    expect(cancelHadFocus).toBe(true);
   });
 });

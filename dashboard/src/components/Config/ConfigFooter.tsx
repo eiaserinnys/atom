@@ -24,18 +24,18 @@ export function ConfigFooter({
   const { t } = useTranslation();
   const isAuthTab = activeTab === 'auth';
 
-  if (mobile && !isAuthTab && !pendingRestart) return null;
+  if (mobile && !isAuthTab) return null;
 
   return (
     <footer className="shrink-0 border-t border-border px-6 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="mr-auto flex min-w-0 items-center text-sm text-muted-foreground" aria-live="polite">
-          {pendingRestart ? (
-            <span className="flex items-center gap-2 text-[var(--amber)]">
-              <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+          {pendingRestart && !mobile ? (
+            <span className="flex items-center gap-2 text-foreground">
+              <TriangleAlert className="h-4 w-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
               {t('system.restart_required')}
             </span>
-          ) : isAuthTab && authFooter?.message ? (
+          ) : !pendingRestart && isAuthTab && authFooter?.message ? (
             <span className={authFooter.message.ok ? 'text-muted-foreground' : 'text-node-error'}>
               {authFooter.message.text}
             </span>

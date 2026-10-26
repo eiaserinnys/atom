@@ -11,9 +11,10 @@ export function LanguageTab() {
             key={code}
             className={`px-3 py-2 text-sm rounded-none border transition-colors cursor-pointer ${
               language === code
-                ? 'border-node-user text-node-user bg-node-user/10'
+                ? 'border-brand text-brand bg-brand/10 font-semibold'
                 : 'border-border text-foreground hover:bg-muted'
             }`}
+            aria-pressed={language === code}
             onClick={() => setLanguage(code)}
           >
             {LANG_LABELS[code]}

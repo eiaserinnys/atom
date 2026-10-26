@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfig } from '../../hooks/useConfig';
 import type { UserRole } from '../../api/client';
-import { ConfigActionButton, CONFIG_CONTROL_CLASS } from './ConfigFields';
+import { ConfigActionButton, ConfigField, CONFIG_CONTROL_CLASS } from './ConfigFields';
 
 interface Props {
   currentUserEmail: string;
@@ -76,27 +76,31 @@ export function UserManagementTab({ currentUserEmail }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-foreground">
+    <div className="space-y-6">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t('users.add_section')}
         </h3>
-        <div className="flex flex-col gap-2">
-          <input
-            className={`w-full ${CONFIG_CONTROL_CLASS}`}
-            placeholder={t('users.invite_placeholder')}
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-          />
-          <input
-            className={`w-full ${CONFIG_CONTROL_CLASS}`}
-            placeholder={t('users.display_name_placeholder')}
-            value={newDisplayName}
-            onChange={(e) => setNewDisplayName(e.target.value)}
-          />
-          <div className="flex gap-2 items-center">
+        <ConfigField
+          label={t('users.email_label')}
+          placeholder={t('users.invite_placeholder')}
+          value={newEmail}
+          onChange={setNewEmail}
+        />
+        <ConfigField
+          label={t('users.display_name_label')}
+          placeholder={t('users.display_name_placeholder')}
+          value={newDisplayName}
+          onChange={setNewDisplayName}
+        />
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col">
+            <label htmlFor="new-user-role" className="mb-1 block text-[13px] text-muted-foreground">
+              {t('users.role_label')}
+            </label>
             <select
-              className={`w-auto min-h-10 ${CONFIG_CONTROL_CLASS}`}
+              id="new-user-role"
+              className={`w-auto h-9 ${CONFIG_CONTROL_CLASS}`}
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as UserRole)}
             >
@@ -104,18 +108,18 @@ export function UserManagementTab({ currentUserEmail }: Props) {
               <option value="editor">editor</option>
               <option value="viewer">viewer</option>
             </select>
-            <ConfigActionButton onClick={handleAdd} disabled={adding}>
-              {adding ? t('users.adding') : t('users.invite_btn')}
-            </ConfigActionButton>
           </div>
-          {addError && (
-            <div className="text-node-error text-[13px]">{addError}</div>
-          )}
+          <ConfigActionButton onClick={handleAdd} disabled={adding}>
+            {adding ? t('users.adding') : t('users.invite_btn')}
+          </ConfigActionButton>
         </div>
-      </div>
+        {addError && (
+          <div className="mt-2 text-node-error text-[13px]">{addError}</div>
+        )}
+      </section>
 
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-foreground">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t('users.list_section')}
         </h3>
         {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
@@ -145,20 +149,26 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                     {user.is_active ? t('users.active') : t('users.inactive')}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <select
-                    className={`w-auto min-h-10 ${CONFIG_CONTROL_CLASS} disabled:opacity-50 disabled:cursor-not-allowed`}
-                    value={user.role}
-                    disabled={isSelf}
-                    title={isSelf ? t('users.self_role_tooltip') : undefined}
-                    onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                  >
-                    {Object.entries(ROLE_LABELS).map(([r, label]) => (
-                      <option key={r} value={r}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="flex flex-col">
+                    <label htmlFor={`user-role-${user.id}`} className="mb-1 block text-[13px] text-muted-foreground">
+                      {t('users.role_label')}
+                    </label>
+                    <select
+                      id={`user-role-${user.id}`}
+                      className={`w-auto h-9 ${CONFIG_CONTROL_CLASS}`}
+                      value={user.role}
+                      disabled={isSelf}
+                      title={isSelf ? t('users.self_role_tooltip') : undefined}
+                      onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
+                    >
+                      {Object.entries(ROLE_LABELS).map(([r, label]) => (
+                        <option key={r} value={r}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <ConfigActionButton
                     tone="secondary"
                     disabled={isSelf}
@@ -175,7 +185,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
             );
           })}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

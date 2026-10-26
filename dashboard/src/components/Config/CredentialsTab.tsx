@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useAdapters } from '../../hooks/useAdapters';
 import { useLocalStorageCredentials } from '../../hooks/useLocalStorageCredentials';
-import { CONFIG_CONTROL_CLASS } from './ConfigFields';
+import { ConfigField } from './ConfigFields';
 
 export function CredentialsTab() {
   const { t } = useTranslation();
@@ -9,7 +9,7 @@ export function CredentialsTab() {
   const { credentials, updateCredential } = useLocalStorageCredentials();
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="space-y-6">
       {isLoading && (
         <div className="text-muted-foreground text-sm">{t('credentials.loading')}</div>
       )}
@@ -19,29 +19,20 @@ export function CredentialsTab() {
       )}
 
       {adapters.map((adapter) => (
-        <div key={adapter.sourceType} className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-foreground">
+        <section key={adapter.sourceType}>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">
             {adapter.sourceType}
           </h3>
-          <div className="flex flex-col gap-2 bg-card border border-border rounded-none px-3 py-3">
-            {adapter.credentialFields.map((field) => (
-              <div key={field.key} className="flex items-center gap-2">
-                <label className="text-[13px] text-muted-foreground w-24 shrink-0">
-                  {field.label}
-                </label>
-                <input
-                  type={field.secret ? 'password' : 'text'}
-                  placeholder={field.hint ?? ''}
-                  value={credentials[adapter.sourceType]?.[field.key] ?? ''}
-                  onChange={(e) =>
-                    updateCredential(adapter.sourceType, field.key, e.target.value)
-                  }
-                  className={`w-full ${CONFIG_CONTROL_CLASS}`}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+          {adapter.credentialFields.map((field) => (
+            <ConfigField
+              key={field.key}
+              label={field.label}
+              type={field.secret ? 'password' : 'text'}
+              value={credentials[adapter.sourceType]?.[field.key] ?? ''}
+              onChange={(value) => updateCredential(adapter.sourceType, field.key, value)}
+            />
+          ))}
+        </section>
       ))}
     </div>
   );
