@@ -104,7 +104,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
         ref={combinedRef}
         {...attributes}
         {...listeners}
-        className={`relative flex items-center gap-1 py-0.5 pr-2 cursor-pointer rounded-none mx-1 transition-colors min-h-[26px] ${
+        className={`relative flex items-center gap-1 max-md:gap-2 py-0.5 max-md:py-2 pr-2 max-md:pr-3 cursor-pointer rounded-none mx-1 transition-colors min-h-[26px] max-md:min-h-[42px] touch-pan-y ${
           isDragging
             ? 'opacity-40'
             : isSelected
@@ -122,25 +122,25 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
       >
         {/* 토글 화살표: 클릭만 담당 (DnD listeners는 outer div로 이동) */}
         <span
-          className="w-4 flex items-center justify-center text-muted-foreground cursor-grab shrink-0"
+          className="w-4 h-6 max-md:w-9 max-md:h-9 max-md:-my-1 max-md:-ml-1.5 flex items-center justify-center text-muted-foreground cursor-grab shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             if (!loading && hasChildren) handleToggle(e);
           }}
         >
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" strokeWidth={1.75} /> : hasChildren ? (isExpanded ? <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.75} /> : <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.75} />) : ' '}
+          {loading ? <Loader2 className="w-3.5 h-3.5 max-md:w-4 max-md:h-4 animate-spin text-muted-foreground" strokeWidth={1.75} /> : hasChildren ? (isExpanded ? <ChevronDown className="w-3.5 h-3.5 max-md:w-4 max-md:h-4" strokeWidth={1.75} /> : <ChevronRight className="w-3.5 h-3.5 max-md:w-4 max-md:h-4" strokeWidth={1.75} />) : ' '}
         </span>
         <span className="inline-flex items-center justify-center shrink-0" title={isStructure ? 'structure' : 'knowledge'}>
           {isStructure
             ? isExpanded
-              ? <FolderOpen className="w-3.5 h-3.5 text-[var(--blue)]" strokeWidth={1.75} />
-              : <Folder className="w-3.5 h-3.5 text-[var(--blue)]" strokeWidth={1.75} />
-            : <FileText className="w-3.5 h-3.5 text-brand" strokeWidth={1.75} />}
+              ? <FolderOpen className="w-3.5 h-3.5 max-md:w-4 max-md:h-4 text-[var(--blue)]" strokeWidth={1.75} />
+              : <Folder className="w-3.5 h-3.5 max-md:w-4 max-md:h-4 text-[var(--blue)]" strokeWidth={1.75} />
+            : <FileText className="w-3.5 h-3.5 max-md:w-4 max-md:h-4 text-brand" strokeWidth={1.75} />}
         </span>
         {node.is_symlink && (
           <span className="text-[13px] text-muted-foreground shrink-0" title="symlink">↗</span>
         )}
-        <span className="flex-1 min-w-0 text-sm truncate">
+        <span className="flex-1 min-w-0 text-sm max-md:text-[15px] truncate">
           {node.card.title}
         </span>
         {node.is_symlink && node.canonical_path && (

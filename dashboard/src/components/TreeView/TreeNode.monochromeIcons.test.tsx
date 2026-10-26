@@ -79,6 +79,28 @@ test('tree structure, knowledge, and expand controls render monochrome SVG icons
   expect(icons[2].getAttribute('class')).toContain('text-brand');
 });
 
+test('tree rows expose mobile touch targets for rows and expand controls', () => {
+  const structure = node('structure', 'structure', [node('knowledge', 'knowledge')]);
+  const markup = renderToStaticMarkup(
+    <TreeNode
+      node={structure}
+      selectedNodeId={null}
+      onSelect={() => {}}
+      isExpanded
+      expandedNodes={new Set(['structure'])}
+      onToggle={() => {}}
+    />
+  );
+  const container = parseMarkup(markup);
+  const row = container.querySelector('[data-testid="tree-node-structure"] > div');
+  const toggle = row?.querySelector('span');
+
+  expect(row?.className).toContain('max-md:min-h-[42px]');
+  expect(row?.className).toContain('touch-pan-y');
+  expect(toggle?.className).toContain('max-md:w-9');
+  expect(toggle?.className).toContain('max-md:h-9');
+});
+
 test('mobile navigation renders five monochrome SVG icons with the theme color classes', () => {
   const markup = renderToStaticMarkup(
     <MobileTabBar activeTab="tree" onTabChange={() => {}} showSettings />

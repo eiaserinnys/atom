@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragStartEvent,
@@ -13,7 +14,8 @@ import { buildMovePayload, type TreeMovePayload } from '../../utils/treeMoveInte
 import type { DropZone, TreeDndState } from './TreeDndContext';
 import { calcDropZone, isAncestorOf } from './treeDndLogic';
 
-const pointerSensorOptions = { activationConstraint: { distance: 5 } };
+export const mouseSensorOptions = { activationConstraint: { distance: 8 } };
+export const touchSensorOptions = { activationConstraint: { delay: 400, tolerance: 8 } };
 
 interface UseTreeDragAndDropArgs {
   roots: TreeNodeData[] | undefined;
@@ -34,12 +36,21 @@ export function useTreeDragAndDrop({ roots, onMove }: UseTreeDragAndDropArgs) {
   useEffect(() => {
     if (!activeId) return;
     const onPointerMove = (e: PointerEvent) => { pointerYRef.current = e.clientY; };
+    const onTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (touch) pointerYRef.current = touch.clientY;
+    };
     window.addEventListener('pointermove', onPointerMove);
-    return () => window.removeEventListener('pointermove', onPointerMove);
+    window.addEventListener('touchmove', onTouchMove);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('touchmove', onTouchMove);
+    };
   }, [activeId]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, pointerSensorOptions)
+    useSensor(MouseSensor, mouseSensorOptions),
+    useSensor(TouchSensor, touchSensorOptions)
   );
 
   function resetDragState() {
