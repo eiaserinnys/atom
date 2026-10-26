@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'editor' | 'viewer';
+export type AgentScope = 'read' | 'write';
 
 export interface User {
   id: string;
@@ -15,6 +16,7 @@ export interface Agent {
   display_name: string | null;
   is_active: boolean;
   created_at: string;
+  scope: AgentScope;
 }
 
 export interface TreeNodeData {

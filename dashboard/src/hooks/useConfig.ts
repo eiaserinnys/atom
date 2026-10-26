@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { configApi, type User, type Agent, type UserRole } from '../api/client';
+import { configApi, type Agent, type AgentScope, type User, type UserRole } from '../api/client';
 
 export function useConfig() {
   const [users, setUsers] = useState<User[]>([]);
@@ -46,7 +46,7 @@ export function useConfig() {
   );
 
   const createAgent = useCallback(
-    async (input: { agent_id: string; display_name?: string }) => {
+    async (input: { agent_id: string; display_name?: string; scope: AgentScope }) => {
       const result = await configApi.createAgent(input);
       setLastCreatedSecret(result.secret ?? null);
       await loadAgents();
@@ -60,11 +60,11 @@ export function useConfig() {
   }, []);
 
   const updateAgent = useCallback(
-    async (id: string, body: { is_active: boolean }) => {
-      await configApi.updateAgent(id, body);
-      await loadAgents();
+    async (id: string, body: { is_active?: boolean; scope?: AgentScope }) => {
+      const updated = await configApi.updateAgent(id, body);
+      setAgents(current => current.map(agent => agent.id === id ? updated : agent));
     },
-    [loadAgents]
+    []
   );
 
   const clearSecret = useCallback(() => setLastCreatedSecret(null), []);
