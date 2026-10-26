@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Spinner } from '../components/Spinner';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -22,8 +23,7 @@ export function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="flex flex-col items-center gap-3 px-12 py-10 bg-card border border-border rounded-none min-w-[280px]">
-        <h1 className="m-0 text-2xl font-semibold text-foreground font-sans">{t('login.title')}</h1>
-        <p className="m-0 text-sm text-muted-foreground font-sans">{t('login.desc')}</p>
+        <h1 className="m-0 font-mono font-bold text-2xl tracking-[-0.03em] text-foreground">{t('login.title')}</h1>
 
         <div className="flex flex-col gap-2 mt-2 w-full">
           {providers?.slack && (
@@ -61,7 +61,7 @@ export function LoginPage() {
 
           {providers === null && (
             <div className="flex justify-center py-2">
-              <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-none animate-spin" />
+              <Spinner label={t('common.loading')} />
             </div>
           )}
         </div>

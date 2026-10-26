@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Spinner } from '../Spinner';
 
 interface CardFormModalProps {
   mode: 'create' | 'edit';
@@ -50,7 +51,7 @@ export function CardFormModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70"
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -96,9 +97,9 @@ export function CardFormModal({
           <button
             onClick={handleConfirm}
             disabled={!title.trim() || isLoading}
-            className="px-3 py-1.5 text-sm bg-primary hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm bg-primary hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
-            {isLoading ? t('cardform.saving') : mode === 'create' ? t('cardform.creating') : t('common.save')}
+            {isLoading && <Spinner size="sm" />}{mode === 'create' ? t('cardform.creating') : t('common.save')}
           </button>
         </div>
       </div>

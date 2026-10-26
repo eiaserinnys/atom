@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
+import { Spinner } from '../Spinner';
 
 interface DeleteConfirmModalProps {
   title: string;
@@ -27,7 +28,7 @@ export function DeleteConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70"
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -39,7 +40,7 @@ export function DeleteConfirmModal({
         </div>
 
         {isStructure && (
-          <div className="flex items-center gap-2 text-[13px] text-[var(--amber)] bg-[var(--amber-soft)] border border-[var(--amber)]/30 rounded-none px-3 py-2">
+          <div className="flex items-center gap-2 text-[13px] text-foreground bg-[var(--amber-soft)] border border-[var(--amber)]/30 rounded-none px-3 py-2">
             <AlertTriangle className="w-4 h-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
             {t('delete_modal.sub_items_warning')}
           </div>
@@ -60,9 +61,9 @@ export function DeleteConfirmModal({
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="px-3 py-1.5 text-sm bg-node-error hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm bg-node-error hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
-            {isLoading ? t('delete_modal.deleting') : t('delete_modal.confirm_btn')}
+            {isLoading && <Spinner size="sm" />}{t('delete_modal.confirm_btn')}
           </button>
         </div>
       </div>
