@@ -48,6 +48,16 @@ describe("FlatEmbeddingIndex", () => {
     expect(results.map(result => result.similarity)).toEqual([0.5, 0.5]);
   });
 
+  it("accepts a null source so query vectors do not exclude a card by identity", () => {
+    const index = new FlatEmbeddingIndex();
+    index.loadRows([
+      { cardId: "first", version: 1, embedding: serializeEmbedding(vector(0, 0.9)) },
+      { cardId: "second", version: 1, embedding: serializeEmbedding(vector(0, 0.8)) },
+    ]);
+    const results = index.nearest(vector(0, 1), null, new Map([["first", 1], ["second", 1]]), 2);
+    expect(results.map(result => result.cardId)).toEqual(["first", "second"]);
+  });
+
   it("deduplicates IDs, updates versions in place, and swap-deletes without gaps", async () => {
     const index = new FlatEmbeddingIndex();
     index.loadRows([

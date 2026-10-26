@@ -115,7 +115,7 @@ export class FlatEmbeddingIndex {
 
   nearest(
     query: Float32Array,
-    sourceCardId: string,
+    sourceCardId: string | null,
     currentVersions: ReadonlyMap<string, number>,
     limit: number,
   ): NeighborScore[] {

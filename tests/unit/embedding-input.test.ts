@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createEmbeddingHash, createEmbeddingInput } from "../../src/services/embeddings/input.js";
+import { createEmbeddingHash, createEmbeddingInput, createEmbeddingInputFromText } from "../../src/services/embeddings/input.js";
 import { EMBEDDING_POLICY } from "../../src/services/embeddings/policy.js";
 
 describe("embedding input", () => {
@@ -40,5 +40,17 @@ describe("embedding input", () => {
     const result = createEmbeddingInput("한글 제목", "한글 본문 <|endoftext|> <|im_start|>");
     expect(result.tokenCount).toBeGreaterThan(0);
     expect(result.text).toContain("<|endoftext|>");
+  });
+
+  it("shares exact text tokenization while query text has no title separator", () => {
+    const card = createEmbeddingInput("제목", "본문");
+    const fromText = createEmbeddingInputFromText(card.text);
+    expect(fromText).toEqual(card);
+
+    const query = createEmbeddingInputFromText("query text");
+    expect(query.text).toBe("query text");
+    expect(query.contentHash).toBe(createEmbeddingHash("query text"));
+    expect(query.tokenCount).toBe(query.inputTokens.length);
+    expect(query.truncated).toBe(false);
   });
 });
