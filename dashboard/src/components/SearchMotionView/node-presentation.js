@@ -1,6 +1,10 @@
 // Use paths already present in events and the shared tree query cache. Never fetch.
 export function resolveDisplayPath(node, graph, cachedTrees = []) {
-  if (node.path?.length > 1) return node.path;
+  return createDisplayPathResolver(graph, cachedTrees)(node);
+}
+
+// A sync resolves every node against the same graph and tree cache.
+export function createDisplayPathResolver(graph, cachedTrees = []) {
   const known = new Map([...graph.values()].filter(n => n.nodeId).map(n => [n.nodeId, { title: n.title, parent: n.physicalParent }]));
   const visit = rows => {
     for (const row of rows) {
@@ -10,12 +14,15 @@ export function resolveDisplayPath(node, graph, cachedTrees = []) {
     }
   };
   visit(cachedTrees);
-  const path = [node.title]; const seen = new Set([node.nodeId]);
-  let parent = known.get(node.nodeId)?.parent ?? node.physicalParent;
-  while (parent && !seen.has(parent) && known.has(parent)) {
-    seen.add(parent); const item = known.get(parent); path.unshift(item.title); parent = item.parent;
-  }
-  return path;
+  return node => {
+    if (node.path?.length > 1) return node.path;
+    const path = [node.title]; const seen = new Set([node.nodeId]);
+    let parent = known.get(node.nodeId)?.parent ?? node.physicalParent;
+    while (parent && !seen.has(parent) && known.has(parent)) {
+      seen.add(parent); const item = known.get(parent); path.unshift(item.title); parent = item.parent;
+    }
+    return path;
+  };
 }
 
 export function nodeTextLayout(path, zoom, height = 48) {

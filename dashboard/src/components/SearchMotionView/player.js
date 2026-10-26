@@ -2,7 +2,7 @@
 // to preserve the reviewed drawing and playback behavior; the pure reducer is model.js.
 import { createModel, applyEvent } from "./model.js";
 import { createExplorationSession } from './exploration-session.js';
-import { fitZoom, operationGroups, nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
+import { fitZoom, operationGroups, nodeTextLayout, createDisplayPathResolver } from './node-presentation.js';
 import { motionIcon } from './motion-icons.js';
 
 export function createMotionPlayer(root, callbacks, samples = null) {
@@ -32,6 +32,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   let continued = false;
   let receivedDone = false;
   let continuation = false;
+  let continuationOutcome = '';
   let revision = 0;
   const tr = (key, values) => callbacks.translate?.(key, values) ?? key;
   const nodeTitle = n => n.type === 'root' ? tr('visual_search.root') : n.title;
@@ -227,14 +228,15 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   function targetOf(n, L) {
     const key = L.hidden.get(n.ref);
     const p = key ? L.piles.get(key) : L.pos.get(n.ref);
-    return { x: p.x, y: p.y, a: key ? 0 : 1, alive: isAlive(n) ? 1 : 0, dim: isDim(n) ? 1 : 0, sel: n.selected ? 1 : 0, judge: n.judging ? 1 : 0, score: n.score != null ? 1 : 0, port: n.type !== "structure" ? 0 : n.verdict === "open" ? 1 : n.verdict === "pending" ? 0.45 : 0, read: n.reading > 0 || n.climbing ? 1 : 0, soft: n.byRoot ? 1 : 0 };
+    return { x: p.x, y: p.y, a: key ? 0 : 1, alive: isAlive(n) ? 1 : 0, dim: isDim(n) ? 1 : 0, sel: n.selected ? 1 : 0, judge: n.judging ? 1 : 0, score: n.score != null && !(model.continuationStep && n.judging) ? 1 : 0, port: n.type !== "structure" ? 0 : n.verdict === "open" ? 1 : n.verdict === "pending" ? 0.45 : 0, read: n.reading > 0 || n.climbing ? 1 : 0, soft: n.byRoot ? 1 : 0 };
   }
   function snapNode(v) { const t = v.t; v.next = null; v.x = t.x; v.y = t.y; v.vx = v.vy = 0; v.a = t.a; v.alive = t.alive; v.dim = t.dim; v.sel = t.sel; v.judge = t.judge; v.scoreA = t.score; v.port = t.port; v.read = t.read; v.wipe = 1; v.born = 0; v.selAt = 0; }
 
   // 모델이 바뀔 때마다 부른다. animate가 거짓이면 그 자리로 바로 옮긴다(되감기, 건너뛰기, 모션 줄임)
   function sync(now, animate, delta) {
     if (reduced()) animate = false;
-    for (const n of model.nodes.values()) if (!n.referenceTarget) n.path = resolveDisplayPath(n, model.nodes, callbacks.getCachedTreeNodes?.() ?? []);
+    const resolvePath = createDisplayPathResolver(model.nodes, callbacks.getCachedTreeNodes?.() ?? []);
+    for (const n of model.nodes.values()) if (!n.referenceTarget) n.path = resolvePath(n);
     for (const n of model.nodes.values()) if (n.referenceTarget) n.path = model.nodes.get(n.referenceTarget).path;
     const L = layout(model); view.L = L;
     const addedAt = new Map(); const scoredAt = new Map();
@@ -307,7 +309,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     }
     for (const hop of [...view.gauges.keys()]) if (!L.cols.some((c) => c.hop === hop)) view.gauges.delete(hop);
     view.askInfo = model.asking || view.askInfo;
-    if (!animate) { view.stop = model.terminal ? 1 : 0; view.ask = model.asking ? 1 : 0; view.fx.length = 0; view.march = 0; }
+    if (!animate) { view.stop = model.terminal || model.continuationStep ? 1 : 0; view.ask = model.asking ? 1 : 0; view.fx.length = 0; view.march = 0; }
     // 사건에 붙는 한 번짜리 효과
     if (animate && delta) {
       delta.opened.forEach((r, i) => view.fx.push({ type: "ring", ref: r, port: true, at: now + Math.min(240, (scoredAt.get(r) || 0) * 12) + 60, dur: 520, color: "path" }));
@@ -362,8 +364,9 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       if (Math.abs(g.a - g.ta) > 0.01 || Math.abs(g.v - g.tv) > 0.004 || Math.abs(g.ok - g.tok) > 0.01 || (live && g.spin)) active = true;
     }
     view.ask = approach(view.ask, model.asking ? 1 : 0, dt, model.asking ? 0.09 : 0.12);
-    view.stop = approach(view.stop, model.terminal ? 1 : 0, dt, 0.09);
-    if (Math.abs(view.ask - (model.asking ? 1 : 0)) > 0.01 || Math.abs(view.stop - (model.terminal ? 1 : 0)) > 0.01) active = true;
+    const stopping = model.terminal || model.continuationStep ? 1 : 0;
+    view.stop = approach(view.stop, stopping, dt, 0.09);
+    if (Math.abs(view.ask - (model.asking ? 1 : 0)) > 0.01 || Math.abs(view.stop - stopping) > 0.01) active = true;
     if (live && model.inflight.size > 0) active = true;
     view.fx = view.fx.filter((f) => now < f.at + f.dur);
     if (view.fx.length || now < view.march) active = true;
@@ -719,7 +722,8 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       const bold = alive > 0.5; const f = wfont(bold ? 650 : 500, 14);
       const scoreFont = wfont(bold ? 600 : 500, 13);
       ctx.font = scoreFont;
-      const scoreW = n.score != null ? ctx.measureText(n.score.toFixed(2)).width + 8 : n.byHit || n.judging ? 36 : 4;
+      const pending = model.continuationStep && n.judging;
+      const scoreW = n.score != null && !pending ? ctx.measureText(n.score.toFixed(2)).width + 8 : n.byHit || n.judging ? 36 : 4;
       const availableWidth = w - (tx - x) - 8 - scoreW - portPad;
       const key = `${f}/${availableWidth}`;
       if (!v.fit || v.fitKey !== key) { v.fit = fitText(nodeTitle(n), availableWidth, f); v.fitKey = key; }
@@ -732,13 +736,13 @@ export function createMotionPlayer(root, callbacks, samples = null) {
         ctx.fillText(fitText(path, w - (tx - x) - 8, wfont(500, 13)), tx, y + 35);
       }
       const sx = x + w - 9 - portPad;
-      if (n.score != null && v.scoreA > 0.02) {
+      if (n.score != null && !pending && v.scoreA > 0.02) {
         ctx.globalAlpha = v.a * v.scoreA; ctx.font = scoreFont; ctx.textAlign = "right";
         ctx.fillStyle = css(mix(T.ink2, T.lowText, dim)); ctx.fillText(n.score.toFixed(2), sx, cy + (1 - v.scoreA) * 5); ctx.globalAlpha = v.a;
       } else if (n.byHit) {
         ctx.strokeStyle = css(T.path); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(sx - 5, cy + 5); ctx.lineTo(sx - 5, cy - 5); ctx.moveTo(sx - 9, cy - 1); ctx.lineTo(sx - 5, cy - 5); ctx.lineTo(sx - 1, cy - 1); ctx.stroke();
       }
-      if (v.judge > 0.02 && n.score == null) {
+      if (v.judge > 0.02 && (n.score == null || pending)) {
         for (let i = 0; i < 3; i += 1) { const ph = judging() ? 0.5 + 0.5 * Math.sin(now / 150 - i * 0.9) : 0.6; ctx.globalAlpha = v.a * v.judge * (0.3 + 0.7 * ph); ctx.fillStyle = css(T.jev); ctx.beginPath(); ctx.arc(sx - 18 + i * 7, cy, 2, 0, 6.2832); ctx.fill(); }
         ctx.globalAlpha = v.a;
       }
@@ -858,7 +862,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     }
     // 끝난 까닭 (우측 하단 스탬프 배지 - 상단 홉 눈금과 절대 겹치지 않도록 배치)
     if (view.stop > 0.02 && L.cols.length) {
-      const label = operationNarration() || stopLabel(model.terminal); ctx.font = font(700, 13);
+      const label = model.continuationStep ? tr('visual_search.status_more') : operationNarration() || stopLabel(model.terminal); ctx.font = font(700, 13);
       const tw = ctx.measureText(label).width + 30;
       const bx = Math.max(8, W - tw - 14);
       const failed = model.exploration?.operations.at(-1)?.status === 'failed';
@@ -971,13 +975,11 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   function receive(ev) {
     history.receive(ev);
     if (continuation) {
-      const follow = cursor === history.timeline().frames.length || cursor === history.timeline().frames.length - 1;
-      if (ev.event === 'done') { continued = true; receivedDone = true; continuation = false; player.serverDone = true; }
-      if (follow) {
-        projectTo(history.timeline().frames.length, true);
-        if (ev.event === 'done') { setFollow(true); followHop(model.maxHop, reduced()); setFollow(false); }
-      }
-      chrome(); return;
+      if (ev.event === 'done') { continued = true; receivedDone = true; player.serverDone = true; }
+      // Network delivery can contain an entire segment in one chunk. Its frames
+      // still belong to the presentation clock, just like the initial search.
+      if (!player.timer) pumpContinuation();
+      return;
     }
     const t = eventTime(ev); if (player.events.length === 0) player.t0 = t;
     player.events.push(ev); player.ts.push(Math.max(player.ts[player.ts.length - 1] || 0, t - player.t0));
@@ -986,6 +988,43 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     player.received = player.events.length;
     if (ev.event === "run") tickSummary();
     pump();
+  }
+  function pumpContinuation() {
+    player.timer = 0;
+    if (!player.playing) return;
+    const frames = history.timeline().frames;
+    if (reduced() && !player.serverDone) return;
+    if (reduced() || player.fast) {
+      projectTo(frames.length, false, true);
+      if (player.serverDone) finishContinuation();
+      return;
+    }
+    if (cursor < frames.length) {
+      const events = frames[cursor].events;
+      const completed = events.findLast(event => event.event === 'step_completed');
+      const before = new Set(model.nodes.keys());
+      projectTo(cursor + 1, true, true, false, true);
+      if (ui.follow && !['selection', 'run_terminal'].includes(completed?.data.step.stage)) {
+        followHop(model.continuationStep?.hop ?? model.maxHop, false);
+        const added = [...model.nodes.values()].filter(node => !before.has(node.ref));
+        if (added.length) { followHop(added.at(-1).hop, false); ensureVisible(added.at(-1).ref); }
+        else if (model.continuationStep?.refs.length) {
+          const ref = model.continuationStep.refs[0];
+          ensureVisible(view.L.hidden.has(ref) ? '@' + view.L.hidden.get(ref) : ref);
+        }
+      }
+      const gap = player.fast || reduced() ? 0 : gapAfter(completed) * (player.serverDone ? 0.5 : 1);
+      player.timer = setTimeout(pumpContinuation, gap);
+    } else if (player.serverDone) {
+      // done can be appended to the last frame after that frame was displayed.
+      projectTo(cursor, true, true);
+      finishContinuation();
+    }
+  }
+  function finishContinuation() {
+    continuation = false; player.playing = false; player.fast = false;
+    if (ui.follow) followHop(model.maxHop, true);
+    setFollow(false); chrome();
   }
   // resume이 참이면 입구에서 끝난 실행을 그 자리에서 이어 간다(더 찾아보기). 입구까지의 사건은 바로 반영하고 다음 홉부터 펼친다
   function startLive(source, instant = false, resume = false) {
@@ -1032,6 +1071,12 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   }
   function seekEvent(index) { seek(0, false); while (player.applied < Math.min(index, player.received)) applyEvent(model, player.events[player.applied++]); sync(performance.now(), false, null); if (model.last) followHop(model.last.hop, true); chrome(); }
   function play() {
+    if (continuation) {
+      player.playing = !player.playing;
+      clearTimeout(player.timer); player.timer = 0;
+      if (player.playing) pumpContinuation();
+      chrome(); return;
+    }
     if (receivedDone) {
       if (player.playing) { player.playing = false; clearTimeout(player.timer); chrome(); return; }
       if (!projected || cursor >= history.timeline().frames.length) projectTo(0, false);
@@ -1057,6 +1102,15 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   }
   // 건너뛰기: 받은 데까지 바로 보여 주고, 남은 사건은 도착하는 대로 기다림 없이 반영한다
   function skip() {
+    if (continuation) {
+      clearTimeout(player.timer); player.timer = 0;
+      projectTo(history.timeline().frames.length, false);
+      player.fast = !player.serverDone; player.playing = !player.serverDone;
+      if (player.serverDone) continuation = false;
+      setFollow(true); followHop(model.maxHop, true);
+      if (player.serverDone) setFollow(false);
+      chrome(); return;
+    }
     if (receivedDone && !player.source) { projectTo(history.timeline().frames.length, false); fitAll(true); return; }
     clearTimeout(player.timer);
     clearTimeout(player.arrive);
@@ -1244,19 +1298,31 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     if (activeIndex >= 0) syncDockActive(activeIndex, false);
   }
 
-  function projectTo(position, animate = false, keepPlaying = false, evaluating = false) {
+  function projectTo(position, animate = false, keepPlaying = false, evaluating = false, searching = false) {
     if (!keepPlaying) { clearTimeout(player.timer); player.playing = false; }
     projected = true; cursor = clamp(position, 0, history.timeline().frames.length);
-    const result = history.project(cursor, evaluating); model = result.scene;
+    const result = history.project(cursor, evaluating, searching); model = result.scene;
     selectedRef = [...model.nodes.values()].find(n => n.cardId === result.selectionCardId)?.ref ?? null;
     if (selectedArrival && !model.exploration.operations.some(op => op.id === selectedArrival)) selectedArrival = null;
     sync(performance.now(), animate, null);
-    dashboard.syncSearchOutcome(model, sentText, verdictOf);
+    // Read/judge animation is local to the canvas. Repeated exhaustive steps do
+    // not change the frozen cards, so they need no React result-tree update.
+    const outcomeKey = continuation ? JSON.stringify([selectedRef, model.exploration.cards.map(card => [
+      card.cardId, card.nodeId, card.title, card.path, card.score, card.rank, card.selected,
+      card.evaluation, card.renderNode?.verdict, card.renderNode?.asked,
+    ])]) : null;
+    const publish = !continuation || continuationOutcome !== outcomeKey;
+    if (publish) {
+      continuationOutcome = outcomeKey;
+      const outcome = searching ? { ...model, nodes: new Map([...model.nodes].map(([ref, node]) => [ref,
+        { ...node, reading: 0, judging: null, climbing: false }])) } : model;
+      dashboard.syncSearchOutcome(outcome, sentText, verdictOf);
+    }
     renderResultTray();
-    if (selectedRef) {
+    if (publish && selectedRef) {
       const n = model.nodes.get(selectedRef);
       dashboard.selectFromSearch(n, verdictOf(n).word, sentText(n, true));
-    } else callbacks.onSelect(null);
+    } else if (publish) callbacks.onSelect(null);
     chrome();
   }
   function snapshot() {
@@ -1284,7 +1350,11 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     const fingerprint = JSON.stringify([chapters, cursor]);
     if (strip.dataset.projection === fingerprint) return;
     strip.dataset.projection = fingerprint; strip.replaceChildren();
-    const titles = new Map(history.project(timeline.frames.length).projection.cards.map(card => [card.cardId, card.title]));
+    // Chapter labels need titles, not a second full projection of the future.
+    const titles = new Map();
+    for (const frame of timeline.frames) for (const event of frame.events) {
+      for (const card of event.data?.candidates ?? event.response?.neighbors ?? []) titles.set(card.card_id, card.title);
+    }
     for (const [number, chapter] of chapters.entries()) {
       const button = document.createElement('button'); button.type = 'button';
       const index = timeline.frames.findLastIndex(frame => chapter.frameIds.includes(frame.id)) + 1;
@@ -1364,7 +1434,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     const calls = new Map([...model.calls.values(), ...operations.flatMap(op => op.auditCalls)].filter(call => JEV.has(call.stage)).map(call => [call.call_id, call]));
     const active = operations.find(op => op.status === 'running');
     const waiting = active && (active.kind === 'evaluate' ? active.requestedCardIds : active.fromCardId === null ? active.resultCardIds : []).some(id => !model.exploration.evaluations.has(id));
-    const duration = model.run && model.done ? Math.max(0, Date.parse(model.done.completed_at) - Date.parse(model.run.started_at)) : 0;
+    const duration = model.searchDurationMs ?? (model.run && model.done ? Math.max(0, Date.parse(model.done.completed_at) - Date.parse(model.run.started_at)) : 0);
     const extra = operations.flatMap(op => op.auditCalls).reduce((sum, call) => sum + (call.latency_ms ?? 0), 0);
     $('sum-time').textContent = tr('visual_search.seconds', { value: ((duration + extra) / 1000 || 0).toFixed(1) });
     $('sum-jev').textContent = ', ' + tr('visual_search.jev_calls', { count: calls.size + (waiting ? 1 : 0) });
@@ -1520,7 +1590,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   }
   function ensureVisible(key) {
     const v = key[0] === "@" ? view.piles.get(key.slice(1)) : view.nodes.get(key); if (!v) return;
-    const t = v.t || { x: v.tx, y: v.ty }; const z = cam.tz; const vw = (W - sheetInset()) / z; const vh = (H - M.headerH - overlayRoom()) / z; let x = cam.tx; let y = cam.ty;
+    const t = v.t || { x: v.tx, y: v.ty }; const z = cam.tz; const vw = (W - sheetInset()) / z; const vh = (H - M.headerH - overlayRoom(!!model.continuationStep)) / z; let x = cam.tx; let y = cam.ty;
     const width = key === selectedRef ? Math.max(M.colW, actionWidth / z) : M.colW;
     if (t.x + width + 16 > x + vw) x = t.x + width + 16 - vw; if (t.x - 16 < x) x = t.x - 16;
     const bottom = M.rowH + (key === selectedRef ? (M.actionH + M.actionGap * 2) / z : 0);
@@ -1648,7 +1718,11 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   listen($("t-prev"), "click", () => seek(projected ? cursor - 1 : frameOf(player.applied) - (player.frameEnds[frameOf(player.applied) - 1] === player.applied ? 1 : 0)));
   listen($("t-next"), "click", () => seek(projected ? cursor + 1 : frameOf(player.applied) + 1));
   listen($("t-last"), "click", () => { if (receivedDone) seek(history.timeline().frames.length, false); else skip(); });
-  listen($("t-skip"), "change", e => { if (e.target.checked) skip(); else { player.fast = false; pump(); } });
+  listen($("t-skip"), "change", e => { if (e.target.checked) skip(); else {
+    player.fast = false;
+    if (continuation) { clearTimeout(player.timer); player.timer = 0; pumpContinuation(); }
+    else pump();
+  } });
   listen($("scrub"), "input", (e) => seek(Number(e.target.value)));
   listen($("t-low"), "change", (e) => { ui.showLow = e.target.checked; sync(performance.now(), true, null); });
   listen($("t-zin"), "click", () => zoomFromSelection(cam.tz * 1.25));
@@ -1691,7 +1765,9 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       if (resume) {
         if (!projected) skip();
         history.truncate(cursor); history.begin(query, { resume: true });
-        continuation = true; revision += 1; player.serverDone = false; chrome(); return;
+        continuation = true; continuationOutcome = ''; revision += 1;
+        clearTimeout(player.timer); player.timer = 0; player.serverDone = false; player.playing = true; player.fast = false;
+        setFollow(true); chrome(); return;
       }
       history.begin(query); projected = false; cursor = 0; selectedRef = null; initialStopReason = null; continued = false; receivedDone = false; continuation = false; revision += 1;
       live = true; lastQuery = query;
