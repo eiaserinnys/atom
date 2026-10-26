@@ -32,6 +32,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   let continued = false;
   let receivedDone = false;
   let continuation = false;
+  let continuationOutcome = '';
   let revision = 0;
   const tr = (key, values) => callbacks.translate?.(key, values) ?? key;
   const nodeTitle = n => n.type === 'root' ? tr('visual_search.root') : n.title;
@@ -227,7 +228,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   function targetOf(n, L) {
     const key = L.hidden.get(n.ref);
     const p = key ? L.piles.get(key) : L.pos.get(n.ref);
-    return { x: p.x, y: p.y, a: key ? 0 : 1, alive: isAlive(n) ? 1 : 0, dim: isDim(n) ? 1 : 0, sel: n.selected ? 1 : 0, judge: n.judging ? 1 : 0, score: n.score != null ? 1 : 0, port: n.type !== "structure" ? 0 : n.verdict === "open" ? 1 : n.verdict === "pending" ? 0.45 : 0, read: n.reading > 0 || n.climbing ? 1 : 0, soft: n.byRoot ? 1 : 0 };
+    return { x: p.x, y: p.y, a: key ? 0 : 1, alive: isAlive(n) ? 1 : 0, dim: isDim(n) ? 1 : 0, sel: n.selected ? 1 : 0, judge: n.judging ? 1 : 0, score: n.score != null && !(model.continuationStep && n.judging) ? 1 : 0, port: n.type !== "structure" ? 0 : n.verdict === "open" ? 1 : n.verdict === "pending" ? 0.45 : 0, read: n.reading > 0 || n.climbing ? 1 : 0, soft: n.byRoot ? 1 : 0 };
   }
   function snapNode(v) { const t = v.t; v.next = null; v.x = t.x; v.y = t.y; v.vx = v.vy = 0; v.a = t.a; v.alive = t.alive; v.dim = t.dim; v.sel = t.sel; v.judge = t.judge; v.scoreA = t.score; v.port = t.port; v.read = t.read; v.wipe = 1; v.born = 0; v.selAt = 0; }
 
@@ -721,7 +722,8 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       const bold = alive > 0.5; const f = wfont(bold ? 650 : 500, 14);
       const scoreFont = wfont(bold ? 600 : 500, 13);
       ctx.font = scoreFont;
-      const scoreW = n.score != null ? ctx.measureText(n.score.toFixed(2)).width + 8 : n.byHit || n.judging ? 36 : 4;
+      const pending = model.continuationStep && n.judging;
+      const scoreW = n.score != null && !pending ? ctx.measureText(n.score.toFixed(2)).width + 8 : n.byHit || n.judging ? 36 : 4;
       const availableWidth = w - (tx - x) - 8 - scoreW - portPad;
       const key = `${f}/${availableWidth}`;
       if (!v.fit || v.fitKey !== key) { v.fit = fitText(nodeTitle(n), availableWidth, f); v.fitKey = key; }
@@ -734,13 +736,13 @@ export function createMotionPlayer(root, callbacks, samples = null) {
         ctx.fillText(fitText(path, w - (tx - x) - 8, wfont(500, 13)), tx, y + 35);
       }
       const sx = x + w - 9 - portPad;
-      if (n.score != null && v.scoreA > 0.02) {
+      if (n.score != null && !pending && v.scoreA > 0.02) {
         ctx.globalAlpha = v.a * v.scoreA; ctx.font = scoreFont; ctx.textAlign = "right";
         ctx.fillStyle = css(mix(T.ink2, T.lowText, dim)); ctx.fillText(n.score.toFixed(2), sx, cy + (1 - v.scoreA) * 5); ctx.globalAlpha = v.a;
       } else if (n.byHit) {
         ctx.strokeStyle = css(T.path); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(sx - 5, cy + 5); ctx.lineTo(sx - 5, cy - 5); ctx.moveTo(sx - 9, cy - 1); ctx.lineTo(sx - 5, cy - 5); ctx.lineTo(sx - 1, cy - 1); ctx.stroke();
       }
-      if (v.judge > 0.02 && n.score == null) {
+      if (v.judge > 0.02 && (n.score == null || pending)) {
         for (let i = 0; i < 3; i += 1) { const ph = judging() ? 0.5 + 0.5 * Math.sin(now / 150 - i * 0.9) : 0.6; ctx.globalAlpha = v.a * v.judge * (0.3 + 0.7 * ph); ctx.fillStyle = css(T.jev); ctx.beginPath(); ctx.arc(sx - 18 + i * 7, cy, 2, 0, 6.2832); ctx.fill(); }
         ctx.globalAlpha = v.a;
       }
@@ -1303,12 +1305,24 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     selectedRef = [...model.nodes.values()].find(n => n.cardId === result.selectionCardId)?.ref ?? null;
     if (selectedArrival && !model.exploration.operations.some(op => op.id === selectedArrival)) selectedArrival = null;
     sync(performance.now(), animate, null);
-    dashboard.syncSearchOutcome(model, sentText, verdictOf);
+    // Read/judge animation is local to the canvas. Repeated exhaustive steps do
+    // not change the frozen cards, so they need no React result-tree update.
+    const outcomeKey = continuation ? JSON.stringify([selectedRef, model.exploration.cards.map(card => [
+      card.cardId, card.nodeId, card.title, card.path, card.score, card.rank, card.selected,
+      card.evaluation, card.renderNode?.verdict, card.renderNode?.asked,
+    ])]) : null;
+    const publish = !continuation || continuationOutcome !== outcomeKey;
+    if (publish) {
+      continuationOutcome = outcomeKey;
+      const outcome = searching ? { ...model, nodes: new Map([...model.nodes].map(([ref, node]) => [ref,
+        { ...node, reading: 0, judging: null, climbing: false }])) } : model;
+      dashboard.syncSearchOutcome(outcome, sentText, verdictOf);
+    }
     renderResultTray();
-    if (selectedRef) {
+    if (publish && selectedRef) {
       const n = model.nodes.get(selectedRef);
       dashboard.selectFromSearch(n, verdictOf(n).word, sentText(n, true));
-    } else callbacks.onSelect(null);
+    } else if (publish) callbacks.onSelect(null);
     chrome();
   }
   function snapshot() {
@@ -1751,7 +1765,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       if (resume) {
         if (!projected) skip();
         history.truncate(cursor); history.begin(query, { resume: true });
-        continuation = true; revision += 1;
+        continuation = true; continuationOutcome = ''; revision += 1;
         clearTimeout(player.timer); player.timer = 0; player.serverDone = false; player.playing = true; player.fast = false;
         setFollow(true); chrome(); return;
       }

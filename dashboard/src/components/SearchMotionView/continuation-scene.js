@@ -34,7 +34,6 @@ export function presentContinuation(scene, segment, frame, active) {
   if (['structure_noul', 'content_noul', 'sufficiency_noul'].includes(step.stage)) {
     for (const ref of refs) {
       scene.nodes.get(ref).judging = `${frame.segmentId}:${step.id}`;
-      scene.nodes.get(ref).score = null;
     }
     const call = scene.inflight.get(`${frame.segmentId}:${step.id}`);
     for (const targetHop of new Set(refs.map(ref => scene.nodes.get(ref).hop))) {

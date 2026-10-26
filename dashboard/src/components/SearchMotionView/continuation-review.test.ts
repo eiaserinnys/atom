@@ -38,7 +38,7 @@ test('A: continuation expansion and gate frames mark the existing canonical node
     const active = [...scene.nodes.values()].filter((n: any) => stage === 'atom_outline' ? n.reading > 0 : n.judging);
     expect(active.length).toBeGreaterThan(0);
     expect(active.every((n: any) => initial.nodes.has(n.ref))).toBe(true);
-    if (stage !== 'atom_outline') expect(active.every((n: any) => n.score === null)).toBe(true);
+    if (stage !== 'atom_outline') expect(active.every((n: any) => n.score === initial.nodes.get(n.ref).score)).toBe(true);
     expect(scene.inflight.size).toBeGreaterThan(0);
   }
 });
