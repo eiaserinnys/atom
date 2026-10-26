@@ -46,7 +46,7 @@ export function ConfigFooter({
             {t('common.close')}
           </ConfigActionButton>
         )}
-        {pendingRestart ? (
+        {pendingRestart && !mobile ? (
           <ConfigActionButton onClick={triggerRestart}>{t('system.restart_now')}</ConfigActionButton>
         ) : isAuthTab ? (
           <ConfigActionButton onClick={() => { void authFooter?.onSave(); }} disabled={authFooter?.disabled ?? true}>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Folder, XCircle } from 'lucide-react';
+import { CheckCircle2, TriangleAlert, XCircle } from 'lucide-react';
 import { configApi } from '../../api/client';
 import { useSystem } from '../../contexts/systemContext';
 import { ConfigActionButton, CONFIG_CONTROL_CLASS } from './ConfigFields';
@@ -158,7 +158,7 @@ export function DatabaseTab() {
               {info.deprecatedFileExists ? (
                 <span className="text-brand text-[13px]"><CheckCircle2 className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.file_migrated')}</span>
               ) : info.sqliteFileExists ? (
-                <span className="text-[var(--amber)] text-[13px]"><Folder className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.file_exists')}</span>
+                <span className="flex items-center gap-2 text-foreground text-[13px]"><TriangleAlert className="h-4 w-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />{t('database.file_exists')}</span>
               ) : (
                 <span className="text-muted-foreground text-[13px]">{t('database.file_none')}</span>
               )}

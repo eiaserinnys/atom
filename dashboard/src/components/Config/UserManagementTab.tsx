@@ -149,26 +149,22 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                     {user.is_active ? t('users.active') : t('users.inactive')}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="flex flex-col">
-                    <label htmlFor={`user-role-${user.id}`} className="mb-1 block text-[13px] text-muted-foreground">
-                      {t('users.role_label')}
-                    </label>
-                    <select
-                      id={`user-role-${user.id}`}
-                      className={`w-auto h-9 ${CONFIG_CONTROL_CLASS}`}
-                      value={user.role}
-                      disabled={isSelf}
-                      title={isSelf ? t('users.self_role_tooltip') : undefined}
-                      onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                    >
-                      {Object.entries(ROLE_LABELS).map(([r, label]) => (
-                        <option key={r} value={r}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    id={`user-role-${user.id}`}
+                    aria-label={t('users.role_label')}
+                    className={`w-auto h-9 ${CONFIG_CONTROL_CLASS}`}
+                    value={user.role}
+                    disabled={isSelf}
+                    title={isSelf ? t('users.self_role_tooltip') : undefined}
+                    onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
+                  >
+                    {Object.entries(ROLE_LABELS).map(([r, label]) => (
+                      <option key={r} value={r}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                   <ConfigActionButton
                     tone="secondary"
                     disabled={isSelf}

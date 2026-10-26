@@ -28,6 +28,7 @@ export function CredentialsTab() {
               key={field.key}
               label={field.label}
               type={field.secret ? 'password' : 'text'}
+              placeholder={field.hint}
               value={credentials[adapter.sourceType]?.[field.key] ?? ''}
               onChange={(value) => updateCredential(adapter.sourceType, field.key, value)}
             />
