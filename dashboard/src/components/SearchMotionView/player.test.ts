@@ -5,6 +5,14 @@ import markup from './motion.html?raw';
 import samples from './samples.json';
 import type { MotionEvent } from './stream';
 
+function settleFrames(frames: FrameRequestCallback[]) {
+  let now = performance.now();
+  for (let step = 0; step < 60 && frames.length; step++) {
+    now += 16;
+    frames.shift()!(now);
+  }
+}
+
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 test('skip stays checked while a live stream is arriving and applies the remaining steps', () => {
   const context = new Proxy({}, { get: (_target, key) => key === 'measureText' ? (text: string) => ({ width: text.length * 7 }) : key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {} });
@@ -40,7 +48,7 @@ test('renders approved two-line rows and shows low candidates by default at desk
   const host = document.createElement('div'); host.innerHTML = markup; document.body.append(host);
   const player = createMotionPlayer(host, { onSelect: vi.fn(), onResults: vi.fn(), onMore: vi.fn(), onCancel: vi.fn() }, samples);
   try {
-    frames.shift()?.(performance.now());
+    settleFrames(frames);
     expect.soft(host.querySelector<HTMLInputElement>('[data-motion-id=t-low]')!.checked).toBe(true);
     const nodeHeights = rects.filter(([, , width]) => width === 268).map(([, , , height]) => height);
     expect.soft(nodeHeights).toContain(48);
@@ -66,7 +74,7 @@ test('selection exposes DOM operations, repeated cards become references, and re
     (samples.atom as unknown as MotionEvent[]).forEach(event => player.receive(event.event === 'done' ? { ...event, data: { ...event.data, stop_reason: 'exhausted' } } : event));
     const plot = button('plot'); plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    frames.shift()?.(performance.now());
+    settleFrames(frames);
     expect(button('node-actions').hidden).toBe(false);
     expect(button('node-expand').disabled).toBe(false);
     expect(button('node-evaluate').disabled).toBe(true);
