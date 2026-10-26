@@ -93,7 +93,7 @@
     "inactive": "Inactive",
     "activate": "Activate",
     "deactivate": "Deactivate",
-    "reissue": "Reissue Secret",
+    "reissue": "Reissue",
     "acknowledged": "Got it",
     "copy_hint": "Copy secret",
     "revoke_confirm": "Revoke API key \"{{name}}\"?",

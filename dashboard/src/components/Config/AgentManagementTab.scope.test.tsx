@@ -161,6 +161,7 @@ describe('Agent API key scopes', () => {
     await render('editor');
 
     expect(host.textContent).not.toContain('agents.create_section');
+    expect(host.textContent).not.toContain('agents.list_section');
     expect(host.textContent).toContain('Read');
     expect(host.textContent).toContain('Write');
     expect(host.querySelector('select')).toBeNull();

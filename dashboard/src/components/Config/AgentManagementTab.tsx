@@ -161,9 +161,11 @@ export function AgentManagementTab({ currentUserRole }: Props) {
       )}
 
       <section>
-        <h3 className="mb-3 text-sm font-semibold text-foreground">
-          {t('agents.list_section')}
-        </h3>
+        {canManageAgents && (
+          <h3 className="mb-3 text-sm font-semibold text-foreground">
+            {t('agents.list_section')}
+          </h3>
+        )}
         {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
         {!loading && agents.length === 0 && (
           <div className="text-muted-foreground text-sm">{t('agents.no_agents')}</div>

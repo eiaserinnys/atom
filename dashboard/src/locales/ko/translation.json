@@ -93,7 +93,7 @@
     "inactive": "비활성",
     "activate": "활성화",
     "deactivate": "비활성화",
-    "reissue": "시크릿 재발급",
+    "reissue": "재발급",
     "acknowledged": "확인했습니다",
     "copy_hint": "시크릿 복사",
     "revoke_confirm": "\"{{name}}\" API 키를 폐기하시겠습니까?",
