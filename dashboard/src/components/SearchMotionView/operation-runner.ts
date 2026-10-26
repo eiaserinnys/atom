@@ -3,7 +3,8 @@ import type { MotionPlayer } from './player.js';
 import type { EvaluationResponse, JevAuditCall, OperationRecord, OperationSnapshot, VisualOperationEvent, VisualSearchNeighborsResponse } from './operation-types';
 
 class OperationApiError extends Error {
-  constructor(code: string, readonly auditCalls: JevAuditCall[]) { super(code); }
+  readonly auditCalls: JevAuditCall[];
+  constructor(code: string, auditCalls: JevAuditCall[]) { super(code); this.auditCalls = auditCalls; }
 }
 
 function waitForIndex(ms: number, signal: AbortSignal) {
