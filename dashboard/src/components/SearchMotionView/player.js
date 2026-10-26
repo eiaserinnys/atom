@@ -1296,6 +1296,9 @@ export function createMotionPlayer(root, callbacks, samples) {
     group.hidden = !n?.cardId || !v || v.a < 0.4;
     if (group.hidden) return;
     const sx = (v.x - cam.x) * cam.z; const sy = M.headerH + (v.y - cam.y) * cam.z;
+    group.hidden = sx < 0 || sx + M.colW * cam.z > W - sheetInset()
+      || sy < M.headerH || sy + M.rowH * cam.z + M.actionGap + M.actionH > H - overlayRoom();
+    if (group.hidden) return;
     group.style.left = `${sx}px`; group.style.top = `${sy + M.rowH * cam.z + M.actionGap}px`;
     const state = snapshot();
     const expanded = state.operations.some(op => op.kind === 'expand' && op.fromCardId === n.cardId && op.status === 'succeeded');
@@ -1321,7 +1324,6 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (!fullActionWidth) { group.classList.remove('is-compact'); fullActionWidth = group.offsetWidth; }
     group.classList.toggle('is-compact', fullActionWidth > M.colW * cam.z);
     actionWidth = group.offsetWidth;
-    if (cam.mode === 'idle' && sy + M.rowH * cam.z + M.actionGap + group.offsetHeight > H - overlayRoom()) ensureVisible(selectedRef);
   }
   let summaryTimer = 0;
   function operationNarration() {
@@ -1504,6 +1506,24 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (x !== cam.tx || y !== cam.ty) { const b = bounds(z); cam.tx = clamp(x, b.minX, b.maxX + sheetInset() / z); cam.ty = clamp(y, b.minY, b.maxY); if (reduced()) { cam.x = cam.tx; cam.y = cam.ty; } else cam.mode = "spring"; invalidate(); }
   }
 
+  function followOperation(operation) {
+    const column = operation?.kind === 'evaluate' ? operation.viaOperationId : operation?.id;
+    const nodes = [...model.nodes.values()].filter(n => n.displayColumn === column && view.L.pos.has(n.ref));
+    nodes.sort((a, b) => view.L.pos.get(a.ref).y - view.L.pos.get(b.ref).y);
+    const node = nodes[0]; if (!node) return;
+    const source = [...model.nodes.values()].find(n => n.cardId === operation.fromCardId && !n.referenceTarget);
+    const target = view.L.pos.get(node.ref); const from = source && view.L.pos.get(source.ref);
+    const z = cam.tz; const availableW = (W - sheetInset()) / z; const availableH = (H - M.headerH - overlayRoom()) / z;
+    if (from) {
+      const left = Math.min(from.x, target.x); const right = Math.max(from.x, target.x) + M.colW;
+      const top = Math.min(from.y, target.y); const bottom = Math.max(target.y + M.rowH, from.y + M.rowH + (M.actionGap + M.actionH) / z);
+      if (right - left + 2 * M.padX <= availableW && bottom - top + M.padTop <= availableH) {
+        setFollow(false); moveCamera(left - M.padX, top - M.padTop, z, reduced()); return;
+      }
+    }
+    setFollow(true); followHop(node.hop, reduced()); setFollow(false); ensureVisible(node.ref);
+  }
+
   // 포인터: 끌어서 옮기기(손을 1:1로 따라가고, 놓으면 속도를 이어받아 미끄러진다), 두 손가락 확대
   const pointers = new Map(); let drag = null; let pinch = null;
   const local = (e) => { const r = plot.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
@@ -1677,8 +1697,7 @@ export function createMotionPlayer(root, callbacks, samples) {
         projectTo(history.timeline().frames.length, true);
         if (event.type === 'completed' || event.type === 'expansion_succeeded') {
           const operation = model.exploration.operations.find(op => op.id === event.operationId);
-          const node = [...model.nodes.values()].find(n => n.displayColumn === (operation?.kind === 'evaluate' ? operation.viaOperationId : operation?.id));
-          if (node) { setFollow(true); followHop(node.hop, reduced()); setFollow(false); ensureVisible(node.ref); }
+          followOperation(operation);
         }
       }
       else chrome();
