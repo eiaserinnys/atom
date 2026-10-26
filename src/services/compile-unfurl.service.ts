@@ -33,7 +33,8 @@ export async function resolveCompileRefs(
   cardCache: ReadonlyMap<string, Card>,
   mode: "cached" | "fresh",
   credentials: Record<string, UnfurlCredentials>,
-  deps: CompileUnfurlDeps
+  deps: CompileUnfurlDeps,
+  canWriteRefs: boolean
 ): Promise<Map<string, ResolvedRef>> {
   const resolved = new Map<string, ResolvedRef>();
 
@@ -45,7 +46,7 @@ export async function resolveCompileRefs(
       const adapter = typedAdapter ?? deps.findAdapterByRef(card.source_ref);
       if (!adapter) return;
 
-      if (!typedAdapter) {
+      if (!typedAdapter && canWriteRefs) {
         runFireAndForget(
           () => deps.repairSourceType(cardId, adapter.sourceType),
           "[unfurl] source_type repair failed",
@@ -66,11 +67,13 @@ export async function resolveCompileRefs(
       try {
         const result = await adapter.resolve(card.source_ref, credentials[adapter.sourceType] ?? {});
         resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
-        runFireAndForget(
-          () => deps.writeSnapshot(cardId, result.snapshot),
-          "[unfurl] snapshot write failed",
-          deps
-        );
+        if (canWriteRefs) {
+          runFireAndForget(
+            () => deps.writeSnapshot(cardId, result.snapshot),
+            "[unfurl] snapshot write failed",
+            deps
+          );
+        }
       } catch (error) {
         resolved.set(cardId, { ok: false, error: serializeError(error), sourceType: card.source_type });
       }

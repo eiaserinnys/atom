@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TreeCycleError } from "../../db/queries/tree.js";
+import type { AgentScope } from "../../shared/types.js";
 import {
   getNode,
   listChildren,
@@ -12,7 +13,7 @@ import {
 } from "../../services/tree.service.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function registerTreeTools(server: McpServer, _agentId: string): void {
+export function registerTreeTools(server: McpServer, _agentId: string, scope: AgentScope = "write"): void {
   // get_node
   server.tool(
     "get_node",
@@ -87,7 +88,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
         maxChars: max_chars,
         excludeNodes: exclude_nodes ? new Set(exclude_nodes) : undefined,
         limit,
-      }, resolve_refs, credentials);
+      }, resolve_refs, credentials, scope === "write");
       return { content: [{ type: "text", text: result.markdown }] };
     }
   );

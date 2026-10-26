@@ -30,6 +30,7 @@ import { createNeighborService } from "../services/embeddings/neighbors.js";
 import { createOpenAIConfigRoutes } from "./routes/openai-config.js";
 import { createNeighborsRoutes } from "./routes/neighbors.js";
 import { inspectStartupConfig } from "./startup-config.js";
+import { isAuthBypassEnabled } from "./auth-mode.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,8 +89,12 @@ async function seedMigration(): Promise<void> {
   // ALLOWED_EMAIL → users 테이블 admin 마이그레이션
   const allowedEmail = process.env["ALLOWED_EMAIL"];
   if (allowedEmail && !(await userExists(db))) {
-    await insertUser(db, { email: allowedEmail, display_name: "Admin", role: "admin" });
-    console.log(`[seed] Migrated ALLOWED_EMAIL=${allowedEmail} as admin user`);
+    if (/^[^@\s]+@[^@\s]+$/.test(allowedEmail)) {
+      await insertUser(db, { email: allowedEmail, display_name: "Admin", role: "admin" });
+      console.log(`[seed] Migrated ALLOWED_EMAIL=${allowedEmail} as admin user`);
+    } else {
+      app.log.warn("Set ALLOWED_EMAIL to a full email address to create the first admin.");
+    }
   }
 
 }
@@ -110,7 +115,7 @@ const start = async (): Promise<void> => {
   await runMigrations(migrationsDir);
   await seedMigration();
   await loadAdapters(adapterRegistry);
-  await app.listen({ port, host: "0.0.0.0" });
+  await app.listen({ port, host: isAuthBypassEnabled() ? "127.0.0.1" : "0.0.0.0" });
   embeddingSync.start();
 };
 

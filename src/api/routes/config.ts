@@ -34,6 +34,7 @@ import {
   updateAgentSettings,
 } from '../../db/queries/agents.js';
 import type { AgentScope, UserRole } from '../../shared/types.js';
+import { closeUserEventConnections } from './events.js';
 
 export type MigrationRouteDeps = Omit<ConfigMigrationServiceDeps, 'db'> & {
   getDb(): DatabaseAdapter;
@@ -119,6 +120,9 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     if (is_active !== undefined) {
       const r = await updateUserActive(db, id, is_active);
       if (r) updated = r;
+    }
+    if (updated.role !== targetUser.role || (targetUser.is_active && !updated.is_active)) {
+      closeUserEventConnections(id);
     }
     return reply.send(updated);
   });

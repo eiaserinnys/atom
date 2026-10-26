@@ -69,12 +69,28 @@ async function copySqliteRowsToPostgres(
 async function copyUsers(sqliteDb: SqliteMigrationDatabase, tx: Queryable): Promise<void> {
   const users = sqliteDb.prepare('SELECT * FROM users ORDER BY created_at').all();
   for (const u of users) {
+    const conflicts = await tx.query(
+      'SELECT id FROM users WHERE email = $1 AND id <> $2',
+      [u['email'], u['id']],
+    );
+    let agentIds: unknown[] = [];
+    if (conflicts.rows.length > 0) {
+      // SQLite owns the user's identity. Deleting the seed sets its agents'
+      // created_by to NULL; restore those references after inserting the source.
+      const seedId = conflicts.rows[0]['id'];
+      const agents = await tx.query('SELECT id FROM agents WHERE created_by = $1', [seedId]);
+      agentIds = agents.rows.map((agent) => agent['id']);
+      await tx.query('DELETE FROM users WHERE id = $1', [seedId]);
+    }
     await tx.query(
       `INSERT INTO users (id, email, display_name, role, is_active, created_at)
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (id) DO NOTHING`,
       [u['id'], u['email'], u['display_name'] ?? null, u['role'], Boolean(u['is_active']), u['created_at']],
     );
+    if (agentIds.length > 0) {
+      await tx.query('UPDATE agents SET created_by = $1 WHERE id = ANY($2::uuid[])', [u['id'], agentIds]);
+    }
   }
 }
 
