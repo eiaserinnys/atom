@@ -1,0 +1,435 @@
+[
+  {
+    "key": "handbook",
+    "title": "Handbook",
+    "card_type": "structure",
+    "content": "Atom keeps related knowledge in a small tree.\nEach card should hold one claim or fact.\nPlace canonical guidance under one topic and link to it from other branches.\nAgents can compile a branch when they need its context.",
+    "tags": ["handbook", "usage"],
+    "children": [
+      {
+        "key": "how-to-write-a-card",
+        "title": "How to write a card",
+        "card_type": "knowledge",
+        "content": "A card states one fact that can be checked on its own.\nUse a title that makes the claim in one short sentence.\nPut evidence in the body and link to source cards when a claim depends on them.\nSplit a card when it starts making unrelated claims.",
+        "tags": ["cards", "writing"]
+      },
+      {
+        "key": "where-things-go",
+        "title": "Where things go",
+        "card_type": "knowledge",
+        "content": "Use Projects for work that changes over time.\nUse Knowledge for reusable facts and explanations.\nUse Agents for instructions shared by agent sessions.\nUse References for external sources, one card per source.",
+        "tags": ["organization"]
+      },
+      { "symlink": "writing-instructions" }
+    ]
+  },
+  {
+    "key": "projects",
+    "title": "Projects",
+    "card_type": "structure",
+    "content": "Projects collect work with an owner and a current state.\nKeep decisions, incidents, and work notes close to the project they describe.\nLink shared knowledge instead of copying it.",
+    "tags": ["projects"],
+    "children": [
+      {
+        "key": "harbor",
+        "title": "Harbor",
+        "card_type": "structure",
+        "content": "Harbor is a small job queue backed by PostgreSQL.\nA fictional payment service and mail service use it to process background work.\nThe queue stays inside each service database.",
+        "tags": ["postgresql", "queue"],
+        "children": [
+          {
+            "key": "harbor-overview",
+            "title": "Overview",
+            "card_type": "knowledge",
+            "content": "Harbor accepts background jobs from the payment and mail services.\nWorkers claim jobs, perform one unit of work, and record the outcome.\nThe system favors simple recovery paths over exactly-once claims.",
+            "tags": ["queue", "overview"]
+          },
+          {
+            "key": "harbor-architecture",
+            "title": "Architecture",
+            "card_type": "structure",
+            "content": "The queue uses ordinary PostgreSQL tables and transactions.\nWorkers claim jobs in short transactions, then perform work outside the claim transaction.\nShared queue concepts live under Knowledge.",
+            "tags": ["architecture", "postgresql"],
+            "children": [
+              { "symlink": "skip-locked" },
+              {
+                "key": "retry-schedule",
+                "title": "Retry schedule",
+                "card_type": "knowledge",
+                "content": "A failed job waits before it becomes eligible again.\nThe delay grows with each attempt and includes random jitter.\nCap the delay so an old job does not wait without bound.",
+                "tags": ["retries", "queue"],
+                "references": ["backoff-with-jitter"]
+              },
+              {
+                "key": "job-states",
+                "title": "Job states",
+                "card_type": "knowledge",
+                "content": "A new job starts as queued and a worker claim moves it to running.\nSuccessful work moves to done.\nA retryable error returns it to queued after its delay.\nAn exhausted job moves to dead for inspection.",
+                "tags": ["queue", "states"]
+              },
+              {
+                "key": "metrics-we-export",
+                "title": "Metrics we export",
+                "card_type": "knowledge",
+                "content": "Export queue depth by state and the age of the oldest queued job.\nRecord claim time, completion time, attempt count, and dead job count.\nAvoid high-cardinality labels such as job IDs.",
+                "tags": ["metrics", "queue"]
+              }
+            ]
+          },
+          {
+            "key": "harbor-decisions",
+            "title": "Decisions",
+            "card_type": "structure",
+            "content": "Decisions record a choice and its reason.\nKeep each decision short and link related technical knowledge.\nReplace a decision with a new record when the choice changes.",
+            "tags": ["decisions"],
+            "children": [
+              {
+                "key": "adr-001-postgresql",
+                "title": "ADR-001 Keep the queue in PostgreSQL",
+                "card_type": "knowledge",
+                "content": "Context: both services already depend on PostgreSQL.\nDecision: store jobs in the service database and claim them with row locks.\nThis keeps job state close to the data that work changes.\nRevisit the choice if measured load outgrows the database.",
+                "tags": ["adr", "postgresql"]
+              },
+              {
+                "key": "adr-002-at-least-once",
+                "title": "ADR-002 At-least-once delivery",
+                "card_type": "knowledge",
+                "content": "A worker can finish external work and fail before recording completion.\nThe queue may then deliver the job again.\nConsumers must make repeated requests safe with an idempotency key.\nThis is an at-least-once contract.",
+                "tags": ["adr", "delivery"],
+                "references": ["idempotency-keys"]
+              },
+              {
+                "key": "adr-003-no-scheduler",
+                "title": "ADR-003 No separate scheduler process",
+                "card_type": "knowledge",
+                "content": "Workers query for queued jobs whose retry time has arrived.\nThe database clock is the source for eligibility checks.\nA separate scheduler would add deployment and recovery work without a current need.",
+                "tags": ["adr", "scheduler"]
+              },
+              { "symlink": "idempotency-keys" }
+            ]
+          },
+          {
+            "key": "harbor-incidents",
+            "title": "Incidents",
+            "card_type": "structure",
+            "content": "Incident cards record what happened and what changed afterward.\nKeep the timeline factual and link the decisions that shaped the response.\nUse fictional examples in this demo.",
+            "tags": ["incidents"],
+            "children": [
+              {
+                "key": "incident-2026-09-14-duplicate-emails",
+                "title": "2026-09-14 Duplicate emails after failover",
+                "card_type": "knowledge",
+                "content": "After a database failover, a worker retried a mail job whose send had already succeeded.\nThe mail service had no idempotency check for that request.\nWe added a request key and made duplicate delivery return the stored result.\nThe queue contract remains at-least-once.",
+                "tags": ["incident", "mail"],
+                "references": ["adr-002-at-least-once", "idempotency-keys"]
+              },
+              {
+                "key": "incident-2026-10-02-slow-dequeue",
+                "title": "2026-10-02 Slow dequeue on a bloated table",
+                "card_type": "knowledge",
+                "content": "Dequeue time rose as old job rows accumulated in the table.\nThe active-row index remained small, but dead tuples increased scan work.\nWe reviewed autovacuum activity and added a table maintenance check.\nWe also retained completed jobs for a shorter period.",
+                "tags": ["incident", "postgresql"],
+                "references": ["vacuum-table-bloat"]
+              }
+            ]
+          },
+          {
+            "key": "harbor-work-log",
+            "title": "Work log",
+            "card_type": "structure",
+    "content": "Short dated notes capture completed changes.\nThe five newest entries are shown in the normal compiled view.\nThe journal limit keeps recent notes visible.",
+            "tags": ["work-log"],
+            "journal_limit": 5,
+            "children": [
+              {
+                "key": "log-2026-10-20",
+                "title": "2026-10-20 Added queue depth alert",
+                "card_type": "knowledge",
+                "content": "Added an alert for queued jobs above the service threshold.\nThe alert includes the oldest queued job age.\nThe on-call runbook now links to the queue dashboard.",
+                "tags": ["work-log", "alerts"]
+              },
+              {
+                "key": "log-2026-10-21",
+                "title": "2026-10-21 Reduced retry noise",
+                "card_type": "knowledge",
+                "content": "Grouped retry logs by job key and attempt number.\nRoutine retry messages now use the lower log level.\nFailures that reach the dead state remain visible as errors.",
+                "tags": ["work-log", "logging"]
+              },
+              {
+                "key": "log-2026-10-22",
+                "title": "2026-10-22 Added queue age chart",
+                "card_type": "knowledge",
+                "content": "Added a chart for the age of the oldest queued job.\nThe chart is split by service and queue state.\nIt helps distinguish a backlog from slow individual jobs.",
+                "tags": ["work-log", "metrics"]
+              },
+              {
+                "key": "log-2026-10-23",
+                "title": "2026-10-23 Paused a bad template",
+                "card_type": "knowledge",
+                "content": "Paused a mail template that produced invalid output.\nQueued jobs were held until the template was corrected.\nThe worker reported the template version with each failure.",
+                "tags": ["work-log", "mail"]
+              },
+              {
+                "key": "log-2026-10-24",
+                "title": "2026-10-24 Replayed stalled jobs",
+                "card_type": "knowledge",
+                "content": "Replayed a small set of jobs after fixing a worker timeout.\nThe replay used the original idempotency keys.\nWe checked the completion count before reopening the queue.",
+                "tags": ["work-log", "recovery"]
+              },
+              {
+                "key": "log-2026-10-25",
+                "title": "2026-10-25 Verified failover behavior",
+                "card_type": "knowledge",
+                "content": "Ran a failover exercise against a disposable test database.\nA worker resumed claims after reconnecting.\nRepeated mail requests returned the saved result.",
+                "tags": ["work-log", "failover"]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "atlas",
+        "title": "Atlas",
+        "card_type": "structure",
+        "content": "Atlas is a fictional internal documentation site generated from Markdown.\nTeams keep source files in a repository and publish the built site from a review branch.\nIts search index is built with each release.",
+        "tags": ["documentation", "project"],
+        "children": [
+          {
+            "key": "atlas-overview",
+            "title": "Overview",
+            "card_type": "knowledge",
+            "content": "Atlas turns Markdown files into browsable documentation pages.\nAuthors review changes in source control before publication.\nThe published site links back to each source file.",
+            "tags": ["documentation", "overview"]
+          },
+          {
+            "key": "atlas-build-pipeline",
+            "title": "Build pipeline",
+            "card_type": "knowledge",
+            "content": "A build checks Markdown links and front matter before rendering pages.\nThe output is written to a versioned directory.\nPublication switches the site to the completed build.",
+            "tags": ["documentation", "build"]
+          },
+          {
+            "key": "atlas-search-index",
+            "title": "Search index",
+            "card_type": "knowledge",
+            "content": "The build extracts titles, headings, and short text excerpts.\nIt writes an index alongside the rendered pages.\nThe browser searches that index without sending each query to a server.",
+            "tags": ["documentation", "search"]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "knowledge",
+    "title": "Knowledge",
+    "card_type": "structure",
+    "content": "Knowledge cards explain ideas that can help more than one project.\nKeep the claim separate from project-specific decisions.\nLink from a project to the canonical explanation.",
+    "tags": ["knowledge"],
+    "children": [
+      {
+        "key": "databases",
+        "title": "Databases",
+        "card_type": "structure",
+        "content": "Database cards describe query patterns and maintenance concepts.\nEach card covers one technique or behavior.\nExternal references are kept in References.",
+        "tags": ["databases"],
+        "children": [
+          {
+            "key": "skip-locked",
+            "title": "SKIP LOCKED for job queues",
+            "card_type": "knowledge",
+            "content": "Workers can select eligible rows with FOR UPDATE SKIP LOCKED.\nA worker skips rows already locked by another transaction instead of waiting for them.\nUse a stable order and update the claimed rows inside the same short transaction.\nThis pattern allows several workers to claim separate jobs concurrently.",
+            "tags": ["postgresql", "queue"],
+            "references": ["ref-postgresql-skip-locked"]
+          },
+          {
+            "key": "partial-indexes-hot-rows",
+            "title": "Partial indexes for hot rows",
+            "card_type": "knowledge",
+            "content": "A partial index stores entries only for rows that meet its predicate.\nFor a queue, an index can cover rows that are still eligible for work.\nKeep the query predicate aligned with the index predicate.\nCheck the plan against real table sizes before adding the index.",
+            "tags": ["postgresql", "indexes"]
+          },
+          {
+            "key": "advisory-locks",
+            "title": "Advisory locks",
+            "card_type": "knowledge",
+            "content": "An advisory lock coordinates work that has no natural row to lock.\nThe application chooses a numeric key and releases the lock according to its scope.\nDocument the key mapping so separate features do not claim the same lock.\nPrefer row locks when a row already represents the resource.",
+            "tags": ["postgresql", "locking"]
+          },
+          {
+            "key": "vacuum-table-bloat",
+            "title": "VACUUM and table bloat",
+            "card_type": "knowledge",
+            "content": "PostgreSQL keeps old row versions until they are no longer visible to active transactions.\nVACUUM makes dead tuple space reusable and updates visibility information.\nLong transactions can prevent cleanup and let tables grow.\nWatch dead tuples and autovacuum progress before changing settings.",
+            "tags": ["postgresql", "maintenance"],
+            "references": ["ref-postgresql-vacuum"]
+          }
+        ]
+      },
+      {
+        "key": "distributed-systems",
+        "title": "Distributed systems",
+        "card_type": "structure",
+        "content": "These cards describe behavior across retries, processes, and service boundaries.\nThey focus on guarantees callers can observe.\nUse a project decision for the choice made by one system.",
+        "tags": ["distributed-systems"],
+        "children": [
+          {
+            "key": "idempotency-keys",
+            "title": "Idempotency keys",
+            "card_type": "knowledge",
+            "content": "An idempotency key identifies one logical request across retries.\nThe service stores the result for a key and returns it when the same request is repeated.\nScope keys to the operation and retain them for the retry window.\nReject reuse of a key with a different request body.",
+            "tags": ["retries", "api"],
+            "references": ["ref-stripe-idempotent-requests"]
+          },
+          {
+            "key": "backoff-with-jitter",
+            "title": "Backoff with jitter",
+            "card_type": "knowledge",
+            "content": "Exponential backoff increases the delay after each failed attempt.\nJitter adds random variation so many clients do not retry together.\nSet a maximum delay and an overall retry limit.\nUse the same policy for one class of retrying work.",
+            "tags": ["retries", "distributed-systems"],
+            "references": ["ref-aws-backoff-jitter"]
+          },
+          {
+            "key": "at-least-once-vs-exactly-once",
+            "title": "At-least-once vs exactly-once",
+            "card_type": "knowledge",
+            "content": "At-least-once delivery may repeat a message when completion is uncertain.\nExactly-once effects require coordination across delivery and the external side effect.\nMost services use retries with idempotent handling instead of claiming a global exactly-once guarantee.\nState the boundary of the guarantee.",
+            "tags": ["delivery", "distributed-systems"]
+          }
+        ]
+      },
+      {
+        "key": "writing",
+        "title": "Writing",
+        "card_type": "structure",
+        "content": "Writing cards record reusable conventions for technical knowledge.\nKeep examples short and focused.\nLink agent instructions here when they need the same guidance.",
+        "tags": ["writing"],
+        "children": [
+          {
+            "key": "writing-instructions",
+            "title": "Writing instructions for agents",
+            "card_type": "knowledge",
+            "content": "Write one claim per card and use a title that states the claim.\nPrefer short sentences and familiar technical terms.\nInclude evidence or a link when the reader needs to verify a fact.\nRemove details that do not help the reader act or understand.",
+            "tags": ["agents", "writing"]
+          },
+          {
+            "key": "commit-messages",
+            "title": "Commit messages",
+            "card_type": "knowledge",
+            "content": "Start with a short verb phrase that names the change.\nKeep the first line focused on one outcome.\nAdd a body only when the reason or tradeoff needs context.\nDo not repeat the diff in prose.",
+            "tags": ["git", "writing"]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "agents",
+    "title": "Agents",
+    "card_type": "structure",
+    "content": "Agent context is compiled from instructions and shared knowledge.\nKeep shared rules short enough to use during a task.\nLink to the canonical writing guidance instead of duplicating it.",
+    "tags": ["agents"],
+    "children": [
+      {
+        "key": "shared-rules",
+        "title": "Shared rules",
+        "card_type": "structure",
+        "content": "Shared rules apply across agent roles.\nCompile this branch when an agent needs the common task context.\nRole-specific checklists stay in their own branches.",
+        "tags": ["agents", "rules"],
+        "children": [
+          {
+            "key": "verify-before-reporting-done",
+            "title": "Verify before reporting done",
+            "card_type": "knowledge",
+            "content": "Run the smallest command that proves the requested result.\nUse fresh output from the final working tree.\nReport what was checked and what remains unverified.",
+            "tags": ["agents", "verification"]
+          },
+          {
+            "key": "cite-card-ids-in-reports",
+            "title": "Cite card ids in reports",
+            "card_type": "knowledge",
+            "content": "Include a card id when a report refers to a specific card.\nUse the id returned by the card system.\nDo not guess ids from a title or path.",
+            "tags": ["agents", "reporting"]
+          },
+          { "symlink": "writing-instructions" }
+        ]
+      },
+      {
+        "key": "reviewer",
+        "title": "Reviewer",
+        "card_type": "structure",
+        "content": "Reviewer guidance focuses on the user-visible result and the changed code.\nRecord evidence for each finding.\nKeep unrelated issues separate from the current review.",
+        "tags": ["agents", "review"],
+        "children": [
+          {
+            "key": "review-checklist",
+            "title": "Review checklist",
+            "card_type": "knowledge",
+            "content": "Check the changed behavior against the request.\nTrace important values through their callers and storage.\nLook for a simpler implementation that preserves the contract.\nReport findings with file, line, impact, and a concrete fix.",
+            "tags": ["agents", "review"]
+          }
+        ]
+      },
+      {
+        "key": "release-bot",
+        "title": "Release bot",
+        "card_type": "structure",
+        "content": "The release bot prepares a versioned build from a reviewed change.\nIt checks the target branch and reports the artifact location.\nA human owns the final release decision.",
+        "tags": ["agents", "release"],
+        "children": [
+          {
+            "key": "release-steps",
+            "title": "Release steps",
+            "card_type": "knowledge",
+            "content": "Confirm the requested version and target branch.\nBuild from the reviewed commit and record its checksum.\nPublish the artifact and verify the release page.\nReport the commit, artifact, and verification result.",
+            "tags": ["agents", "release"]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "references",
+    "title": "References",
+    "card_type": "structure",
+    "content": "Each reference card represents one external source.\nRecord the source URL and the small set of ideas used by this knowledge base.\nKeep summaries in your own words.",
+    "tags": ["references"],
+    "children": [
+      {
+        "key": "ref-postgresql-skip-locked",
+        "title": "PostgreSQL docs: SELECT ... FOR UPDATE SKIP LOCKED",
+        "card_type": "knowledge",
+        "content": "Workers can skip rows locked by other transactions while claiming work.\nUse a short transaction and a consistent ordering for the claim query.\nThe lock does not replace the need to handle a worker crash after the claim.",
+        "tags": ["postgresql", "reference"],
+        "source_type": "url",
+        "source_ref": "https://www.postgresql.org/docs/current/sql-select.html"
+      },
+      {
+        "key": "ref-postgresql-vacuum",
+        "title": "PostgreSQL docs: Routine vacuuming",
+        "card_type": "knowledge",
+        "content": "Routine vacuuming makes space from dead rows reusable and maintains visibility information.\nAutovacuum normally handles this work.\nLong-running transactions can delay cleanup.",
+        "tags": ["postgresql", "reference"],
+        "source_type": "url",
+        "source_ref": "https://www.postgresql.org/docs/current/routine-vacuuming.html"
+      },
+      {
+        "key": "ref-aws-backoff-jitter",
+        "title": "AWS Blog: Exponential Backoff And Jitter",
+        "card_type": "knowledge",
+        "content": "Exponential backoff spreads retries over increasing delays.\nJitter randomizes delays so clients do not retry at the same instant.\nA retry cap bounds the wait before another attempt.",
+        "tags": ["retries", "reference"],
+        "source_type": "url",
+        "source_ref": "https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/"
+      },
+      {
+        "key": "ref-stripe-idempotent-requests",
+        "title": "Stripe docs: Idempotent requests",
+        "card_type": "knowledge",
+        "content": "A client can attach an idempotency key to a request that may be retried.\nThe service returns a saved result for a repeated matching request.\nThe caller should keep the key scope and lifetime clear.",
+        "tags": ["api", "reference"],
+        "source_type": "url",
+        "source_ref": "https://docs.stripe.com/api/idempotent_requests"
+      }
+    ]
+  }
+]

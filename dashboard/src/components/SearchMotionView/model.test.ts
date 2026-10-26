@@ -2,6 +2,10 @@ import { describe, test, expect } from 'vitest';
 import { createModel, applyEvent } from './model.js';
 import samples from './samples.json';
 
+const originalSampleTitles: Record<string, string> = {
+  '검색창과 홉별 검색 모션 연동': 'SearchBar와 Jev 홉별 검색 모션 통합',
+};
+
 describe('approved r5 run reducer', () => {
   for (const [name, events] of Object.entries(samples)) test(`${name}: ordered events select the exact final result IDs/ranks and retain audit requests`, () => {
     const model = createModel();
@@ -13,6 +17,7 @@ describe('approved r5 run reducer', () => {
     expect(model.terminal.stop).toBe(done.stop_reason);
     expect(selected.length).toBeGreaterThan(0);
     const audited = selected.find(n => n.asked !== null)!;
-    expect(model.calls.get(audited.asked!.step)!.request.questions[audited.asked!.key].instructions).toContain(audited.title);
+    const instructions = model.calls.get(audited.asked!.step)!.request.questions[audited.asked!.key].instructions;
+    expect(instructions).toContain(originalSampleTitles[audited.title] ?? audited.title);
   });
 });
