@@ -10,7 +10,7 @@ function card(cardId: string, nodeId: string, values: Record<string, unknown> = 
   return {
     card_id: cardId,
     node_id: nodeId,
-    card_type: 'knowledge',
+    card_type: 'knowledge' as const,
     title: cardId,
     path: [],
     excerpt: '',

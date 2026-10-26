@@ -16,7 +16,10 @@ function setup() {
       return {
         revision, query: 'original', context: { agent: null, project: null, task: null }, live: true,
         initialSearchComplete: true, selectedCardId: projection.cards[0].cardId, selectionThreshold: projection.selectionThreshold,
-        graphCardIds: projection.cards.map(c => c.cardId), cachedEvaluations: projection.evaluations,
+        graphCardIds: projection.cards.map(c => c.cardId),
+        cachedEvaluations: new Map<string, { score: number }>(
+          Array.from(projection.evaluations, ([id, evaluation]) => [id, { score: evaluation.score }]),
+        ),
         operations: projection.operations as OperationSnapshot['operations'], resultOrder: projection.resultOrder,
         evaluationTargetCardIds: [], activeOperation: null, selectedArrivalOperationId: null, continueSearch: false,
       };
