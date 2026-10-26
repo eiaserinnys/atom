@@ -1,7 +1,5 @@
-import { TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useSystem } from '../contexts/systemContext';
-import { ConfigActionButton } from './Config/ConfigFields';
 
 export function RestartBanner() {
   const { t } = useTranslation();
@@ -10,14 +8,14 @@ export function RestartBanner() {
   if (!pendingRestart) return null;
 
   return (
-    <div className="bg-card border-b border-border px-6 py-4 flex flex-wrap items-center gap-2 shrink-0">
-      <span className="mr-auto flex min-w-0 items-center gap-2 text-sm text-foreground">
-        <TriangleAlert className="h-4 w-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
-        {t('system.restart_required')}
-      </span>
-      <ConfigActionButton tone="brand" onClick={triggerRestart}>
+    <div className="bg-yellow-500/10 border-b border-yellow-500/30 px-4 py-2 flex items-center justify-between shrink-0">
+      <span className="text-sm text-yellow-300">{t('system.restart_required')}</span>
+      <button
+        className="px-3 py-1 text-[13px] font-medium rounded-none bg-yellow-600 text-primary-foreground hover:bg-yellow-500"
+        onClick={triggerRestart}
+      >
         {t('system.restart_now')}
-      </ConfigActionButton>
+      </button>
     </div>
   );
 }
