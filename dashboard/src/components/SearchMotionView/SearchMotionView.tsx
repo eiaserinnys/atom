@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { QueryClientContext } from '@tanstack/react-query';
-import { createMotionPlayer, type CameraPosition, type MotionPlayer } from './player.js';
+import { createMotionPlayer, type ExplorationRecord, type MotionPlayer } from './player.js';
 import { readSearchStream, searchUrl, type SearchRequest } from './stream';
 import type { MotionNode } from './types';
 import sampleUrl from './samples.json?url';
@@ -14,7 +14,7 @@ import type { OperationSnapshot } from './operation-types';
 const motionMarkup = { __html: markup };
 
 export interface SearchMotionViewProps {
-  cameraState?: { current: { requestId: number; camera: CameraPosition } | null };
+  explorationState?: { current: { requestId: number; record: ExplorationRecord } | null };
   request: SearchRequest | null;
   onSummary?(summary: string): void;
   onSelectNode(nodeId: string | null, verdict: MotionNode | null): void;
@@ -22,7 +22,7 @@ export interface SearchMotionViewProps {
   onOpenInTree?(nodeId: string): void;
 }
 
-export function SearchMotionView({ request, onSelectNode, onResults, onSummary, onOpenInTree, cameraState }: SearchMotionViewProps) {
+export function SearchMotionView({ request, onSelectNode, onResults, onSummary, onOpenInTree, explorationState }: SearchMotionViewProps) {
   const { t } = useTranslation();
   const queryClient = useContext(QueryClientContext);
   const host = useRef<HTMLDivElement>(null);
@@ -48,7 +48,10 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
   useEffect(() => {
     let instance: MotionPlayer | null = null;
     const controller = new AbortController();
-    void fetch(sampleUrl, { signal: controller.signal }).then(response => { if (!response.ok) throw new Error('표본을 불러오지 못했습니다.'); return response.json(); }).then(samples => {
+    const saved = explorationState?.current;
+    const restoring = saved?.requestId === requestRef.current?.requestId && saved?.record.complete;
+    const sampleData = restoring ? Promise.resolve({}) : fetch(sampleUrl, { signal: controller.signal }).then(response => { if (!response.ok) throw new Error('표본을 불러오지 못했습니다.'); return response.json(); });
+    void sampleData.then(samples => {
     if (controller.signal.aborted) return;
     instance = createMotionPlayer(host.current!, {
       getCachedTreeNodes: () => queryClient?.getQueryCache().getAll()
@@ -66,7 +69,7 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
     player.current = instance; setReady(true);
     }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '표본을 불러오지 못했습니다.'); });
     return () => {
-      if (instance && cameraState && requestRef.current) cameraState.current = { requestId: requestRef.current.requestId, camera: instance.getCamera() };
+      if (instance && explorationState && requestRef.current) explorationState.current = { requestId: requestRef.current.requestId, record: instance.getRecord() };
       controller.abort(); active.current?.abort(); instance?.dispose(); player.current = null;
     };
   }, []);
@@ -89,8 +92,7 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
       const controller = new AbortController();
       active.current = controller;
       setError('');
-      const saved = cameraState?.current;
-      player.current!.begin(query, { resume, camera: saved?.requestId === requestRef.current?.requestId ? saved?.camera : null });
+      player.current!.begin(query, { resume });
       retryRef.current = () => startRef.current(query, exhaustive, resume);
       try {
         const response = await fetch(searchUrl(query, { rootNodeId: requestRef.current?.rootNodeId, exhaustive }), {
@@ -108,7 +110,14 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
       }
     };
     startRef.current = (query, exhaustive, resume) => { void start(query, exhaustive, resume); };
-    if (request) void start(request.query, request.exhaustive);
+    const saved = explorationState?.current;
+    if (request && saved?.requestId === request.requestId && player.current!.restoreRecord(saved.record)) {
+      const failed = player.current!.getSnapshot().operations.at(-1);
+      if (failed?.status === 'failed') {
+        setError(callbacks.current.t('visual_search.error', { code: failed.errorCode }));
+        retryRef.current = () => operationRef.current(failed.kind === 'evaluate' ? 'evaluate' : failed.fromCardId ? 'expand' : 'query', player.current!.getSnapshot(), failed.id);
+      }
+    } else if (request) void start(request.query, request.exhaustive);
     return () => active.current?.abort();
   }, [request, ready]);
 

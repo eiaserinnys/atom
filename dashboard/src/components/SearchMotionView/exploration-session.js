@@ -186,6 +186,8 @@ export function createExplorationSession() {
       if (frameId) selections.push({ frameId, cardId });
     },
     timeline, project, truncate,
+    exportLog() { return structuredClone({ entries, query, revision, serial, selections }); },
+    restoreLog(log) { ({ entries, query, revision, serial, selections } = structuredClone(log)); },
     chapters() { return groupExplorationChapters(timeline()); },
     get revision() { return revision; },
   };

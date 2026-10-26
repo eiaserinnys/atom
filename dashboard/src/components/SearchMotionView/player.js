@@ -431,6 +431,16 @@ export function createMotionPlayer(root, callbacks, samples) {
     setFollow(false);
     moveCamera(wx - px / z, wy - (py - M.headerH) / z, z);
   }
+  function zoomFromSelection(z) {
+    const v = selectedRef && view.nodes.get(selectedRef);
+    if (v && v.a >= .4) {
+      const x = (v.x - cam.x) * cam.z; const y = M.headerH + (v.y - cam.y) * cam.z;
+      if (x >= 0 && x + M.colW * cam.z <= W - sheetInset() && y >= M.headerH && y + M.rowH * cam.z <= H - overlayRoom()) {
+        zoomTo(z, x + M.colW * cam.z / 2, y + M.rowH * cam.z / 2); return;
+      }
+    }
+    zoomTo(z);
+  }
   function fitAll(instant = false) {
     const isAuto = instant === true;
     if (isAuto && cameraChosen) return;
@@ -1606,8 +1616,8 @@ export function createMotionPlayer(root, callbacks, samples) {
   listen(plot, "keydown", (e) => {
     if (e.target !== plot) return;
     const k = e.key;
-    if (k === "+" || k === "=") { zoomTo(cam.tz * 1.25); e.preventDefault(); return; }
-    if (k === "-") { zoomTo(cam.tz / 1.25); e.preventDefault(); return; }
+    if (k === "+" || k === "=") { zoomFromSelection(cam.tz * 1.25); e.preventDefault(); return; }
+    if (k === "-") { zoomFromSelection(cam.tz / 1.25); e.preventDefault(); return; }
     if (k === "0") { fitAll(); e.preventDefault(); return; }
     if (k === "Escape") { hidePop(); return; }
     if ((k === "Enter" || k === " ") && view.focus) { e.preventDefault(); activate(view.focus, plot); return; }
@@ -1637,8 +1647,8 @@ export function createMotionPlayer(root, callbacks, samples) {
   listen($("t-skip"), "change", e => { if (e.target.checked) skip(); else { player.fast = false; pump(); } });
   listen($("scrub"), "input", (e) => seek(Number(e.target.value)));
   listen($("t-low"), "change", (e) => { ui.showLow = e.target.checked; sync(performance.now(), true, null); });
-  listen($("t-zin"), "click", () => zoomTo(cam.tz * 1.25));
-  listen($("t-zout"), "click", () => zoomTo(cam.tz / 1.25));
+  listen($("t-zin"), "click", () => zoomFromSelection(cam.tz * 1.25));
+  listen($("t-zout"), "click", () => zoomFromSelection(cam.tz / 1.25));
   listen($("t-fit"), "click", fitAll);
   listen($("t-follow"), "click", () => { setFollow(true); if (model.last) followHop(model.last.hop); });
   listen($("sheet-close"), "click", () => closeSheet());
@@ -1670,11 +1680,11 @@ export function createMotionPlayer(root, callbacks, samples) {
 
   const first = Object.hasOwn(samples, params.get('sample')) ? params.get('sample') : 'atom';
   const auto = params.get("auto") !== "0" && !reduced();
-  choose(first, auto);
+  if (Object.hasOwn(samples, first)) choose(first, auto);
   if (params.has("event")) seekEvent(Number(params.get("event")));
   else if (params.has("frame")) seek(Number(params.get("frame")), false);
   return {
-    begin(query, { resume = false, camera = null } = {}) {
+    begin(query, { resume = false } = {}) {
       if (resume) {
         if (!projected) skip();
         history.truncate(cursor); history.begin(query, { resume: true });
@@ -1682,20 +1692,41 @@ export function createMotionPlayer(root, callbacks, samples) {
       }
       history.begin(query); projected = false; cursor = 0; selectedRef = null; initialStopReason = null; continued = false; receivedDone = false; continuation = false; revision += 1;
       live = true; lastQuery = query;
-      cameraChosen = Boolean(camera);
+      cameraChosen = false;
       clearTimeout(player.timer); clearTimeout(player.arrive); clearTimeout(summaryTimer);
       Object.assign(player, { events: [], ts: [], received: 0, applied: 0, frameEnds: [], total: null, playing: true, serverDone: false, fast: false, source: null, liveStart: performance.now(), lastApply: 0 });
       player.clock0 = player.liveStart; resetView(); shownAt.clear(); callbacks.onResults([]);
       $("tray").replaceChildren(); syncDockActive(0, false); $("more").hidden = true;
       $("query-title").textContent = "“" + query + "”";
       root.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-checked', 'false'));
-      setFollow(!camera); sync(performance.now(), false, null);
-      if (camera) { Object.assign(cam, { x: camera.x, tx: camera.x, y: camera.y, ty: camera.y, z: camera.z, tz: camera.z, mode: 'idle' }); updateZoomLabel(); }
+      setFollow(true); sync(performance.now(), false, null);
       tickSummary(); chrome();
     },
     receive,
     getSnapshot: snapshot,
     getCamera() { return { x: cam.tx, y: cam.ty, z: cam.tz }; },
+    getRecord() {
+      const log = history.exportLog();
+      const complete = log.entries.length > 0 && log.entries.every(entry => entry.type === 'search'
+        ? entry.events.at(-1)?.event === 'done' : ['completed', 'failed'].includes(entry.events.at(-1)?.type));
+      return { log, complete, cursor: projected ? cursor : frameOf(player.applied), camera: { x: cam.tx, y: cam.ty, z: cam.tz } };
+    },
+    restoreRecord(record) {
+      if (!record.complete) return false;
+      clearTimeout(player.timer); clearTimeout(player.arrive); clearTimeout(summaryTimer);
+      history.restoreLog(record.log); resetView();
+      const searches = record.log.entries.filter(entry => entry.type === 'search');
+      const events = searches[0].events;
+      live = true; lastQuery = record.log.query; revision += 1; receivedDone = true; continuation = false;
+      initialStopReason = events.at(-1).data.stop_reason; continued = searches.length > 1; selectedArrival = null;
+      Object.assign(player, { events, received: events.length, applied: events.length, source: null, playing: false, fast: false, serverDone: true });
+      cameraChosen = true; setFollow(false);
+      const camera = record.camera;
+      Object.assign(cam, { x: camera.x, tx: camera.x, y: camera.y, ty: camera.y, z: camera.z, tz: camera.z, mode: 'idle', vx: 0, vy: 0, vz: 0 });
+      $('query-title').textContent = '“' + lastQuery + '”'; updateZoomLabel();
+      projectTo(record.cursor, false);
+      return true;
+    },
     refreshPaths() { sync(performance.now(), false, null); invalidate(); },
     applyOperation(event, expectedRevision) {
       if (expectedRevision != null && expectedRevision !== revision) return false;

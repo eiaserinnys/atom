@@ -6,7 +6,7 @@ import type { SearchMotionViewProps } from '../SearchMotionView/SearchMotionView
 import type { MotionNode } from '../SearchMotionView/types';
 import { CenterTabs, type CenterMode } from './CenterTabs';
 interface Props {
-  cameraState?: SearchMotionViewProps['cameraState'];
+  explorationState?: SearchMotionViewProps['explorationState'];
   nodeId: string | null;
   mode: CenterMode;
   onModeChange(mode: CenterMode): void;
@@ -15,7 +15,7 @@ interface Props {
   onResults(nodes: MotionNode[]): void;
   onOpenInTree?(nodeId: string): void;
 }
-export function CenterWorkspace({ nodeId, mode, onModeChange, request, onSelectNode, onResults, onOpenInTree, cameraState }: Props) {
+export function CenterWorkspace({ nodeId, mode, onModeChange, request, onSelectNode, onResults, onOpenInTree, explorationState }: Props) {
   const [searchVisited, setSearchVisited] = useState(mode === 'search');
   if (mode === 'search' && !searchVisited) setSearchVisited(true);
   const tabs = <CenterTabs mode={mode} onChange={onModeChange} />;
@@ -27,7 +27,7 @@ export function CenterWorkspace({ nodeId, mode, onModeChange, request, onSelectN
       <div className="h-10 px-3.5 flex items-center justify-between border-b border-border bg-card shrink-0">
         {tabs}
       </div>
-      <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView cameraState={cameraState} request={request} onSelectNode={onSelectNode} onResults={onResults} onOpenInTree={onOpenInTree} />}</div>
+      <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView explorationState={explorationState} request={request} onSelectNode={onSelectNode} onResults={onResults} onOpenInTree={onOpenInTree} />}</div>
     </div>
   </div>;
 }
