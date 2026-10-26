@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, Folder, Search, SlidersHorizontal } from 'lucide-react';
 import { api, type SearchResult } from '../../api/client';
+import { Spinner } from '../Spinner';
 import {
   buildSearchFilters,
   formatBreadcrumb,
   hasSearchFilters,
+  snippetParts,
   type SearchFilterDraft,
 } from './searchBarLogic';
 
@@ -122,6 +124,7 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
         <input
           className="min-w-0 flex-1 bg-transparent border-none outline-none text-foreground text-[14px] font-sans py-2 placeholder:text-muted-foreground"
           type="text"
+          enterKeyHint="search"
           placeholder={t('searchbar.placeholder')}
           value={query}
           onChange={handleChange}
@@ -131,7 +134,7 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
           onKeyDown={e => { if (e.key === 'Enter' && (e.nativeEvent.isComposing || composingRef.current)) e.preventDefault(); if (e.key === 'Escape') setOpen(false); }}
           onFocus={() => (results.length > 0 || query.trim() || filtersOpen) && setOpen(true)}
         />
-        {loading && <span className="text-muted-foreground text-base">⋯</span>}
+        {loading && <Spinner size="sm" label={t('common.loading')} />}
         <button
           type="button"
           className={`relative grid size-7 place-items-center rounded-none border-none bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${filtersOpen || activeFilters ? 'bg-muted text-foreground' : ''}`}
@@ -147,7 +150,7 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
           <SlidersHorizontal size={15} aria-hidden="true" />
           {activeFilters && <span className="absolute right-1 top-1 size-1.5 rounded-none bg-brand" />}
         </button>
-        <button type="submit" className="index-action bg-foreground text-background">검색</button>
+        <button type="submit" className="index-action bg-foreground text-background">{t('common.search')}</button>
       </div>
 
       {shouldShowPanel && (
@@ -237,7 +240,9 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
                       )}
                       {r.snippet && (
                         <div className="text-[13px] text-muted-foreground mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
-                          {r.snippet}
+                          {snippetParts(r.snippet).map((part, index) => part.match
+                            ? <strong key={index} className="font-semibold text-foreground">{part.text}</strong>
+                            : <span key={index}>{part.text}</span>)}
                         </div>
                       )}
                     </div>

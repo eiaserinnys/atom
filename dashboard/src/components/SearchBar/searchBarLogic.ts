@@ -42,6 +42,41 @@ export function formatBreadcrumb(nodePath?: string[]): string | null {
   return nodePath.join(' / ');
 }
 
+export function snippetParts(snippet: string): { text: string; match: boolean }[] {
+  const cleaned = snippet
+    .replace(/<b>/g, '\u0001')
+    .replace(/<\/b>/g, '\u0002')
+    .split('\n')
+    .map((line) => {
+      if (/^\s*(?:```|~~~|\|?\s*:?-{3,})/.test(line)) return '';
+      return line
+        .replace(/^\s*#{1,6}\s+/, '')
+        .replace(/^\s*>\s?/, '')
+        .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
+        .replace(/^\s*\|/, '')
+        .replace(/\|\s*$/, '')
+        .replace(/\s*\|\s*/g, ' ');
+    })
+    .join(' ')
+    .replace(/\*\*|__|`/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const parts: { text: string; match: boolean }[] = [];
+  let match = false;
+  for (const text of cleaned.split(/(\u0001|\u0002)/)) {
+    if (text === '\u0001') {
+      match = true;
+    } else if (text === '\u0002') {
+      match = false;
+    } else if (text) {
+      parts.push({ text, match });
+    }
+  }
+  return parts;
+}
+
 function parseTags(tagsText: string): string[] {
   const tags: string[] = [];
   for (const tag of tagsText.split(',')) {
