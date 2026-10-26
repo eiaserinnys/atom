@@ -1001,9 +1001,10 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     }
     if (cursor < frames.length) {
       const events = frames[cursor].events;
+      const completed = events.findLast(event => event.event === 'step_completed');
       const before = new Set(model.nodes.keys());
       projectTo(cursor + 1, true, true, false, true);
-      if (ui.follow) {
+      if (ui.follow && !['selection', 'run_terminal'].includes(completed?.data.step.stage)) {
         followHop(model.continuationStep?.hop ?? model.maxHop, false);
         const added = [...model.nodes.values()].filter(node => !before.has(node.ref));
         if (added.length) { followHop(added.at(-1).hop, false); ensureVisible(added.at(-1).ref); }
@@ -1012,7 +1013,6 @@ export function createMotionPlayer(root, callbacks, samples = null) {
           ensureVisible(view.L.hidden.has(ref) ? '@' + view.L.hidden.get(ref) : ref);
         }
       }
-      const completed = events.findLast(event => event.event === 'step_completed');
       const gap = player.fast || reduced() ? 0 : gapAfter(completed) * (player.serverDone ? 0.5 : 1);
       player.timer = setTimeout(pumpContinuation, gap);
     } else if (player.serverDone) {

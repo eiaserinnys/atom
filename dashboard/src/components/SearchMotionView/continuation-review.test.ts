@@ -95,3 +95,21 @@ test('E: unchecking skip while SSE is arriving resumes the continuation queue', 
     expect(r.count()).toBe(26); expect(r.button('t-skip').disabled).toBe(true);
   } finally { r.player.dispose(); }
 });
+
+test('continuation selection keeps the current camera and has no expansion or gate targets', () => {
+  const r = rig();
+  try {
+    r.motion(true); r.player.begin('q', { resume: true }); events.forEach(e => r.player.receive(e));
+    for (let i = 0; i < 20 && r.count() < 24; i++) vi.advanceTimersToNextTimer();
+    expect(r.count()).toBe(24);
+    const before = r.player.getCamera();
+    vi.advanceTimersToNextTimer();
+    expect(r.count()).toBe(25);
+    expect(r.player.getCamera()).toEqual(before);
+    const session = createExplorationSession(); session.restoreLog(r.player.getRecord().log);
+    const scene = session.project(25, false, true).scene;
+    expect(scene.continuationStep).toBeUndefined();
+    expect(scene.inflight.size).toBe(0);
+    expect([...scene.nodes.values()].every((node: any) => !node.judging && !node.reading && !node.climbing)).toBe(true);
+  } finally { r.player.dispose(); }
+});

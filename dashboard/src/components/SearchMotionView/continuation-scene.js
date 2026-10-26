@@ -10,7 +10,7 @@ export function presentContinuation(scene, segment, frame, active) {
   scene.terminal = segment.terminal;
   scene.inflight = new Map();
   scene.asking = null;
-  if (!active || step.stage === 'run_terminal') return;
+  if (!active || step.stage === 'selection' || step.stage === 'run_terminal') return;
   const byCard = new Map(); const byNode = new Map();
   for (const node of scene.nodes.values()) {
     if (node.cardId) byCard.set(node.cardId, node.ref);
