@@ -10,7 +10,6 @@ import { Spinner } from '../Spinner';
 
 interface CompileContentProps {
   contentRef: RefObject<HTMLDivElement | null>;
-  nodeId: string | null;
   isLoading: boolean;
   error: Error | null;
   markdown: string | undefined;
@@ -21,7 +20,6 @@ interface CompileContentProps {
 
 export function CompileContent({
   contentRef,
-  nodeId,
   isLoading,
   error,
   markdown,
