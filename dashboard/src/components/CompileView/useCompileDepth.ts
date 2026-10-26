@@ -1,4 +1,4 @@
-import { useCallback, useState, type ChangeEvent } from 'react';
+import { useCallback, useState } from 'react';
 import {
   DEPTH_SLIDER_KEY,
   formatDepthLabel,
@@ -11,8 +11,7 @@ export function useCompileDepth() {
     parseStoredDepthSlider(localStorage.getItem(DEPTH_SLIDER_KEY))
   );
 
-  const handleSliderChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
+  const selectDepth = useCallback((value: number) => {
     setSliderValue(value);
     localStorage.setItem(DEPTH_SLIDER_KEY, String(value));
   }, []);
@@ -21,6 +20,6 @@ export function useCompileDepth() {
     sliderValue,
     depth: sliderToDepth(sliderValue),
     depthLabel: formatDepthLabel(sliderValue),
-    handleSliderChange,
+    selectDepth,
   };
 }

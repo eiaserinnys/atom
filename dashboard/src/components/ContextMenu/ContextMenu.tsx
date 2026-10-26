@@ -5,6 +5,7 @@ export interface ContextMenuItem {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  checked?: boolean;
 }
 
 interface ContextMenuProps {
@@ -43,15 +44,18 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       ref={menuRef}
       data-testid="context-menu"
       style={{ top: adjustedY, left: adjustedX }}
+      role="menu"
       className="fixed z-[100] min-w-[140px] max-w-[200px] bg-card border border-border rounded-none shadow-card py-1"
     >
       {items.map((item, i) => (
         <button
           key={i}
           data-testid="context-menu-item"
+          role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+          aria-checked={item.checked === undefined ? undefined : item.checked}
           onClick={() => { item.onClick(); onClose(); }}
           className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors truncate ${
-            item.danger ? 'text-node-error' : 'text-foreground'
+            item.checked ? 'text-brand font-semibold' : item.danger ? 'text-node-error' : 'text-foreground'
           }`}
         >
           {item.label}
