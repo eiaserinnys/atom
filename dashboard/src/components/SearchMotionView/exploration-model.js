@@ -205,6 +205,7 @@ export function applyExplorationEvent(model, event) {
   } else if (event.type === 'evaluation_batch_succeeded') {
     const response = event.response;
     for (const result of response.results ?? []) {
+      if (next.evaluationCache.has(result.card_id)) continue;
       next.evaluationCache.set(result.card_id, {
         score: result.score,
         origin: 'manual_content',
@@ -243,8 +244,8 @@ export function projectExploration(model) {
       similarity: card.similarity,
       selected: rankByCardId.has(cardId),
       rank: rankByCardId.get(cardId) ?? card.initialRank,
-      score: evaluation?.score ?? card.initialScore,
-      evaluation: evaluation ?? null,
+      score: card.initialScore ?? evaluation?.score ?? null,
+      evaluation: card.initialScore != null && evaluation?.origin !== 'initial_content' ? null : evaluation ?? null,
     };
   });
   const results = model.resultOrder.map((cardId, index) => {
@@ -253,7 +254,7 @@ export function projectExploration(model) {
     return {
       cardId,
       rank: index + 1,
-      score: evaluation?.score ?? card.initialScore,
+      score: card.initialScore ?? evaluation?.score ?? null,
       sourceLabel: card.columnLabel,
     };
   });

@@ -74,6 +74,7 @@ test('content relevance never changes an existing structure traversal verdict', 
   session.apply({ type: 'evaluation_batch_succeeded', operationId: 'evaluate', response: { results: [{ card_id: target.cardId, score: .1 }], audit: { calls: [] } } });
   session.apply({ type: 'completed', operationId: 'evaluate' });
   const node = session.project(session.timeline().frames.length).scene.nodes.get(target.ref);
-  expect(node.score).toBe(.1);
+  expect(node.score).toBe(target.score);
+  expect(node.asked).toEqual(target.asked);
   expect(node.verdict).toBe('open');
 });
