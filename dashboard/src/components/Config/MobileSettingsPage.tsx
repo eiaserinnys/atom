@@ -7,8 +7,9 @@ import { LanguageTab } from './LanguageTab';
 import { UserManagementTab } from './UserManagementTab';
 import { DatabaseTab } from './DatabaseTab';
 import { AuthTab } from './AuthTab';
+import { OpenAITab } from './OpenAITab';
 
-type SubTab = 'users' | 'agents' | 'credentials' | 'language' | 'database' | 'auth' | null;
+type SubTab = 'users' | 'agents' | 'credentials' | 'language' | 'database' | 'auth' | 'openai' | null;
 
 interface Props {
   currentUserRole: UserRole;
@@ -28,6 +29,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: 'users',       labelKey: 'config.tab_users',    adminOnly: true },
   { id: 'database',    labelKey: 'config.tab_database', adminOnly: true },
   { id: 'auth',        labelKey: 'config.tab_auth',     adminOnly: true },
+  { id: 'openai',      labelKey: 'config.tab_openai',   adminOnly: true },
 ];
 
 export function MobileSettingsPage({ currentUserRole, currentUserEmail }: Props) {
@@ -66,6 +68,7 @@ export function MobileSettingsPage({ currentUserRole, currentUserEmail }: Props)
           )}
           {activeSubTab === 'database' && isAdmin && <DatabaseTab />}
           {activeSubTab === 'auth' && isAdmin && <AuthTab />}
+          {activeSubTab === 'openai' && isAdmin && <OpenAITab />}
         </div>
       </div>
     );

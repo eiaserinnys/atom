@@ -24,7 +24,32 @@
     "tab_credentials": "외부 참조 인증",
     "tab_language": "언어",
     "tab_database": "데이터베이스",
-    "tab_auth": "인증"
+    "tab_auth": "인증",
+    "tab_openai": "OpenAI"
+  },
+  "openai": {
+    "key": "API 키",
+    "configured": "설정됨",
+    "not_configured": "미설정",
+    "saved_at": "저장 시각",
+    "embeddings": "임베딩",
+    "progress": "{{completed}} / {{total}}",
+    "running": "생성 중",
+    "idle": "대기 중",
+    "paused_no_key": "키 필요",
+    "paused_auth": "키 확인 필요",
+    "paused_rate_limited": "호출 대기",
+    "saved": "저장됨",
+    "deleted": "삭제됨",
+    "request_failed": "설정을 처리하지 못했습니다.",
+    "load_failed": "상태를 불러오지 못했습니다.",
+    "error_OPENAI_AUTH": "인증 오류",
+    "error_OPENAI_RATE_LIMIT": "호출 한도",
+    "error_OPENAI_UPSTREAM": "OpenAI 오류",
+    "error_OPENAI_NETWORK": "연결 오류",
+    "error_OPENAI_REQUEST": "요청 오류",
+    "error_OPENAI_BAD_RESPONSE": "응답 오류",
+    "error_EMBEDDING_STORAGE": "저장 오류"
   },
   "users": {
     "title": "사용자 관리",

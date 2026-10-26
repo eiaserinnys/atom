@@ -1,0 +1,16 @@
+export const EMBEDDING_POLICY = Object.freeze({
+  model: "text-embedding-3-large",
+  dimensions: 3072,
+  maxInputTokens: 8191,
+  candidatePageSize: 32,
+  maxInputsPerRequest: 32,
+  maxRequestTokens: 30_000,
+  debounceMs: 500,
+  sweepIntervalMs: 60_000,
+  requestTimeoutMs: 30_000,
+  indexPageSize: 256,
+  cleanupPageSize: 256,
+  neighborsDefaultLimit: 20,
+  neighborsMaxLimit: 50,
+  excerptMaxChars: 200,
+} as const);

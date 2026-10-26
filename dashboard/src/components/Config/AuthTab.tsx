@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { configApi } from '../../api/client';
 import { useSystem } from '../../contexts/systemContext';
+import { ConfigActionButton, ConfigField } from './ConfigFields';
 
 const ENV_KEYS = {
   google: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CALLBACK_URL'] as const,
@@ -56,17 +57,15 @@ export function AuthTab() {
     const val = values[key] ?? '';
     const isMasked = isSensitive && val === '***';
     return (
-      <div key={key} className="mb-3">
-        <label className="block text-[13px] text-muted-foreground mb-1">{label}</label>
-        <input
-          type={isSensitive ? 'password' : 'text'}
-          className="w-full px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground"
-          placeholder={isMasked ? t('auth.secret_set') : isSensitive ? t('auth.secret_not_set') : ''}
-          value={isMasked ? '' : val}
-          onChange={(e) => handleChange(key, e.target.value)}
-          disabled={pendingRestart}
-        />
-      </div>
+      <ConfigField
+        key={key}
+        label={label}
+        type={isSensitive ? 'password' : 'text'}
+        placeholder={isMasked ? t('auth.secret_set') : isSensitive ? t('auth.secret_not_set') : ''}
+        value={isMasked ? '' : val}
+        onChange={(value) => handleChange(key, value)}
+        disabled={pendingRestart}
+      />
     );
   };
 
@@ -98,13 +97,9 @@ export function AuthTab() {
         </div>
       )}
 
-      <button
-        className="px-4 py-2 text-sm font-medium rounded-none bg-brand text-primary-foreground hover:opacity-90 disabled:opacity-50"
-        onClick={handleSave}
-        disabled={saving || pendingRestart}
-      >
+      <ConfigActionButton onClick={handleSave} disabled={saving || pendingRestart}>
         {saving ? t('common.loading') : t('auth.save')}
-      </button>
+      </ConfigActionButton>
     </div>
   );
 }
