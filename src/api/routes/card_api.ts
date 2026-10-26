@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
 import { listChildren, compileSubtree, getTreeOutline } from "../../services/tree.service.js";
-import { agentKeyPreHandler } from "../agent-key-auth.js";
+import { agentKeyPreHandler, requireAgentWriteScope } from "../agent-key-auth.js";
 import type { UpdateCardInput } from "../../shared/types.js";
 import { parseCompileLimit } from "./compile-limit.js";
 import { createTreeOutlineHandler } from "./tree-outline.js";
@@ -41,7 +41,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/cards — create a card (agent key auth)
   app.post(
     "/api/cards",
-    { preHandler: agentKeyPreHandler },
+    { preHandler: [agentKeyPreHandler, requireAgentWriteScope] },
     async (req, reply) => {
       const body = req.body as Record<string, unknown>;
       if (!body["title"] || typeof body["title"] !== "string") {
@@ -66,7 +66,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
   // PATCH /api/cards/:cardId — update a card (agent key auth)
   app.patch<{ Params: { cardId: string } }>(
     "/api/cards/:cardId",
-    { preHandler: agentKeyPreHandler },
+    { preHandler: [agentKeyPreHandler, requireAgentWriteScope] },
     async (req, reply) => {
       const body = req.body as Record<string, unknown>;
       const allowedFields = new Set(["content", "title", "tags", "source_ref"]);

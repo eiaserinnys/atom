@@ -178,6 +178,9 @@ export async function handleSlackCallback(input: {
   const db = input.deps.getDb();
   let dbUser = await input.deps.findUserByEmail(db, email);
   if (!dbUser) {
+    if (!input.slackAllowedTeamId) {
+      return input.reply.redirect(`${input.frontendUrl}/?auth_error=unauthorized`);
+    }
     dbUser = await input.deps.insertUser(db, { email, display_name: name, role: 'editor' });
     input.log.info({ email, name }, 'Auto-created user from Slack OAuth');
   }

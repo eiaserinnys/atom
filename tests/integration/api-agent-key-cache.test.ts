@@ -92,6 +92,37 @@ function readRpcBody(body: string): any {
   return JSON.parse(dataLine ? dataLine.slice(6) : body);
 }
 
+async function postMcpRpc(key: string, method: string, id: number, params?: Record<string, unknown>) {
+  const address = app.server.address();
+  if (address === null || typeof address === "string") throw new Error("server is not listening on TCP");
+  const res = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+    method: "POST",
+    headers: {
+      "x-api-key": key,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "mcp-protocol-version": "2025-03-26",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) }),
+  });
+  const body = await res.text();
+  const eventData = body.split("\n").find((line) => line.startsWith("data:"));
+  const payload = eventData ? eventData.slice("data:".length).trim() : body;
+  return { statusCode: res.status, response: JSON.parse(payload) as { result?: { tools?: Array<{ name: string }> } } };
+}
+
+async function listMcpTools(key: string): Promise<string[]> {
+  const initialized = await postMcpRpc(key, "initialize", 1, {
+    protocolVersion: "2025-03-26",
+    capabilities: {},
+    clientInfo: { name: "scope-test", version: "0" },
+  });
+  expect(initialized.statusCode).toBe(200);
+  const listed = await postMcpRpc(key, "tools/list", 2);
+  expect(listed.statusCode).toBe(200);
+  return (listed.response.result?.tools ?? []).map((tool) => tool.name);
+}
+
 describe("agent key verification cache", () => {
   it("runs bcrypt on the first request only", async () => {
     expect((await getTree(SECRET)).statusCode).toBe(200);
@@ -187,6 +218,87 @@ describe("agent key verification cache", () => {
     expect(clearSpy).toHaveBeenCalledTimes(1);
     clearSpy.mockRestore();
     expect((await getTree(created.json<{ secret: string }>().secret)).statusCode).toBe(200);
+  });
+
+  it("limits read keys to read-only MCP tools and REST routes", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/config/agents",
+      payload: { agent_id: "read-only-agent", scope: "read" },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json<{ scope: string }>().scope).toBe("read");
+    const { id, secret: readSecret } = created.json<{ id: string; secret: string }>();
+
+    const tools = await listMcpTools(readSecret);
+    expect(tools.sort()).toEqual([
+      "compile_subtree",
+      "evaluate_cards",
+      "get_backlinks",
+      "get_card",
+      "get_card_neighbors",
+      "get_node",
+      "get_tree",
+      "list_children",
+      "search_cards",
+    ]);
+
+    const create = await app.inject({
+      method: "POST",
+      url: "/api/cards",
+      headers: { "x-api-key": readSecret },
+      payload: { card_type: "knowledge", title: "Read key cannot create" },
+    });
+    expect(create.statusCode).toBe(403);
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/api/cards/${agent.id}`,
+      headers: { "x-api-key": readSecret },
+      payload: { title: "Read key cannot update" },
+    });
+    expect(patch.statusCode).toBe(403);
+    expect((await app.inject({
+      method: "GET",
+      url: "/api/tree",
+      headers: { "x-api-key": readSecret },
+    })).statusCode).toBe(200);
+
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/api/config/agents/${id}`,
+      payload: { scope: "write" },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json<{ scope: string }>().scope).toBe("write");
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/cards",
+      headers: { "x-api-key": readSecret },
+      payload: { card_type: "knowledge", title: "Read key is now write" },
+    })).statusCode).toBe(201);
+  });
+
+  it("keeps write keys registered for every current MCP tool", async () => {
+    const tools = await listMcpTools(SECRET);
+    expect(tools.sort()).toEqual([
+      "batch_op",
+      "compile_subtree",
+      "create_card",
+      "create_symlink",
+      "delete_card",
+      "delete_node",
+      "evaluate_cards",
+      "get_backlinks",
+      "get_card",
+      "get_card_neighbors",
+      "get_node",
+      "get_tree",
+      "list_children",
+      "move_node",
+      "search_cards",
+      "update_card",
+      "update_node",
+    ]);
   });
 
   it("keeps warm-key latency under 20ms at p50", async () => {

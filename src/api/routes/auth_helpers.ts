@@ -86,9 +86,10 @@ export function isSlackWorkspaceAllowed(teamId: string, allowedTeamId?: string):
   return !allowedTeamId || teamId === allowedTeamId;
 }
 
-export function getStateCookieOptions() {
+export function getStateCookieOptions(nodeEnv: string | undefined) {
   return {
     httpOnly: true,
+    secure: nodeEnv === 'production',
     sameSite: 'lax' as const,
     path: '/',
     maxAge: 300,

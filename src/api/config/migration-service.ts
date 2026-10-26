@@ -82,8 +82,8 @@ async function copyAgents(sqliteDb: SqliteMigrationDatabase, tx: Queryable): Pro
   const agents = sqliteDb.prepare('SELECT * FROM agents ORDER BY created_at').all();
   for (const a of agents) {
     await tx.query(
-      `INSERT INTO agents (id, agent_id, secret_hash, display_name, is_active, created_by, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO agents (id, agent_id, secret_hash, display_name, is_active, created_by, created_at, scope)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id) DO NOTHING`,
       [
         a['id'],
@@ -93,6 +93,7 @@ async function copyAgents(sqliteDb: SqliteMigrationDatabase, tx: Queryable): Pro
         Boolean(a['is_active']),
         a['created_by'] ?? null,
         a['created_at'],
+        a['scope'] ?? 'write',
       ],
     );
   }

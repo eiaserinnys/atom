@@ -105,8 +105,18 @@ describe("migrateSqliteToPostgres", () => {
           secret_hash: "hash",
           display_name: "Agent One",
           is_active: 1,
+          scope: "read",
           created_by: "user-1",
           created_at: "2026-05-24T00:01:00.000Z",
+        },
+        {
+          id: "agent-row-2",
+          agent_id: "agent-2",
+          secret_hash: "hash-2",
+          display_name: "Legacy Agent",
+          is_active: 1,
+          created_by: "user-1",
+          created_at: "2026-05-24T00:01:30.000Z",
         },
       ],
       "SELECT * FROM cards ORDER BY card_timestamp": [
@@ -164,18 +174,21 @@ describe("migrateSqliteToPostgres", () => {
     expect(insertCalls.map((call) => call.table)).toEqual([
       "users",
       "agents",
+      "agents",
       "cards",
       "cards",
       "tree_nodes",
       "tree_nodes",
     ]);
-    expect(insertCalls[2].values?.[4]).toEqual(["ref-1", "ref-2"]);
-    expect(insertCalls[2].values?.[5]).toEqual(["tag-a", "tag-b"]);
-    expect(insertCalls[4].values?.[0]).toBe("node-parent");
-    expect(insertCalls[4].values?.[3]).toBe("0000000010");
-    expect(insertCalls[5].values?.[0]).toBe("node-child");
-    expect(insertCalls[5].values?.[2]).toBe("node-parent");
-    expect(insertCalls[5].values?.[3]).toBe("0000000020");
+    expect(insertCalls[3].values?.[4]).toEqual(["ref-1", "ref-2"]);
+    expect(insertCalls[3].values?.[5]).toEqual(["tag-a", "tag-b"]);
+    expect(insertCalls[1].values?.[7]).toBe("read");
+    expect(insertCalls[2].values?.[7]).toBe("write");
+    expect(insertCalls[5].values?.[0]).toBe("node-parent");
+    expect(insertCalls[5].values?.[3]).toBe("0000000010");
+    expect(insertCalls[6].values?.[0]).toBe("node-child");
+    expect(insertCalls[6].values?.[2]).toBe("node-parent");
+    expect(insertCalls[6].values?.[3]).toBe("0000000020");
     expect(operationLog.slice(-3)).toEqual([
       "pg.commit",
       "sqlite.close",

@@ -30,10 +30,10 @@ import {
 import {
   listAgents,
   insertAgent,
-  updateAgentActive,
   updateAgentSecret,
+  updateAgentSettings,
 } from '../../db/queries/agents.js';
-import type { UserRole } from '../../shared/types.js';
+import type { AgentScope, UserRole } from '../../shared/types.js';
 
 export type MigrationRouteDeps = Omit<ConfigMigrationServiceDeps, 'db'> & {
   getDb(): DatabaseAdapter;
@@ -132,14 +132,17 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     return reply.send(agents.map(agentToPublic));
   });
 
-  // POST /api/config/agents — create agent (admin or editor), returns secret once
-  app.post<{ Body: { agent_id: string; display_name?: string } }>(
+  // POST /api/config/agents — create agent (admin only), returns secret once
+  app.post<{ Body: { agent_id: string; display_name?: string; scope?: AgentScope } }>(
     '/api/config/agents',
     async (req, reply) => {
-      if (!requireRole(req, reply, 'editor')) return;
-      const { agent_id, display_name } = req.body;
+      if (!requireRole(req, reply, 'admin')) return;
+      const { agent_id, display_name, scope } = req.body;
       if (!agent_id) {
         return reply.code(400).send({ error: 'agent_id is required' });
+      }
+      if (scope !== undefined && scope !== 'read' && scope !== 'write') {
+        return reply.code(400).send({ error: 'scope must be read or write' });
       }
 
       const plainSecret = randomBytes(32).toString('hex');
@@ -148,6 +151,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
         agent_id,
         secret_hash: secretHash,
         display_name,
+        scope,
         created_by: req.jwtUser!.id === 'bypass' ? undefined : req.jwtUser!.id,
       });
       agentKeyVerifier.clear();
@@ -158,11 +162,11 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  // POST /api/config/agents/:id/reissue — reissue secret (admin or editor)
+  // POST /api/config/agents/:id/reissue — reissue secret (admin only)
   app.post<{ Params: { id: string } }>(
     '/api/config/agents/:id/reissue',
     async (req, reply) => {
-      if (!requireRole(req, reply, 'editor')) return;
+      if (!requireRole(req, reply, 'admin')) return;
       const { id } = req.params;
 
       const plainSecret = randomBytes(32).toString('hex');
@@ -178,20 +182,26 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  // PATCH /api/config/agents/:id — update agent (admin or editor)
+  // PATCH /api/config/agents/:id — update agent (admin only)
   app.patch<{
     Params: { id: string };
-    Body: { is_active?: boolean };
+    Body: { is_active?: boolean; scope?: AgentScope };
   }>('/api/config/agents/:id', async (req, reply) => {
-    if (!requireRole(req, reply, 'editor')) return;
+    if (!requireRole(req, reply, 'admin')) return;
     const db = getDb();
     const { id } = req.params;
-    const { is_active } = req.body;
+    const { is_active, scope } = req.body;
 
-    if (is_active === undefined) {
+    if (is_active === undefined && scope === undefined) {
       return reply.code(400).send({ error: 'No updatable fields provided' });
     }
-    const agent = await updateAgentActive(db, id, is_active);
+    if (is_active !== undefined && typeof is_active !== 'boolean') {
+      return reply.code(400).send({ error: 'is_active must be a boolean' });
+    }
+    if (scope !== undefined && scope !== 'read' && scope !== 'write') {
+      return reply.code(400).send({ error: 'scope must be read or write' });
+    }
+    const agent = await updateAgentSettings(db, id, { is_active, scope });
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
     agentKeyVerifier.clear();
     return reply.send(agentToPublic(agent));

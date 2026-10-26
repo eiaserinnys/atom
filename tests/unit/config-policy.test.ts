@@ -13,6 +13,7 @@ describe("config policy helpers", () => {
       secret_hash: "hash-value",
       display_name: "Writer",
       is_active: true,
+      scope: "write",
       created_by: "user-1",
       created_at: "2026-05-24T00:00:00.000Z",
     };
@@ -24,6 +25,7 @@ describe("config policy helpers", () => {
       agent_id: "writer",
       display_name: "Writer",
       is_active: true,
+      scope: "write",
       created_by: "user-1",
       created_at: "2026-05-24T00:00:00.000Z",
     });

@@ -1,5 +1,6 @@
 import type { Queryable } from '../queryable.js';
 import { deserializeBoolean } from '../utils.js';
+import type { AgentScope } from '../../shared/types.js';
 
 export interface Agent {
   id: string;
@@ -7,6 +8,7 @@ export interface Agent {
   secret_hash: string;
   display_name: string | null;
   is_active: boolean;
+  scope: AgentScope;
   created_by: string | null;
   created_at: string;
 }
@@ -18,6 +20,7 @@ function rowToAgent(row: Record<string, unknown>): Agent {
     secret_hash: row["secret_hash"] as string,
     display_name: (row["display_name"] as string | null) ?? null,
     is_active: deserializeBoolean(row["is_active"]),
+    scope: row["scope"] as AgentScope,
     created_by: (row["created_by"] as string | null) ?? null,
     created_at: row["created_at"] as string,
   };
@@ -36,13 +39,13 @@ export async function findAgentByAgentId(
 
 export async function insertAgent(
   db: Queryable,
-  input: { agent_id: string; secret_hash: string; display_name?: string; created_by?: string; }
+  input: { agent_id: string; secret_hash: string; display_name?: string; created_by?: string; scope?: AgentScope; }
 ): Promise<Agent> {
   const id = crypto.randomUUID();
   const result = await db.query(
-    `INSERT INTO agents (id, agent_id, secret_hash, display_name, created_by)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [id, input.agent_id, input.secret_hash, input.display_name ?? null, input.created_by ?? null]
+    `INSERT INTO agents (id, agent_id, secret_hash, display_name, created_by, scope)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [id, input.agent_id, input.secret_hash, input.display_name ?? null, input.created_by ?? null, input.scope ?? 'write']
   );
   return rowToAgent(result.rows[0]);
 }
@@ -60,6 +63,21 @@ export async function updateAgentActive(
   const result = await db.query(
     `UPDATE agents SET is_active = $1 WHERE id = $2 RETURNING *`,
     [isActive, id]
+  );
+  if (result.rows.length === 0) return null;
+  return rowToAgent(result.rows[0]);
+}
+
+export async function updateAgentSettings(
+  db: Queryable,
+  id: string,
+  changes: { is_active?: boolean; scope?: AgentScope },
+): Promise<Agent | null> {
+  const result = await db.query(
+    `UPDATE agents
+     SET is_active = COALESCE($1, is_active), scope = COALESCE($2, scope)
+     WHERE id = $3 RETURNING *`,
+    [changes.is_active ?? null, changes.scope ?? null, id]
   );
   if (result.rows.length === 0) return null;
   return rowToAgent(result.rows[0]);

@@ -7,6 +7,7 @@ import { registerBatchTools } from "../../mcp/tools/batch_tools.js";
 import { registerExpansionTools } from "../../mcp/tools/expansion_tools.js";
 import { runConfiguredJevEvaluation } from "../../services/jev-search/evaluate.js";
 import type { NeighborService } from "../../services/embeddings/neighbors.js";
+import { createScopedMcpServer } from "../../mcp/tool-scope.js";
 import { agentKeyVerifier } from "../agent-key-auth.js";
 import type { FastifyPluginAsync } from "fastify";
 
@@ -28,11 +29,12 @@ export const mcpRoutes: FastifyPluginAsync<McpRoutesOptions> = async (app, { nei
     }
 
     const server = new McpServer({ name: "atom", version: "0.1.0" });
-    registerCardTools(server, agent.agent_id);
-    registerTreeTools(server, agent.agent_id);
-    registerSearchTools(server);
-    registerBatchTools(server, agent.agent_id);
-    registerExpansionTools(server, { neighbors: neighborService, evaluate: runConfiguredJevEvaluation });
+    const scopedServer = createScopedMcpServer(server, agent.scope);
+    registerCardTools(scopedServer, agent.agent_id);
+    registerTreeTools(scopedServer, agent.agent_id);
+    registerSearchTools(scopedServer);
+    registerBatchTools(scopedServer, agent.agent_id);
+    registerExpansionTools(scopedServer, { neighbors: neighborService, evaluate: runConfiguredJevEvaluation });
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless — 세션 없이 매 요청 독립 처리

@@ -19,6 +19,7 @@ function agentRow(agent_id: string, secret_hash: string): Agent {
     secret_hash,
     display_name: null,
     is_active: true,
+    scope: "write",
     created_by: null,
     created_at: "2026-09-22T00:00:00Z",
   };
