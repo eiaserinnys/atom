@@ -1,5 +1,7 @@
 import { useId, type ReactNode } from "react";
 
+export const CONFIG_CONTROL_CLASS = "px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground";
+
 interface ConfigFieldProps {
   label: string;
   type?: "text" | "password";
@@ -16,7 +18,7 @@ export function ConfigField({ label, type = "text", placeholder = "", value, dis
       <input
         id={id}
         type={type}
-        className="w-full px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground"
+        className={`w-full ${CONFIG_CONTROL_CLASS}`}
         placeholder={placeholder}
         value={value}
         onChange={event => onChange(event.target.value)}
@@ -30,10 +32,11 @@ interface ConfigActionButtonProps {
   children: ReactNode;
   disabled?: boolean;
   tone?: "brand" | "danger" | "secondary";
+  title?: string;
   onClick: () => void;
 }
 
-export function ConfigActionButton({ children, disabled, tone = "brand", onClick }: ConfigActionButtonProps) {
+export function ConfigActionButton({ children, disabled, tone = "brand", title, onClick }: ConfigActionButtonProps) {
   const color = tone === "brand"
     ? "bg-brand text-primary-foreground"
     : tone === "danger"
@@ -44,6 +47,7 @@ export function ConfigActionButton({ children, disabled, tone = "brand", onClick
       className={`px-4 py-2 text-sm font-medium rounded-none ${color} ${tone === "secondary" ? "" : "hover:opacity-90"} disabled:opacity-50`}
       onClick={onClick}
       disabled={disabled}
+      title={title}
     >
       {children}
     </button>

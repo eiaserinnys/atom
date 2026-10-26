@@ -53,6 +53,7 @@
   },
   "users": {
     "title": "사용자 관리",
+    "email_required": "이메일을 입력하세요.",
     "add_section": "사용자 추가",
     "list_section": "사용자 목록",
     "invite_placeholder": "이메일",
@@ -71,6 +72,7 @@
   },
   "agents": {
     "title": "API 키 관리",
+    "agent_id_required": "에이전트 ID를 입력하세요.",
     "desc": "API 시크릿은 지금만 표시됩니다. 안전한 곳에 저장하세요.",
     "create_section": "에이전트 생성",
     "list_section": "에이전트 목록",

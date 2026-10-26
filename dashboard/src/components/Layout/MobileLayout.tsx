@@ -28,12 +28,12 @@ export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNode
   const handleSelectNode = useCallback((nodeId: string | null) => { onSelectNode(nodeId); if (nodeId) setActiveTab('compile'); }, [onSelectNode]);
   return <div className="flex h-full flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
     <div className="flex-1 min-h-0 overflow-hidden">
-      <div hidden={activeTab !== 'tree'} className="h-full"><TreeView selectedNodeId={selectedNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} /></div>
+      <div hidden={activeTab !== 'tree'} className="h-full"><TreeView selectedNodeId={selectedNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} showLogout={false} /></div>
       <div hidden={activeTab !== 'compile'} className="h-full"><CompileView nodeId={selectedNodeId} /></div>
       <div hidden={activeTab !== 'search'} className="h-full">{searchVisited && <SearchMotionView request={request} onResults={onResults} onSelectNode={(id, node) => { onSearchSelect(id, node); setActiveTab('detail'); }} />}</div>
       <div hidden={activeTab !== 'detail'} className="h-full"><CardDetail nodeId={selectedNodeId} verdict={verdict} /></div>
-      {activeTab === 'settings' && <div className="h-full overflow-y-auto"><MobileSettingsPage currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} /></div>}
+      {activeTab === 'settings' && <div className="h-full flex flex-col"><MobileSettingsPage currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} /></div>}
     </div>
-    <MobileTabBar activeTab={activeTab} onTabChange={setActiveTab} showSettings={auth.role !== null && auth.role !== 'viewer'} />
+    <MobileTabBar activeTab={activeTab} onTabChange={setActiveTab} showSettings={auth.role !== null} />
   </div>;
 }

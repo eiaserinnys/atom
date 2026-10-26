@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useAdapters } from '../../hooks/useAdapters';
 import { useLocalStorageCredentials } from '../../hooks/useLocalStorageCredentials';
+import { CONFIG_CONTROL_CLASS } from './ConfigFields';
 
 export function CredentialsTab() {
   const { t } = useTranslation();
@@ -9,10 +10,6 @@ export function CredentialsTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="text-[13px] text-muted-foreground">
-        {t('credentials.desc')}
-      </div>
-
       {isLoading && (
         <div className="text-muted-foreground text-sm">{t('credentials.loading')}</div>
       )}
@@ -23,9 +20,9 @@ export function CredentialsTab() {
 
       {adapters.map((adapter) => (
         <div key={adapter.sourceType} className="flex flex-col gap-2">
-          <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <h3 className="text-sm font-semibold text-foreground">
             {adapter.sourceType}
-          </div>
+          </h3>
           <div className="flex flex-col gap-2 bg-card border border-border rounded-none px-3 py-3">
             {adapter.credentialFields.map((field) => (
               <div key={field.key} className="flex items-center gap-2">
@@ -39,7 +36,7 @@ export function CredentialsTab() {
                   onChange={(e) =>
                     updateCredential(adapter.sourceType, field.key, e.target.value)
                   }
-                  className="flex-1 text-sm bg-background border border-border rounded-none px-2.5 py-1.5 text-foreground outline-none focus:border-brand font-sans"
+                  className={`w-full ${CONFIG_CONTROL_CLASS}`}
                 />
               </div>
             ))}

@@ -53,6 +53,7 @@
   },
   "users": {
     "title": "Users",
+    "email_required": "Enter an email address.",
     "add_section": "Add User",
     "list_section": "User List",
     "invite_placeholder": "Email",
@@ -71,6 +72,7 @@
   },
   "agents": {
     "title": "API Keys",
+    "agent_id_required": "Enter an agent ID.",
     "desc": "API secret is shown only once. Store it in a safe place.",
     "create_section": "Create Agent",
     "list_section": "Agent List",
