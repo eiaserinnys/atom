@@ -14,7 +14,7 @@ export function createExplorationSession(): {
   receive(event: any): void;
   apply(event: any): void;
   timeline(): ExplorationTimeline;
-  project(cursor: number, evaluating?: boolean): { scene: any; projection: ExplorationProjection; selectionCardId: string | null };
+  project(cursor: number, evaluating?: boolean, searching?: boolean): { scene: any; projection: ExplorationProjection; selectionCardId: string | null };
   select(cardId: string, cursor: number): void;
   truncate(cursor: number): void;
   chapters(): ExplorationChapter[];

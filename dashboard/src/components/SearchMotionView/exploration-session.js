@@ -1,6 +1,7 @@
 import { createModel, applyEvent } from './model.js';
 import { createExplorationModel, applyExplorationEvent, projectExploration } from './exploration-model.js';
 import { buildExplorationTimeline, groupExplorationChapters } from './exploration-timeline.js';
+import { presentContinuation } from './continuation-scene.js';
 
 const hopLabel = hop => hop === 0 ? '입구' : `홉 ${hop}`;
 const blankNode = () => ({ parent: null, climbFrom: [], reading: 0, climbing: false, byHit: false, again: [], dormant: false });
@@ -132,7 +133,7 @@ export function createExplorationSession() {
     }
     return { frames, operations, operationEvents: entries.flatMap(e => e.type === 'operation' ? e.events : []) };
   }
-  function project(cursor, evaluating = false) {
+  function project(cursor, evaluating = false, searching = false) {
     const frames = timeline().frames.slice(0, cursor);
     const previous = folded && frames[folded.cursor - 1];
     if (!folded || evaluating || folded.evaluating || frames.length < folded.cursor
@@ -144,6 +145,9 @@ export function createExplorationSession() {
       if (frame.entry.type === 'search') {
         const segment = searchModels.get(frame.segmentId) ?? createModel();
         for (const event of frame.events) applyEvent(segment, event);
+        const last = frame.events.at(-1);
+        const end = last.event === 'done' ? last.data.completed_at : last.data.step?.completed_at;
+        segment.elapsedMs = Math.max(0, Date.parse(end) - Date.parse(segment.run.started_at));
         searchModels.set(frame.segmentId, segment);
         if (frame.entry === entries[0]) {
           scene = segment;
@@ -165,8 +169,11 @@ export function createExplorationSession() {
     // Materialization adds display columns and resolves display paths. Never put those
     // mutations back into the search reducer's scene.
     const result = materialize({ ...scene, nodes: new Map(scene.nodes), order: [...scene.order], calls: new Map(scene.calls) }, exploration);
-    result.scene.searchDurationMs = [...searchModels.values()].reduce((sum, segment) => sum + (segment.done && segment.run
-      ? Math.max(0, Date.parse(segment.done.completed_at) - Date.parse(segment.run.started_at)) : 0), 0);
+    result.scene.searchDurationMs = [...searchModels.values()].reduce((sum, segment) => sum + (segment.elapsedMs ?? 0), 0);
+    const current = frames.at(-1);
+    if (current?.entry.type === 'search' && current.entry !== entries[0]) {
+      presentContinuation(result.scene, searchModels.get(current.segmentId), current, searching);
+    }
     const selectionFrame = frames.findLast(frame => selections.some(selection => selection.frameId === frame.id));
     const selected = selections.find(selection => selection.frameId === selectionFrame?.id);
     result.selectionCardId = selected && exploration.cards.has(selected.cardId) ? selected.cardId : null;
