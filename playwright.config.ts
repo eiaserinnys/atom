@@ -29,7 +29,8 @@ export default defineConfig({
         API_PORT: TEST_API_PORT,
         JWT_SECRET: 'e2e-test-secret',
         NODE_ENV: 'test',
-        // bypass mode: explicitly clear OAuth credentials so authMiddleware skips JWT check
+        // Test-only local bypass is explicit; never copy this environment to a public server.
+        AUTH_BYPASS: '1',
         GOOGLE_CLIENT_ID: '',
         SLACK_CLIENT_ID: '',
       },

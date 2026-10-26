@@ -2,10 +2,17 @@ import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { createPageAccessCorsOptions } from "../../src/api/page_access.js";
 
-const PAGES_ORIGIN = "https://pages.eiaserinnys.me";
+const SEARCH_MOTION_PAGE_URL = "https://pages.example/d/atom-search-motion";
+const PAGES_ORIGIN = new URL(SEARCH_MOTION_PAGE_URL).origin;
 const DASHBOARD_ORIGIN = "https://dashboard.example";
+const savedEnv = { ...process.env };
 
-async function makeApp(frontendUrl?: string) {
+async function makeApp(
+  frontendUrl?: string,
+  searchMotionPageUrl: string | null = SEARCH_MOTION_PAGE_URL,
+) {
+  if (searchMotionPageUrl) process.env["SEARCH_MOTION_PAGE_URL"] = searchMotionPageUrl;
+  else delete process.env["SEARCH_MOTION_PAGE_URL"];
   const app = Fastify({ logger: false });
   await app.register(cors, createPageAccessCorsOptions(frontendUrl));
   app.get("/api/auth/providers", async () => ({ google: true, slack: false }));
@@ -19,6 +26,10 @@ async function makeApp(frontendUrl?: string) {
 }
 
 describe("Pages read-only CORS boundary", () => {
+  afterEach(() => {
+    process.env = { ...savedEnv };
+  });
+
   it("allows Pages credentials for the four exact GET/HEAD read paths", async () => {
     const app = await makeApp(DASHBOARD_ORIGIN);
     const urls = [
@@ -123,9 +134,26 @@ describe("Pages read-only CORS boundary", () => {
     await app.close();
   });
 
-  it("preserves the unset FRONTEND_URL fallback while limiting Pages", async () => {
-    const app = await makeApp(undefined);
-    const fallback = await app.inject({
+  it("rejects an unconfigured origin when FRONTEND_URL is set", async () => {
+    const app = await makeApp(DASHBOARD_ORIGIN);
+    const response = await app.inject({
+      method: "GET",
+      url: "/private",
+      headers: { origin: "https://other.example" },
+    });
+
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    await app.close();
+  });
+
+  it("allows loopback origins only when FRONTEND_URL is unset", async () => {
+    const app = await makeApp(undefined, null);
+    const allowed = await app.inject({
+      method: "GET",
+      url: "/private",
+      headers: { origin: "http://localhost:15173" },
+    });
+    const denied = await app.inject({
       method: "GET",
       url: "/private",
       headers: { origin: "https://other.example" },
@@ -139,8 +167,39 @@ describe("Pages read-only CORS boundary", () => {
       },
     });
 
-    expect(fallback.headers["access-control-allow-origin"]).toBe("https://other.example");
+    expect(allowed.headers["access-control-allow-origin"]).toBe("http://localhost:15173");
+    expect(denied.headers["access-control-allow-origin"]).toBeUndefined();
     expect(pagesWritePreflight.headers["access-control-allow-origin"]).toBeUndefined();
+    await app.close();
+  });
+
+  it("allows the three configured loopback host forms with explicit ports", async () => {
+    const app = await makeApp(undefined, null);
+
+    for (const origin of [
+      "http://localhost:15173",
+      "http://127.0.0.1:14200",
+      "http://[::1]:4200",
+    ]) {
+      const response = await app.inject({
+        method: "GET",
+        url: "/private",
+        headers: { origin },
+      });
+      expect(response.headers["access-control-allow-origin"]).toBe(origin);
+    }
+    await app.close();
+  });
+
+  it("disables the search-motion CORS exception when its page URL is unset", async () => {
+    const app = await makeApp(undefined, null);
+    const response = await app.inject({
+      method: "GET",
+      url: "/search",
+      headers: { origin: PAGES_ORIGIN },
+    });
+
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
     await app.close();
   });
 });

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetTestDb } from './helpers';
+import { assertBypassAuthStatus, resetTestDb } from './helpers';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,6 +10,7 @@ const envPath = path.resolve(__dirname, '../.env');
 test.describe('Fresh install — bypass mode API key issuance', () => {
   test.beforeAll(async () => {
     await resetTestDb();
+    await assertBypassAuthStatus();
     // Ensure clean .env (no pendingRestart state from other tests)
     if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
   });

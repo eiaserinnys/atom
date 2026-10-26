@@ -17,6 +17,16 @@ export async function resetTestDb(): Promise<void> {
 
 const TEST_API_BASE = 'http://127.0.0.1:14200';
 
+/** Verify that Playwright's local API server was started with AUTH_BYPASS=1. */
+export async function assertBypassAuthStatus(): Promise<void> {
+  const res = await fetch(TEST_API_BASE + '/api/auth/status');
+  if (!res.ok) throw new Error('assertBypassAuthStatus failed: ' + res.status);
+  const status = await res.json() as { authenticated?: boolean; id?: string };
+  if (status.authenticated !== true || status.id !== 'bypass') {
+    throw new Error('Playwright API server is not using AUTH_BYPASS=1');
+  }
+}
+
 export interface TestTreeNode {
   id: string;
   card: { title: string; card_type: string };
@@ -24,7 +34,7 @@ export interface TestTreeNode {
   parent_node_id: string | null;
 }
 
-/** bypass 모드에서 로그인 없이 카드 생성 (POST /cards) */
+/** AUTH_BYPASS=1인 Playwright 서버에서 로그인 없이 카드 생성 (POST /cards) */
 export async function createTestCard(opts: {
   card_type: 'structure' | 'knowledge';
   title: string;

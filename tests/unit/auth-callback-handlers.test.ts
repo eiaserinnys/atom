@@ -46,9 +46,10 @@ describe("auth callback handlers", () => {
     await app.close();
   });
 
-  it("GET /api/auth/google/callback returns a fixed Pages error URL for a validated motion state", async () => {
+  it("GET /api/auth/google/callback returns the configured motion-page error URL for a validated motion state", async () => {
     configureGoogleCallbackEnv();
     process.env["FRONTEND_URL"] = "https://dashboard.example";
+    process.env["SEARCH_MOTION_PAGE_URL"] = "https://pages.example/d/atom-search-motion";
     const state = "d".repeat(32) + ".atom-search-motion";
     const harness = makeFakeAuthDeps({
       fetchResponses: [jsonResponse(false, { error: "invalid_grant" })],
@@ -63,7 +64,7 @@ describe("auth callback handlers", () => {
 
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe(
-      "https://pages.eiaserinnys.me/d/atom-search-motion/?auth_error=token_exchange",
+      "https://pages.example/d/atom-search-motion/?auth_error=token_exchange",
     );
     expect(harness.fetchCalls.map((call) => call.url)).toEqual(["https://oauth2.googleapis.com/token"]);
     await app.close();

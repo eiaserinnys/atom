@@ -1,3 +1,4 @@
+<!-- Set atom-api-origin in the metadata below before publishing this page. -->
 <!doctype html>
 <html lang="ko" data-design="apple">
 <head>
@@ -7,14 +8,14 @@
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title>atom 검색</title>
   <meta name="description" content="검색 결과가 노드로 펼쳐지는 공간">
+  <meta name="atom-api-origin" content="">
   <meta property="og:title" content="atom 검색">
   <meta property="og:description" content="검색 결과가 노드로 펼쳐지는 공간">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
   <meta property="og:site_name" content="atom">
-  <meta property="og:url" content="https://pages.eiaserinnys.me/d/atom-search-motion/">
-  <meta property="og:image" content="https://pub-236dc9dc170e487faec4c8b5e2d084c6.r2.dev/pages/atom-search-motion/fc793002d99d/og-node-diagram.png">
-  <meta property="og:image:secure_url" content="https://pub-236dc9dc170e487faec4c8b5e2d084c6.r2.dev/pages/atom-search-motion/fc793002d99d/og-node-diagram.png">
+  <meta property="og:image" content="og-node-diagram.png">
+  <meta property="og:image:secure_url" content="og-node-diagram.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -22,7 +23,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="atom 검색">
   <meta name="twitter:description" content="검색 결과가 노드로 펼쳐지는 공간">
-  <meta name="twitter:image" content="https://pub-236dc9dc170e487faec4c8b5e2d084c6.r2.dev/pages/atom-search-motion/fc793002d99d/og-node-diagram.png">
+  <meta name="twitter:image" content="og-node-diagram.png">
   <meta name="twitter:image:alt" content="atom 검색 결과가 노드로 펼쳐지는 다이어그램">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <!-- Single-file publication: the approved canvas renderer stays inline so html-publish preserves its complete runtime. -->
@@ -275,8 +276,8 @@
     <span class="grow"></span>
     <p class="summary" id="auth-message" role="alert" hidden></p>
     <button class="btn small" id="retry-auth" type="button" hidden>다시 시도</button>
-    <a class="btn" id="login" href="https://atom.eiaserinnys.me/api/auth/google?return_to=atom-search-motion" hidden>Google로 로그인</a>
-    <a class="btn small" href="https://atom.eiaserinnys.me" target="_blank" rel="noopener noreferrer">atom</a>
+    <a class="btn" id="login" href="#" hidden>Google로 로그인</a>
+    <a class="btn small" id="atom-home" href="#" target="_blank" rel="noopener noreferrer">atom</a>
   </header>
 
   <form class="search" id="search-form">
@@ -1565,11 +1566,13 @@
   $("sheet-close").addEventListener("click", () => closeSheet());
   $("more").addEventListener("click", () => submitSearch(lastQuery, true));
 
-  const API_BASE_URL = "https://atom.eiaserinnys.me";
+  const configuredApiOrigin = document.querySelector('meta[name="atom-api-origin"]').content.trim();
+  const API_BASE_URL = (configuredApiOrigin || window.location.origin).replace(/\/+$/, "");
   const RETURN_SELECTOR = "atom-search-motion";
   let authenticated = false; let googleAvailable = false; let composing = false;
   let activeSearch = null; let activeCardRequest = null; let searchVersion = 0; let cardVersion = 0; let lastQuery = "";
   $("login").href = API_BASE_URL + "/api/auth/google?return_to=" + encodeURIComponent(RETURN_SELECTOR);
+  $("atom-home").href = API_BASE_URL;
   function setAuthMessage(message) { $("auth-message").textContent = message || ""; $("auth-message").hidden = !message; }
   function updateSearchAvailability() { $("q").disabled = $("go").disabled = !authenticated; $("login").hidden = authenticated || !googleAvailable; }
   function errorStatus(status) { const error = new Error("request-failed"); error.status = status; return error; }

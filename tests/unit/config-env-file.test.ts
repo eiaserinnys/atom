@@ -4,7 +4,7 @@ import {
 } from "../../src/api/config/env-file.js";
 
 describe("config env file helpers", () => {
-  it("parses key-value lines and masks sensitive values", () => {
+  it("returns only allowlisted values in plain text", () => {
     expect(
       parseConfigEnvContent([
         "# comment",
@@ -12,6 +12,9 @@ describe("config env file helpers", () => {
         "GOOGLE_CLIENT_SECRET=shh",
         "EMPTY_TOKEN=",
         "PASSWORD_HINT = visible",
+        "DATABASE_URL=postgresql://user:secret@localhost/atom",
+        "TYPESAFE_API_KEY=jev-secret",
+        "SEARCH_MOTION_PAGE_URL=https://pages.example/d/atom-search-motion",
         "INVALID_LINE",
         "COMPLEX=a=b",
       ].join("\n"))
@@ -20,7 +23,10 @@ describe("config env file helpers", () => {
       GOOGLE_CLIENT_SECRET: "***",
       EMPTY_TOKEN: "",
       PASSWORD_HINT: "***",
-      COMPLEX: "a=b",
+      DATABASE_URL: "***",
+      TYPESAFE_API_KEY: "***",
+      SEARCH_MOTION_PAGE_URL: "https://pages.example/d/atom-search-motion",
+      COMPLEX: "***",
     });
   });
 
@@ -31,12 +37,14 @@ describe("config env file helpers", () => {
       "",
       "GOOGLE_CLIENT_SECRET=old-secret",
       "ALLOWED_EMAIL=old@example.com",
+      "NEW_SECRET=old-value",
     ].join("\n");
 
     expect(
       updateConfigEnvContent(content, [
         { key: "API_PORT", value: "4000" },
         { key: "GOOGLE_CLIENT_SECRET", value: "***" },
+        { key: "NEW_SECRET", value: "***" },
         { key: "NEW_KEY", value: "new-value" },
       ])
     ).toBe([
@@ -45,15 +53,17 @@ describe("config env file helpers", () => {
       "",
       "GOOGLE_CLIENT_SECRET=old-secret",
       "ALLOWED_EMAIL=old@example.com",
+      "NEW_SECRET=old-value",
       "NEW_KEY=new-value",
     ].join("\n"));
   });
 
-  it("skips new masked sensitive values and appends non-sensitive keys for missing files", () => {
+  it("skips new masked values outside the allowlist and appends allowlisted keys", () => {
     expect(
       updateConfigEnvContent("", [
         { key: "GOOGLE_CLIENT_SECRET", value: "***" },
         { key: "ALLOWED_EMAIL", value: "owner@example.com" },
+        { key: "UNLISTED_KEY", value: "***" },
       ])
     ).toBe("\nALLOWED_EMAIL=owner@example.com");
   });

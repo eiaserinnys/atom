@@ -122,13 +122,24 @@ describe("auth route safety boundaries", () => {
     await app.close();
   });
 
-  it("GET /api/auth/status returns the existing bypass admin response when providers are absent", async () => {
+  it("GET /api/auth/status returns the bypass admin response only when explicitly enabled", async () => {
+    process.env["AUTH_BYPASS"] = "1";
     const app = await makeAuthApp();
 
     const response = await app.inject({ method: "GET", url: "/api/auth/status" });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(buildBypassAuthStatus());
+    await app.close();
+  });
+
+  it("GET /api/auth/status returns the unauthenticated response without explicit bypass", async () => {
+    const app = await makeAuthApp();
+
+    const response = await app.inject({ method: "GET", url: "/api/auth/status" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ authenticated: false });
     await app.close();
   });
 
@@ -191,9 +202,10 @@ describe("auth route safety boundaries", () => {
     await app.close();
   });
 
-  it("GET /api/auth/google binds the fixed motion-page selector into state and its cookie", async () => {
+  it("GET /api/auth/google binds the configured motion-page selector into state and its cookie", async () => {
     process.env["GOOGLE_CLIENT_ID"] = "google-client";
     process.env["GOOGLE_CALLBACK_URL"] = "https://atom.example/api/auth/google/callback";
+    process.env["SEARCH_MOTION_PAGE_URL"] = "https://pages.example/d/atom-search-motion";
     const app = await makeAuthApp();
 
     const response = await app.inject({
@@ -209,6 +221,21 @@ describe("auth route safety boundaries", () => {
     expect(extractCookieValue(stateCookie, STATE_COOKIE_NAME)).toBe(state);
     expect(stateCookie).toContain("HttpOnly");
     expect(stateCookie).toContain("SameSite=Lax");
+    await app.close();
+  });
+
+  it("GET /api/auth/google rejects the motion-page selector when it is not configured", async () => {
+    process.env["GOOGLE_CLIENT_ID"] = "google-client";
+    const app = await makeAuthApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/auth/google?return_to=atom-search-motion",
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Invalid return_to" });
+    expect(response.headers["set-cookie"]).toBeUndefined();
     await app.close();
   });
 
@@ -229,9 +256,10 @@ describe("auth route safety boundaries", () => {
     await app.close();
   });
 
-  it("GET /api/auth/google/callback sends valid motion state to the fixed Pages error URL", async () => {
+  it("GET /api/auth/google/callback sends valid motion state to the configured page error URL", async () => {
     configureGoogleCallbackEnv();
     process.env["FRONTEND_URL"] = "https://dashboard.example";
+    process.env["SEARCH_MOTION_PAGE_URL"] = "https://pages.example/d/atom-search-motion";
     const state = `${"a".repeat(32)}.atom-search-motion`;
     const app = await makeAuthApp();
 
@@ -243,7 +271,7 @@ describe("auth route safety boundaries", () => {
 
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe(
-      "https://pages.eiaserinnys.me/d/atom-search-motion/?auth_error=google_error",
+      "https://pages.example/d/atom-search-motion/?auth_error=google_error",
     );
     expect(getSingleHeaderValue(response.headers["set-cookie"])).toContain(`${STATE_COOKIE_NAME}=`);
     await app.close();
@@ -273,6 +301,7 @@ describe("auth route safety boundaries", () => {
   it("GET /api/auth/google/callback keeps arbitrary callback selectors out of the redirect destination", async () => {
     configureGoogleCallbackEnv();
     process.env["FRONTEND_URL"] = "https://dashboard.example";
+    process.env["SEARCH_MOTION_PAGE_URL"] = "https://pages.example/d/atom-search-motion";
     const state = `${"c".repeat(32)}.atom-search-motion`;
     const harness = makeFakeAuthDeps({
       users: { "user@example.com": makeUser({ email: "user@example.com" }) },
@@ -287,7 +316,7 @@ describe("auth route safety boundaries", () => {
     });
 
     expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("https://pages.eiaserinnys.me/d/atom-search-motion/");
+    expect(response.headers.location).toBe("https://pages.example/d/atom-search-motion/");
     await app.close();
   });
 

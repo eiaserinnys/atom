@@ -13,11 +13,13 @@ export function restoreAuthEnv() {
   delete process.env["GOOGLE_CLIENT_ID"];
   delete process.env["GOOGLE_CLIENT_SECRET"];
   delete process.env["GOOGLE_CALLBACK_URL"];
+  delete process.env["AUTH_BYPASS"];
   delete process.env["SLACK_CLIENT_ID"];
   delete process.env["SLACK_CLIENT_SECRET"];
   delete process.env["SLACK_CALLBACK_URL"];
   delete process.env["SLACK_ALLOWED_TEAM_ID"];
   delete process.env["FRONTEND_URL"];
+  delete process.env["SEARCH_MOTION_PAGE_URL"];
   delete process.env["ALLOWED_EMAIL"];
   process.env["JWT_SECRET"] = "test-secret-for-auth-route-safety";
 }
