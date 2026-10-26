@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, Folder, Search, SlidersHorizontal } from 'lucide-react';
 import { api, type SearchResult } from '../../api/client';
@@ -40,16 +40,24 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
   const containerRef = useRef<HTMLFormElement>(null);
   const composingRef = useRef(false);
   const requestVersion = useRef(0);
+  const invalidateSearch = useCallback(() => {
+    requestVersion.current += 1;
+  }, []);
+  const closeResults = useCallback(() => {
+    invalidateSearch();
+    setLoading(false);
+    setOpen(false);
+  }, [invalidateSearch]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        closeResults();
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [closeResults]);
 
   const makeFilters = (draft: SearchFilterState = filterDraft) =>
     buildSearchFilters({ ...draft, currentNodeId });
@@ -71,9 +79,11 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
 
   const scheduleSearch = (nextQuery: string, draft: SearchFilterState = filterDraft) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    invalidateSearch();
     if (!nextQuery.trim()) {
       setResults([]);
       setOpen(filtersOpen);
+      setLoading(false);
       return;
     }
 
@@ -96,8 +106,8 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
 
   const handleSelect = (result: SearchResult) => {
     if (!result.node_id) return;
+    closeResults();
     onSelectNode(result.node_id);
-    setOpen(false);
     setQuery('');
     setResults([]);
   };
@@ -110,7 +120,7 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
     const filters = makeFilters();
     const { rootNodeId, ...bm25 } = filters;
     if (hasSearchFilters(bm25) || !onSubmitJevSearch) { void runSearch(query.trim()); return; }
-    requestVersion.current += 1; setLoading(false); setOpen(false);
+    closeResults();
     onSubmitJevSearch(query.trim(), { rootNodeId });
   };
 
@@ -131,7 +141,7 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
           aria-label={t('searchbar.placeholder')}
           onCompositionStart={() => { composingRef.current = true; }}
           onCompositionEnd={() => { composingRef.current = false; }}
-          onKeyDown={e => { if (e.key === 'Enter' && (e.nativeEvent.isComposing || composingRef.current)) e.preventDefault(); if (e.key === 'Escape') setOpen(false); }}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.nativeEvent.isComposing || composingRef.current)) e.preventDefault(); if (e.key === 'Escape') closeResults(); }}
           onFocus={() => (results.length > 0 || query.trim() || filtersOpen) && setOpen(true)}
         />
         {loading && <Spinner size="sm" label={t('common.loading')} />}
