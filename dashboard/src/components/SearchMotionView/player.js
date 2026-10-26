@@ -25,6 +25,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   let projected = false;
   let selectedRef = null;
   let actionWidth = 0;
+  let fullActionWidth = 0;
   let selectedArrival = null;
   let initialStopReason = null;
   let continued = false;
@@ -74,8 +75,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   const metric = (name, value) => Number.parseFloat(geometry.getPropertyValue(name)) || value;
   const M = { colW: metric('--motion-node-width', 268), gap: metric('--motion-column-gap', 64), rowH: metric('--motion-node-height', 48), pitch: 56, lowPitch: 56, actionH: metric('--motion-action-height', 28), actionGap: metric('--motion-action-gap', 4), chipH: 22, bandGap: 14, groupGap: 6, padX: 24, padTop: 14, headerH: 42, pileH: 26, pendCap: 14, cell: 5, laneY: -9 };
   const ui = { showLow: true, expanded: new Set(), follow: true };
-  const columnWidth = () => selectedRef ? Math.max(M.colW, actionWidth / cam.z) : M.colW;
-  const colX = (hop) => hop * (columnWidth() + M.gap);
+  const colX = (hop) => hop * (M.colW + M.gap);
   // 열은 홉. 한 열 안에서 위 띠는 살아 있는 것(열린 구조, 맞은 카드, 선정)과 아직 판정 전인 것,
   // 아래 띠는 닫히거나 낮은 것. 넘치는 것은 부모별 더미(+N)로 접는다.
   function layout(m) {
@@ -88,7 +88,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     const lastHop = m.run ? Math.max(m.maxHop, 0) : -1;
     const gridCols = Math.floor((M.colW - 16) / M.cell);
     // 입구 하나뿐인 동안에는 씨앗을 여러 줄로 넓게 편다(가장 자주 보는 화면). 다음 홉이 나오면 한 열로 접힌다
-    const stride = columnWidth() + 16;
+    const stride = M.colW + 16;
     const K = lastHop <= 0 && !root && W > 0 ? clamp(Math.floor((W - 2 * M.padX + 16) / stride), 1, 3) : 1;
     const byScore = (a, b) => (b.layoutScore ?? b.score ?? 2) - (a.layoutScore ?? a.score ?? 2) || a.order - b.order;
     const reserve = n => n.ref === selectedRef && n.cardId ? (M.actionH + M.actionGap) / Math.min(1, cam?.z ?? 1) : 0;
@@ -193,7 +193,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     const wide = K > 1 && lastHop <= 0;
     const last = cols[cols.length - 1];
-    return { cols, pos, piles, hidden, dorm, bands, wide, width: wide ? K * stride - 16 : last ? last.x + columnWidth() : 0, height };
+    return { cols, pos, piles, hidden, dorm, bands, wide, width: wide ? K * stride - 16 : last ? last.x + M.colW : 0, height };
   }
 
   // ------------------------------------------------------------------ 3. 보이는 상태 (스프링, 효과)
@@ -416,7 +416,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     moveCamera(right - left > vw ? Math.min(right - vw, colX(Math.max(...hops)) - 16) : clamp(cam.tx, right - vw, left), -M.padTop, cam.tz, instant);
   }
   function zoomTo(z, px = W / 2, py = H / 2) {
-    z = clamp(z, 0.4, 1.6);
+    z = clamp(z, 0.25, 1.6);
     const wx = px / cam.z + cam.x; const wy = (py - M.headerH) / cam.z + cam.y;
     setFollow(false);
     moveCamera(wx - px / z, wy - (py - M.headerH) / z, z);
@@ -424,7 +424,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   function fitAll(instant = false) {
     const isAuto = instant === true;
     const L = view.L; const w = L.width + 2 * M.padX + badgeRoom(); const h = L.height + M.padTop + 54;
-    const z = clamp(Math.min(W / w, (H - M.headerH - overlayRoom()) / h), .5, 1);
+    const z = clamp(Math.min(W / w, (H - M.headerH - overlayRoom()) / h), .25, 1);
     setFollow(false);
     $("t-follow").hidden = ui.follow || !player.playing;
     const targetX = W < w * z ? -M.padX : -M.padX - Math.max(0, (W / z - w) / 2);
@@ -1290,15 +1290,21 @@ export function createMotionPlayer(root, callbacks, samples) {
     $('node-tree').disabled = !live;
     const label = (id, icon, text) => {
       const button = $(id);
+      button.setAttribute('aria-label', text); button.title = text;
       if (button.dataset.label === text) return;
       button.dataset.label = text; button.innerHTML = motionIcon(icon);
       const span = document.createElement('span'); span.textContent = text; button.append(span);
+      fullActionWidth = 0;
     };
     label('node-expand', 'expand', tr('visual_search.expand'));
     label('node-evaluate', 'evaluate', tr(state.activeOperation?.kind === 'evaluate' || state.activeOperation?.fromCardId === null ? 'visual_search.evaluating' : 'visual_search.evaluate'));
     if (!$('node-tree').querySelector('svg')) $('node-tree').innerHTML = motionIcon('tree');
     $('node-tree').setAttribute('aria-label', tr('visual_search.open_tree'));
-    if (actionWidth !== group.offsetWidth) { actionWidth = group.offsetWidth; sync(performance.now(), false, null); invalidate(); }
+    $('node-tree').title = tr('visual_search.open_tree');
+    $('node-evaluate').setAttribute('aria-busy', String(state.activeOperation?.kind === 'evaluate' || state.activeOperation?.fromCardId === null));
+    if (!fullActionWidth) { group.classList.remove('is-compact'); fullActionWidth = group.offsetWidth; }
+    group.classList.toggle('is-compact', fullActionWidth > M.colW * cam.z);
+    actionWidth = group.offsetWidth;
     if (cam.mode === 'idle' && sy + M.rowH * cam.z + M.actionGap + group.offsetHeight > H - overlayRoom()) ensureVisible(selectedRef);
   }
   let summaryTimer = 0;

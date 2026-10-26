@@ -30,6 +30,8 @@
 .search-motion .nb-actions .btn {height:var(--motion-action-height);font-size:14px;}
 .search-motion .motion-icon {width:14px;height:14px;flex-shrink:0;}
 .search-motion .nb-actions .btn {gap:6px;}
+.search-motion .nb-actions.is-compact .btn {width:var(--motion-action-height);padding:0;}
+.search-motion .nb-actions.is-compact .btn > span {display:none;}
 .search-motion [data-motion-id=node-tree] {width:28px;padding:0;}
 .search-motion .search-workspace {flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
 .search-motion .toolbar {display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
