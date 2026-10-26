@@ -208,6 +208,53 @@ describe('useAtomEvents lifecycle', () => {
 });
 
 describe('applyAtomEventToCache', () => {
+  test('makes an unloaded knowledge parent expandable after card creation', () => {
+    const queryClient = new QueryClient();
+    const parent = { ...makeNode('parent', 'parent-card'), child_count: 0 };
+    queryClient.setQueryData(rootTreeQueryKey(), [parent]);
+    const child = makeNode('child', 'child-card', 'parent');
+
+    applyAtomEventToCache(queryClient, {
+      type: 'card:created', cardId: child.card_id, nodeId: child.id,
+      parentNodeId: parent.id, data: child.card, node: child, actor: null,
+    }, null);
+
+    expect(queryClient.getQueryData<TreeNodeData[]>(rootTreeQueryKey())?.[0]?.child_count).toBeUndefined();
+  });
+
+  test('updates loaded move source counts and invalidates an unloaded destination count', () => {
+    const queryClient = new QueryClient();
+    const moving = makeNode('moving', 'moving-card', 'old-parent');
+    const oldParent = { ...makeNode('old-parent', 'old-card', null, 100, [moving]), child_count: 1 };
+    const newParent = { ...makeNode('new-parent', 'new-card', null, 200), child_count: 0 };
+    queryClient.setQueryData(rootTreeQueryKey(), [oldParent, newParent]);
+    const moved = { ...moving, parent_node_id: newParent.id };
+
+    applyAtomEventToCache(queryClient, {
+      type: 'node:moved', nodeId: moved.id, oldParentNodeId: oldParent.id,
+      newParentNodeId: newParent.id, node: moved, affectedNodes: [moved], actor: null,
+    }, null);
+
+    const roots = queryClient.getQueryData<TreeNodeData[]>(rootTreeQueryKey())!;
+    expect(roots[0]?.children).toEqual([]);
+    expect(roots[0]?.child_count).toBe(0);
+    expect(roots[1]?.child_count).toBeUndefined();
+  });
+
+  test('makes a parent expandable after symlink creation', () => {
+    const queryClient = new QueryClient();
+    const parent = { ...makeNode('parent', 'parent-card'), child_count: 0 };
+    queryClient.setQueryData(rootTreeQueryKey(), [parent]);
+    const symlink = { ...makeNode('shortcut', 'shared-card', 'parent'), is_symlink: true };
+
+    applyAtomEventToCache(queryClient, {
+      type: 'node:created', nodeId: symlink.id, cardId: symlink.card_id,
+      parentNodeId: parent.id, node: symlink, actor: null,
+    }, null);
+
+    expect(queryClient.getQueryData<TreeNodeData[]>(rootTreeQueryKey())?.[0]?.child_count).toBeUndefined();
+  });
+
   test('batch:completed patches tree and children caches without broad invalidation', () => {
     const queryClient = new QueryClient();
     const root = makeNode('root', 'root-card', null, 100, [

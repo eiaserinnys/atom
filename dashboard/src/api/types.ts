@@ -25,6 +25,7 @@ export interface TreeNodeData {
   is_symlink: boolean;
   created_at: string;
   journal_limit: number | null;
+  child_count?: number;
   card: CardData;
   children?: TreeNodeData[];
   canonical_path?: string;

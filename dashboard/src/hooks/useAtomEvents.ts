@@ -130,6 +130,92 @@ function patchChildrenCaches(queryClient: QueryClient, event: AtomPatchEvent): v
   patchKnownChildrenQueries(queryClient, event);
 }
 
+function affectedParentIds(event: AtomPatchEvent): string[] {
+  switch (event.type) {
+    case 'card:created':
+    case 'node:created':
+      return event.parentNodeId ? [event.parentNodeId] : [];
+    case 'node:deleted':
+      return event.parentNodeId ? [event.parentNodeId] : [];
+    case 'card:deleted':
+      return [...new Set(event.parentNodeIds.filter((id): id is string => id !== null))];
+    case 'node:moved':
+      return [...new Set([event.oldParentNodeId, event.newParentNodeId]
+        .filter((id): id is string => id !== null))];
+    case 'card:updated':
+    case 'node:updated':
+      return [];
+  }
+}
+
+function findNode(nodes: TreeNodeData[], nodeId: string): TreeNodeData | undefined {
+  for (const node of nodes) {
+    if (node.id === nodeId) return node;
+    if (node.children) {
+      const nested = findNode(node.children, nodeId);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
+function patchNodeChildCount(
+  nodes: TreeNodeData[],
+  nodeId: string,
+  childCount: number | undefined
+): TreeNodeData[] {
+  let changed = false;
+  const patched = nodes.map((node) => {
+    let next = node;
+    if (node.id === nodeId && node.child_count !== childCount) {
+      next = { ...next, child_count: childCount };
+      changed = true;
+    }
+    if (node.children) {
+      const children = patchNodeChildCount(node.children, nodeId, childCount);
+      if (children !== node.children) {
+        next = { ...next, children };
+        changed = true;
+      }
+    }
+    return next;
+  });
+  return changed ? patched : nodes;
+}
+
+function syncAffectedParentChildCounts(queryClient: QueryClient, event: AtomPatchEvent): void {
+  for (const parentNodeId of affectedParentIds(event)) {
+    const cachedChildren = queryClient.getQueryData<TreeNodeData[]>(childrenQueryKey(parentNodeId));
+    const treeParent = findNode(
+      queryClient.getQueryData<TreeNodeData[]>(rootTreeQueryKey()) ?? [],
+      parentNodeId
+    );
+    const childCount = cachedChildren !== undefined
+      ? cachedChildren.length
+      : treeParent?.children?.length;
+
+    for (const queryKey of [rootTreeQueryKey(), structureTreeQueryKey()]) {
+      const nodes = queryClient.getQueryData<TreeNodeData[]>(queryKey);
+      if (!nodes) continue;
+      const patched = patchNodeChildCount(nodes, parentNodeId, childCount);
+      if (patched !== nodes) queryClient.setQueryData(queryKey, patched);
+    }
+
+    const childrenCaches = queryClient.getQueriesData<TreeNodeData[]>({ queryKey: allChildrenQueryKey() });
+    for (const [queryKey, nodes] of childrenCaches) {
+      if (!nodes) continue;
+      const patched = patchNodeChildCount(nodes, parentNodeId, childCount);
+      if (patched !== nodes) queryClient.setQueryData(queryKey, patched);
+    }
+
+    const nodeKey = nodeQueryKey(parentNodeId);
+    const node = queryClient.getQueryData<TreeNodeData>(nodeKey);
+    if (node && node.child_count !== childCount) {
+      queryClient.setQueryData(nodeKey, { ...node, child_count: childCount });
+    }
+  }
+}
+
 function patchNodeCaches(queryClient: QueryClient, event: AtomPatchEvent): void {
   switch (event.type) {
     case 'card:updated': {
@@ -183,6 +269,7 @@ export function applyAtomEventToCache(
     case 'card:created':
       patchTreeCollectionCaches(queryClient, payload);
       patchChildrenCaches(queryClient, payload);
+      syncAffectedParentChildCounts(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
@@ -190,12 +277,14 @@ export function applyAtomEventToCache(
       patchNodeCaches(queryClient, payload);
       patchTreeCollectionCaches(queryClient, payload);
       patchChildrenCaches(queryClient, payload);
+      syncAffectedParentChildCounts(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
     case 'card:deleted':
       patchTreeCollectionCaches(queryClient, payload);
       patchChildrenCaches(queryClient, payload);
+      syncAffectedParentChildCounts(queryClient, payload);
       patchNodeCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
@@ -203,6 +292,7 @@ export function applyAtomEventToCache(
     case 'node:created':
       patchTreeCollectionCaches(queryClient, payload);
       patchChildrenCaches(queryClient, payload);
+      syncAffectedParentChildCounts(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
@@ -210,12 +300,14 @@ export function applyAtomEventToCache(
       patchNodeCaches(queryClient, payload);
       patchTreeCollectionCaches(queryClient, payload);
       patchChildrenCaches(queryClient, payload);
+      syncAffectedParentChildCounts(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 
     case 'node:deleted':
       patchTreeCollectionCaches(queryClient, payload);
       patchChildrenCaches(queryClient, payload);
+      syncAffectedParentChildCounts(queryClient, payload);
       patchNodeCaches(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
@@ -224,6 +316,7 @@ export function applyAtomEventToCache(
       patchNodeCaches(queryClient, payload);
       patchTreeCollectionCaches(queryClient, payload);
       patchChildrenCaches(queryClient, payload);
+      syncAffectedParentChildCounts(queryClient, payload);
       invalidateCompile(queryClient, payload, selectedNodeId);
       break;
 

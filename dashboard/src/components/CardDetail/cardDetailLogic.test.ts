@@ -24,11 +24,13 @@ describe('parseJournalLimitDraft', () => {
 });
 
 describe('formatJournalLimitLabel', () => {
-  test('keeps the existing labels for empty, all, and limited states', () => {
-    expect(formatJournalLimitLabel(null)).toBeNull();
-    expect(formatJournalLimitLabel(undefined)).toBeNull();
-    expect(formatJournalLimitLabel(0)).toBe('최근 전체');
-    expect(formatJournalLimitLabel(3)).toBe('최근 3개');
+  test('uses translated labels for all and limited states', () => {
+    const t = (key: 'card.journal_limit_all' | 'card.journal_limit_latest', options?: { count: number }) =>
+      options ? `${key}:${options.count}` : key;
+
+    expect(formatJournalLimitLabel(null, t)).toBe('card.journal_limit_all');
+    expect(formatJournalLimitLabel(0, t)).toBe('card.journal_limit_all');
+    expect(formatJournalLimitLabel(5, t)).toBe('card.journal_limit_latest:5');
   });
 });
 

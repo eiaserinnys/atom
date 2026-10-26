@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Folder } from 'lucide-react';
 import { type TreeNodeData } from '../../api/client';
+import { PanelState } from '../PanelState';
+import { Spinner } from '../Spinner';
 import { fetchFullStructureTree } from '../../api/treeQueries';
 import { structureTreeQueryKey } from '../../query/queryKeys';
 
@@ -91,7 +93,7 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70"
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -100,9 +102,9 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
 
         <p className="text-[13px] text-muted-foreground">{t('move_modal.select_hint')}</p>
 
-        <div className="flex-1 overflow-y-auto border border-border rounded-none px-1 py-1 min-h-[120px]">
+        <div className="flex-1 overflow-y-auto border border-border rounded-none px-1 py-1 min-h-[120px] flex flex-col">
           {treeLoading && (
-            <div className="p-3 text-sm text-muted-foreground">{t('common.loading')}</div>
+            <PanelState><Spinner label={t('common.loading')} /></PanelState>
           )}
           {!treeLoading && structureRoots.length === 0 && (
             <div className="p-3 text-sm text-muted-foreground">{t('move_modal.empty')}</div>
@@ -129,9 +131,9 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
           <button
             onClick={() => selectedId && onConfirm(selectedId)}
             disabled={!selectedId || isLoading}
-            className="px-3 py-1.5 text-sm bg-primary hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm bg-primary hover:opacity-90 text-primary-foreground rounded-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
-            {isLoading ? t('common.loading') : t('move_modal.confirm_btn')}
+            {isLoading && <Spinner size="sm" />}{t('move_modal.confirm_btn')}
           </button>
         </div>
       </div>

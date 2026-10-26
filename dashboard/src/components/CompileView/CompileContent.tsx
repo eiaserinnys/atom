@@ -5,10 +5,11 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import type { UnfurlEntry } from '../../api/client';
 import { UnfurlSectionList } from '../UnfurlSection';
+import { PanelState } from '../PanelState';
+import { Spinner } from '../Spinner';
 
 interface CompileContentProps {
   contentRef: RefObject<HTMLDivElement | null>;
-  nodeId: string | null;
   isLoading: boolean;
   error: Error | null;
   markdown: string | undefined;
@@ -19,7 +20,6 @@ interface CompileContentProps {
 
 export function CompileContent({
   contentRef,
-  nodeId,
   isLoading,
   error,
   markdown,
@@ -30,12 +30,9 @@ export function CompileContent({
   const { t } = useTranslation();
 
   return (
-    <div className="p-4" ref={contentRef}>
-      {!nodeId && (
-        <div className="text-muted-foreground text-sm">{t('compile.no_selection')}</div>
-      )}
-      {isLoading && <div className="text-muted-foreground text-sm">{t('compile.loading')}</div>}
-      {error && <div className="text-node-error text-sm">{t('common.error')}: {error.message}</div>}
+    <div className={isLoading || error ? 'h-full p-4 flex' : 'p-4'} ref={contentRef}>
+      {isLoading && <PanelState><Spinner label={t('common.loading')} /></PanelState>}
+      {error && <PanelState><p className="text-sm text-node-error">{t('common.error')}: {error.message}</p></PanelState>}
       {markdown && !isLoading && (
         <div className="markdown-content">
           <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={headingComponents}>{processedMarkdown}</Markdown>

@@ -16,7 +16,7 @@ interface CompileViewProps {
 
 export function CompileView({ nodeId, headerTabs }: CompileViewProps) {
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
-  const { sliderValue, depth, depthLabel, handleSliderChange } = useCompileDepth();
+  const { sliderValue, depth, depthLabel, selectDepth } = useCompileDepth();
   const { markdown, isLoading, error, unfurls } = useCompileQueries(nodeId, depth, unfurlEnabled);
   const processedMarkdown = useMemo(
     () => (markdown ? closeUnclosedCodeFences(markdown) : undefined),
@@ -41,14 +41,14 @@ export function CompileView({ nodeId, headerTabs }: CompileViewProps) {
   const headingComponents = useEditableHeadingComponents(nodeId, sectionMap);
 
   return (
-    <div className="h-full flex flex-col bg-background border-r border-border">
+    <div className="h-full flex flex-col bg-background">
       <CompileToolbar
         headerTabs={headerTabs}
         nodeId={nodeId}
         sliderValue={sliderValue}
         depthLabel={depthLabel}
         unfurlEnabled={unfurlEnabled}
-        onSliderChange={handleSliderChange}
+        selectDepth={selectDepth}
         onToggleUnfurl={() => setUnfurlEnabled((v) => !v)}
       />
 
@@ -65,7 +65,6 @@ export function CompileView({ nodeId, headerTabs }: CompileViewProps) {
         <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
           <CompileContent
             contentRef={contentRef}
-            nodeId={nodeId}
             isLoading={isLoading}
             error={error}
             markdown={markdown}

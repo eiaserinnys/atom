@@ -67,7 +67,7 @@
   --node-tool: #f59e0b;
   --node-skill: #a855f7;
   --node-intervention: #f97316;
-  --node-error: #ef4444;
+  --node-error: #DC2626;
   --node-system: #6b7280;
   --node-input-request: #ec4899;
 
@@ -312,4 +312,4 @@
 .center-tabs { display:flex; gap:12px; white-space:nowrap; flex-shrink:0; height:40px; align-items:stretch; }
 .center-tabs button { font-size:13px; font-weight:600; border-bottom:2px solid transparent; cursor:pointer; }
 .center-tabs button[aria-selected=true] {border-color:var(--brand);color:var(--foreground);}
-@media (max-width:767px) { .index-brand,.index-actions {padding:0 8px;} .center-tabs {gap:8px;} }
+@media (max-width:767px) { .index-brand,.index-actions {padding:0 8px;border:0;} .center-tabs {gap:8px;} }

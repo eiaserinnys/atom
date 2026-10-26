@@ -1,6 +1,7 @@
-import type { ChangeEvent } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, Link2 } from 'lucide-react';
+import { Link2, ListTree } from 'lucide-react';
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu';
 import { INFINITY_SLIDER_VALUE } from './compileDepth';
 
 interface CompileToolbarProps {
@@ -9,7 +10,7 @@ interface CompileToolbarProps {
   sliderValue: number;
   depthLabel: string;
   unfurlEnabled: boolean;
-  onSliderChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  selectDepth: (value: number) => void;
   onToggleUnfurl: () => void;
 }
 
@@ -19,51 +20,72 @@ export function CompileToolbar({
   sliderValue,
   depthLabel,
   unfurlEnabled,
-  onSliderChange,
+  selectDepth,
   onToggleUnfurl,
 }: CompileToolbarProps) {
   const { t } = useTranslation();
+  const depthButton = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+
+  const openDepthMenu = () => {
+    const rect = depthButton.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMenuPosition({ x: rect.left, y: rect.bottom + 4 });
+    setMenuOpen(true);
+  };
+
+  const depthItems: ContextMenuItem[] = Array.from({ length: INFINITY_SLIDER_VALUE }, (_, index) => {
+    const depth = index + 1;
+    return {
+      label: depth === INFINITY_SLIDER_VALUE
+        ? t('compile.depth_all')
+        : t('compile.depth_option', { count: depth }),
+      checked: sliderValue === depth,
+      onClick: () => {
+        selectDepth(depth);
+        setMenuOpen(false);
+      },
+    };
+  });
 
   return (
-    <div className="h-10 flex items-center px-3.5 gap-2 border-b border-border bg-card text-[13px] font-semibold text-muted-foreground shrink-0">
-      {headerTabs ?? t('compile.header')}
+    <div className="h-10 max-md:h-12 flex items-center px-4 gap-2 border-b border-border bg-card shrink-0">
+      {headerTabs}
       {nodeId && (
-        <div className="ml-auto min-w-0 flex items-center gap-1">
-          <div className="flex items-center gap-1">
-            <input
-              type="range"
-              min={1}
-              max={INFINITY_SLIDER_VALUE}
-              step={1}
-              value={sliderValue}
-              onChange={onSliderChange}
-              className="w-16 accent-primary cursor-pointer"
-              title={t('compile.depth_label', { depth: depthLabel })}
-            />
-            <span className="text-[13px] font-mono text-muted-foreground w-4 text-center">
-              {depthLabel}
-            </span>
-          </div>
-          <span className="hidden xl:block px-2 py-0.5 text-[13px] font-mono bg-muted border border-border rounded-none text-muted-foreground">
-            {nodeId.slice(0, 8)}
-          </span>
+        <div className="ml-auto -mr-2 min-w-0 flex items-center">
           <button
-            onClick={() => navigator.clipboard.writeText(nodeId)}
-            className="p-1 rounded-none hover:bg-muted text-muted-foreground"
-            title={t('compile.copy_id')}
+            type="button"
+            ref={depthButton}
+            onClick={openDepthMenu}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={t('compile.depth_label', { depth: depthLabel })}
+            title={t('compile.depth_label', { depth: depthLabel })}
+            className="h-8 px-2 inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
-            <Copy className="w-3 h-3" />
+            <ListTree className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
+            <span className="text-[13px] font-mono">{depthLabel}</span>
           </button>
           <button
+            type="button"
             onClick={onToggleUnfurl}
-            className={`p-1 rounded-none text-muted-foreground transition-colors ${
-              unfurlEnabled ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
-            }`}
+            aria-pressed={unfurlEnabled}
+            aria-label={unfurlEnabled ? t('compile.unfurl_disable') : t('compile.unfurl_enable')}
             title={unfurlEnabled ? t('compile.unfurl_disable') : t('compile.unfurl_enable')}
+            className={`w-8 h-8 inline-flex items-center justify-center transition-colors ${unfurlEnabled ? 'bg-brand/10 text-brand' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
           >
-            <Link2 className="w-3 h-3" />
+            <Link2 className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
+      )}
+      {menuOpen && menuPosition && (
+        <ContextMenu
+          x={menuPosition.x}
+          y={menuPosition.y}
+          items={depthItems}
+          onClose={() => setMenuOpen(false)}
+        />
       )}
     </div>
   );

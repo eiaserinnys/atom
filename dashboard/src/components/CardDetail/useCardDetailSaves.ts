@@ -1,14 +1,15 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, type CardData } from '../../api/client';
 import { parseJournalLimitDraft } from './cardDetailLogic';
 import { nodeQueryKey } from '../../query/queryKeys';
 
 interface UseCardDetailSavesArgs {
   nodeId: string | null;
   saveFailedLabel: string;
-  onTitleSaved: () => void;
-  onContentSaved: () => void;
+  onSaveError: (field: 'title' | 'content' | 'journalLimit', message: string) => void;
+  onTitleSaved: (card: CardData) => void;
+  onContentSaved: (card: CardData) => void;
   onJournalLimitSaved: () => void;
   onJournalLimitIgnored: () => void;
 }
@@ -20,6 +21,7 @@ function getErrorMessage(error: unknown): string {
 export function useCardDetailSaves({
   nodeId,
   saveFailedLabel,
+  onSaveError,
   onTitleSaved,
   onContentSaved,
   onJournalLimitSaved,
@@ -32,19 +34,19 @@ export function useCardDetailSaves({
     queryClient.invalidateQueries({ queryKey: nodeQueryKey(nodeId) });
   }, [nodeId, queryClient]);
 
-  const showSaveError = useCallback((error: unknown) => {
-    alert(`${saveFailedLabel}: ${getErrorMessage(error)}`);
-  }, [saveFailedLabel]);
+  const showSaveError = useCallback((field: 'title' | 'content' | 'journalLimit', error: unknown) => {
+    onSaveError(field, `${saveFailedLabel}: ${getErrorMessage(error)}`);
+  }, [onSaveError, saveFailedLabel]);
 
   const saveTitle = useCallback(async (cardId: string | undefined, titleDraft: string) => {
     if (!cardId) return;
     setSaving(true);
     try {
-      await api.updateCard(cardId, { title: titleDraft });
-      onTitleSaved();
+      const updatedCard = await api.updateCard(cardId, { title: titleDraft });
+      onTitleSaved(updatedCard);
       invalidateNode();
     } catch (error: unknown) {
-      showSaveError(error);
+      showSaveError('title', error);
     } finally {
       setSaving(false);
     }
@@ -54,11 +56,11 @@ export function useCardDetailSaves({
     if (!cardId) return;
     setSaving(true);
     try {
-      await api.updateCard(cardId, { content: contentDraft });
-      onContentSaved();
+      const updatedCard = await api.updateCard(cardId, { content: contentDraft });
+      onContentSaved(updatedCard);
       invalidateNode();
     } catch (error: unknown) {
-      showSaveError(error);
+      showSaveError('content', error);
     } finally {
       setSaving(false);
     }
@@ -79,7 +81,7 @@ export function useCardDetailSaves({
       onJournalLimitSaved();
       invalidateNode();
     } catch (error: unknown) {
-      showSaveError(error);
+      showSaveError('journalLimit', error);
     } finally {
       setSaving(false);
     }

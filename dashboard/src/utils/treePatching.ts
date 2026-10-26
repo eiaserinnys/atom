@@ -61,7 +61,7 @@ export function applyChildrenPatch(
 
     case 'node:created': {
       if (event.parentNodeId !== parentNodeId) return children;
-      return upsertNode(event.node);
+      return upsertNode({ ...event.node, child_count: event.node.child_count ?? 0 });
     }
 
     case 'node:deleted': {
