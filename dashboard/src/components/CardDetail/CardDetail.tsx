@@ -1,6 +1,6 @@
 import { JevVerdict } from './JevVerdict';
 import type { MotionNode } from '../SearchMotionView/types';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Check, Copy, FileText, Folder } from 'lucide-react';
@@ -24,8 +24,10 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [editingContent, setEditingContent] = useState(false);
+  const editingContentRef = useRef(false);
   const [contentDraft, setContentDraft] = useState('');
   const [editingJournalLimit, setEditingJournalLimit] = useState(false);
+  const editingTitleRef = useRef(false);
   const [journalLimitDraft, setJournalLimitDraft] = useState('');
   const [copied, setCopied] = useState(false);
   const [editBaseVersion, setEditBaseVersion] = useState<number | null>(null);
@@ -71,12 +73,14 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
     saveFailedLabel: t('card.save_failed'),
     onSaveError: setSaveError,
     onTitleSaved: (updatedCard) => {
+      editingTitleRef.current = false;
       setEditingTitle(false);
-      setEditBaseVersion(editingContent ? updatedCard.version : null);
+      setEditBaseVersion(editingContentRef.current ? updatedCard.version : null);
     },
     onContentSaved: (updatedCard) => {
+      editingContentRef.current = false;
       setEditingContent(false);
-      setEditBaseVersion(editingTitle ? updatedCard.version : null);
+      setEditBaseVersion(editingTitleRef.current ? updatedCard.version : null);
     },
     onJournalLimitSaved: () => setEditingJournalLimit(false),
     onJournalLimitIgnored: () => setEditingJournalLimit(false),
@@ -95,6 +99,8 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   }
 
   const handleRefresh = () => {
+    editingTitleRef.current = false;
+    editingContentRef.current = false;
     setEditingTitle(false);
     setEditingContent(false);
     setEditingJournalLimit(false);
@@ -107,7 +113,8 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
     if (!card) return;
     setTitleDraft(card.title);
     clearSaveError('title');
-    if (!editingContent) setEditBaseVersion(card.version);
+    if (!editingContentRef.current) setEditBaseVersion(card.version);
+    editingTitleRef.current = true;
     setEditingTitle(true);
   };
 
@@ -115,7 +122,8 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
     if (!card) return;
     setContentDraft(card.content ?? '');
     clearSaveError('content');
-    if (!editingTitle) setEditBaseVersion(card.version);
+    if (!editingTitleRef.current) setEditBaseVersion(card.version);
+    editingContentRef.current = true;
     setEditingContent(true);
   };
 
@@ -174,13 +182,13 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
               setTitleDraft={setTitleDraft}
               onStartTitleEdit={startTitleEdit}
               onSaveTitle={() => { clearSaveError('title'); void saveTitle(card.id, titleDraft); }}
-              onCancelTitle={() => { clearSaveError('title'); setEditingTitle(false); if (!editingContent) setEditBaseVersion(null); }}
+              onCancelTitle={() => { clearSaveError('title'); editingTitleRef.current = false; setEditingTitle(false); if (!editingContentRef.current) setEditBaseVersion(null); }}
               editingContent={editingContent}
               contentDraft={contentDraft}
               setContentDraft={setContentDraft}
               onStartContentEdit={startContentEdit}
               onSaveContent={() => { clearSaveError('content'); void saveContent(card.id, contentDraft); }}
-              onCancelContent={() => { clearSaveError('content'); setEditingContent(false); if (!editingTitle) setEditBaseVersion(null); }}
+              onCancelContent={() => { clearSaveError('content'); editingContentRef.current = false; setEditingContent(false); if (!editingTitleRef.current) setEditBaseVersion(null); }}
             />
             <CardMetadata
               card={card}
