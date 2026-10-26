@@ -9,11 +9,15 @@ const events = samples.atom as any[];
 function rig() {
   let reduced = true;
   const texts: string[] = [];
-  const context = new Proxy({}, { get: (_t, key) => key === 'measureText' ? (s: string) => ({ width: s.length * 7 }) : key === 'fillText' ? (s: string) => texts.push(s) : key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {} });
+  const chipLabels: string[] = [];
+  const context = new Proxy({}, { get: (_t, key) => key === 'measureText' ? (s: string) => ({ width: s.length * 7 }) : key === 'fillText' ? (s: string, _x: number, y: number) => { texts.push(s); if (y === 0.5) chipLabels.push(s); } : key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {} });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D);
   vi.stubGlobal('matchMedia', () => ({ get matches() { return reduced; }, addEventListener() {}, removeEventListener() {} }));
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
+  let frameNow = performance.now();
+  const paint = () => { for (let i = 0; i < 20 && frames.length; i++) { frameNow += 16; frames.shift()!(frameNow); } };
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 640, 600));
   const host = document.createElement('div'); host.innerHTML = markup; document.body.append(host);
   const player = createMotionPlayer(host, { onResults: vi.fn(), onSelect: vi.fn(), onMore: vi.fn(), onCancel: vi.fn(), translate: (key, args) => key === 'visual_search.seconds' ? String(args?.value) : key === 'visual_search.narrate' ? `${args?.hop}: ${args?.stage}` : key });
@@ -21,7 +25,7 @@ function rig() {
   const count = () => Number(button('count').textContent!.split('/')[0]);
   player.begin('query'); events.forEach(e => player.receive(e));
   vi.useFakeTimers();
-  return { player, button, count, texts, motion: (value: boolean) => { reduced = !value; } };
+  return { player, button, count, texts, chipLabels, paint, motion: (value: boolean) => { reduced = !value; } };
 }
 
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.replaceChildren(); });
@@ -106,10 +110,20 @@ test('continuation selection keeps the current camera and has no expansion or ga
     vi.advanceTimersToNextTimer();
     expect(r.count()).toBe(25);
     expect(r.player.getCamera()).toEqual(before);
+    r.paint();
+    expect(r.chipLabels).not.toContain('');
+    expect(r.chipLabels.at(-1)).toBe('visual_search.status_more');
     const session = createExplorationSession(); session.restoreLog(r.player.getRecord().log);
     const scene = session.project(25, false, true).scene;
-    expect(scene.continuationStep).toBeUndefined();
+    expect(scene.continuationStep).toMatchObject({ stage: 'selection', refs: [] });
     expect(scene.inflight.size).toBe(0);
     expect([...scene.nodes.values()].every((node: any) => !node.judging && !node.reading && !node.climbing)).toBe(true);
+    r.chipLabels.length = 0;
+    vi.advanceTimersToNextTimer();
+    expect(r.count()).toBe(26);
+    r.paint();
+    expect(r.chipLabels.length).toBeGreaterThan(0);
+    expect(r.chipLabels).not.toContain('');
+    expect(r.chipLabels).not.toContain('visual_search.status_more');
   } finally { r.player.dispose(); }
 });
