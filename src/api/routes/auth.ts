@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { jwtVerify } from 'jose';
 import crypto from 'crypto';
-import { findUserByEmail, insertUser } from '../../db/queries/users.js';
+import { findUserByEmail, findUserById, insertUser } from '../../db/queries/users.js';
 import { getDb } from '../../db/client.js';
 import {
   JWT_COOKIE_NAME,
@@ -192,12 +192,17 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
 
       try {
         const { payload } = await jwtVerify(token, jwtSecret);
+        const userId = payload['id'];
+        const user = typeof userId === 'string' ? await findUserById(deps.getDb(), userId) : null;
+        if (!user?.is_active) {
+          return reply.send({ authenticated: false });
+        }
         return reply.send({
           authenticated: true,
-          id: payload['id'],
-          email: payload['email'],
-          name: payload['name'],
-          role: payload['role'],
+          id: user.id,
+          email: user.email,
+          name: user.display_name ?? payload['name'],
+          role: user.role,
         });
       } catch {
         return reply.send({ authenticated: false });

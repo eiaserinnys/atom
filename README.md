@@ -61,7 +61,7 @@ AUTH_BYPASS=1
 ```
 
 > [!WARNING]
-> `AUTH_BYPASS=1` turns off browser sign-in: every request that would otherwise need a session cookie runs with `admin` access. Because the server listens on `0.0.0.0` by default, any device that can reach the port gets the same `admin` access. Use `AUTH_BYPASS=1` only on a machine that other devices cannot reach. The server refuses to start if `AUTH_BYPASS=1` is set together with `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
+> `AUTH_BYPASS=1` turns off browser sign-in: every request that would otherwise need a session cookie runs with `admin` access. In this mode the server binds only to `127.0.0.1` for local use. The server refuses to start if `AUTH_BYPASS=1` is set together with `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
 
 ### 3. Seed Synthetic Demo Data
 
@@ -214,6 +214,7 @@ Browser API access is denied by default:
   - When `GOOGLE_CLIENT_ID` is set, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `JWT_SECRET`, and `FRONTEND_URL` are also present.
   - When `SLACK_CLIENT_ID` is set, `SLACK_CLIENT_SECRET`, `SLACK_CALLBACK_URL`, `JWT_SECRET`, and `FRONTEND_URL` are also present.
 - **Google OAuth admission (`ALLOWED_EMAIL`)**: A new Google user can sign in only if their email matches `ALLOWED_EMAIL`. The value can be a single address (`alice@example.com`) or a domain suffix (`@example.com`). If the `users` table is empty at startup and `ALLOWED_EMAIL` is a full address, `seedMigration()` creates that user as the first `admin`. Users who sign in through Google after that are created as `editor`.
+  With an empty `users` table, a domain-only value leaves it empty and logs a warning to set a full address for the first admin.
 - **Slack OAuth admission (`SLACK_ALLOWED_TEAM_ID`)**: Creating a new user via Slack sign-in requires `SLACK_ALLOWED_TEAM_ID` to be set and to match the user's Slack workspace team ID. If the variable is empty, new Slack users are rejected. Admitted Slack users are created with the `editor` role.
 
 ### Permissions Model
