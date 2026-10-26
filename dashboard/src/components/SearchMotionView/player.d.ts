@@ -4,6 +4,7 @@ import type { OperationSnapshot, VisualOperationEvent } from './operation-types'
 export interface MotionPlayer {
   begin(query: string, options?: { resume?: boolean }): void;
   getSnapshot(): OperationSnapshot;
+  refreshPaths(): void;
   applyOperation(event: VisualOperationEvent, expectedRevision?: number): boolean;
   receive(event: MotionEvent): void;
   error(message: string): void;
@@ -18,4 +19,5 @@ export function createMotionPlayer(root: HTMLElement, callbacks: {
   onOpenInTree?(nodeId: string): void;
   translate?(key: string, values?: Record<string, unknown>): string;
   onCancel(): void;
+  getCachedTreeNodes?(): unknown[];
 }, samples: unknown): MotionPlayer;

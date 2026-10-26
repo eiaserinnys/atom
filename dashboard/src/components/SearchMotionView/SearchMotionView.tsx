@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { QueryClientContext } from '@tanstack/react-query';
 import { createMotionPlayer, type MotionPlayer } from './player.js';
 import { readSearchStream, searchUrl, type SearchRequest } from './stream';
 import type { MotionNode } from './types';
@@ -22,6 +23,7 @@ export interface SearchMotionViewProps {
 
 export function SearchMotionView({ request, onSelectNode, onResults, onSummary, onOpenInTree }: SearchMotionViewProps) {
   const { t } = useTranslation();
+  const queryClient = useContext(QueryClientContext);
   const host = useRef<HTMLDivElement>(null);
   const player = useRef<MotionPlayer | null>(null);
   const active = useRef<AbortController | null>(null);
@@ -33,6 +35,9 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
   const startRef = useRef<(query: string, exhaustive?: boolean, resume?: boolean) => void>(() => {});
   const operationRef = useRef<(kind: 'expand' | 'evaluate' | 'query', snapshot: OperationSnapshot, retryId?: string) => void>(() => {});
   const retryRef = useRef<() => void>(() => {});
+  useEffect(() => queryClient?.getQueryCache().subscribe(event => {
+    if (['tree', 'children', 'node'].includes(String(event.query.queryKey[0]))) player.current?.refreshPaths?.();
+  }), [queryClient]);
 
   useEffect(() => { callbacks.current = { onSelectNode, onResults, onSummary, onOpenInTree, t }; requestRef.current = request; });
   useEffect(() => {
@@ -45,6 +50,9 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
     void fetch(sampleUrl, { signal: controller.signal }).then(response => { if (!response.ok) throw new Error('표본을 불러오지 못했습니다.'); return response.json(); }).then(samples => {
     if (controller.signal.aborted) return;
     instance = createMotionPlayer(host.current!, {
+      getCachedTreeNodes: () => queryClient?.getQueryCache().getAll()
+        .filter(query => ['tree', 'children', 'node'].includes(String(query.queryKey[0])))
+        .flatMap(query => Array.isArray(query.state.data) ? query.state.data : query.state.data ? [query.state.data] : []) ?? [],
       onSummary: text => callbacks.current.onSummary?.(text),
       onSelect: (node) => { if (node.nodeId) callbacks.current.onSelectNode(node.nodeId, node); },
       onResults: (nodes) => callbacks.current.onResults(nodes),

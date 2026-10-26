@@ -1,0 +1,20 @@
+import { expect, test } from 'vitest';
+import { nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
+
+test('B3/B4: compact titles stay 14 screen px, center without a path, and hide together below 50%', () => {
+  for (const zoom of [.5, .72, .76]) {
+    const layout = nodeTextLayout(['Folder', 'Card'], zoom);
+    expect(layout.titleSize * zoom).toBe(14);
+    expect(layout.titleY).toBe(24);
+    expect(layout.showPath).toBe(false);
+  }
+  expect(nodeTextLayout(['Card'], 1).titleY).toBe(24);
+  expect(nodeTextLayout(['Folder', 'Card'], 1).showPath).toBe(true);
+  expect(nodeTextLayout(['Folder', 'Card'], .46).showText).toBe(false);
+});
+test('B4: event ancestors and already cached tree nodes fill lexical paths without fetching', () => {
+  const node = { nodeId: 'c', title: 'Card', path: ['Card'], physicalParent: 'p' };
+  const graph = new Map([['parent', { nodeId: 'p', title: 'Folder', physicalParent: 'root' }]]);
+  expect(resolveDisplayPath(node, graph)).toEqual(['Folder', 'Card']);
+  expect(resolveDisplayPath(node, graph, [{ id: 'root', card: { title: 'Root' }, parent_node_id: null }])).toEqual(['Root', 'Folder', 'Card']);
+});

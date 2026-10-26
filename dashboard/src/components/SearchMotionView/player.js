@@ -215,6 +215,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   // 모델이 바뀔 때마다 부른다. animate가 거짓이면 그 자리로 바로 옮긴다(되감기, 건너뛰기, 모션 줄임)
   function sync(now, animate, delta) {
     if (reduced()) animate = false;
+    for (const n of model.nodes.values()) if (!n.referenceTarget) n.path = resolveDisplayPath(n, model.nodes, callbacks.getCachedTreeNodes?.() ?? []);
     const L = layout(model); view.L = L;
     const addedAt = new Map(); const scoredAt = new Map();
     if (delta) { delta.added.forEach((r, i) => addedAt.set(r, i)); delta.scored.forEach((r, i) => scoredAt.set(r, i)); }
@@ -1560,6 +1561,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     },
     receive,
     getSnapshot: snapshot,
+    refreshPaths() { sync(performance.now(), false, null); invalidate(); },
     applyOperation(event, expectedRevision) {
       if (expectedRevision != null && expectedRevision !== revision) return false;
       if (event.type === 'started') {
