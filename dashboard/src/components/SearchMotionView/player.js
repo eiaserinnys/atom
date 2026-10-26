@@ -423,8 +423,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   function fitAll(instant = false) {
     const isAuto = instant === true;
     const L = view.L; const w = L.width + 2 * M.padX + badgeRoom(); const h = L.height + M.padTop + 54;
-    const minZ = W < 480 ? 0.76 : 0.72;
-    const z = clamp(Math.min(W / w, (H - M.headerH) / h), minZ, 1);
+    const z = clamp(Math.min(W / w, (H - M.headerH - overlayRoom()) / h), .5, 1);
     setFollow(false);
     $("t-follow").hidden = ui.follow || !player.playing;
     const targetX = W < w * z ? -M.padX : -M.padX - Math.max(0, (W / z - w) / 2);
@@ -941,7 +940,10 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (continuation) {
       const follow = cursor === history.timeline().frames.length || cursor === history.timeline().frames.length - 1;
       if (ev.event === 'done') { continued = true; receivedDone = true; continuation = false; player.serverDone = true; }
-      if (follow) projectTo(history.timeline().frames.length, true);
+      if (follow) {
+        projectTo(history.timeline().frames.length, true);
+        if (ev.event === 'done') { setFollow(true); followHop(model.maxHop, reduced()); setFollow(false); }
+      }
       chrome(); return;
     }
     const t = eventTime(ev); if (player.events.length === 0) player.t0 = t;
@@ -1620,7 +1622,14 @@ export function createMotionPlayer(root, callbacks, samples) {
       }
       const atEnd = cursor === history.timeline().frames.length;
       history.apply(event);
-      if (atEnd) projectTo(history.timeline().frames.length, true);
+      if (atEnd) {
+        projectTo(history.timeline().frames.length, true);
+        if (event.type === 'completed' || event.type === 'expansion_succeeded') {
+          const operation = model.exploration.operations.find(op => op.id === event.operationId);
+          const node = [...model.nodes.values()].find(n => n.displayColumn === (operation?.kind === 'evaluate' ? operation.viaOperationId : operation?.id));
+          if (node) { setFollow(true); followHop(node.hop, reduced()); setFollow(false); }
+        }
+      }
       else chrome();
       return true;
     },
