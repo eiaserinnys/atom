@@ -73,8 +73,11 @@ test('selection exposes DOM operations, repeated cards become references, and re
     player.begin('query');
     (samples.atom as unknown as MotionEvent[]).forEach(event => player.receive(event.event === 'done' ? { ...event, data: { ...event.data, stop_reason: 'exhausted' } } : event));
     const plot = button('plot'); plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    // The sample's sufficiency gauge precedes its cards in keyboard order.
+    plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     settleFrames(frames);
+    expect(player.getSnapshot().selectedCardId).not.toBeNull();
     expect(button('node-actions').hidden).toBe(false);
     expect(button('node-expand').disabled).toBe(false);
     expect(button('node-evaluate').disabled).toBe(true);
