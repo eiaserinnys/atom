@@ -674,7 +674,8 @@ export function createMotionPlayer(root, callbacks, samples) {
       ctx.beginPath(); ctx.rect(x, y, 5, h); ctx.fill();
       if (n.type === "structure") ctx.fillRect(x + 7, y + 5, 1.6, h - 10);
     }
-    const rankW = n.selected ? 34 : 0;
+    ctx.font = wfont(700, 13);
+    const rankW = n.selected ? ctx.measureText(`#${n.rank}`).width + 12 / cam.z : 0;
     const textLayout = nodeTextLayout(n.path || [], cam.z, h);
     const tx = x + (n.type === "structure" ? 15 : 12) + rankW; const cy = y + textLayout.titleY;
     const portPad = n.type === "structure" ? 4 : 0;
@@ -731,9 +732,10 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     // 순위는 마디 안쪽에서 결과 도크와 같은 번호를 쓴다.
     if (v.sel > 0.02 && text) {
-      const k = easeOut(v.sel); ctx.globalAlpha = v.a * k; const cx = x + 10; const cyy = cy - (M.chipH - 4) / 2;
-      rr(cx, cyy, 30, M.chipH - 4, 6); ctx.fillStyle = css(T.evidence); ctx.fill();
-      ctx.fillStyle = css(T.evidenceInk); ctx.font = wfont(700, 13); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(n.rank), cx + 15, cyy + (M.chipH - 4) / 2 + 0.5); ctx.textAlign = "left";
+      const k = easeOut(v.sel); ctx.globalAlpha = v.a * k; const cx = x + 10; const chipHeight = (M.chipH - 4) / Math.min(1, cam.z); const cyy = cy - chipHeight / 2;
+      const chipWidth = rankW - 4 / cam.z;
+      rr(cx, cyy, chipWidth, chipHeight, 6); ctx.fillStyle = css(T.evidence); ctx.fill();
+      ctx.fillStyle = css(T.evidenceInk); ctx.font = wfont(700, 13); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(`#${n.rank}`, cx + chipWidth / 2, cy); ctx.textAlign = "left";
     }
     // 미뤄 둔 묶음: 구조 아래의 칩. 열 곳이 떨어지면 꺼내 훑는다
     const put = view.L.dorm.get(n.ref);
