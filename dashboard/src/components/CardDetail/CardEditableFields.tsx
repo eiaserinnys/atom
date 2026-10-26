@@ -131,7 +131,7 @@ export function CardEditableFields({
           </div>
         ) : (
           <div
-            className="group relative text-base text-foreground -mx-2 px-2 py-1.5 border border-transparent cursor-pointer transition-colors hover:border-border hover:bg-muted"
+            className="text-base text-foreground -mx-2 px-2 py-1.5 border border-transparent cursor-pointer transition-colors hover:border-border hover:bg-muted"
             onClick={onStartContentEdit}
             onKeyDown={(event) => startEditOnKeyboard(event, onStartContentEdit)}
             role="button"
@@ -146,7 +146,6 @@ export function CardEditableFields({
             ) : (
               <span className="text-muted-foreground">{t('card.empty_content')}</span>
             )}
-            <Pencil className="absolute top-1.5 right-2 w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" strokeWidth={1.75} />
           </div>
         )}
       </div>

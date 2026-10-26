@@ -155,7 +155,7 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
         {isLoading && <PanelState><Spinner label={t('common.loading')} /></PanelState>}
 
         {/* Dirty State Guard — 편집 중 외부 변경 감지 배너 */}
-        {!!card && editBaseVersion !== null && card.version !== editBaseVersion && (editingTitle || editingContent) && (
+        {!saving && !!card && editBaseVersion !== null && card.version !== editBaseVersion && (editingTitle || editingContent) && (
           <div className="flex items-center justify-between gap-2 bg-brand/8 border border-brand/25 rounded-none px-3 py-2 text-sm text-foreground shrink-0">
             <span className="flex-1">
               {t('card.unsaved_changes')}

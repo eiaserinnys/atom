@@ -111,7 +111,8 @@ describe('TreeView Rename save errors', () => {
     update.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
     await settle(() => button(english.common.save).click());
     expect(alert()).toBeNull();
-    expect(button(english.cardform.saving).disabled).toBe(true);
+    expect(button(english.common.save).disabled).toBe(true);
+    expect(button(english.common.save).querySelector('.animate-spin')).not.toBeNull();
     expect(button(english.common.cancel).disabled).toBe(true);
     expect(input().value).toBe('Draft title');
     expect(content().value).toBe('Retained draft');

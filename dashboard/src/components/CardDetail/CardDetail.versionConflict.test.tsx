@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { api, type CardData, type TreeNodeData } from '../../api/client';
 import english from '../../locales/en/translation.json';
 import { nodeQueryKey } from '../../query/queryKeys';
+import { applyAtomEventToCache } from '../../hooks/useAtomEvents';
 import { CardDetail } from './CardDetail';
 
 function makeNode(card: CardData): TreeNodeData {
@@ -102,5 +103,60 @@ describe('CardDetail edit version tracking', () => {
     expect(container.querySelector('textarea')?.value).toBe('Unsubmitted body draft');
     expect(container.textContent).not.toContain(english.card.unsaved_changes);
     expect([...container.querySelectorAll('button')].some(button => button.textContent === english.card.refresh)).toBe(false);
+  });
+
+  test('an SSE update before the PUT response never renders a false warning and later external changes still warn', async () => {
+    let finishPut!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise<Response>((resolve) => { finishPut = resolve; }));
+    click(container.querySelector(`[aria-label="${english.card.edit_content}"]`)!);
+    setInput(container.querySelector('textarea')!, 'Unsubmitted body draft');
+    click(container.querySelector(`[aria-label="${english.card.edit_title}"]`)!);
+    const titleDraft = container.querySelector('input')!;
+    setInput(titleDraft, 'Saved title');
+
+    const warnings: string[] = [];
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node.textContent?.includes(english.card.unsaved_changes)) warnings.push(node.textContent);
+        }
+      }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    try {
+      act(() => titleDraft.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+      const savedCard = { ...currentNode.card, title: 'Saved title', version: 2 };
+      await act(async () => {
+        currentNode = makeNode(savedCard);
+        applyAtomEventToCache(queryClient, { type: 'card:updated', cardId: savedCard.id, data: savedCard, actor: null }, 'node-1');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(container.querySelector('button:disabled')).not.toBeNull();
+      expect(container.textContent).not.toContain(english.card.unsaved_changes);
+      await act(async () => {
+        finishPut({ ok: true, status: 200, json: async () => ({ card: savedCard, conflict: false }) } as Response);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(warnings).toEqual([]);
+      expect(container.querySelector('textarea')?.value).toBe('Unsubmitted body draft');
+
+      await act(async () => {
+        const externalCard = { ...savedCard, content: 'External body', version: 3 };
+        currentNode = makeNode(externalCard);
+        applyAtomEventToCache(queryClient, { type: 'card:updated', cardId: externalCard.id, data: externalCard, actor: null }, 'node-1');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(container.textContent).toContain(english.card.unsaved_changes);
+      const refresh = [...container.querySelectorAll('button')].find(button => button.textContent === english.card.refresh)!;
+      await act(async () => {
+        refresh.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(container.querySelector('textarea')).toBeNull();
+      expect(container.textContent).toContain('External body');
+      expect(container.textContent).not.toContain(english.card.unsaved_changes);
+    } finally {
+      observer.disconnect();
+    }
   });
 });
