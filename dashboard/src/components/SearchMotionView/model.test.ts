@@ -13,6 +13,7 @@ describe('approved r5 run reducer', () => {
     expect(model.terminal.stop).toBe(done.stop_reason);
     expect(selected.length).toBeGreaterThan(0);
     const audited = selected.find(n => n.asked !== null)!;
-    expect(model.calls.get(audited.asked!.step)!.request.questions[audited.asked!.key].instructions).toContain(audited.title);
+    const instructions = model.calls.get(audited.asked!.step)!.request.questions[audited.asked!.key].instructions;
+    expect(instructions).toContain(audited.title);
   });
 });
