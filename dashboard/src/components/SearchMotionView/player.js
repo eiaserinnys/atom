@@ -1282,6 +1282,12 @@ export function createMotionPlayer(root, callbacks, samples) {
       button.dataset.frame = String(index); button.setAttribute('aria-current', String(cursor === index));
       strip.append(button);
     }
+    const active = strip.querySelector('[aria-current=true]');
+    if (active) {
+      const outer = strip.getBoundingClientRect(); const inner = active.getBoundingClientRect();
+      if (inner.left < outer.left) strip.scrollLeft += inner.left - outer.left;
+      else if (inner.right > outer.right) strip.scrollLeft += inner.right - outer.right;
+    }
   }
   function translateLabel(label) {
     if (label === '입구') return tr('visual_search.entry');
@@ -1590,7 +1596,11 @@ export function createMotionPlayer(root, callbacks, samples) {
     let say;
     if (key[0] === "#") { const sf = model.suff.get(Number(key.slice(1))); say = sf ? `${hopName(Number(key.slice(1)))}까지 찾은 정도 ${sf.score.toFixed(2)}, ${sf.ok ? "찾는 것이 있다" : "아직 없다"}` : ""; }
     else if (key[0] === "@") { const p = view.L.piles.get(key.slice(1)); say = p ? `접어 둔 후보 ${p.count}개` : ""; }
-    else { const n = model.nodes.get(key); const v = verdictOf(n); say = `${n.title}, ${n.type === "structure" ? "구조" : n.type === "root" ? "루트" : "지식"}, ${hopName(n.hop)}, ${v.score} ${v.word}`; }
+    else {
+      const focused = model.nodes.get(key); const n = focused.referenceTarget ? model.nodes.get(focused.referenceTarget) : focused;
+      const v = verdictOf(n); const column = translateLabel(n.columnLabel || hopName(n.hop));
+      say = `${n.title}, ${n.type === "structure" ? "구조" : n.type === "root" ? "루트" : "지식"}, ${column}, ${v.score} ${v.word}`;
+    }
     $("graph-live").textContent = say; invalidate();
   }
   listen(plot, "keydown", (e) => {
