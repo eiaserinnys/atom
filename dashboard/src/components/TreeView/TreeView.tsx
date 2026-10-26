@@ -8,6 +8,9 @@ import {
 import { FileText, Folder, LogOut, Plus } from 'lucide-react';
 import { api, type TreeNodeData } from '../../api/client';
 import { fetchRootsWithChildren } from '../../api/treeQueries';
+import { PanelState } from '../PanelState';
+import { Spinner } from '../Spinner';
+import { ConfigActionButton } from '../Config/ConfigFields';
 import { TreeNode } from './TreeNode';
 import { TreeDndContext } from './TreeDndContext';
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu';
@@ -164,9 +167,6 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
     }
   }
 
-  if (isLoading) return <div className="p-4 text-muted-foreground text-sm">{t('tree.loading')}</div>;
-  if (error) return <div className="p-4 text-node-error text-sm">{t('common.error')}: {error.message}</div>;
-
   return (
     <DndContext
       sensors={treeDrag.sensors}
@@ -202,8 +202,16 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
 
           {/* 트리 본문 */}
           <div className="flex-1 overflow-y-auto py-1">
-            {(!roots || roots.length === 0) ? (
-              <div className="p-4 text-muted-foreground text-sm">{t('tree.empty')}</div>
+            {isLoading ? (
+              <PanelState><Spinner label={t('common.loading')} /></PanelState>
+            ) : error ? (
+              <PanelState><p className="text-sm text-node-error">{t('common.error')}: {error.message}</p></PanelState>
+            ) : !roots || roots.length === 0 ? (
+              <PanelState>
+                <ConfigActionButton onClick={() => setModal({ type: 'create-root', cardType: 'knowledge' })}>
+                  <span className="inline-flex items-center gap-1.5"><Plus className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />{t('cardform.new_knowledge')}</span>
+                </ConfigActionButton>
+              </PanelState>
             ) : (
               roots.map((root) => (
                 <TreeNode

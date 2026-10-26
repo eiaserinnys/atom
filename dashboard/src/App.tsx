@@ -10,6 +10,8 @@ import { TreeView } from './components/TreeView/TreeView';
 import { CardDetail } from './components/CardDetail/CardDetail';
 import { SearchBar } from './components/SearchBar/SearchBar';
 import { ThemeToggle } from './components/ThemeToggle';
+import { PanelState } from './components/PanelState';
+import { Spinner } from './components/Spinner';
 import { ConfigModal } from './components/Config/ConfigModal';
 import { RestartBanner } from './components/RestartBanner';
 import { ReconnectOverlay } from './components/ReconnectOverlay';
@@ -63,7 +65,7 @@ function AppInner() {
   // Sample node IDs are scoped to the preset; never send them to mutation or compile APIs.
   const actualNodeId = verdict?.sample && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(selectedNodeId ?? '') ? null : selectedNodeId;
   useAtomEvents(actualNodeId);
-  if (auth.loading) return null;
+  if (auth.loading) return <div className="h-dvh bg-background"><PanelState><Spinner label={t('common.loading')} /></PanelState></div>;
   if (!auth.authenticated) return <LoginPage />;
   const showConfigButton = auth.role !== null;
   return <SystemProvider><div className="h-dvh flex flex-col bg-background text-foreground overflow-hidden">
