@@ -119,17 +119,24 @@ export class FlatEmbeddingIndex {
     currentVersions: ReadonlyMap<string, number>,
     limit: number,
   ): NeighborScore[] {
-    if (query.length !== EMBEDDING_POLICY.dimensions) throw new Error("Invalid embedding");
+    const vectors = this.vectors;
+    const ids = this.ids;
+    const versions = this.versions;
+    const dimensions = EMBEDDING_POLICY.dimensions;
+    if (query.length !== dimensions) throw new Error("Invalid embedding");
     const top: NeighborScore[] = [];
-    for (let slot = 0; slot < this.ids.length; slot += 1) {
-      const cardId = this.ids[slot];
-      const version = this.versions[slot];
+    for (let slot = 0; slot < ids.length; slot += 1) {
+      const cardId = ids[slot];
+      const version = versions[slot];
       if (cardId === sourceCardId || currentVersions.get(cardId) !== version) continue;
-      const start = slot * EMBEDDING_POLICY.dimensions;
+      const start = slot * dimensions;
       let similarity = 0;
-      for (let i = 0; i < EMBEDDING_POLICY.dimensions; i += 1) {
-        similarity += query[i] * this.vectors[start + i];
+      for (let i = 0; i < dimensions; i += 1) {
+        similarity += query[i] * vectors[start + i];
       }
+      const last = top[top.length - 1];
+      if (top.length === limit && last
+        && (similarity < last.similarity || (similarity === last.similarity && cardId >= last.cardId))) continue;
       const candidate = { cardId, version, similarity };
       let index = top.findIndex(item => similarity > item.similarity || (similarity === item.similarity && cardId < item.cardId));
       if (index < 0) index = top.length;

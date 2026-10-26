@@ -119,7 +119,7 @@ export async function listIndexEmbeddings(db: Queryable, afterId: string | null)
   const result = await db.query(
     `SELECT e.card_id, e.card_version, e.embedding
      FROM card_embeddings e JOIN cards c ON c.id = e.card_id
-     WHERE e.model = $1 AND e.dimensions = $2 AND e.card_version = c.version
+     WHERE e.model = $1 AND e.dimensions = $2
        AND TRIM(COALESCE(c.content, '')) <> ''
        AND EXISTS (SELECT 1 FROM tree_nodes tn WHERE tn.card_id = c.id AND tn.is_symlink = FALSE)
        ${cursorFilter}
@@ -137,7 +137,7 @@ export async function countIndexEmbeddings(db: Queryable): Promise<number> {
   const result = await db.query(
     `SELECT COUNT(*) AS count
      FROM card_embeddings e JOIN cards c ON c.id = e.card_id
-     WHERE e.model = $1 AND e.dimensions = $2 AND e.card_version = c.version
+     WHERE e.model = $1 AND e.dimensions = $2
        AND TRIM(COALESCE(c.content, '')) <> ''
        AND EXISTS (SELECT 1 FROM tree_nodes tn WHERE tn.card_id = c.id AND tn.is_symlink = FALSE)`,
     [EMBEDDING_POLICY.model, EMBEDDING_POLICY.dimensions]

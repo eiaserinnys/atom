@@ -6,19 +6,21 @@ import { ConfigActionButton, ConfigField } from './ConfigFields';
 
 const POLL_INTERVAL_MS = 5000;
 
+type Action = 'save' | 'delete' | null;
+
 export function OpenAITab() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [status, setStatus] = useState<OpenAIConfigResponse | null>(null);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [pendingAction, setPendingAction] = useState<Action>(null);
+  const [requestFailed, setRequestFailed] = useState(false);
   const [notice, setNotice] = useState<'saved' | 'deleted' | null>(null);
   const mounted = useRef(false);
-  const inFlight = useRef<Promise<void> | null>(null);
+  const inFlight = useRef<Promise<boolean> | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     if (inFlight.current) return inFlight.current;
     const operation = (async () => {
       try {
@@ -27,15 +29,17 @@ export function OpenAITab() {
           setStatus(value);
           setLoadFailed(false);
         }
+        return true;
       } catch {
         if (mounted.current) setLoadFailed(true);
+        return false;
       } finally {
         if (mounted.current) setLoading(false);
       }
     })();
     inFlight.current = operation;
     try {
-      await operation;
+      return await operation;
     } finally {
       if (inFlight.current === operation) inFlight.current = null;
     }
@@ -57,98 +61,132 @@ export function OpenAITab() {
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
-  const refreshAfterMutation = async () => {
+  const refreshAfterMutation = async (): Promise<boolean> => {
     if (inFlight.current) await inFlight.current;
-    await refresh();
+    return refresh();
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setFailed(false);
+    setPendingAction('save');
+    setRequestFailed(false);
     setNotice(null);
     try {
       await configApi.putOpenAIKey(draft);
       setDraft('');
-      setNotice('saved');
-      await refreshAfterMutation();
+      if (await refreshAfterMutation()) setNotice('saved');
     } catch {
-      setFailed(true);
+      setRequestFailed(true);
     } finally {
-      setSaving(false);
+      setPendingAction(null);
     }
   };
 
   const handleDelete = async () => {
-    setSaving(true);
-    setFailed(false);
+    setPendingAction('delete');
+    setRequestFailed(false);
     setNotice(null);
     try {
       await configApi.deleteOpenAIKey();
       setDraft('');
-      setNotice('deleted');
-      await refreshAfterMutation();
+      if (await refreshAfterMutation()) setNotice('deleted');
     } catch {
-      setFailed(true);
+      setRequestFailed(true);
     } finally {
-      setSaving(false);
+      setPendingAction(null);
     }
   };
 
-  const pauseKey = status?.embedding.paused_reason
-    ? `openai.paused_${status.embedding.paused_reason}`
-    : status?.embedding.running ? 'openai.running' : 'openai.idle';
-  const errorKey = status?.embedding.last_error
-    ? `openai.error_${status.embedding.last_error.kind}`
+  const embedding = status?.embedding;
+  const complete = embedding !== undefined
+    && embedding.completed_cards >= embedding.target_cards
+    && !embedding.last_error;
+  const pauseKey = embedding
+    ? complete ? null : embedding.paused_reason
+      ? `openai.paused_${embedding.paused_reason}`
+      : embedding.running ? 'openai.running' : 'openai.idle'
     : null;
+  const duplicateError = embedding?.paused_reason === 'auth'
+      && embedding.last_error?.kind === 'OPENAI_AUTH'
+    || embedding?.paused_reason === 'rate_limited'
+      && embedding.last_error?.kind === 'OPENAI_RATE_LIMIT';
+  const errorKey = embedding?.last_error && !duplicateError
+    ? `openai.error_${embedding.last_error.kind}`
+    : null;
+  const progress = embedding
+    ? embedding.target_cards > 0
+      ? Math.min(100, embedding.completed_cards / embedding.target_cards * 100)
+      : 100
+    : 0;
+  const actionMessageKey = pendingAction
+    ? null
+    : requestFailed
+      ? 'openai.request_failed'
+      : loadFailed
+        ? 'openai.load_failed'
+        : notice ? `openai.${notice}` : null;
+  const actionMessageError = requestFailed || loadFailed;
 
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="text-sm font-semibold text-foreground mb-3">{t('config.tab_openai')}</h3>
-        <div className="mb-3 text-sm text-foreground">
-          {status
-            ? status.key.configured ? t('openai.configured') : t('openai.not_configured')
-            : loading ? t('common.loading') : loadFailed ? t('openai.load_failed') : null}
-        </div>
-        {status?.key.last_saved_at && (
-          <div className="mb-3 text-[13px] text-muted-foreground">
-            {t('openai.saved_at')}: {new Date(status.key.last_saved_at).toLocaleString()}
-          </div>
-        )}
         <ConfigField
           label={t('openai.key')}
           type="password"
+          placeholder={status ? t(status.key.configured ? 'openai.configured' : 'openai.not_configured') : ''}
           value={draft}
-          disabled={saving}
+          disabled={pendingAction !== null}
           onChange={setDraft}
         />
-        <div className="flex gap-2">
-          <ConfigActionButton onClick={handleSave} disabled={saving || draft.trim().length === 0}>
-            {saving ? t('common.loading') : t('common.save')}
+        {status?.key.configured && status.key.last_saved_at && (
+          <div className="mb-3 text-[13px] text-muted-foreground">
+            {t('openai.saved_at')}: {new Date(status.key.last_saved_at).toLocaleString(i18n.language, {
+              year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit',
+            })}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <ConfigActionButton onClick={handleSave} disabled={pendingAction !== null || draft.trim().length === 0}>
+            {pendingAction === 'save' ? t('common.loading') : t('common.save')}
           </ConfigActionButton>
           {status?.key.configured && (
-            <ConfigActionButton tone="danger" onClick={handleDelete} disabled={saving}>
-              {t('common.delete')}
+            <ConfigActionButton tone="secondary" onClick={handleDelete} disabled={pendingAction !== null}>
+              {pendingAction === 'delete' ? t('common.loading') : t('common.delete')}
             </ConfigActionButton>
+          )}
+          {actionMessageKey && (
+            <span className={`text-sm ${actionMessageError ? 'text-node-error' : 'text-muted-foreground'}`} aria-live="polite">
+              {t(actionMessageKey)}
+            </span>
           )}
         </div>
       </section>
 
       <section>
         <h3 className="text-sm font-semibold text-foreground mb-3">{t('openai.embeddings')}</h3>
-        <div className="mb-3 text-sm text-foreground">{status?.embedding.model ?? 'text-embedding-3-large'}</div>
-        {status && <div className="mb-3 text-sm text-foreground">
-          {t('openai.progress', {
-            completed: status.embedding.completed_cards.toLocaleString(),
-            total: status.embedding.target_cards.toLocaleString(),
-          })}
+        <div className="mb-3 text-[13px] text-muted-foreground">{embedding?.model ?? 'text-embedding-3-large'}</div>
+        {embedding && <div className="mb-3 flex items-center gap-2 text-sm">
+          <div
+            className="h-0.5 flex-1 overflow-hidden bg-muted"
+            role="progressbar"
+            aria-label={t('openai.embeddings')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress)}
+          >
+            <div className="h-full bg-brand" style={{ width: `${progress}%` }} />
+          </div>
+          <span className="shrink-0">
+            {t('openai.progress', {
+              completed: embedding.completed_cards.toLocaleString(),
+              total: embedding.target_cards.toLocaleString(),
+            })}
+          </span>
         </div>}
-        {status && <div className="mb-3 text-sm text-muted-foreground">{t(pauseKey)}</div>}
+        {pauseKey && <div className="mb-3 text-sm text-muted-foreground">{t(pauseKey)}</div>}
         {errorKey && <div className="text-sm text-node-error">{t(errorKey)}</div>}
       </section>
 
-      {failed && <div className="text-sm text-node-error">{t('openai.request_failed')}</div>}
-      {notice && <div className="text-sm text-muted-foreground">{t(`openai.${notice}`)}</div>}
+      {loading && !status && <div className="text-sm text-muted-foreground">{t('common.loading')}</div>}
     </div>
   );
 }
