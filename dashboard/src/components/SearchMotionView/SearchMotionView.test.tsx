@@ -3,6 +3,8 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, test, expect, vi } from 'vitest';
 import { SearchMotionView } from './SearchMotionView';
+import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
+const refreshPaths = vi.hoisted(() => vi.fn());
 vi.mock('react-i18next', async () => {
   const { createInstance } = await import('i18next');
   const { default: translation } = await import('../../locales/en/translation.json');
@@ -12,7 +14,7 @@ vi.mock('react-i18next', async () => {
 });
 vi.mock('./player.js', () => ({ createMotionPlayer: (host: HTMLElement) => {
   host.querySelector('[data-motion-id=query-title]')!.textContent = 'Playing query';
-  return { begin: vi.fn(), receive: vi.fn(), dispose: vi.fn(), error: vi.fn() };
+  return { begin: vi.fn(), receive: vi.fn(), dispose: vi.fn(), error: vi.fn(), refreshPaths };
 } }));
 afterEach(() => { vi.unstubAllGlobals(); });
 async function view() {
@@ -85,4 +87,24 @@ test('English motion markup translates text, aria-label, title and graph descrip
     expect(v.host.querySelector('.skip')!.textContent).toContain('Skip');
     expect(v.host.innerHTML).not.toMatch(/[가-힣]/);
   } finally { await v.close(); }
+});
+
+test('tree observer changes do not relayout the graph; new tree data refreshes paths once', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const client = new QueryClient();
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  let unsubscribe = () => {};
+  try {
+    await act(async () => root.render(<QueryClientProvider client={client}><SearchMotionView request={null} onSelectNode={vi.fn()} onResults={vi.fn()} /></QueryClientProvider>));
+    refreshPaths.mockClear();
+    const observer = new QueryObserver(client, { queryKey: ['tree'], enabled: false });
+    unsubscribe = observer.subscribe(() => {});
+    observer.setOptions({ queryKey: ['tree'], enabled: false, staleTime: 1000 });
+    expect(refreshPaths).not.toHaveBeenCalled();
+    client.setQueryData(['tree'], []);
+    expect(refreshPaths).toHaveBeenCalledTimes(1);
+    client.setQueryData(['unrelated'], []);
+    expect(refreshPaths).toHaveBeenCalledTimes(1);
+  } finally { unsubscribe(); await act(async () => root.unmount()); client.clear(); host.remove(); }
 });

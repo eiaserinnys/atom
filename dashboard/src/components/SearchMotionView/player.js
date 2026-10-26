@@ -2,7 +2,7 @@
 // to preserve the reviewed drawing and playback behavior; the pure reducer is model.js.
 import { createModel, applyEvent } from "./model.js";
 import { createExplorationSession } from './exploration-session.js';
-import { fitZoom, operationGroups, nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
+import { fitZoom, operationGroups, nodeTextLayout, createDisplayPathResolver } from './node-presentation.js';
 import { motionIcon } from './motion-icons.js';
 
 export function createMotionPlayer(root, callbacks, samples = null) {
@@ -234,7 +234,8 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   // 모델이 바뀔 때마다 부른다. animate가 거짓이면 그 자리로 바로 옮긴다(되감기, 건너뛰기, 모션 줄임)
   function sync(now, animate, delta) {
     if (reduced()) animate = false;
-    for (const n of model.nodes.values()) if (!n.referenceTarget) n.path = resolveDisplayPath(n, model.nodes, callbacks.getCachedTreeNodes?.() ?? []);
+    const resolvePath = createDisplayPathResolver(model.nodes, callbacks.getCachedTreeNodes?.() ?? []);
+    for (const n of model.nodes.values()) if (!n.referenceTarget) n.path = resolvePath(n);
     for (const n of model.nodes.values()) if (n.referenceTarget) n.path = model.nodes.get(n.referenceTarget).path;
     const L = layout(model); view.L = L;
     const addedAt = new Map(); const scoredAt = new Map();
@@ -971,13 +972,11 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   function receive(ev) {
     history.receive(ev);
     if (continuation) {
-      const follow = cursor === history.timeline().frames.length || cursor === history.timeline().frames.length - 1;
-      if (ev.event === 'done') { continued = true; receivedDone = true; continuation = false; player.serverDone = true; }
-      if (follow) {
-        projectTo(history.timeline().frames.length, true);
-        if (ev.event === 'done') { setFollow(true); followHop(model.maxHop, reduced()); setFollow(false); }
-      }
-      chrome(); return;
+      if (ev.event === 'done') { continued = true; receivedDone = true; player.serverDone = true; }
+      // Network delivery can contain an entire segment in one chunk. Its frames
+      // still belong to the presentation clock, just like the initial search.
+      if (!player.timer) pumpContinuation();
+      return;
     }
     const t = eventTime(ev); if (player.events.length === 0) player.t0 = t;
     player.events.push(ev); player.ts.push(Math.max(player.ts[player.ts.length - 1] || 0, t - player.t0));
@@ -986,6 +985,23 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     player.received = player.events.length;
     if (ev.event === "run") tickSummary();
     pump();
+  }
+  function pumpContinuation() {
+    player.timer = 0;
+    if (!player.playing) return;
+    const frames = history.timeline().frames;
+    if (cursor < frames.length) {
+      const events = frames[cursor].events;
+      projectTo(cursor + 1, true, true);
+      if (ui.follow) followHop(model.maxHop, reduced());
+      const completed = events.findLast(event => event.event === 'step_completed');
+      const gap = player.fast || reduced() ? 0 : gapAfter(completed) * (player.serverDone ? 0.5 : 1);
+      player.timer = setTimeout(pumpContinuation, gap);
+    } else if (player.serverDone) {
+      // done can be appended to the last frame after that frame was displayed.
+      projectTo(cursor, true, true);
+      continuation = false; player.playing = false; player.fast = false; setFollow(false); chrome();
+    }
   }
   // resume이 참이면 입구에서 끝난 실행을 그 자리에서 이어 간다(더 찾아보기). 입구까지의 사건은 바로 반영하고 다음 홉부터 펼친다
   function startLive(source, instant = false, resume = false) {
@@ -1032,6 +1048,12 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   }
   function seekEvent(index) { seek(0, false); while (player.applied < Math.min(index, player.received)) applyEvent(model, player.events[player.applied++]); sync(performance.now(), false, null); if (model.last) followHop(model.last.hop, true); chrome(); }
   function play() {
+    if (continuation) {
+      player.playing = !player.playing;
+      clearTimeout(player.timer); player.timer = 0;
+      if (player.playing) pumpContinuation();
+      chrome(); return;
+    }
     if (receivedDone) {
       if (player.playing) { player.playing = false; clearTimeout(player.timer); chrome(); return; }
       if (!projected || cursor >= history.timeline().frames.length) projectTo(0, false);
@@ -1057,6 +1079,13 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   }
   // 건너뛰기: 받은 데까지 바로 보여 주고, 남은 사건은 도착하는 대로 기다림 없이 반영한다
   function skip() {
+    if (continuation) {
+      clearTimeout(player.timer); player.timer = 0;
+      projectTo(history.timeline().frames.length, false);
+      player.fast = !player.serverDone; player.playing = !player.serverDone;
+      if (player.serverDone) continuation = false;
+      fitAll(true); chrome(); return;
+    }
     if (receivedDone && !player.source) { projectTo(history.timeline().frames.length, false); fitAll(true); return; }
     clearTimeout(player.timer);
     clearTimeout(player.arrive);
@@ -1284,7 +1313,11 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     const fingerprint = JSON.stringify([chapters, cursor]);
     if (strip.dataset.projection === fingerprint) return;
     strip.dataset.projection = fingerprint; strip.replaceChildren();
-    const titles = new Map(history.project(timeline.frames.length).projection.cards.map(card => [card.cardId, card.title]));
+    // Chapter labels need titles, not a second full projection of the future.
+    const titles = new Map();
+    for (const frame of timeline.frames) for (const event of frame.events) {
+      for (const card of event.data?.candidates ?? event.response?.neighbors ?? []) titles.set(card.card_id, card.title);
+    }
     for (const [number, chapter] of chapters.entries()) {
       const button = document.createElement('button'); button.type = 'button';
       const index = timeline.frames.findLastIndex(frame => chapter.frameIds.includes(frame.id)) + 1;
@@ -1364,7 +1397,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     const calls = new Map([...model.calls.values(), ...operations.flatMap(op => op.auditCalls)].filter(call => JEV.has(call.stage)).map(call => [call.call_id, call]));
     const active = operations.find(op => op.status === 'running');
     const waiting = active && (active.kind === 'evaluate' ? active.requestedCardIds : active.fromCardId === null ? active.resultCardIds : []).some(id => !model.exploration.evaluations.has(id));
-    const duration = model.run && model.done ? Math.max(0, Date.parse(model.done.completed_at) - Date.parse(model.run.started_at)) : 0;
+    const duration = model.searchDurationMs ?? (model.run && model.done ? Math.max(0, Date.parse(model.done.completed_at) - Date.parse(model.run.started_at)) : 0);
     const extra = operations.flatMap(op => op.auditCalls).reduce((sum, call) => sum + (call.latency_ms ?? 0), 0);
     $('sum-time').textContent = tr('visual_search.seconds', { value: ((duration + extra) / 1000 || 0).toFixed(1) });
     $('sum-jev').textContent = ', ' + tr('visual_search.jev_calls', { count: calls.size + (waiting ? 1 : 0) });
@@ -1691,7 +1724,9 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       if (resume) {
         if (!projected) skip();
         history.truncate(cursor); history.begin(query, { resume: true });
-        continuation = true; revision += 1; player.serverDone = false; chrome(); return;
+        continuation = true; revision += 1;
+        clearTimeout(player.timer); player.timer = 0; player.serverDone = false; player.playing = true; player.fast = false;
+        setFollow(true); chrome(); return;
       }
       history.begin(query); projected = false; cursor = 0; selectedRef = null; initialStopReason = null; continued = false; receivedDone = false; continuation = false; revision += 1;
       live = true; lastQuery = query;

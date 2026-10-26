@@ -39,7 +39,8 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
   const operationRef = useRef<(kind: 'expand' | 'evaluate' | 'query', snapshot: OperationSnapshot, retryId?: string) => void>(() => {});
   const retryRef = useRef<() => void>(() => {});
   useEffect(() => queryClient?.getQueryCache().subscribe(event => {
-    if (['tree', 'children', 'node'].includes(String(event.query.queryKey[0]))) player.current?.refreshPaths?.();
+    if (event.type === 'updated' && event.action.type === 'success'
+      && ['tree', 'children', 'node'].includes(String(event.query.queryKey[0]))) player.current?.refreshPaths?.();
   }), [queryClient]);
 
   useEffect(() => { callbacks.current = { onSelectNode, onResults, onSummary, onOpenInTree, t }; requestRef.current = request; });

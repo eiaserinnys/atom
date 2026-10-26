@@ -106,6 +106,9 @@ function materialize(scene, exploration) {
 export function createExplorationSession() {
   let entries = []; let query = ''; let revision = 0; let serial = 0;
   let selections = [];
+  // Keep one folded prefix. Forward playback only reduces the newly visible frames;
+  // rewinds and edits rebuild from the event log, which remains the source of truth.
+  let folded = null;
   function timeline() {
     const frames = []; const operations = [];
     for (const entry of entries) {
@@ -130,10 +133,14 @@ export function createExplorationSession() {
     return { frames, operations, operationEvents: entries.flatMap(e => e.type === 'operation' ? e.events : []) };
   }
   function project(cursor, evaluating = false) {
-    let scene = createModel(); let exploration = null;
-    const searchModels = new Map();
     const frames = timeline().frames.slice(0, cursor);
-    for (const frame of frames) {
+    const previous = folded && frames[folded.cursor - 1];
+    if (!folded || evaluating || folded.evaluating || frames.length < folded.cursor
+      || (folded.cursor && (previous?.id !== folded.frameId || previous.events.length !== folded.eventCount))) {
+      folded = { scene: createModel(), exploration: null, searchModels: new Map(), cursor: 0 };
+    }
+    let { scene, exploration, searchModels } = folded;
+    for (const frame of frames.slice(folded.cursor)) {
       if (frame.entry.type === 'search') {
         const segment = searchModels.get(frame.segmentId) ?? createModel();
         for (const event of frame.events) applyEvent(segment, event);
@@ -153,13 +160,20 @@ export function createExplorationSession() {
       }
     }
     if (!exploration) exploration = createExplorationModel({ query, selectionThreshold: null, initialCards: [] });
-    const result = materialize(scene, exploration);
+    folded = { scene, exploration, searchModels, cursor: frames.length, frameId: frames.at(-1)?.id,
+      eventCount: frames.at(-1)?.events.length, evaluating };
+    // Materialization adds display columns and resolves display paths. Never put those
+    // mutations back into the search reducer's scene.
+    const result = materialize({ ...scene, nodes: new Map(scene.nodes), order: [...scene.order], calls: new Map(scene.calls) }, exploration);
+    result.scene.searchDurationMs = [...searchModels.values()].reduce((sum, segment) => sum + (segment.done && segment.run
+      ? Math.max(0, Date.parse(segment.done.completed_at) - Date.parse(segment.run.started_at)) : 0), 0);
     const selectionFrame = frames.findLast(frame => selections.some(selection => selection.frameId === frame.id));
     const selected = selections.find(selection => selection.frameId === selectionFrame?.id);
     result.selectionCardId = selected && exploration.cards.has(selected.cardId) ? selected.cardId : null;
     return result;
   }
   function truncate(cursor) {
+    folded = null;
     const frames = timeline().frames.slice(0, cursor);
     selections = selections.filter(selection => frames.some(frame => frame.id === selection.frameId));
     entries = entries.flatMap(entry => {
@@ -171,7 +185,7 @@ export function createExplorationSession() {
   }
   return {
     begin(text, { resume = false } = {}) {
-      if (!resume) { entries = []; selections = []; query = text; revision += 1; }
+      if (!resume) { entries = []; selections = []; query = text; revision += 1; folded = null; }
       const id = `search-${++serial}`;
       entries.push({ type: 'search', id, events: [] });
     },
@@ -187,7 +201,7 @@ export function createExplorationSession() {
     },
     timeline, project, truncate,
     exportLog() { return structuredClone({ entries, query, revision, serial, selections }); },
-    restoreLog(log) { ({ entries, query, revision, serial, selections } = structuredClone(log)); },
+    restoreLog(log) { ({ entries, query, revision, serial, selections } = structuredClone(log)); folded = null; },
     chapters() { return groupExplorationChapters(timeline()); },
     get revision() { return revision; },
   };
