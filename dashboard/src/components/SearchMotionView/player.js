@@ -3,6 +3,7 @@
 import { createModel, applyEvent } from "./model.js";
 import { createExplorationSession } from './exploration-session.js';
 import { nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
+import { motionIcon } from './motion-icons.js';
 
 export function createMotionPlayer(root, callbacks, samples) {
   let disposed = false;
@@ -1267,8 +1268,15 @@ export function createMotionPlayer(root, callbacks, samples) {
     const needsEvaluation = state.evaluationTargetCardIds.some(id => !state.cachedEvaluations.has(id) || (state.cachedEvaluations.get(id).score >= state.selectionThreshold && !state.resultOrder.includes(id)));
     $('node-evaluate').disabled = disabled || !needsEvaluation;
     $('node-tree').disabled = !live;
-    $('node-expand').textContent = tr('visual_search.expand');
-    $('node-evaluate').textContent = tr(state.activeOperation?.kind === 'evaluate' || state.activeOperation?.fromCardId === null ? 'visual_search.evaluating' : 'visual_search.evaluate');
+    const label = (id, icon, text) => {
+      const button = $(id);
+      if (button.dataset.label === text) return;
+      button.dataset.label = text; button.innerHTML = motionIcon(icon);
+      const span = document.createElement('span'); span.textContent = text; button.append(span);
+    };
+    label('node-expand', 'expand', tr('visual_search.expand'));
+    label('node-evaluate', 'evaluate', tr(state.activeOperation?.kind === 'evaluate' || state.activeOperation?.fromCardId === null ? 'visual_search.evaluating' : 'visual_search.evaluate'));
+    if (!$('node-tree').querySelector('svg')) $('node-tree').innerHTML = motionIcon('tree');
     $('node-tree').setAttribute('aria-label', tr('visual_search.open_tree'));
     if (actionWidth !== group.offsetWidth) { actionWidth = group.offsetWidth; sync(performance.now(), false, null); invalidate(); }
     if (cam.mode === 'idle' && sy + M.rowH * cam.z + M.actionGap + group.offsetHeight > H - overlayRoom()) ensureVisible(selectedRef);
