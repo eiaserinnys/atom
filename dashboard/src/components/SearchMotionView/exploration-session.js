@@ -23,12 +23,15 @@ function mergeSearch(exploration, segment, id, label, scene) {
   let column = exploration.columns.find(c => c.id === id);
   if (!column) { column = { id, label, cardIds: [], referenceIds: [] }; exploration.columns.push(column); }
   for (const input of initialCards(segment, label)) {
-    if (exploration.cards.has(input.card_id)) continue;
+    const existing = exploration.cards.get(input.card_id);
+    if (existing && existing.displayColumnId !== id) continue;
     const card = { ...input, cardId: input.card_id, nodeId: input.node_id, cardType: input.card_type,
-      displayColumnId: id, columnLabel: label, discoveryOrder: exploration.nextDiscoveryOrder++, initialScore: input.score };
+      displayColumnId: id, columnLabel: label, discoveryOrder: existing?.discoveryOrder ?? exploration.nextDiscoveryOrder++, initialScore: input.score };
     // Continuations have their own namespace. Their original topology stays in the segment trace.
-    card.renderNode = { ...input.renderNode, ref: `${id}:${input.renderNode.ref}`, parent: null, climbFrom: [], hop: scene.maxHop + 1 };
-    exploration.cards.set(card.cardId, card); exploration.cardOrder.push(card.cardId); column.cardIds.push(card.cardId);
+    card.renderNode = { ...input.renderNode, ref: `${id}:${input.renderNode.ref}`, parent: null, climbFrom: [], hop: scene.maxHop + 1,
+      asked: input.renderNode.asked ? { ...input.renderNode.asked, step: `${id}:${input.renderNode.asked.step}` } : null };
+    exploration.cards.set(card.cardId, card);
+    if (!existing) { exploration.cardOrder.push(card.cardId); column.cardIds.push(card.cardId); }
     if (input.initial_evaluation) exploration.evaluationCache.set(card.cardId, {
       score: input.initial_evaluation.score, callId: input.initial_evaluation.call_id,
       questionKey: input.initial_evaluation.question_key, origin: 'initial_content', operationId: null,
@@ -62,7 +65,7 @@ function materialize(scene, exploration) {
       similarity: card.similarity, sameBranch: card.tree_relation?.same_top_level_branch ?? false,
       fromRef: operation?.fromCardId ? refs.get(operation.fromCardId) : null,
       selected: card.selected, rank: card.rank ?? 0, score: card.score,
-      verdict: card.score == null ? original?.verdict ?? 'pending' : card.score >= exploration.selectionThreshold ? 'hit' : 'low',
+      verdict: original?.verdict ?? (card.score == null ? 'pending' : card.score >= exploration.selectionThreshold ? 'hit' : 'low'),
       evaluation: card.evaluation,
       layoutScore: original?.score,
     };
@@ -84,6 +87,8 @@ function materialize(scene, exploration) {
     const ref = row.id;
     scene.nodes.set(ref, { ...target, ...blankNode(), ref, cardId: null, origin: 'reference',
       referenceTarget: targetRef, hop, fromRef: refs.get(row.fromCardId), similarity: row.similarity,
+      displayColumn: row.columnId, sameBranch: row.tree_relation?.same_top_level_branch ?? false,
+      arrivalOperationId: row.operationId,
       selected: false, rank: target.rank, columnLabel: row.label, order: scene.order.length });
     scene.order.push(ref); scene.columnLabels.set(hop, row.label);
   }
@@ -161,7 +166,7 @@ export function createExplorationSession() {
     },
     receive(event) { entries.at(-1).events.push(event); },
     apply(event) {
-      if (event.type === 'started') entries.push({ type: 'operation', id: event.id, events: [] });
+      if (event.type === 'started' && !entries.some(entry => entry.id === event.id)) entries.push({ type: 'operation', id: event.id, events: [] });
       entries.find(entry => entry.id === (event.operationId ?? event.id))?.events.push(event);
     },
     timeline, project, truncate,

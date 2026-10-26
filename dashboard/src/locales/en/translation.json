@@ -16,6 +16,8 @@
     "entry": "Entry",
     "hop": "Hop {{count}}",
     "empty": "No new candidates",
+    "relevance_above": "At or above selection threshold {{threshold}}",
+    "relevance_below": "Below selection threshold {{threshold}}",
     "error": "Exploration could not finish. ({{code}})",
     "retry": "Retry"
   },

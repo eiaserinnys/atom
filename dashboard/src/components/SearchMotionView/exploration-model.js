@@ -109,6 +109,10 @@ export function applyExplorationEvent(model, event) {
   const next = cloneModel(model);
   if (event.type === 'started') {
     const index = operationIndex(next, event.id);
+    if (index >= 0) {
+      next.operations[index].status = 'running'; next.operations[index].errorCode = null;
+      return next;
+    }
     const operation = {
       id: event.id,
       kind: event.kind,
@@ -133,8 +137,6 @@ export function applyExplorationEvent(model, event) {
   const operationPosition = operationIndex(next, event.operationId);
   if (event.type === 'index_loading') {
     operation.loadingIndex = true;
-  } else if (event.type === 'evaluation_retry_started') {
-    operation.status = 'running'; operation.errorCode = null;
   } else if (event.type === 'expansion_succeeded') {
     const queryExpansion = operation.fromCardId === null;
     const count = next.operations.slice(0, operationPosition + 1)
@@ -215,6 +217,7 @@ export function applyExplorationEvent(model, event) {
     operation.auditCalls.push(...(response.audit?.calls ?? []));
     for (const result of response.results ?? []) addAccepted(next, operation, result.card_id);
   } else if (event.type === 'failed') {
+    finishOperation(next, operation);
     operation.status = 'failed';
     operation.errorCode = event.errorCode;
     operation.auditCalls.push(...(event.auditCalls ?? []));

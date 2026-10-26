@@ -1,5 +1,6 @@
 import type {
   EvaluationResponse,
+  JevAuditCall,
   VisualSearchNeighborsResponse,
 } from '../components/SearchMotionView/operation-types';
 
@@ -8,6 +9,7 @@ export interface VisualSearchApiError {
   key_configured?: boolean;
   status?: 'loading';
   retry_after_ms?: number;
+  audit?: { calls: JevAuditCall[] };
 }
 
 export interface VisualSearchApiResult<T> {

@@ -16,6 +16,8 @@
     "entry": "입구",
     "hop": "홉 {{count}}",
     "empty": "새 후보 없음",
+    "relevance_above": "선정 기준 {{threshold}} 이상",
+    "relevance_below": "선정 기준 {{threshold}} 미만",
     "error": "탐색을 완료하지 못했습니다. ({{code}})",
     "retry": "다시 시도"
   },

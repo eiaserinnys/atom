@@ -1,6 +1,10 @@
 import { visualSearchApi, type VisualSearchApiResult, type VisualSearchApiError } from '../../api/visualSearchApi';
 import type { MotionPlayer } from './player.js';
-import type { EvaluationResponse, OperationRecord, OperationSnapshot, VisualOperationEvent, VisualSearchNeighborsResponse } from './operation-types';
+import type { EvaluationResponse, JevAuditCall, OperationRecord, OperationSnapshot, VisualOperationEvent, VisualSearchNeighborsResponse } from './operation-types';
+
+class OperationApiError extends Error {
+  constructor(code: string, readonly auditCalls: JevAuditCall[]) { super(code); }
+}
 
 function waitForIndex(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -13,7 +17,10 @@ function waitForIndex(ms: number, signal: AbortSignal) {
 }
 
 function unwrap<T>(result: VisualSearchApiResult<T>): T {
-  if (result.status !== 200) throw new Error((result.body as VisualSearchApiError).error?.code ?? 'VISUAL_SEARCH_FAILED');
+  if (result.status !== 200) {
+    const body = result.body as VisualSearchApiError;
+    throw new OperationApiError(body.error?.code ?? 'VISUAL_SEARCH_FAILED', body.audit?.calls ?? []);
+  }
   return result.body as T;
 }
 
@@ -22,10 +29,11 @@ export async function runVisualOperation(
   signal: AbortSignal, api = visualSearchApi, retry?: OperationRecord,
 ) {
   const id = retry?.id ?? crypto.randomUUID();
-  if (retry) player.applyOperation({ type: 'evaluation_retry_started', operationId: id });
+  if (retry) player.applyOperation({ type: 'started', id, kind: retry.kind,
+    fromCardId: retry.fromCardId, query: retry.query, viaOperationId: retry.viaOperationId, requestedCardIds: retry.requestedCardIds });
   else player.applyOperation({ type: 'started', id, kind: kind === 'evaluate' ? 'evaluate' : 'expand',
     fromCardId: kind === 'query' ? null : snapshot.selectedCardId, query: kind === 'query' ? snapshot.query : null,
-    viaOperationId: kind === 'evaluate' ? snapshot.operations.findLast(op => op.kind === 'expand' && op.fromCardId === snapshot.selectedCardId)?.id ?? null : null,
+    viaOperationId: snapshot.selectedArrivalOperationId,
     requestedCardIds: kind === 'evaluate' ? snapshot.evaluationTargetCardIds : [],
   });
   const revision = player.getSnapshot().revision;
@@ -63,7 +71,7 @@ export async function runVisualOperation(
   } catch (cause) {
     if (signal.aborted || player.getSnapshot().revision !== revision) return;
     const code = cause instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(cause.message) ? cause.message : 'VISUAL_SEARCH_FAILED';
-    apply({ type: 'failed', operationId: id, errorCode: code });
+    apply({ type: 'failed', operationId: id, errorCode: code, auditCalls: cause instanceof OperationApiError ? cause.auditCalls : [] });
     return { code, retry: evaluationOnly || kind === 'evaluate' ? id : null };
   }
 }

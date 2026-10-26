@@ -126,4 +126,19 @@ describe('exploration model', () => {
     expect(view.references).toEqual([expect.objectContaining({ fromCardId: null, toCardId: A, similarity: 0.9 })]);
     expect(view.resultOrder).toEqual([]);
   });
+
+  test('a later evaluation failure preserves candidates already accepted from cached content', () => {
+    let model = createExplorationModel({ query: 'original', selectionThreshold: .5, initialCards: [
+      card(A, 'node-a', { selected: true, rank: 1, score: .9 }),
+      card(X, 'node-x', { initial_evaluation: { score: .8 } }),
+    ] });
+    model = applyExplorationEvent(model, started('expand', A, 'expand'));
+    model = applyExplorationEvent(model, { type: 'expansion_succeeded', operationId: 'expand', response: { neighbors: [card(X, 'node-x')] } });
+    model = applyExplorationEvent(model, { type: 'completed', operationId: 'expand' });
+    model = applyExplorationEvent(model, started('evaluate', A, 'evaluate', [X]));
+    model = applyExplorationEvent(model, { type: 'evaluations_reused', operationId: 'evaluate', cardIds: [X] });
+    model = applyExplorationEvent(model, { type: 'failed', operationId: 'evaluate', errorCode: 'JEV_EVALUATION_BUSY' });
+    expect(projectExploration(model).resultOrder).toEqual([A, X]);
+    expect(projectExploration(model).operations.at(-1)?.status).toBe('failed');
+  });
 });

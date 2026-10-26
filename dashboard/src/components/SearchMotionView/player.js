@@ -22,6 +22,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   let cursor = 0;
   let projected = false;
   let selectedRef = null;
+  let selectedArrival = null;
   let initialStopReason = null;
   let continued = false;
   let receivedDone = false;
@@ -623,7 +624,8 @@ export function createMotionPlayer(root, callbacks, samples) {
     ctx.globalAlpha = v.a;
     if (n.referenceTarget) {
       ctx.globalAlpha = v.a * 0.45; ctx.font = wfont(500, 14); ctx.fillStyle = css(T.ink2); ctx.textBaseline = 'middle';
-      ctx.fillText(fitText(`↗ ${n.rank ? '#' + n.rank + ' ' : ''}${n.title}`, w - 16, wfont(500, 14)), x + 8, y + h / 2);
+      ctx.fillText(fitText(`↗ ${n.rank ? '#' + n.rank + ' ' : ''}${n.title}`, w - 64, wfont(500, 14)), x + 8, y + h / 2);
+      if (n.score != null) { ctx.font = wfont(500, 13); ctx.textAlign = 'right'; ctx.fillText(n.score.toFixed(2), x + w - 8, y + h / 2); ctx.textAlign = 'left'; }
       ctx.globalAlpha = 1; v.a = va; return;
     }
     rr(x, y, w, h, 5);
@@ -761,7 +763,7 @@ export function createMotionPlayer(root, callbacks, samples) {
         if (f.hop !== c.hop || !JEV.has(f.stage)) continue;
         ctx.globalAlpha = playing() ? 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now / 130 + k * 1.3)) : 0.9; ctx.fillStyle = css(T.jev); ctx.beginPath(); ctx.arc(dx + 3, cy, 3.4, 0, 6.2832); ctx.fill(); dx += 11; k += 1;
       }
-      if (model.exploration?.operations.some(op => op.status === 'running' && model.columnLabels?.get(c.hop) === model.exploration.columns.find(col => col.id === (op.viaOperationId || op.id))?.label)) {
+      if (model.exploration && [...model.nodes.values()].some(n => n.hop === c.hop && model.exploration.operations.some(op => op.id === n.judging && op.status === 'running'))) {
         ctx.fillStyle = css(T.jev); ctx.beginPath(); ctx.arc(dx + 3, cy, 3.4, 0, 6.2832); ctx.fill();
       }
       const g = view.gauges.get(c.hop);
@@ -1166,6 +1168,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     projected = true; cursor = clamp(position, 0, history.timeline().frames.length);
     const result = history.project(cursor, evaluating); model = result.scene;
     if (selectedRef && !model.nodes.has(selectedRef)) selectedRef = null;
+    if (selectedArrival && !model.exploration.operations.some(op => op.id === selectedArrival)) selectedArrival = null;
     sync(performance.now(), animate, null);
     dashboard.syncSearchOutcome(model, sentText, verdictOf);
     renderResultTray();
@@ -1189,7 +1192,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       resultOrder: projection?.resultOrder ?? [],
       graphCardIds: projection?.cards.map(card => card.cardId) ?? [],
       cachedEvaluations: projection?.evaluations ?? new Map(),
-      selectedArrivalOperationId: selected?.displayColumn ?? null,
+      selectedArrivalOperationId: selectedArrival,
       continueSearch: initialStopReason === 'sufficient' && !continued,
     };
   }
@@ -1228,7 +1231,8 @@ export function createMotionPlayer(root, callbacks, samples) {
     const expanded = state.operations.some(op => op.kind === 'expand' && op.fromCardId === n.cardId && op.status === 'succeeded');
     const disabled = !live || !state.initialSearchComplete || !!state.activeOperation || continuation;
     $('node-expand').disabled = disabled || expanded;
-    $('node-evaluate').disabled = disabled || !state.evaluationTargetCardIds.length;
+    const needsEvaluation = state.evaluationTargetCardIds.some(id => !state.cachedEvaluations.has(id) || (state.cachedEvaluations.get(id).score >= state.selectionThreshold && !state.resultOrder.includes(id)));
+    $('node-evaluate').disabled = disabled || !needsEvaluation;
     $('node-tree').disabled = !live;
     $('node-expand').textContent = tr('visual_search.expand');
     $('node-evaluate').textContent = tr(state.activeOperation?.kind === 'evaluate' || state.activeOperation?.fromCardId === null ? 'visual_search.evaluating' : 'visual_search.evaluate');
@@ -1274,6 +1278,10 @@ export function createMotionPlayer(root, callbacks, samples) {
     const th = (model.policy && model.policy.structure_threshold) ?? 0.5; const sc = n.score != null ? n.score.toFixed(2) : "";
     if (n.type === "root") return { score: "", word: "루트에서 그물을 넓힘", ok: true };
     if (n.selected) return { score: sc, word: `선정 ${n.rank}`, ok: true };
+    if (n.evaluation?.origin === 'manual_content') {
+      const threshold = model.exploration.selectionThreshold;
+      return { score: sc, word: tr(n.score >= threshold ? 'visual_search.relevance_above' : 'visual_search.relevance_below', { threshold: threshold.toFixed(2) }), ok: n.score >= threshold };
+    }
     if (n.byHit) return { score: "", word: "맞은 카드의 윗구조라 묻지 않고 엶", ok: true };
     if (n.byRoot) return { score: "", word: "최상위라 묻지 않고 엶", ok: true };
     if (n.verdict === "open") return { score: sc, word: `열림 (${th.toFixed(2)} 이상)`, ok: true };
@@ -1354,15 +1362,16 @@ export function createMotionPlayer(root, callbacks, samples) {
   // 원문 자리. 시안에서는 본문 대신 자리만 보여 준다
   const sheet = $("sheet"); let sheetOpener = null; let sheetRef = null;
   const sheetInset = () => (sheet.classList.contains("open") && W >= 720 ? sheet.offsetWidth : 0);
-  function openSheet(ref, opener) {
+  function openSheet(ref, opener, arrival) {
     const n = model.nodes.get(ref); if (!n || n.type === "root") return;
     if (n.referenceTarget) {
       const pile = view.L.hidden.get(n.referenceTarget);
       if (pile) ui.expanded.add(pile);
       sync(performance.now(), false, null);
-      openSheet(n.referenceTarget, opener); return;
+      openSheet(n.referenceTarget, opener, n.arrivalOperationId); return;
     }
     selectedRef = ref;
+    selectedArrival = arrival ?? [...(model.exploration?.operations ?? [])].reverse().find(op => op.kind === 'expand' && op.status === 'succeeded' && op.resultCardIds.includes(n.cardId))?.id ?? null;
     sync(performance.now(), false, null);
     const chips = [...$("tray").querySelectorAll(".rchip")];
     const index = chips.findIndex(c => c.dataset.nodeId === n.nodeId);

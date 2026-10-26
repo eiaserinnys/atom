@@ -94,7 +94,6 @@ export interface VisualOperationStarted {
 export type VisualOperationEvent =
   | VisualOperationStarted
   | { type: 'index_loading'; operationId: string }
-  | { type: 'evaluation_retry_started'; operationId: string }
   | { type: 'expansion_succeeded'; operationId: string; response: VisualSearchNeighborsResponse }
   | { type: 'evaluations_reused'; operationId: string; cardIds: string[] }
   | { type: 'evaluation_batch_succeeded'; operationId: string; response: EvaluationResponse }

@@ -42,3 +42,38 @@ test('preserves first positions and ranks when an exhaustive search segment repe
   expect(after.projection.cards.map(n => [n.cardId, n.renderNode?.ref, n.columnLabel])).toEqual(before.projection.cards.map(n => [n.cardId, n.renderNode?.ref, n.columnLabel]));
   expect(session.timeline().frames.length).toBe(26);
 });
+
+test('a continuation card displays the evidence from its own search segment', () => {
+  const session = createExplorationSession(); session.begin('query');
+  samples.atom.forEach(event => session.receive(event));
+  const events: any[] = structuredClone(samples.atom);
+  const candidate = events.find(event => event.event === 'step_completed' && event.data.candidates.length)?.data.candidates[0];
+  candidate.card_id = 'continuation-only'; candidate.node_id = 'continuation-node';
+  for (const event of events) {
+    if (event.data.call?.stage === 'content_noul') {
+      for (const question of Object.values(event.data.call.request.questions) as any[]) question.instructions = 'Evidence from continued search';
+    }
+  }
+  session.begin('query', { resume: true }); events.forEach(event => session.receive(event));
+  const { scene } = session.project(session.timeline().frames.length);
+  const node = [...scene.nodes.values()].find((node: any) => node.cardId === 'continuation-only');
+  const question = scene.calls.get(node.asked.step)?.request.questions[node.asked.key];
+  expect(question?.instructions).toBe('Evidence from continued search');
+});
+
+test('content relevance never changes an existing structure traversal verdict', () => {
+  const session = createExplorationSession(); session.begin('query');
+  samples.atom.forEach(event => session.receive(event));
+  const { scene: initial } = session.project(session.timeline().frames.length);
+  const target: any = [...initial.nodes.values()].find((node: any) => node.cardId && node.type === 'structure' && node.verdict === 'open');
+  const source: any = [...initial.nodes.values()].find((node: any) => node.cardId && node.type === 'knowledge');
+  session.apply({ type: 'started', id: 'expand', kind: 'expand', fromCardId: source.cardId });
+  session.apply({ type: 'expansion_succeeded', operationId: 'expand', response: { neighbors: [{ card_id: target.cardId, node_id: target.nodeId, card_type: 'structure', title: target.title, path: [], similarity: .8, tree_relation: null }] } });
+  session.apply({ type: 'completed', operationId: 'expand' });
+  session.apply({ type: 'started', id: 'evaluate', kind: 'evaluate', fromCardId: source.cardId, requestedCardIds: [target.cardId] });
+  session.apply({ type: 'evaluation_batch_succeeded', operationId: 'evaluate', response: { results: [{ card_id: target.cardId, score: .1 }], audit: { calls: [] } } });
+  session.apply({ type: 'completed', operationId: 'evaluate' });
+  const node = session.project(session.timeline().frames.length).scene.nodes.get(target.ref);
+  expect(node.score).toBe(.1);
+  expect(node.verdict).toBe('open');
+});

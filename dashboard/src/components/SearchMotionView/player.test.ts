@@ -53,7 +53,8 @@ test('selection exposes DOM operations, repeated cards become references, and re
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D);
   vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
   HTMLElement.prototype.scrollTo = vi.fn();
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1200, 800));
   const host = document.createElement('div'); host.innerHTML = markup; document.body.append(host);
@@ -65,6 +66,7 @@ test('selection exposes DOM operations, repeated cards become references, and re
     (samples.atom as unknown as MotionEvent[]).forEach(event => player.receive(event.event === 'done' ? { ...event, data: { ...event.data, stop_reason: 'exhausted' } } : event));
     const plot = button('plot'); plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    frames.shift()?.(performance.now());
     expect(button('node-actions').hidden).toBe(false);
     expect(button('node-expand').disabled).toBe(false);
     expect(button('node-evaluate').disabled).toBe(true);
@@ -72,7 +74,10 @@ test('selection exposes DOM operations, repeated cards become references, and re
     expect(operation).toHaveBeenCalledWith('expand', expect.objectContaining({ selectedCardId: expect.any(String) }));
     const source = player.getSnapshot().selectedCardId!;
     player.applyOperation({ type: 'started', id: 'e', kind: 'expand', fromCardId: source, query: null, viaOperationId: null, requestedCardIds: [] });
-    player.applyOperation({ type: 'expansion_succeeded', operationId: 'e', response: { status: 'ready', model: 'text-embedding-3-large', dimensions: 3072, key_configured: true, index: { indexed_cards: 1 }, neighbors: [{ card_id: source, node_id: 'alias', card_type: 'knowledge', title: 'Repeated', similarity: .8, excerpt: '', path: [], tree_relation: null }] } });
+    player.applyOperation({ type: 'expansion_succeeded', operationId: 'e', response: { status: 'ready', model: 'text-embedding-3-large', dimensions: 3072, key_configured: true, index: { indexed_cards: 2 }, neighbors: [
+      { card_id: source, node_id: 'alias', card_type: 'knowledge', title: 'Repeated', similarity: .8, excerpt: '', path: [], tree_relation: null },
+      { card_id: 'new-card', node_id: 'new-node', card_type: 'knowledge', title: 'New card', similarity: .7, excerpt: '', path: [], tree_relation: null },
+    ] } });
     player.applyOperation({ type: 'completed', operationId: 'e' });
     expect(button('node-expand').disabled).toBe(true);
     expect(button('node-evaluate').disabled).toBe(false);

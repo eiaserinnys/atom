@@ -10,6 +10,7 @@ function setup() {
   const history = createExplorationSession(); history.begin('original');
   samples.atom.forEach(event => history.receive(event));
   let revision = 0;
+  const eventTypes: string[] = [];
   const player = {
     getSnapshot(): OperationSnapshot {
       const { projection } = history.project(history.timeline().frames.length);
@@ -27,6 +28,7 @@ function setup() {
     applyOperation(event: any, expected?: number) {
       if (expected != null && expected !== revision) return false;
       if (event.type === 'started') revision++;
+      eventTypes.push(event.type);
       history.apply(event); return true;
     },
   } as MotionPlayer;
@@ -35,7 +37,7 @@ function setup() {
     expand: vi.fn().mockResolvedValue(response), neighbors: vi.fn().mockResolvedValue(response),
     evaluate: vi.fn().mockResolvedValue({ status: 200, body: { results: [{ card_id: 'new-card', score: .99 }], audit: { calls: [] } } }),
   } as unknown as typeof visualSearchApi;
-  return { player, api, history, branch: () => { revision++; } };
+  return { player, api, history, eventTypes, branch: () => { revision++; } };
 }
 
 test('query expansion excludes the whole graph, evaluates automatically and keeps two frames', async () => {
@@ -53,15 +55,20 @@ test('query expansion excludes the whole graph, evaluates automatically and keep
 });
 
 test('failed automatic evaluation preserves candidates and retry only evaluates', async () => {
-  const { player, api } = setup();
-  vi.mocked(api.evaluate).mockResolvedValueOnce({ status: 429, body: { error: { code: 'JEV_EVALUATION_BUSY' } } });
+  const { player, api, eventTypes } = setup();
+  const audit = { call_id: 'failed-call', run_id: 'evaluation', seq: 1, stage: 'content_noul', candidate_count: 1,
+    disposition: 'error' as const, started_at: '', completed_at: null, latency_ms: null, usage: null,
+    request: {}, response: null, error: { code: 'JEV_UPSTREAM_UNAVAILABLE', message: 'Unavailable' } };
+  vi.mocked(api.evaluate).mockResolvedValueOnce({ status: 429, body: { error: { code: 'JEV_EVALUATION_BUSY' }, audit: { calls: [audit] } } });
   const failure = await runVisualOperation(player, 'query', player.getSnapshot(), new AbortController().signal, api);
   expect(failure?.code).toBe('JEV_EVALUATION_BUSY');
   expect(player.getSnapshot().graphCardIds).toContain('new-card');
+  expect(player.getSnapshot().operations.at(-1)?.auditCalls).toEqual([audit]);
   const retry = player.getSnapshot().operations.find(op => op.id === failure?.retry)!;
   await runVisualOperation(player, 'query', player.getSnapshot(), new AbortController().signal, api, retry);
   expect(api.expand).toHaveBeenCalledTimes(1);
   expect(player.getSnapshot().resultOrder).toContain('new-card');
+  expect(eventTypes.every(type => ['started', 'index_loading', 'expansion_succeeded', 'evaluations_reused', 'evaluation_batch_succeeded', 'completed', 'failed'].includes(type))).toBe(true);
 });
 
 test('a response from a discarded branch cannot add cards to the current projection', async () => {
