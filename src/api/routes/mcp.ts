@@ -4,10 +4,17 @@ import { registerCardTools } from "../../mcp/tools/card_tools.js";
 import { registerTreeTools } from "../../mcp/tools/tree_tools.js";
 import { registerSearchTools } from "../../mcp/tools/search_tools.js";
 import { registerBatchTools } from "../../mcp/tools/batch_tools.js";
+import { registerExpansionTools } from "../../mcp/tools/expansion_tools.js";
+import { runConfiguredJevEvaluation } from "../../services/jev-search/evaluate.js";
+import type { NeighborService } from "../../services/embeddings/neighbors.js";
 import { agentKeyVerifier } from "../agent-key-auth.js";
-import type { FastifyInstance } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 
-export async function mcpRoutes(app: FastifyInstance): Promise<void> {
+export interface McpRoutesOptions {
+  neighborService: NeighborService;
+}
+
+export const mcpRoutes: FastifyPluginAsync<McpRoutesOptions> = async (app, { neighborService }) => {
   app.post("/mcp", async (request, reply) => {
     const secret = request.headers['x-api-key'] as string | undefined;
     if (!secret) {
@@ -25,6 +32,7 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
     registerTreeTools(server, agent.agent_id);
     registerSearchTools(server);
     registerBatchTools(server, agent.agent_id);
+    registerExpansionTools(server, { neighbors: neighborService, evaluate: runConfiguredJevEvaluation });
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless — 세션 없이 매 요청 독립 처리
@@ -33,4 +41,4 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
     await server.connect(transport);
     await transport.handleRequest(request.raw, reply.raw, request.body);
   });
-}
+};

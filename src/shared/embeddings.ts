@@ -30,6 +30,7 @@ export interface NeighborPathEntry {
 export interface CardNeighbor {
   card_id: string;
   node_id: string;
+  card_type: "structure" | "knowledge";
   title: string;
   similarity: number;
   excerpt: string;
@@ -50,6 +51,7 @@ export interface CardNeighborsResponse {
   source: {
     card_id: string;
     node_id: string;
+    card_type: "structure" | "knowledge";
     title: string;
     path: NeighborPathEntry[];
   };

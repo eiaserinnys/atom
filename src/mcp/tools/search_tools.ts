@@ -20,7 +20,7 @@ export function registerSearchTools(server: McpServer, overrides: Partial<Search
 
   server.tool(
     "search_cards",
-    "Full-text search across card titles and content using PostgreSQL BM25 ranking (ts_rank). Returns cards sorted by relevance. Set engine='jev' to opt into Jev structure and content judging. Jev returns a compact run summary by default; include_trace=true adds the full trace.\n\nQuery syntax (websearch_to_tsquery):\n- Plain text: 'quantum mechanics' → AND search\n- OR: 'quantum OR classical' → either keyword\n- Exact phrase: '\"quantum mechanics\"' → exact match\n- Exclude: 'quantum -classical' → exclude word\n\nDefault strategy: auto. If a long plain-language query has 4+ searchable terms and strict BM25 returns 0 rows, the service retries once with an OR query built from those terms. Explicit OR/AND, phrase, and exclude queries stay strict. Use strategy='strict' to disable the fallback.\n\nFilters (all optional, AND-combined with query):\n- tags: cards containing ALL specified tags\n- card_type: 'structure' or 'knowledge'\n- updated_after/updated_before: ISO 8601 timestamp range on updated_at\n- source_type: exact match (e.g. 'trello', 'github')\n\nEach result includes node_path: ancestor title array from root to parent (e.g. ['project', 'atom', 'TODO']). Empty array for orphan cards. Jev accepts query, root_node_id, limit, context, exhaustive, and include_trace; it does not use BM25 filters.",
+    "Full-text search across card titles and content using PostgreSQL BM25 ranking (ts_rank). Returns cards sorted by relevance. Set engine='jev' to opt into Jev structure and content judging. Jev returns a compact run summary by default; include_trace=true adds the full trace.\n\nQuery syntax (websearch_to_tsquery):\n- Plain text: 'quantum mechanics' → AND search\n- OR: 'quantum OR classical' → either keyword\n- Exact phrase: '\"quantum mechanics\"' → exact match\n- Exclude: 'quantum -classical' → exclude word\n\nDefault strategy: auto. If a long plain-language query has 4+ searchable terms and strict BM25 returns 0 rows, the service retries once with an OR query built from those terms. Explicit OR/AND, phrase, and exclude queries stay strict. Use strategy='strict' to disable the fallback.\n\nFilters (all optional, AND-combined with query):\n- tags: cards containing ALL specified tags\n- card_type: 'structure' or 'knowledge'\n- updated_after/updated_before: ISO 8601 timestamp range on updated_at\n- source_type: exact match (e.g. 'trello', 'github')\n\nEach result includes node_path: ancestor title array from root to parent (e.g. ['project', 'atom', 'TODO']). Empty array for orphan cards. Jev accepts query, root_node_id, limit, context, exhaustive, and include_trace; it does not use BM25 filters. After a Jev search, call get_card_neighbors for a selected card and evaluate_cards for the original query and returned card IDs.",
     {
       query: z.string().min(1).describe("Search query (required, non-empty). Natural language or tsquery syntax."),
       limit: z.number().int().positive().optional().describe("Max results to return (default 20 for BM25, 6 for Jev)."),
@@ -82,12 +82,14 @@ function compactResponse(response: JevSearchResponse): JevSearchCompactResponse 
   const { trace, ...run } = response;
   const jevCalls = trace.calls.filter(call => ["structure_noul", "content_noul", "sufficiency_noul"].includes(call.stage));
   const steps = trace.steps.filter(step => !["selection", "run_terminal"].includes(step.stage));
+  const selectionThreshold = trace.steps.filter(step => step.stage === "selection").at(-1)?.selection_threshold ?? null;
   return { ...run, summary: {
     jev_calls: jevCalls.length,
     input_tokens: jevCalls.reduce((sum, call) => sum + (call.usage?.input_tokens ?? 0), 0),
     elapsed_ms: Math.max(0, Date.parse(run.completed_at) - Date.parse(run.started_at)),
     hops: Math.max(0, ...steps.map(step => step.hop)),
     candidates: trace.candidates.length,
+    selection_threshold: selectionThreshold,
   } };
 }
 

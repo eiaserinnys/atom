@@ -16,6 +16,7 @@ import { agentKeyVerifier } from "../../src/api/agent-key-auth.js";
 import { cardApiRoutes } from "../../src/api/routes/card_api.js";
 import { configRoutes } from "../../src/api/routes/config.js";
 import { mcpRoutes } from "../../src/api/routes/mcp.js";
+import type { NeighborService } from "../../src/services/embeddings/neighbors.js";
 import { insertAgent, type Agent } from "../../src/db/queries/agents.js";
 
 setupIntegrationTestDb();
@@ -41,7 +42,11 @@ beforeEach(async () => {
   });
   await app.register(cardApiRoutes);
   await app.register(configRoutes);
-  await app.register(mcpRoutes);
+  const neighbors: NeighborService = {
+    get: async () => ({ statusCode: 503, body: { error: { code: "INDEX_UNAVAILABLE" } } }),
+    waitForLoad: async () => undefined,
+  };
+  await app.register(mcpRoutes, { neighborService: neighbors });
   // /mcp runs over a real socket: the MCP transport drains the raw request
   // stream and, under inject's fake socket, leaves a timer that crashes later.
   await app.listen({ port: 0, host: "127.0.0.1" });
@@ -57,29 +62,34 @@ function getTree(key: string) {
   return app.inject({ method: "GET", url: "/api/tree", headers: { "x-api-key": key } });
 }
 
-async function postMcp(key: string): Promise<{ statusCode: number }> {
+async function postMcp(key: string | null, method = "initialize"): Promise<{ statusCode: number; body: string }> {
   const address = app.server.address();
   if (address === null || typeof address === "string") throw new Error("server is not listening on TCP");
   const res = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
     method: "POST",
     headers: {
-      "x-api-key": key,
+      ...(key ? { "x-api-key": key } : {}),
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
-      method: "initialize",
-      params: {
+      method,
+      params: method === "initialize" ? {
         protocolVersion: "2025-03-26",
         capabilities: {},
         clientInfo: { name: "cache-test", version: "0" },
-      },
+      } : {},
     }),
   });
-  await res.text();
-  return { statusCode: res.status };
+  const body = await res.text();
+  return { statusCode: res.status, body };
+}
+
+function readRpcBody(body: string): any {
+  const dataLine = body.split("\n").find(line => line.startsWith("data: "));
+  return JSON.parse(dataLine ? dataLine.slice(6) : body);
 }
 
 describe("agent key verification cache", () => {
@@ -100,6 +110,15 @@ describe("agent key verification cache", () => {
     expect((await getTree(SECRET)).statusCode).toBe(200);
     expect((await postMcp(SECRET)).statusCode).toBe(200);
     expect(compareSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("lists all 17 MCP tools through the HTTP transport and rejects a missing key", async () => {
+    const response = await postMcp(SECRET, "tools/list");
+    expect(response.statusCode).toBe(200);
+    const tools = readRpcBody(response.body).result.tools as Array<{ name: string }>;
+    expect(tools).toHaveLength(17);
+    expect(tools.map(tool => tool.name)).toEqual(expect.arrayContaining(["get_card_neighbors", "evaluate_cards"]));
+    expect((await postMcp(null, "tools/list")).statusCode).toBe(401);
   });
 
   it("rejects a wrong key every time and never caches it", async () => {
