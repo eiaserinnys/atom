@@ -4,6 +4,8 @@ import type {
   VisualSearchNeighborsResponse,
 } from '../components/SearchMotionView/operation-types';
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+
 export interface VisualSearchApiError {
   error: { code: string; message?: string };
   key_configured?: boolean;
@@ -30,7 +32,7 @@ export interface EvaluationRequest {
 }
 
 async function fetchVisualSearch<T>(path: string, init: RequestInit): Promise<VisualSearchApiResult<T>> {
-  const response = await fetch(path, {
+  const response = await fetch(`${BASE_URL}${path}`, {
     credentials: 'same-origin',
     ...init,
     headers: {
