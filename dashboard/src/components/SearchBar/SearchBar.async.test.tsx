@@ -102,6 +102,23 @@ async function startWithDelayedSecondSearch() {
   return { ...ui, pending };
 }
 
+async function startWithScheduledSecondSearch() {
+  const search = vi.mocked(api.search);
+  search.mockResolvedValueOnce([initialResult]);
+  const ui = await mountSearchBar();
+
+  await changeInput(ui.input, 'first query');
+  await advanceSearchDebounce();
+  expect(resultButton(initialResult.title)).not.toBeNull();
+
+  const pending = deferred<SearchResult[]>();
+  search.mockReturnValueOnce(pending.promise);
+  await changeInput(ui.input, 'second query');
+  expect(search).toHaveBeenCalledTimes(1);
+
+  return { ...ui, pending };
+}
+
 describe('stale search responses', () => {
   test.each([
     ['Escape', async (input: HTMLInputElement) => {
@@ -126,6 +143,33 @@ describe('stale search responses', () => {
     expect(resultButton(lateResult.title)).toBeNull();
     expect(host.querySelector('form > div.absolute')).toBeNull();
   });
+
+  test.each(['Escape', 'outside click', 'selecting a result'] as const)(
+    '%s cancels a scheduled search before its debounce fires',
+    async (action) => {
+      const ui = await startWithScheduledSecondSearch();
+
+      if (action === 'Escape') {
+        await act(async () => ui.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+      } else if (action === 'outside click') {
+        await act(async () => outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+      } else {
+        await act(async () => resultButton(initialResult.title)!.click());
+        expect(ui.onSelectNode).toHaveBeenCalledWith(initialResult.node_id);
+        expect(ui.input.value).toBe('');
+      }
+
+      expect(host.querySelector('form > div.absolute')).toBeNull();
+      await advanceSearchDebounce();
+      expect(api.search).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        ui.pending.resolve([lateResult]);
+        await ui.pending.promise;
+      });
+      expect(resultButton(lateResult.title)).toBeNull();
+      expect(host.querySelector('form > div.absolute')).toBeNull();
+    },
+  );
 
   test('a new query invalidates the older response while its debounce is pending', async () => {
     const ui = await startWithDelayedSecondSearch();

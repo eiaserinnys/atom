@@ -40,14 +40,19 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
   const containerRef = useRef<HTMLFormElement>(null);
   const composingRef = useRef(false);
   const requestVersion = useRef(0);
+  const clearScheduledSearch = useCallback(() => {
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+  }, []);
   const invalidateSearch = useCallback(() => {
     requestVersion.current += 1;
   }, []);
   const closeResults = useCallback(() => {
+    clearScheduledSearch();
     invalidateSearch();
     setLoading(false);
     setOpen(false);
-  }, [invalidateSearch]);
+  }, [clearScheduledSearch, invalidateSearch]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -78,7 +83,7 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
   };
 
   const scheduleSearch = (nextQuery: string, draft: SearchFilterState = filterDraft) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    clearScheduledSearch();
     invalidateSearch();
     if (!nextQuery.trim()) {
       setResults([]);
@@ -88,6 +93,7 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
     }
 
     debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
       void runSearch(nextQuery, draft);
     }, 250);
   };
@@ -112,11 +118,11 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
     setResults([]);
   };
 
-  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); requestVersion.current += 1; }, []);
+  useEffect(() => () => { clearScheduledSearch(); requestVersion.current += 1; }, [clearScheduledSearch]);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (composingRef.current || !query.trim()) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    clearScheduledSearch();
     const filters = makeFilters();
     const { rootNodeId, ...bm25 } = filters;
     if (hasSearchFilters(bm25) || !onSubmitJevSearch) { void runSearch(query.trim()); return; }
