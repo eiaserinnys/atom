@@ -119,10 +119,10 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
 
   return (
     <form className="relative h-full w-full" ref={containerRef} onSubmit={submit}>
-      <div className="flex h-full w-full items-center bg-background px-3.5 gap-2.5 focus-within:ring-1 focus-within:ring-brand">
+      <div className="flex h-full w-full items-center bg-background px-3.5 gap-2.5">
         <Search size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
         <input
-          className="min-w-0 flex-1 bg-transparent border-none outline-none text-foreground text-[14px] font-sans py-2 placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 bg-transparent border-none outline-none text-foreground text-[14px] font-sans px-3 py-2 placeholder:text-muted-foreground"
           type="text"
           enterKeyHint="search"
           placeholder={t('searchbar.placeholder')}

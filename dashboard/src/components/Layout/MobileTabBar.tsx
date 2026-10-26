@@ -31,6 +31,7 @@ export function MobileTabBar({ activeTab, onTabChange, showSettings }: Props) {
         <button
           key={tab.id}
           role="tab" aria-selected={activeTab === tab.id}
+          aria-label={tab.id === 'search' ? t(tab.labelKey) : undefined}
           className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 pt-2 text-[13px] font-medium transition-colors ${
             activeTab === tab.id
               ? 'text-brand'
@@ -39,7 +40,7 @@ export function MobileTabBar({ activeTab, onTabChange, showSettings }: Props) {
           onClick={() => onTabChange(tab.id)}
         >
           <tab.icon className="w-4 h-4 shrink-0" strokeWidth={1.75} />
-          <span className="whitespace-nowrap truncate max-w-full px-1">{t(tab.labelKey)}</span>
+          <span className="whitespace-nowrap truncate max-w-full px-1">{t(tab.id === 'search' ? 'common.search' : tab.labelKey)}</span>
         </button>
       ))}
     </div>

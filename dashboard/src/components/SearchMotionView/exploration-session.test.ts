@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { createExplorationSession } from './exploration-session.js';
-import samples from './samples.json';
+import samples from './fixtures/samples.json';
 
 test('projects initial search and operations from the same prefix, truncates future cards and replays without requests', () => {
   const session = createExplorationSession();

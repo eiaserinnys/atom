@@ -1,4 +1,7 @@
 export interface MotionEvent { event: string; data: Record<string, unknown> }
+export class SearchStreamInterruptedError extends Error {
+  constructor() { super('Search stream ended before done.'); this.name = 'SearchStreamInterruptedError'; }
+}
 export interface SearchRequest { query: string; rootNodeId?: string; exhaustive?: boolean; requestId: number }
 export function searchUrl(query: string, options: { rootNodeId?: string; exhaustive?: boolean } = {}) {
   const params = new URLSearchParams({ q: query, engine: 'jev', stream: '1' });
@@ -36,7 +39,7 @@ export async function readSearchStream(body: ReadableStream<Uint8Array>, receive
       }
       if (chunk.done) break;
     }
-    if (!finished && !signal.aborted) throw new Error('검색 연결이 중단되었습니다. 다시 시도해 주세요.');
+    if (!finished && !signal.aborted) throw new SearchStreamInterruptedError();
   } finally {
     signal.removeEventListener('abort', cancel);
     reader.releaseLock();

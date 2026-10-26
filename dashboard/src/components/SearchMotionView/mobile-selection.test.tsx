@@ -28,10 +28,12 @@ test('graph selection stays in search, detail follows it, and only explicit tree
   try {
     await act(async () => root.render(<Harness />));
     await click('Choose node');
-    expect(host.querySelector('[role=tab][aria-selected=true]')!.textContent).toBe('mobile.tab_search');
+    const searchTab = host.querySelector('[role=tab][aria-selected=true]')!;
+    expect(searchTab.textContent).toBe('common.search');
+    expect(searchTab.getAttribute('aria-label')).toBe('mobile.tab_search');
     await click('mobile.tab_detail');
     expect(host.querySelector('[data-testid=detail]')!.textContent).toBe('chosen');
-    await click('mobile.tab_search');
+    await click('common.search');
     await click('Open tree');
     expect(reveal).toHaveBeenCalledWith('chosen');
     expect(host.querySelector('[role=tab][aria-selected=true]')!.textContent).toBe('mobile.tab_tree');

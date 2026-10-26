@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { createModel, applyEvent } from './model.js';
-import samples from './samples.json';
+import samples from './fixtures/samples.json';
 
 describe('approved r5 run reducer', () => {
   for (const [name, events] of Object.entries(samples)) test(`${name}: ordered events select the exact final result IDs/ranks and retain audit requests`, () => {

@@ -1,42 +1,42 @@
-<div class="motion-bar"><strong data-motion-id="query-title"></strong><nav class="seg" data-i18n-label="visual_search.chapters" aria-label="탐색 기록"></nav>
+<div class="motion-bar"><strong data-motion-id="query-title"></strong><nav class="seg" data-i18n-label="visual_search.chapters"></nav>
 <p class="summary-readout"><span data-motion-id="sum-time"></span><span data-motion-id="sum-jev"></span></p></div><div class="search-workspace" data-motion-id="search-view">
-        <div class="toolbar" role="toolbar" aria-label="재생 및 화면 조절">
-          <button class="tool" data-motion-id="t-first" type="button" aria-label="처음으로" title="처음으로"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z"/></svg></button>
-          <button class="tool" data-motion-id="t-prev" type="button" aria-label="이전 단계" title="이전 단계"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>
-          <button class="tool play" data-motion-id="t-play" type="button" aria-label="재생" title="재생"><svg viewBox="0 0 16 16" aria-hidden="true"><path data-motion-id="play-icon" d="M5 3l8 5-8 5z"/></svg></button>
-          <button class="tool" data-motion-id="t-next" type="button" aria-label="다음 단계" title="다음 단계"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
-          <button class="tool" data-motion-id="t-last" type="button" aria-label="끝으로" title="끝으로"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l7 5-7 5zM11 3h2v10h-2z"/></svg></button>
-          <span class="count" data-motion-id="count" aria-label="단계">0</span>
+        <div class="toolbar" role="toolbar" data-i18n-label="visual_search.toolbar">
+          <button class="tool" data-motion-id="t-first" type="button" data-i18n-label="visual_search.first" data-i18n-title="visual_search.first"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z"/></svg></button>
+          <button class="tool" data-motion-id="t-prev" type="button" data-i18n-label="visual_search.prev" data-i18n-title="visual_search.prev"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>
+          <button class="tool play" data-motion-id="t-play" type="button" data-i18n-label="visual_search.play" data-i18n-title="visual_search.play"><svg viewBox="0 0 16 16" aria-hidden="true"><path data-motion-id="play-icon" d="M5 3l8 5-8 5z"/></svg></button>
+          <button class="tool" data-motion-id="t-next" type="button" data-i18n-label="visual_search.next" data-i18n-title="visual_search.next"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
+          <button class="tool" data-motion-id="t-last" type="button" data-i18n-label="visual_search.last" data-i18n-title="visual_search.last"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l7 5-7 5zM11 3h2v10h-2z"/></svg></button>
+          <span class="count" data-motion-id="count" data-i18n-label="visual_search.step">0</span>
           <span class="narr" data-motion-id="narr"></span>
-          <div class="scrub"><input type="range" data-motion-id="scrub" min="0" max="0" step="1" value="0" aria-label="단계 이동"></div>
-          <label class="btn small skip"><input data-motion-id="t-skip" type="checkbox" disabled> 건너뛰기</label>
+          <div class="scrub"><input type="range" data-motion-id="scrub" min="0" max="0" step="1" value="0" data-i18n-label="visual_search.scrub"></div>
+          <label class="btn small skip"><input data-motion-id="t-skip" type="checkbox" disabled> <span data-i18n="visual_search.skip"></span></label>
           <div class="right">
-            <label class="btn small"><input data-motion-id="t-low" type="checkbox" checked> 낮은 후보</label>
+            <label class="btn small"><input data-motion-id="t-low" type="checkbox" checked> <span data-i18n="visual_search.show_low"></span></label>
             <span class="zoomgroup">
-              <button class="tool" data-motion-id="t-zout" type="button" aria-label="축소" title="축소"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
-              <output class="zoom" data-motion-id="zoom" aria-label="배율">100%</output>
-              <button class="tool" data-motion-id="t-zin" type="button" aria-label="확대" title="확대"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M8 3v10"/></svg></button>
+              <button class="tool" data-motion-id="t-zout" type="button" data-i18n-label="visual_search.zoom_out" data-i18n-title="visual_search.zoom_out"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
+              <output class="zoom" data-motion-id="zoom" data-i18n-label="visual_search.zoom">100%</output>
+              <button class="tool" data-motion-id="t-zin" type="button" data-i18n-label="visual_search.zoom_in" data-i18n-title="visual_search.zoom_in"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M8 3v10"/></svg></button>
             </span>
-            <button class="btn small" data-motion-id="t-fit" type="button">전체</button>
+            <button class="btn small" data-motion-id="t-fit" type="button"><span data-i18n="visual_search.fit"></span></button>
           </div>
         </div>
 
         <div class="stage">
-          <div class="plot" data-motion-id="plot" tabindex="0" role="group" aria-roledescription="검색 그래프" aria-label="홉별 노드 다이어그램 검색 그래프">
+          <div class="plot" data-motion-id="plot" tabindex="0" role="group" data-i18n-roledescription="visual_search.graph" data-i18n-label="visual_search.graph_label">
             <canvas data-motion-id="cv" aria-hidden="true"></canvas>
-            <div class="nb-actions" data-motion-id="node-actions" role="group" data-i18n-label="visual_search.actions" aria-label="고른 카드 오퍼레이션" hidden>
+            <div class="nb-actions" data-motion-id="node-actions" role="group" data-i18n-label="visual_search.actions" hidden>
               <button class="btn small" data-motion-id="node-expand" type="button"></button>
               <button class="btn small" data-motion-id="node-evaluate" type="button"></button>
               <button class="btn small" data-motion-id="node-tree" type="button" data-i18n-label="visual_search.open_tree"></button>
             </div>
-            <ul class="legend" aria-label="범례">
-              <li><i class="sw s"></i>구조</li>
-              <li><i class="sw k"></i>지식</li>
-              <li><i class="ln"></i>열림</li>
-              <li><i class="ln c"></i>닫힘</li>
-              <li><i class="ln p"></i>선정</li>
+            <ul class="legend" data-i18n-label="visual_search.legend">
+              <li><i class="sw s"></i><span data-i18n="visual_search.structure"></span></li>
+              <li><i class="sw k"></i><span data-i18n="visual_search.knowledge"></span></li>
+              <li><i class="ln"></i><span data-i18n="visual_search.opened"></span></li>
+              <li><i class="ln c"></i><span data-i18n="visual_search.closed"></span></li>
+              <li><i class="ln p"></i><span data-i18n="visual_search.selected"></span></li>
             </ul>
-            <button class="btn small follow" data-motion-id="t-follow" type="button" hidden>따라가기</button>
+            <button class="btn small follow" data-motion-id="t-follow" type="button" hidden><span data-i18n="visual_search.follow"></span></button>
           </div>
           <div class="pop" data-motion-id="pop" role="tooltip" hidden></div>
           <aside class="sheet" data-motion-id="sheet" aria-labelledby="sheet-title" hidden>
@@ -46,27 +46,27 @@
                 <p class="sheet-path" data-motion-id="sheet-path"></p>
               </div>
               <div style="display:flex;gap:4px;">
-                <button class="btn small accent" data-motion-id="sheet-open-compile" type="button">컴파일 보기</button>
-                <button class="tool" data-motion-id="sheet-close" type="button" aria-label="닫기"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+                <button class="btn small accent" data-motion-id="sheet-open-compile" type="button"><span data-i18n="visual_search.open_compile"></span></button>
+                <button class="tool" data-motion-id="sheet-close" type="button" data-i18n-label="common.close"><svg class="line" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
               </div>
             </div>
             <div class="sheet-body" data-motion-id="sheet-body"></div>
           </aside>
         </div>
 
-        <section class="result-dock" data-motion-id="result-dock" aria-label="상위 검색 결과 카드">
+        <section class="result-dock" data-motion-id="result-dock" data-i18n-label="visual_search.results">
           <div class="result-dock-head">
             <div class="result-dock-meta">
-              <span class="result-dock-label">선정 카드</span>
+              <span class="result-dock-label"><span data-i18n="visual_search.selected_cards"></span></span>
               <span class="result-dock-pos" data-motion-id="dock-pos">0 / 0</span>
             </div>
             <div class="result-dock-actions">
-              <button class="btn small accent more" data-motion-id="more" type="button" hidden>더 찾아보기</button>
-              <button class="dock-nav-btn" data-motion-id="dock-prev" type="button" aria-label="이전 결과 카드" title="이전 카드" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>
-              <button class="dock-nav-btn" data-motion-id="dock-next" type="button" aria-label="다음 결과 카드" title="다음 카드" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
+              <button class="btn small accent more" data-motion-id="more" type="button" hidden><span data-i18n="visual_search.more"></span></button>
+              <button class="dock-nav-btn" data-motion-id="dock-prev" type="button" data-i18n-label="visual_search.prev_result" data-i18n-title="visual_search.prev_result" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>
+              <button class="dock-nav-btn" data-motion-id="dock-next" type="button" data-i18n-label="visual_search.next_result" data-i18n-title="visual_search.next_result" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
             </div>
           </div>
-          <ol class="tray" data-motion-id="tray" aria-label="선정한 카드 캐러셀"></ol>
+          <ol class="tray" data-motion-id="tray" data-i18n-label="visual_search.results"></ol>
         </section>
 
         <p class="sr-only" data-motion-id="status" role="status" aria-live="polite"></p>

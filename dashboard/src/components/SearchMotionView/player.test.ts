@@ -2,7 +2,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { createMotionPlayer } from './player.js';
 import markup from './motion.html?raw';
-import samples from './samples.json';
+import samples from './fixtures/samples.json';
 import type { MotionEvent } from './stream';
 
 function settleFrames(frames: FrameRequestCallback[]) {
@@ -98,5 +98,47 @@ test('selection exposes DOM operations, repeated cards become references, and re
     scrub.value = '13'; scrub.dispatchEvent(new Event('input', { bubbles: true }));
     expect(player.getSnapshot().operations).toHaveLength(0);
     expect(button('node-expand').disabled).toBe(false);
+  } finally { player.dispose(); }
+});
+
+test.each(['long', 'shortmore', 'atommore'] as const)('widened %s root is translated for canvas and dashboard, and a wide legend lifts the terminal badge', fixture => {
+  const texts: string[] = []; const stamps: number[] = []; let translatedY = 0;
+  const context = new Proxy({}, { get: (_target, key) => key === 'measureText' ? (text: string) => ({ width: text.length * 7 })
+    : key === 'translate' ? (_x: number, y: number) => { translatedY = y; }
+    : key === 'fillText' ? (text: string) => { texts.push(text); if (text === 'Searched all') stamps.push(translatedY); }
+    : key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {} });
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D);
+  vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function(this: HTMLElement) {
+    return this.matches('.legend') ? new DOMRect(12, 350, 366, 28) : new DOMRect(0, 0, 390, 400);
+  });
+  HTMLElement.prototype.scrollTo = vi.fn();
+  const host = document.createElement('div'); host.innerHTML = markup; document.body.append(host);
+  const legend = host.querySelector<HTMLElement>('.legend')!;
+  Object.defineProperty(legend, 'offsetHeight', { value: 28 }); legend.style.bottom = '12px';
+  const results = vi.fn();
+  const player = createMotionPlayer(host, { onSelect: vi.fn(), onResults: results, onMore: vi.fn(), onCancel: vi.fn(),
+    translate: key => ({ 'visual_search.root': 'Root', 'visual_search.stop_exhausted': 'Searched all' } as Record<string, string>)[key] ?? key });
+  try {
+    player.begin('query');
+    const events = samples[fixture] as unknown as MotionEvent[];
+    const widened = events.findIndex(event => event.event === 'step_completed' && (event.data.step as { stage: string }).stage === 'widen');
+    events.slice(0, widened + 1).forEach(event => player.receive(event));
+    settleFrames(frames);
+    expect(texts).toContain('Root');
+    events.slice(widened + 1).forEach(event => player.receive(event));
+    settleFrames(frames);
+    const root = results.mock.calls.flatMap(([nodes]) => nodes).find(node => node.type === 'root');
+    expect(root).toMatchObject({ title: 'Root', path: ['Root'] });
+    expect(texts).toContain('Root');
+    expect(texts).not.toContain('루트');
+    // The badge must be above the legend, rather than underneath its wide English labels.
+    if (fixture === 'long') {
+      expect(stamps.length).toBeGreaterThan(0);
+      expect(stamps.every(y => y < 350)).toBe(true);
+    }
   } finally { player.dispose(); }
 });
