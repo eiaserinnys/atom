@@ -1,4 +1,24 @@
 {
+  "visual_search": {
+    "title": "Visual search",
+    "loading": "Loading visual search…",
+    "chapters": "Exploration history",
+    "actions": "Selected card operations",
+    "expand": "Expand neighbors",
+    "evaluate": "Evaluate relevance",
+    "evaluating": "Evaluating",
+    "open_tree": "Open in tree",
+    "chapter_search": "0 Search",
+    "chapter_continue": "Continue search",
+    "query_column": "Query expansion {{count}}",
+    "expand_column": "Expansion {{count}}",
+    "evaluate_column": "Evaluation {{count}}",
+    "entry": "Entry",
+    "hop": "Hop {{count}}",
+    "empty": "No new candidates",
+    "error": "Exploration could not finish. ({{code}})",
+    "retry": "Retry"
+  },
   "common": {
     "close": "Close",
     "save": "Save",
@@ -285,6 +305,6 @@
     "tab_detail": "Detail",
     "tab_settings": "Settings",
     "settings_back": "← Settings",
-    "tab_search": "Search"
+    "tab_search": "Visual search"
   }
 }

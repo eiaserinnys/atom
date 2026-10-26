@@ -1,9 +1,4 @@
-<div class="motion-bar"><strong data-motion-id="query-title"></strong><div class="seg" role="radiogroup" aria-label="표본 검색 기록">
-            <button type="button" role="radio" data-run="atom" aria-checked="true">atom 대시보드</button>
-            <button type="button" role="radio" data-run="medium" aria-checked="false">장미 겨울나기</button>
-            <button type="button" role="radio" data-run="short" aria-checked="false">타르트 반죽</button>
-            <button type="button" role="radio" data-run="long" aria-checked="false">밤하늘 볼거리</button>
-          </div>
+<div class="motion-bar"><strong data-motion-id="query-title"></strong><nav class="seg" data-i18n-label="visual_search.chapters" aria-label="탐색 기록"></nav>
 <p class="summary-readout"><span data-motion-id="sum-time"></span><span data-motion-id="sum-jev"></span></p></div><div class="search-workspace" data-motion-id="search-view">
         <div class="toolbar" role="toolbar" aria-label="재생 및 화면 조절">
           <button class="tool" data-motion-id="t-first" type="button" aria-label="처음으로" title="처음으로"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z"/></svg></button>
@@ -29,6 +24,11 @@
         <div class="stage">
           <div class="plot" data-motion-id="plot" tabindex="0" role="group" aria-roledescription="검색 그래프" aria-label="홉별 노드 다이어그램 검색 그래프">
             <canvas data-motion-id="cv" aria-hidden="true"></canvas>
+            <div class="nb-actions" data-motion-id="node-actions" role="group" data-i18n-label="visual_search.actions" aria-label="고른 카드 오퍼레이션" hidden>
+              <button class="btn small" data-motion-id="node-expand" type="button" data-i18n="visual_search.expand"></button>
+              <button class="btn small" data-motion-id="node-evaluate" type="button" data-i18n="visual_search.evaluate"></button>
+              <button class="btn small" data-motion-id="node-tree" type="button" data-i18n-label="visual_search.open_tree">↗</button>
+            </div>
             <ul class="legend" aria-label="범례">
               <li><i class="sw s"></i>구조</li>
               <li><i class="sw k"></i>지식</li>

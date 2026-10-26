@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import type { SearchMotionViewProps } from './SearchMotionView';
+import { useTranslation } from 'react-i18next';
 const Motion = lazy(() => import('./SearchMotionView').then(module => ({ default: module.SearchMotionView })));
 export function LazySearchMotionView(props: SearchMotionViewProps) {
-  return <Suspense fallback={<div role="status" className="p-3 text-[13px] text-muted-foreground">검색 모션 불러오는 중…</div>}><Motion {...props} /></Suspense>;
+  const { t } = useTranslation();
+  return <Suspense fallback={<div role="status" className="p-3 text-[13px] text-muted-foreground">{t('visual_search.loading')}</div>}><Motion {...props} /></Suspense>;
 }

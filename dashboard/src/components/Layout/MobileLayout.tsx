@@ -19,8 +19,10 @@ interface Props {
   onSearchSelect(nodeId: string, verdict: MotionNode): void;
   onSubmitSearch(query: string, options: { rootNodeId?: string }): void;
   onResults(nodes: MotionNode[]): void;
+  revealRequest?: number;
+  onOpenInTree?(nodeId: string): void;
 }
-export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNodeId, request, searchResults, verdict, onSearchSelect, onSubmitSearch, onResults }: Props) {
+export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNodeId, request, searchResults, verdict, onSearchSelect, onSubmitSearch, onResults, revealRequest, onOpenInTree }: Props) {
   const auth = useAuth();
   const [activeTab, setActiveTab] = useState<MobileTab>(request ? 'search' : 'tree');
   const [previousRequest, setPreviousRequest] = useState(request);
@@ -30,13 +32,13 @@ export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNode
   const handleSelectNode = useCallback((nodeId: string | null) => { onSelectNode(nodeId); if (nodeId) setActiveTab('compile'); }, [onSelectNode]);
   return <div className="flex h-full flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
     <div className="flex-1 min-h-0 overflow-hidden">
-      <div hidden={activeTab !== 'tree'} className="h-full"><TreeView selectedNodeId={selectedNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} showLogout={false} /></div>
+      <div hidden={activeTab !== 'tree'} className="h-full"><TreeView selectedNodeId={selectedNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} showLogout={false} revealRequest={revealRequest} /></div>
       <div hidden={activeTab !== 'compile'} className="h-full"><CompileView nodeId={selectedNodeId} /></div>
       <div hidden={activeTab !== 'search'} className="h-full flex flex-col">
         <div className="h-12 shrink-0 border-b border-border bg-background">
           <SearchBar currentNodeId={selectedNodeId} onSelectNode={handleSelectNode} onSubmitJevSearch={onSubmitSearch} />
         </div>
-        <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView request={request} onResults={onResults} onSelectNode={(id, node) => { onSearchSelect(id, node); setActiveTab('detail'); }} />}</div>
+        <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView request={request} onResults={onResults} onSelectNode={onSearchSelect} onOpenInTree={id => { onOpenInTree?.(id); setActiveTab('tree'); }} />}</div>
       </div>
       <div hidden={activeTab !== 'detail'} className="h-full"><CardDetail nodeId={selectedNodeId} verdict={verdict} /></div>
       {activeTab === 'settings' && <div className="h-full flex flex-col"><MobileSettingsPage currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} /></div>}

@@ -133,6 +133,8 @@ export function applyExplorationEvent(model, event) {
   const operationPosition = operationIndex(next, event.operationId);
   if (event.type === 'index_loading') {
     operation.loadingIndex = true;
+  } else if (event.type === 'evaluation_retry_started') {
+    operation.status = 'running'; operation.errorCode = null;
   } else if (event.type === 'expansion_succeeded') {
     const queryExpansion = operation.fromCardId === null;
     const count = next.operations.slice(0, operationPosition + 1)
@@ -157,6 +159,7 @@ export function applyExplorationEvent(model, event) {
           toCardId: cardId,
           similarity: neighbor.similarity,
           targetNodeId: existing.nodeId,
+          tree_relation: neighbor.tree_relation,
         };
         next.references.push(reference);
         if (operation.fromCardId !== null) {

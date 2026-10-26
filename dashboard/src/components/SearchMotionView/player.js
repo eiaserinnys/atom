@@ -1,6 +1,7 @@
 // Approved r5 renderer port. The animation closure retains shared camera/scene state
 // to preserve the reviewed drawing and playback behavior; the pure reducer is model.js.
 import { createModel, applyEvent } from "./model.js";
+import { createExplorationSession } from './exploration-session.js';
 
 export function createMotionPlayer(root, callbacks, samples) {
   let disposed = false;
@@ -12,11 +13,21 @@ export function createMotionPlayer(root, callbacks, samples) {
   const requestAnimationFrame = (fn) => { const id = window.requestAnimationFrame(t => { animationFrames.delete(id); if (!disposed) fn(t); }); animationFrames.add(id); return id; };
   const listen = (el, type, fn, options) => { el.addEventListener(type, fn, options); cleanup.push(() => el.removeEventListener(type, fn, options)); };
   const dashboard = {
-    syncSearchOutcome(m, sent, verdict) { callbacks.onResults([...m.nodes.values()].map(n => ({ ...n, reason: verdict(n).word, sentText: sent(n, true)?.text || '', sample: !live }))); },
-    selectFromSearch(n, reason, sent) { callbacks.onSelect({ ...n, reason, sentText: sent?.text || '', sample: !live }); }
+    syncSearchOutcome(m, sent, verdict) { callbacks.onResults([...m.nodes.values()].filter(n => !n.referenceTarget).map(n => ({ ...n, columnLabel: translateLabel(n.columnLabel || hopName(n.hop)), reason: verdict(n).word, sentText: sent(n, true)?.text || '', sample: !live }))); },
+    selectFromSearch(n, reason, sent) { callbacks.onSelect({ ...n, columnLabel: translateLabel(n.columnLabel || hopName(n.hop)), reason, sentText: sent?.text || '', sample: !live }); }
   };
   let live = false;
   let lastQuery = '';
+  const history = createExplorationSession();
+  let cursor = 0;
+  let projected = false;
+  let selectedRef = null;
+  let initialStopReason = null;
+  let continued = false;
+  let receivedDone = false;
+  let continuation = false;
+  let revision = 0;
+  const tr = (key, values) => callbacks.translate?.(key, values) ?? key;
 
   "use strict";
   // =====================================================================
@@ -37,7 +48,7 @@ export function createMotionPlayer(root, callbacks, samples) {
 
   // ------------------------------------------------------------------ 1. 사건을 모델로
   const eventTime = (ev) => Date.parse(ev.event === "run" ? ev.data.started_at : ev.event === "step_started" ? ev.data.started_at : ev.event === "done" ? ev.data.completed_at : (ev.data.step.completed_at ?? ev.data.step.started_at));
-  const isAlive = (n) => n.type === "root" || n.verdict === "open" || n.verdict === "hit" || n.selected;
+  const isAlive = (n) => n.type === "root" || n.referenceTarget || n.verdict === "open" || n.verdict === "hit" || n.selected;
   const isDim = (n) => !n.selected && (n.verdict === "closed" || n.verdict === "low" || n.verdict === "nobody");
   function stopLabel(t) {
     if (!t) return "";
@@ -55,7 +66,9 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
 
   // ------------------------------------------------------------------ 2. 자리 잡기
-  const M = { colW: 196, gap: 64, rowH: 30, pitch: 38, lowPitch: 35, chipH: 22, bandGap: 14, groupGap: 6, padX: 24, padTop: 14, headerH: 42, pileH: 26, pendCap: 14, cell: 5, laneY: -9 };
+  const geometry = getComputedStyle(root);
+  const metric = (name, value) => Number.parseFloat(geometry.getPropertyValue(name)) || value;
+  const M = { colW: metric('--motion-node-width', 268), gap: metric('--motion-column-gap', 64), rowH: metric('--motion-node-height', 48), pitch: 56, lowPitch: 56, actionH: metric('--motion-action-height', 28), actionGap: metric('--motion-action-gap', 4), chipH: 22, bandGap: 14, groupGap: 6, padX: 24, padTop: 14, headerH: 42, pileH: 26, pendCap: 14, cell: 5, laneY: -9 };
   const ui = { showLow: true, expanded: new Set(), follow: true };
   const colX = (hop) => hop * (M.colW + M.gap);
   // 열은 홉. 한 열 안에서 위 띠는 살아 있는 것(열린 구조, 맞은 카드, 선정)과 아직 판정 전인 것,
@@ -72,7 +85,8 @@ export function createMotionPlayer(root, callbacks, samples) {
     // 입구 하나뿐인 동안에는 씨앗을 여러 줄로 넓게 편다(가장 자주 보는 화면). 다음 홉이 나오면 한 열로 접힌다
     const stride = M.colW + 16;
     const K = lastHop <= 0 && !root && W > 0 ? clamp(Math.floor((W - 2 * M.padX + 16) / stride), 1, 3) : 1;
-    const byScore = (a, b) => (b.score ?? 2) - (a.score ?? 2) || a.order - b.order;
+    const byScore = (a, b) => (b.layoutScore ?? b.score ?? 2) - (a.layoutScore ?? a.score ?? 2) || a.order - b.order;
+    const reserve = n => n.ref === selectedRef && n.cardId ? (M.actionH + M.actionGap) / Math.min(1, cam?.z ?? 1) : 0;
     // 더미: 접어 둔 후보가 많으면 점 격자로 그린다. 점 하나가 카드 하나이고 자리는 발견 순서라 바뀌지 않는다
     const placePile = (g, x, yy, hop, rest, foldable) => {
       const segs = [...g.steps.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([id, done]) => ({ id, done }));
@@ -86,6 +100,12 @@ export function createMotionPlayer(root, callbacks, samples) {
     for (let hop = 0; hop <= lastHop; hop += 1) {
       const x = colX(hop);
       const nodes = byHop.get(hop) || [];
+      if (m.columnLabels?.has(hop)) {
+        let y = 0;
+        nodes.sort((a, b) => Number(a.sameBranch) - Number(b.sameBranch) || (b.similarity ?? 0) - (a.similarity ?? 0) || a.order - b.order);
+        for (const n of nodes) { pos.set(n.ref, { x, y }); y += M.pitch + reserve(n); }
+        cols.push({ hop, x, height: y, w: M.colW }); height = Math.max(height, y); continue;
+      }
       const groups = new Map();
       for (const n of nodes) {
         const key = hop + "|" + (n.type === "root" ? "@root" : n.parent ?? "@seed");
@@ -103,7 +123,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       if (hop === 0 && K > 1) {
         const g = list[0] || { key: "0|@seed", parent: null, alive: [], pend: [], low: [], nobody: [], steps: new Map(), all: [] };
         g.alive.sort(byScore); g.low.sort(byScore);
-        const rows = (arr, pitch) => { for (let i = 0; i < arr.length; i += K) { const row = arr.slice(i, i + K); row.forEach((n, k) => pos.set(n.ref, { x: x + k * stride, y })); y += pitch + (row.some((n) => n.selected) ? M.chipH + 2 : 0); } };
+        const rows = (arr, pitch) => { for (let i = 0; i < arr.length; i += K) { const row = arr.slice(i, i + K); row.forEach((n, k) => pos.set(n.ref, { x: x + k * stride, y })); y += pitch + Math.max(0, ...row.map(reserve)); } };
         rows(g.alive, M.pitch); rows(g.pend, M.pitch);
         const lows = g.low.concat(g.nobody);
         if (lows.length) { if (y > 0) y += M.bandGap; if (ui.showLow) rows(lows, M.lowPitch); else y += placePile(g, x, y, 0, lows, false) + 6; }
@@ -113,7 +133,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       for (const g of list) {
         g.alive.sort(byScore);
         // 구조가 미뤄 둔 묶음이 있으면 그 아래에 칩 한 줄을 둔다
-        for (const n of g.alive) { pos.set(n.ref, { x, y }); y += M.pitch + (n.selected || dorm.has(n.ref) ? M.chipH + 2 : 0); }
+        for (const n of g.alive) { pos.set(n.ref, { x, y }); y += M.pitch + reserve(n) + (dorm.has(n.ref) ? M.chipH + 2 : 0); }
       }
       // 부모가 많은 열(루트 아래 등)은 판정 전인 줄과 접는 묶음을 열 하나로 합친다
       if (list.length > 4) {
@@ -134,7 +154,7 @@ export function createMotionPlayer(root, callbacks, samples) {
         // 판정 전인 줄은 먼저 발견된 몇 장만 보이고 자리를 지킨다. 더미에서 기다리는 카드를 판정 전에 꺼내 보이지 않는다
         g.pendVis = open ? g.pend : g.pend.filter((n) => head.has(n.ref));
         if (g.pend.length - g.pendVis.length === 1 && g.lowAll.length === g.lowVis.length) g.pendVis = g.pend;
-        for (const n of g.pendVis) { pos.set(n.ref, { x, y }); y += M.pitch; }
+        for (const n of g.pendVis) { pos.set(n.ref, { x, y }); y += M.pitch + reserve(n); }
         // 아직 묻지 않은 카드가 더미에 남아 있으면 더미를 판정 중인 줄 바로 아래에 둔다
         if (g.pend.length > g.pendVis.length) { g.piled = true; const shown = new Set(g.pendVis); y += placePile(g, x, y, hop, g.pend.filter((n) => !shown.has(n)).concat(g.lowAll.slice(g.lowVis.length)), false) + 10; }
       }
@@ -146,7 +166,7 @@ export function createMotionPlayer(root, callbacks, samples) {
         if (!open && ui.showLow && rest.length === 1) { vis = g.lowAll; rest = []; }
         if (vis.length + rest.length === 0 && !open) continue;
         if (!lower && y > 0) y += M.bandGap; lower = true;
-        for (const n of vis) { pos.set(n.ref, { x, y }); y += M.lowPitch; }
+        for (const n of vis) { pos.set(n.ref, { x, y }); y += M.lowPitch + reserve(n); }
         const foldable = open && !g.piled && g.lowAll.length + g.pend.length > lowCap;
         if (rest.length > 0 || foldable) y += placePile(g, x, y, hop, rest, foldable) + 6;
         y += M.groupGap;
@@ -230,6 +250,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       if (n.dormant) continue;
       if (n.origin === "hit_parent") n.climbFrom.forEach((h, i) => edge(h + ">" + n.ref, h, n.ref, "climb", i === 0));
       else if (n.parent) edge(n.parent + ">" + n.ref, n.parent, n.ref, "child", false).lane = n.hop - hopOf(n.parent) > 1;
+      if (n.fromRef) edge(`${n.displayColumn || n.columnLabel}:${n.ref}`, n.fromRef, n.ref, 'expansion', false);
     }
     for (const [key, p] of L.piles) if (p.count > 0) for (const par of p.parents) edge(par + ">@" + key, par, "@" + key, "bundle", false).lane = p.hop - hopOf(par) > 1;
     for (const key of [...view.edges.keys()]) if (!want.has(key)) view.edges.delete(key);
@@ -280,7 +301,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   const approach = (cur, target, dt, tau) => cur + (target - cur) * (1 - Math.exp(-dt / tau));
   function tick(now, dt) {
     let active = false;
-    const live = playing();
+    const live = playing() || !!model.exploration?.operations.some(op => op.status === 'running');
     for (const v of view.nodes.values()) {
       if (v.next && now >= v.hold) { if (v.next.alive > v.t.alive) v.wipe = 0; v.t = v.next; v.next = null; }
       if (v.next) active = true;
@@ -483,6 +504,15 @@ export function createMotionPlayer(root, callbacks, samples) {
       if (e.grow <= 0 || now < e.born) continue;
       const a = anchorOut(e.from); const b = anchorIn(e.to); if (!a || !b) continue;
       const alpha = Math.min(a.a, b.a); if (alpha < 0.03) continue;
+      if (e.kind === 'expansion') {
+        const trunk = a.x + 14;
+        ctx.globalAlpha = alpha * 0.65; ctx.strokeStyle = css(T.thin); ctx.lineWidth = 1.1;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(trunk, a.y); ctx.lineTo(trunk, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - 6, b.y - 3); ctx.lineTo(b.x - 6, b.y + 3); ctx.fillStyle = css(T.thin); ctx.fill();
+        const n = model.nodes.get(e.to);
+        if (n?.similarity != null && z >= 0.8) { ctx.font = font(500, 13); ctx.fillStyle = css(T.lowText); ctx.textAlign = 'right'; ctx.fillText(n.similarity.toFixed(2), b.x - 8, b.y - 6); ctx.textAlign = 'left'; }
+        continue;
+      }
       if ((a.x > x1 && b.x > x1) || (a.x < x0 && b.x < x0)) continue;
       if (e.lane) { if (e.kind === "bundle" || e.sel > 0 || b.alive > 0.5 || view.hoverKeys.has(e.key) || (b.y > y0 && b.y < y1)) lanes.push([e, a, b, alpha, e.kind === "bundle" ? 0 : b.alive]); continue; }
       const sp = span(a, b, y0, y1); if (!sp) continue;
@@ -542,6 +572,16 @@ export function createMotionPlayer(root, callbacks, samples) {
     // 더미
     for (const p of view.piles.values()) { if (now < p.born || p.x > x1 || p.x < x0 || p.y + p.info.h < y0 || p.y > y1) continue; drawPile(p, now, text); }
     // 후보
+    for (const n of model.nodes.values()) {
+      if (n.similarity == null || n.fromRef || !n.displayColumn || n.displayColumn.startsWith('initial:')) continue;
+      const v = view.nodes.get(n.ref); if (!v || v.a < 0.4) continue;
+      const y = v.y + M.rowH / 2; const x = v.x;
+      ctx.globalAlpha = v.a * 0.65; ctx.strokeStyle = css(T.thin); ctx.lineWidth = 1.1;
+      ctx.beginPath(); ctx.moveTo(x - M.gap + 14, y); ctx.lineTo(x, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 6, y - 3); ctx.lineTo(x - 6, y + 3); ctx.fillStyle = css(T.thin); ctx.fill();
+      if (z >= 0.8) { ctx.font = font(500, 13); ctx.fillStyle = css(T.lowText); ctx.textAlign = 'right'; ctx.fillText(n.similarity.toFixed(2), x - 8, y - 6); ctx.textAlign = 'left'; }
+      ctx.globalAlpha = 1;
+    }
     const root = model.nodes.get(ROOT);
     if (root) drawNode(root, view.nodes.get(ROOT), now, text, x0, x1, y0, y1);
     for (const ref of model.order) drawNode(model.nodes.get(ref), view.nodes.get(ref), now, text, x0, x1, y0, y1);
@@ -581,8 +621,11 @@ export function createMotionPlayer(root, callbacks, samples) {
     const va = v.a; v.a = va * (1 - 0.8 * clamp((Math.abs(v.y - v.t.y) - 6) / 80, 0, 1));
     if (v.a < 0.03) { v.a = va; return; }
     ctx.globalAlpha = v.a;
-    // 선정: 노란 테
-    if (v.sel > 0.02) { ctx.globalAlpha = v.a * v.sel; rr(x - 3.5, y - 3.5, w + 7, h + 7, 8); ctx.strokeStyle = css(T.evidence); ctx.lineWidth = 3; ctx.stroke(); ctx.globalAlpha = v.a; }
+    if (n.referenceTarget) {
+      ctx.globalAlpha = v.a * 0.45; ctx.font = wfont(500, 14); ctx.fillStyle = css(T.ink2); ctx.textBaseline = 'middle';
+      ctx.fillText(fitText(`↗ ${n.rank ? '#' + n.rank + ' ' : ''}${n.title}`, w - 16, wfont(500, 14)), x + 8, y + h / 2);
+      ctx.globalAlpha = 1; v.a = va; return;
+    }
     rr(x, y, w, h, 5);
     ctx.fillStyle = css(mix(T.node, fill, alive), 1 - 0.6 * dim); ctx.fill();
     if (v.wipe < 1 && !isRoot) { ctx.save(); ctx.clip(); const k = easeOut(v.wipe); ctx.fillStyle = css(T.node, 1 - k * 0.2); ctx.fillRect(x + w * k, y, w * (1 - k), h); ctx.fillStyle = css(line, 0.35 * (1 - k)); ctx.fillRect(x + w * k - 18, y, 18, h); ctx.restore(); }
@@ -596,10 +639,11 @@ export function createMotionPlayer(root, callbacks, samples) {
       ctx.beginPath(); ctx.rect(x, y, 5, h); ctx.fill();
       if (n.type === "structure") ctx.fillRect(x + 7, y + 5, 1.6, h - 10);
     }
-    const tx = x + (n.type === "structure" ? 15 : 12); const cy = y + h / 2 + 0.5;
+    const rankW = n.selected ? 34 : 0;
+    const tx = x + (n.type === "structure" ? 15 : 12) + rankW; const cy = y + 15;
     const portPad = n.type === "structure" ? 4 : 0;
     if (text) {
-      const bold = alive > 0.5; const f = wfont(bold ? 650 : 500, 14);
+      const bold = alive > 0.5; const f = wfont(bold ? 650 : 500, cam.z < 0.8 ? 14 / cam.z : 14);
       const scoreFont = wfont(bold ? 600 : 500, 13);
       ctx.font = scoreFont;
       const scoreW = n.score != null ? ctx.measureText(n.score.toFixed(2)).width + 8 : n.byHit || n.judging ? 36 : 4;
@@ -609,6 +653,11 @@ export function createMotionPlayer(root, callbacks, samples) {
       ctx.font = f; ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.fillStyle = isRoot ? css(T.shell) : css(mix(T.ink, T.lowText, dim));
       ctx.fillText(v.fit, tx, cy);
+      if (cam.z >= 0.8) {
+        const path = (n.path || []).slice(0, -1).join(' › ');
+        ctx.font = wfont(500, 13); ctx.fillStyle = css(T.lowText);
+        ctx.fillText(fitText(path, w - (tx - x) - 8, wfont(500, 13)), tx, y + 35);
+      }
       const sx = x + w - 9 - portPad;
       if (n.score != null && v.scoreA > 0.02) {
         ctx.globalAlpha = v.a * v.scoreA; ctx.font = scoreFont; ctx.textAlign = "right";
@@ -617,16 +666,16 @@ export function createMotionPlayer(root, callbacks, samples) {
         ctx.strokeStyle = css(T.path); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(sx - 5, cy + 5); ctx.lineTo(sx - 5, cy - 5); ctx.moveTo(sx - 9, cy - 1); ctx.lineTo(sx - 5, cy - 5); ctx.lineTo(sx - 1, cy - 1); ctx.stroke();
       }
       if (v.judge > 0.02 && n.score == null) {
-        for (let i = 0; i < 3; i += 1) { const ph = playing() ? 0.5 + 0.5 * Math.sin(now / 150 - i * 0.9) : 0.6; ctx.globalAlpha = v.a * v.judge * (0.3 + 0.7 * ph); ctx.fillStyle = css(T.jev); ctx.beginPath(); ctx.arc(sx - 18 + i * 7, cy, 2, 0, 6.2832); ctx.fill(); }
+        for (let i = 0; i < 3; i += 1) { const ph = judging() ? 0.5 + 0.5 * Math.sin(now / 150 - i * 0.9) : 0.6; ctx.globalAlpha = v.a * v.judge * (0.3 + 0.7 * ph); ctx.fillStyle = css(T.jev); ctx.beginPath(); ctx.arc(sx - 18 + i * 7, cy, 2, 0, 6.2832); ctx.fill(); }
         ctx.globalAlpha = v.a;
       }
       ctx.textAlign = "left";
     }
     // Jev가 보는 중: 주황 테와 지나가는 빛
     if (v.judge > 0.02) {
-      ctx.globalAlpha = v.a * v.judge; ctx.strokeStyle = css(T.jev); ctx.lineWidth = 1.6; ctx.setLineDash([7, 5]); ctx.lineDashOffset = playing() ? -(now / 22) % 12 : 0;
+      ctx.globalAlpha = v.a * v.judge; ctx.strokeStyle = css(T.jev); ctx.lineWidth = 1.6; ctx.setLineDash([7, 5]); ctx.lineDashOffset = judging() ? -(now / 22) % 12 : 0;
       rr(x - 2.5, y - 2.5, w + 5, h + 5, 7); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
-      if (playing() && !reduced()) {
+      if (judging() && !reduced()) {
         const ph = ((now + (v.y % 7) * 40) % 1000) / 1000; const bx = x - 70 + (w + 140) * ph;
         ctx.save(); rr(x, y, w, h, 5); ctx.clip(); const g = ctx.createLinearGradient(bx - 50, 0, bx + 50, 0); g.addColorStop(0, css(T.jev, 0)); g.addColorStop(0.5, css(T.jev, 0.2)); g.addColorStop(1, css(T.jev, 0));
         ctx.fillStyle = g; ctx.fillRect(bx - 50, y, 100, h); ctx.restore();
@@ -644,9 +693,9 @@ export function createMotionPlayer(root, callbacks, samples) {
       const pulse = v.read > 0.02 && playing() ? 0.5 + 0.5 * Math.sin(now / 90) : 0;
       if (pulse > 0) { ctx.globalAlpha = v.a * 0.5 * pulse; ctx.strokeStyle = css(T.path); ctx.lineWidth = 2; rr(x - 3, y - 3, w + 6, h + 6, 8); ctx.stroke(); ctx.globalAlpha = v.a; }
     }
-    // 선정 칩: 순위. 위 결과 줄의 번호와 같다
+    // 순위는 마디 안쪽에서 결과 도크와 같은 번호를 쓴다.
     if (v.sel > 0.02 && text) {
-      const k = easeOut(v.sel); ctx.globalAlpha = v.a * k; const cx = x + 10; const cyy = y + h + 3 - (1 - k) * 8;
+      const k = easeOut(v.sel); ctx.globalAlpha = v.a * k; const cx = x + 10; const cyy = y + 6;
       rr(cx, cyy, 30, M.chipH - 4, 6); ctx.fillStyle = css(T.evidence); ctx.fill();
       ctx.fillStyle = css(T.evidenceInk); ctx.font = wfont(700, 13); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(n.rank), cx + 15, cyy + (M.chipH - 4) / 2 + 0.5); ctx.textAlign = "left";
     }
@@ -660,6 +709,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     // 가리킨 후보
     if (view.hover === n.ref) { ctx.globalAlpha = v.a * 0.55; ctx.strokeStyle = css(T.ink); ctx.lineWidth = 1.4; rr(x - 1.5, y - 1.5, w + 3, h + 3, 6.5); ctx.stroke(); }
+    if (selectedRef === n.ref) { ctx.globalAlpha = v.a; ctx.strokeStyle = css(T.ink); ctx.lineWidth = 2; rr(x - 1, y - 1, w + 2, h + 2, 6); ctx.stroke(); }
     ctx.globalAlpha = 1; v.a = va;
   }
 
@@ -705,11 +755,14 @@ export function createMotionPlayer(root, callbacks, samples) {
     for (const c of L.cols) {
       const sx = ox + c.x * z; const sw = c.w * z; if (sx + sw < -40 || sx > W + 40) continue;
       ctx.globalAlpha = 1; ctx.textAlign = "left"; ctx.font = font(700, 15); ctx.fillStyle = css(T.ink);
-      const name = sw < 96 ? String(c.hop) : hopName(c.hop); ctx.fillText(name, sx, cy);
+      const name = model.columnLabels?.has(c.hop) ? translateLabel(model.columnLabels.get(c.hop)) : sw < 96 ? String(c.hop) : hopName(c.hop); ctx.fillText(name, sx, cy);
       let dx = sx + ctx.measureText(name).width + 10; let k = 0;
       for (const f of model.inflight.values()) {
         if (f.hop !== c.hop || !JEV.has(f.stage)) continue;
         ctx.globalAlpha = playing() ? 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now / 130 + k * 1.3)) : 0.9; ctx.fillStyle = css(T.jev); ctx.beginPath(); ctx.arc(dx + 3, cy, 3.4, 0, 6.2832); ctx.fill(); dx += 11; k += 1;
+      }
+      if (model.exploration?.operations.some(op => op.status === 'running' && model.columnLabels?.get(c.hop) === model.exploration.columns.find(col => col.id === (op.viaOperationId || op.id))?.label)) {
+        ctx.fillStyle = css(T.jev); ctx.beginPath(); ctx.arc(dx + 3, cy, 3.4, 0, 6.2832); ctx.fill();
       }
       const g = view.gauges.get(c.hop);
       if (g && g.a > 0.02 && sw >= 96) {
@@ -764,18 +817,21 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
 
   let raf = 0; let lastFrame = 0;
+  let actionZoom = 1;
   function invalidate() { if (!raf) raf = requestAnimationFrame(frame); }
   function frame(now) {
     raf = 0; const dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0.016; lastFrame = now;
-    const active = tick(now, dt); draw(now); frames += 1;
+    const active = tick(now, dt);
+    if (selectedRef && Math.abs(actionZoom - cam.z) > 0.01) { actionZoom = cam.z; sync(now, false, null); }
+    draw(now); updateActions(); frames += 1;
     if (active) invalidate(); else lastFrame = 0;
   }
   let frames = 0; let lastW = 0;
   function resize() {
     const r = plot.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1); W = Math.round(r.width); H = Math.round(r.height);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    const colW = W < 680 ? 168 : 196;
-    const gap = W < 680 ? 40 : 64;
+    const colW = metric('--motion-node-width', 268);
+    const gap = metric('--motion-column-gap', 64);
     const padX = W < 680 ? 16 : 24;
     const changed = colW !== M.colW || gap !== M.gap || padX !== M.padX || W !== lastW; lastW = W;
     if (changed) {
@@ -795,6 +851,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   // 화면은 사건을 줄 세워 보여 주되, 결과 줄은 done이 도착하는 즉시 채우고 언제든 건너뛸 수 있다.
   const player = { events: [], ts: [], received: 0, applied: 0, frameEnds: [], total: null, playing: false, serverDone: false, clock0: 0, lastApply: 0, timer: 0, arrive: 0, fast: false, source: null, liveStart: 0 };
   const playing = () => player.playing;
+  const judging = () => playing() || !!model.exploration?.operations.some(op => op.status === 'running');
   const GAP = { lexical_seed: 340, structure_noul: 210, content_noul: 210, atom_outline: 260, hit_parent: 340, sufficiency_noul: 330, widen: 500, deferred_scan: 420, selection: 400, run_terminal: 0 };
   const gapAfter = (ev) => (!ev ? 0 : ev.event === "run" ? 100 : ev.event === "step_completed" ? GAP[ev.data.step.stage] ?? 200 : 0);
   // 묻는 중인 모습이 최소한 이만큼은 보이게 한다. 동시에 나간 호출은 같은 때 시작하므로 서로 쌓이지 않는다
@@ -827,21 +884,29 @@ export function createMotionPlayer(root, callbacks, samples) {
       if (now + 1 < due && !reduced()) { player.timer = setTimeout(pump, due - now); break; }
       applyNext(true); player.lastApply = performance.now();
     }
-    if (player.applied >= player.events.length && player.serverDone) { player.playing = false; player.fast = false; }
+    if (player.applied >= player.events.length && player.serverDone) { player.playing = false; player.fast = false; if (!projected) projectTo(history.timeline().frames.length, false); }
     chrome();
   }
   // 사건 하나가 도착했다. 실제 페이지에서는 스트림을 읽는 쪽이 이 함수를 부른다
   function receive(ev) {
+    history.receive(ev);
+    if (continuation) {
+      const follow = cursor === history.timeline().frames.length || cursor === history.timeline().frames.length - 1;
+      if (ev.event === 'done') { continued = true; receivedDone = true; continuation = false; player.serverDone = true; }
+      if (follow) projectTo(history.timeline().frames.length, true);
+      chrome(); return;
+    }
     const t = eventTime(ev); if (player.events.length === 0) player.t0 = t;
     player.events.push(ev); player.ts.push(Math.max(player.ts[player.ts.length - 1] || 0, t - player.t0));
     if (ev.event === "step_completed") player.frameEnds.push(player.events.length);
-    if (ev.event === "done") { player.frameEnds[player.frameEnds.length - 1] = player.events.length; player.serverDone = true; player.total = player.frameEnds.length; serverDone(ev.data); }
+    if (ev.event === "done") { player.frameEnds[player.frameEnds.length - 1] = player.events.length; player.serverDone = true; player.total = player.frameEnds.length; initialStopReason = ev.data.stop_reason; receivedDone = true; }
     player.received = player.events.length;
     if (ev.event === "run") tickSummary();
     pump();
   }
   // resume이 참이면 입구에서 끝난 실행을 그 자리에서 이어 간다(더 찾아보기). 입구까지의 사건은 바로 반영하고 다음 홉부터 펼친다
   function startLive(source, instant = false, resume = false) {
+    history.begin(source[0].data.query); projected = false; cursor = 0; selectedRef = null; receivedDone = false; continued = false;
     clearTimeout(player.timer); clearTimeout(player.arrive);
     const t0 = eventTime(source[0]);
     const first = resume ? Math.max(1, source.findIndex((e) => e.event === "step_started" && e.data.hop >= 1)) : 0;
@@ -865,6 +930,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   const frameOf = (applied) => { let f = 0; while (f < player.frameEnds.length && player.frameEnds[f] <= applied) f += 1; return f; };
   // 단계 f의 끝 상태로 간다. 바로 다음 단계면 효과와 함께, 아니면 빈 상태에서 다시 쌓는다
   function seek(f, animate = true) {
+    if (receivedDone) { projectTo(f, animate); return; }
     clearTimeout(player.timer); player.playing = false; player.fast = false;
     const target = f <= 0 ? Math.min(1, player.received) : player.frameEnds[Math.min(f, player.frameEnds.length) - 1];
     if (target > player.applied && frameOf(player.applied) === f - 1 && animate) { while (player.applied < target) applyNext(true); }
@@ -883,6 +949,23 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   function seekEvent(index) { seek(0, false); while (player.applied < Math.min(index, player.received)) applyEvent(model, player.events[player.applied++]); sync(performance.now(), false, null); if (model.last) followHop(model.last.hop, true); chrome(); }
   function play() {
+    if (receivedDone) {
+      if (player.playing) { player.playing = false; clearTimeout(player.timer); chrome(); return; }
+      if (!projected || cursor >= history.timeline().frames.length) projectTo(0, false);
+      player.playing = true;
+      const next = () => {
+        if (!player.playing) return;
+        const evaluation = history.timeline().frames[cursor]?.id.endsWith(':evaluate');
+        projectTo(cursor + 1, true, true, evaluation);
+        const finish = () => {
+          if (evaluation) projectTo(cursor, true, true);
+          if (cursor < history.timeline().frames.length) player.timer = setTimeout(next, reduced() ? 0 : GAP.selection);
+          else { player.playing = false; chrome(); }
+        };
+        if (evaluation && !reduced()) player.timer = setTimeout(finish, DWELL.content_noul); else finish();
+      };
+      next(); return;
+    }
     if (player.playing) { player.playing = false; clearTimeout(player.timer); chrome(); return; }
     if (player.serverDone && player.applied >= player.events.length) { seek(0, false); }
     player.playing = true; player.fast = false; player.liveStart = 0; setFollow(true);
@@ -891,6 +974,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   // 건너뛰기: 받은 데까지 바로 보여 주고, 남은 사건은 도착하는 대로 기다림 없이 반영한다
   function skip() {
+    if (receivedDone && !player.source) { projectTo(history.timeline().frames.length, false); fitAll(true); return; }
     clearTimeout(player.timer);
     clearTimeout(player.arrive);
     if (player.source) {
@@ -902,7 +986,8 @@ export function createMotionPlayer(root, callbacks, samples) {
     sync(performance.now(), false, null);
     player.fast = !player.serverDone; player.playing = !player.serverDone; setFollow(true);
     fitAll(true);
-    if (dashboard) {
+    if (receivedDone) { projectTo(history.timeline().frames.length, false); }
+    else if (dashboard) {
       dashboard.syncSearchOutcome(model, sentText, verdictOf);
     }
     chrome();
@@ -988,11 +1073,13 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   setupDockInteractions();
 
-  function serverDone(d) {
-    const outcome = createModel();
-    for (const event of player.events) applyEvent(outcome, event);
-    const oldModel = model; model = outcome;
-    dashboard.syncSearchOutcome(outcome, sentText, verdictOf);
+  function renderResultTray() {
+    const activeCard = selectedRef && model.nodes.get(selectedRef)?.cardId;
+    const results = [...model.nodes.values()].filter(n => n.selected && !n.referenceTarget).sort((a, b) => a.rank - b.rank);
+    const d = { results: results.map(n => ({ card_id: n.cardId, node_id: n.nodeId, title: n.title, score: n.score ?? 0 })) };
+    const fingerprint = JSON.stringify(d.results.map(r => [r.card_id, r.score]));
+    if ($('tray').dataset.projection === fingerprint) return;
+    $('tray').dataset.projection = fingerprint;
     const tray = $("tray"); tray.replaceChildren();
     const dashMap = null;
     const candMap = new Map();
@@ -1008,7 +1095,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       const dashNode = dashMap ? dashMap.get(r.node_id) : null;
       const kindLabel = ((n && n.type === "structure") || (dashNode && dashNode.type === "structure")) ? "구조" : "지식";
       const hopNum = n && typeof n.hop === "number" ? n.hop : 2;
-      const hopLabel = hopNum === 0 ? "입구" : "홉 " + hopNum;
+      const hopLabel = translateLabel(n?.columnLabel || (hopNum === 0 ? "입구" : "홉 " + hopNum));
       const pathArr = n && Array.isArray(n.path) && n.path.length > 1 ? n.path.slice(0, -1) : [];
       const summaryStr = (n && n.summary) || (dashNode && dashNode.summary) || "";
       const subText = pathArr.length
@@ -1054,7 +1141,6 @@ export function createMotionPlayer(root, callbacks, samples) {
       listen(b, "click", (e) => {
         if (dockDragMoved) { e.preventDefault(); return; }
         syncDockActive(i, true);
-        if (player.applied < player.events.length) skip();
         const targetNode = [...model.nodes.values()].find((x) => x.nodeId === r.node_id);
         if (targetNode) openSheet(targetNode.ref, b);
       });
@@ -1071,11 +1157,82 @@ export function createMotionPlayer(root, callbacks, samples) {
       tray.scrollLeft = 0;
       syncDockActive(0, false);
     }
-    const term = { status: d.status, code: d.error ? d.error.code : null, stop: d.stop_reason };
-    $("status").textContent = `검색 끝. ${stopLabel(term)}. 카드 ${d.results.length}장 선정.`;
-    $("more").hidden = d.stop_reason !== "sufficient";
-    tickSummary();
-    model = oldModel;
+    const activeIndex = results.findIndex(n => n.cardId === activeCard);
+    if (activeIndex >= 0) syncDockActive(activeIndex, false);
+  }
+
+  function projectTo(position, animate = false, keepPlaying = false, evaluating = false) {
+    if (!keepPlaying) { clearTimeout(player.timer); player.playing = false; }
+    projected = true; cursor = clamp(position, 0, history.timeline().frames.length);
+    const result = history.project(cursor, evaluating); model = result.scene;
+    if (selectedRef && !model.nodes.has(selectedRef)) selectedRef = null;
+    sync(performance.now(), animate, null);
+    dashboard.syncSearchOutcome(model, sentText, verdictOf);
+    renderResultTray();
+    if (selectedRef) {
+      const n = model.nodes.get(selectedRef);
+      dashboard.selectFromSearch(n, verdictOf(n).word, sentText(n, true));
+    }
+    chrome();
+  }
+  function snapshot() {
+    const projection = model.exploration;
+    const selected = selectedRef && model.nodes.get(selectedRef);
+    const operations = projection?.operations ?? [];
+    const expansion = [...operations].reverse().find(op => op.kind === 'expand' && op.fromCardId === selected?.cardId && op.status === 'succeeded');
+    return {
+      revision, selectedCardId: selected?.cardId ?? null, live, initialSearchComplete: receivedDone && !!model.done,
+      query: lastQuery || model.run?.query || '', context: model.run?.context ?? { agent: null, project: null, task: null },
+      selectionThreshold: projection?.selectionThreshold ?? model.selThreshold ?? 0.5,
+      evaluationTargetCardIds: expansion?.resultCardIds ?? [],
+      activeOperation: operations.find(op => op.status === 'running') ?? null, operations,
+      resultOrder: projection?.resultOrder ?? [],
+      graphCardIds: projection?.cards.map(card => card.cardId) ?? [],
+      cachedEvaluations: projection?.evaluations ?? new Map(),
+      selectedArrivalOperationId: selected?.displayColumn ?? null,
+      continueSearch: initialStopReason === 'sufficient' && !continued,
+    };
+  }
+  function renderChapters() {
+    const strip = root.querySelector('.seg');
+    const timeline = history.timeline();
+    const chapters = history.chapters().sort((a, b) => timeline.frames.findIndex(frame => a.frameIds.includes(frame.id)) - timeline.frames.findIndex(frame => b.frameIds.includes(frame.id)));
+    const fingerprint = JSON.stringify([chapters, cursor]);
+    if (strip.dataset.projection === fingerprint) return;
+    strip.dataset.projection = fingerprint; strip.replaceChildren();
+    for (const chapter of chapters) {
+      const button = document.createElement('button'); button.type = 'button';
+      const index = timeline.frames.findLastIndex(frame => chapter.frameIds.includes(frame.id)) + 1;
+      button.textContent = translateLabel(chapter.label);
+      button.dataset.frame = String(index); button.setAttribute('aria-current', String(cursor === index));
+      strip.append(button);
+    }
+  }
+  function translateLabel(label) {
+    if (label === '입구') return tr('visual_search.entry');
+    const hop = /^홉 (\d+)$/.exec(label);
+    if (hop) return tr('visual_search.hop', { count: Number(hop[1]) });
+    if (label === '0 검색') return tr('visual_search.chapter_search');
+    if (label === '추가 검색') return tr('visual_search.chapter_continue');
+    const match = /^(질의 확장|확장|평가) (\d+)$/.exec(label);
+    return match ? tr(`visual_search.${match[1] === '질의 확장' ? 'query_column' : match[1] === '확장' ? 'expand_column' : 'evaluate_column'}`, { count: Number(match[2]) }) : label;
+  }
+  function updateActions() {
+    const group = $('node-actions'); if (!group) return;
+    const n = selectedRef && model.nodes.get(selectedRef); const v = n && view.nodes.get(selectedRef);
+    group.hidden = !n?.cardId || !v || v.a < 0.4;
+    if (group.hidden) return;
+    const sx = (v.x - cam.x) * cam.z; const sy = M.headerH + (v.y - cam.y) * cam.z;
+    group.style.left = `${sx}px`; group.style.top = `${sy + M.rowH * cam.z + M.actionGap}px`;
+    const state = snapshot();
+    const expanded = state.operations.some(op => op.kind === 'expand' && op.fromCardId === n.cardId && op.status === 'succeeded');
+    const disabled = !live || !state.initialSearchComplete || !!state.activeOperation || continuation;
+    $('node-expand').disabled = disabled || expanded;
+    $('node-evaluate').disabled = disabled || !state.evaluationTargetCardIds.length;
+    $('node-tree').disabled = !live;
+    $('node-expand').textContent = tr('visual_search.expand');
+    $('node-evaluate').textContent = tr(state.activeOperation?.kind === 'evaluate' || state.activeOperation?.fromCardId === null ? 'visual_search.evaluating' : 'visual_search.evaluate');
+    $('node-tree').setAttribute('aria-label', tr('visual_search.open_tree'));
   }
   let summaryTimer = 0;
   function tickSummary() {
@@ -1088,15 +1245,20 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   function chrome() {
     callbacks.onSummary?.(`홉 ${model.maxHop} · ${$("sum-jev").textContent.replace(/^, /, "")} · ${$("sum-time").textContent}`);
-    const f = frameOf(player.applied); const total = player.total;
+    const f = projected ? cursor : frameOf(player.applied); const total = receivedDone ? history.timeline().frames.length : player.total;
     $("count").textContent = total ? `${f}/${total}` : String(f);
     $("narr").textContent = narrate(model);
-    const scrub = $("scrub"); scrub.max = String(player.frameEnds.length); scrub.value = String(f); scrub.setAttribute("aria-valuetext", `${f}단계 ${narrate(model)}`);
+    const lastOperation = model.exploration?.operations.at(-1);
+    if (lastOperation?.kind === 'expand' && lastOperation.status === 'succeeded' && lastOperation.resultCardIds.length === 0) $('narr').textContent = tr('visual_search.empty');
+    const scrub = $("scrub"); scrub.max = String(total ?? player.frameEnds.length); scrub.value = String(f); scrub.setAttribute("aria-valuetext", `${f}단계 ${narrate(model)}`);
     const pl = $("t-play"); pl.setAttribute("aria-label", player.playing ? "일시정지" : "재생"); pl.title = player.playing ? "일시정지" : "재생";
     $("play-icon").setAttribute("d", player.playing ? "M4 3h3v10H4zM9 3h3v10H9z" : "M5 3l8 5-8 5z");
-    $("t-first").disabled = $("t-prev").disabled = f === 0; $("t-next").disabled = $("t-last").disabled = player.applied >= player.received && player.serverDone;
+    $("t-first").disabled = $("t-prev").disabled = f === 0; $("t-next").disabled = $("t-last").disabled = projected ? cursor >= total : player.applied >= player.received && player.serverDone;
     $("t-skip").disabled = !player.playing; $("t-skip").checked = player.fast;
     $("t-follow").hidden = ui.follow || !player.playing;
+    $("more").hidden = !receivedDone;
+    $("more").disabled = !live || continuation || !snapshot().initialSearchComplete || snapshot().activeOperation !== null;
+    renderChapters(); updateActions();
     invalidate();
   }
 
@@ -1194,6 +1356,14 @@ export function createMotionPlayer(root, callbacks, samples) {
   const sheetInset = () => (sheet.classList.contains("open") && W >= 720 ? sheet.offsetWidth : 0);
   function openSheet(ref, opener) {
     const n = model.nodes.get(ref); if (!n || n.type === "root") return;
+    if (n.referenceTarget) {
+      const pile = view.L.hidden.get(n.referenceTarget);
+      if (pile) ui.expanded.add(pile);
+      sync(performance.now(), false, null);
+      openSheet(n.referenceTarget, opener); return;
+    }
+    selectedRef = ref;
+    sync(performance.now(), false, null);
     const chips = [...$("tray").querySelectorAll(".rchip")];
     const index = chips.findIndex(c => c.dataset.nodeId === n.nodeId);
     if (index >= 0) syncDockActive(index, true);
@@ -1209,7 +1379,8 @@ export function createMotionPlayer(root, callbacks, samples) {
     const v = key[0] === "@" ? view.piles.get(key.slice(1)) : view.nodes.get(key); if (!v) return;
     const t = v.t || { x: v.tx, y: v.ty }; const z = cam.tz; const vw = (W - sheetInset()) / z; const vh = (H - M.headerH) / z; let x = cam.tx; let y = cam.ty;
     if (t.x + M.colW + 16 > x + vw) x = t.x + M.colW + 16 - vw; if (t.x - 16 < x) x = t.x - 16;
-    if (t.y + M.rowH + 30 > y + vh) y = t.y + M.rowH + 30 - vh; if (t.y - 10 < y) y = t.y - 10;
+    const bottom = M.rowH + (key === selectedRef ? (M.actionH + M.actionGap * 2) / z : 0) + 30;
+    if (t.y + bottom > y + vh) y = t.y + bottom - vh; if (t.y - 10 < y) y = t.y - 10;
     if (x !== cam.tx || y !== cam.ty) { const b = bounds(z); cam.tx = clamp(x, b.minX, b.maxX + sheetInset() / z); cam.ty = clamp(y, b.minY, b.maxY); if (reduced()) { cam.x = cam.tx; cam.y = cam.ty; } else cam.mode = "spring"; invalidate(); }
   }
 
@@ -1307,9 +1478,9 @@ export function createMotionPlayer(root, callbacks, samples) {
   // 단추
   listen($("t-play"), "click", play);
   listen($("t-first"), "click", () => seek(0));
-  listen($("t-prev"), "click", () => seek(frameOf(player.applied) - (player.frameEnds[frameOf(player.applied) - 1] === player.applied ? 1 : 0)));
-  listen($("t-next"), "click", () => seek(frameOf(player.applied) + 1));
-  listen($("t-last"), "click", () => { if (player.serverDone) seek(player.frameEnds.length, false); else skip(); });
+  listen($("t-prev"), "click", () => seek(projected ? cursor - 1 : frameOf(player.applied) - (player.frameEnds[frameOf(player.applied) - 1] === player.applied ? 1 : 0)));
+  listen($("t-next"), "click", () => seek(projected ? cursor + 1 : frameOf(player.applied) + 1));
+  listen($("t-last"), "click", () => { if (receivedDone) seek(history.timeline().frames.length, false); else skip(); });
   listen($("t-skip"), "change", e => { if (e.target.checked) skip(); else { player.fast = false; pump(); } });
   listen($("scrub"), "input", (e) => seek(Number(e.target.value)));
   listen($("t-low"), "change", (e) => { ui.showLow = e.target.checked; sync(performance.now(), true, null); });
@@ -1318,13 +1489,16 @@ export function createMotionPlayer(root, callbacks, samples) {
   listen($("t-fit"), "click", fitAll);
   listen($("t-follow"), "click", () => { setFollow(true); if (model.last) followHop(model.last.hop); });
   listen($("sheet-close"), "click", () => closeSheet());
-  listen($("more"), "click", () => callbacks.onMore(lastQuery || samples[current][0].data.query));
+  listen($("more"), "click", () => callbacks.onMore(lastQuery || samples[current][0].data.query, snapshot()));
+  listen($('node-expand'), 'click', () => callbacks.onOperationRequest?.('expand', snapshot()));
+  listen($('node-evaluate'), 'click', () => callbacks.onOperationRequest?.('evaluate', snapshot()));
+  listen($('node-tree'), 'click', () => { const n = model.nodes.get(selectedRef); if (n) callbacks.onOpenInTree?.(n.nodeId); });
+  listen($('node-actions'), 'keydown', e => { if (e.key === 'Escape') { e.preventDefault(); plot.focus(); } });
 
   // ------------------------------------------------------------------ 8. 시안의 표본
   let current = null;
   function choose(name, autoplay = true) {
     callbacks.onCancel(); live = false; current = name; callbacks.onResults([]);
-    for (const b of root.querySelectorAll(".seg button")) { const on = b.dataset.run === name; b.setAttribute("aria-checked", String(on)); b.tabIndex = on ? 0 : -1; }
     $("query-title").textContent = "“" + samples[name][0].data.query + "”";
     startLive(samples[name], true);
     if (autoplay && !reduced()) {
@@ -1333,12 +1507,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
   }
   const seg = root.querySelector(".seg");
-  listen(seg, "click", (e) => { const b = e.target.closest("button"); if (b) choose(b.dataset.run); });
-  listen(seg, "keydown", (e) => {
-    if (!e.key.startsWith("Arrow")) return; e.preventDefault();
-    const list = [...seg.querySelectorAll("button")]; const i = list.findIndex((b) => b.dataset.run === current); const next = list[(i + (e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length];
-    next.focus(); choose(next.dataset.run);
-  });
+  listen(seg, 'click', e => { const b = e.target.closest('button'); if (b) seek(Number(b.dataset.frame), false); });
   const resizeObserver = new ResizeObserver(resize); resizeObserver.observe(plot); cleanup.push(() => resizeObserver.disconnect());
   const themeObserver = new MutationObserver(() => { readTokens(); invalidate(); }); themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] }); cleanup.push(() => themeObserver.disconnect());
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTokens(); invalidate(); });
@@ -1346,13 +1515,19 @@ export function createMotionPlayer(root, callbacks, samples) {
   const refit = () => { for (const v of view.nodes.values()) v.fit = null; invalidate(); };
   if (document.fonts) { listen(document.fonts, "loadingdone", refit); const all = Object.values(samples).flat().flatMap((e) => (e.event === "step_completed" ? e.data.candidates.map((c) => c.title) : [])).join("") + "입구홉충분성루트윗구조접기더열곳없음호출시간후보상한0123456789.+"; Promise.all([document.fonts.load(font(650, 14), all), document.fonts.load(font(500, 14), all)]).then(refit, () => {}); }
 
-  const first = "atom";
+  const first = Object.hasOwn(samples, params.get('sample')) ? params.get('sample') : 'atom';
   const auto = params.get("auto") !== "0" && !reduced();
   choose(first, auto);
   if (params.has("event")) seekEvent(Number(params.get("event")));
   else if (params.has("frame")) seek(Number(params.get("frame")), false);
   return {
-    begin(query) {
+    begin(query, { resume = false } = {}) {
+      if (resume) {
+        if (!projected) skip();
+        history.truncate(cursor); history.begin(query, { resume: true });
+        continuation = true; revision += 1; player.serverDone = false; chrome(); return;
+      }
+      history.begin(query); projected = false; cursor = 0; selectedRef = null; initialStopReason = null; continued = false; receivedDone = false; continuation = false; revision += 1;
       live = true; lastQuery = query;
       clearTimeout(player.timer); clearTimeout(player.arrive); clearTimeout(summaryTimer);
       Object.assign(player, { events: [], ts: [], received: 0, applied: 0, frameEnds: [], total: null, playing: true, serverDone: false, fast: false, source: null, liveStart: performance.now(), lastApply: 0 });
@@ -1363,6 +1538,19 @@ export function createMotionPlayer(root, callbacks, samples) {
       setFollow(true); sync(performance.now(), false, null); tickSummary(); chrome();
     },
     receive,
+    getSnapshot: snapshot,
+    applyOperation(event, expectedRevision) {
+      if (expectedRevision != null && expectedRevision !== revision) return false;
+      if (event.type === 'started') {
+        if (!projected) skip();
+        history.truncate(cursor); revision += 1;
+      }
+      const atEnd = cursor === history.timeline().frames.length;
+      history.apply(event);
+      if (atEnd) projectTo(history.timeline().frames.length, true);
+      else chrome();
+      return true;
+    },
     error(message) { player.playing = false; clearTimeout(player.timer); clearTimeout(summaryTimer); $("status").textContent = message; chrome(); },
     dispose() { disposed = true; cleanup.forEach(fn => fn()); timers.forEach(id => window.clearTimeout(id)); animationFrames.forEach(id => window.cancelAnimationFrame(id)); }
   };

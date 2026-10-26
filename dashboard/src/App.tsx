@@ -38,6 +38,8 @@ function AppInner() {
   const [centerMode, setCenterMode] = useState<CenterMode>(request ? 'search' : 'compile');
   const [searchResults, setSearchResults] = useState<MotionNode[]>([]);
   const [selectionVerdict, setSelectionVerdict] = useState<MotionNode | null>(null);
+  const [revealRequest, setRevealRequest] = useState(0);
+  const openSearchNodeInTree = useCallback((nodeId: string) => { setSelectedNodeId(nodeId); setRevealRequest(value => value + 1); }, []);
   const verdict = selectionVerdict ?? searchResults.find(n => n.nodeId === selectedNodeId) ?? null;
   const handleSearchResults = useCallback((nodes: MotionNode[]) => {
     const nextVerdict = verdict ? nodes.find(n => n.nodeId === verdict.nodeId) ?? null : null;
@@ -82,10 +84,10 @@ function AppInner() {
     </header>
     {!isMobile && showConfigButton && <ConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} />}
     <main className="flex-1 min-h-0 overflow-hidden">
-      {isMobile ? <MobileLayout selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onSubmitSearch={submitSearch} onResults={handleSearchResults} /> :
+      {isMobile ? <MobileLayout selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onSubmitSearch={submitSearch} onResults={handleSearchResults} revealRequest={revealRequest} onOpenInTree={openSearchNodeInTree} /> :
         <ThreePanelLayout onLayoutWidthsChange={setWidths}
-          left={<TreeView selectedNodeId={actualNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} />}
-          center={<CenterWorkspace nodeId={actualNodeId} mode={centerMode} onModeChange={setCenterMode} request={request} onSelectNode={selectSearchNode} onResults={handleSearchResults} />}
+          left={<TreeView selectedNodeId={actualNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} revealRequest={revealRequest} />}
+          center={<CenterWorkspace nodeId={actualNodeId} mode={centerMode} onModeChange={setCenterMode} request={request} onSelectNode={selectSearchNode} onResults={handleSearchResults} onOpenInTree={openSearchNodeInTree} />}
           right={<CardDetail nodeId={actualNodeId} verdict={verdict} />} />}
     </main>
   </div></SystemProvider>;

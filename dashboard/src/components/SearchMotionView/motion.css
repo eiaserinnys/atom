@@ -1,5 +1,7 @@
 /* Approved r5 motion surfaces, scoped to the React host. */
 .search-motion {
+  --motion-node-width:268px; --motion-node-height:48px; --motion-column-gap:64px;
+  --motion-action-height:28px; --motion-action-gap:4px;
   --bg:var(--background); --bg-2:var(--card); --bg-3:var(--muted);
   --ink:var(--foreground); --ink-2:var(--muted-foreground); --ink-3:var(--muted-foreground);
   --rule:var(--border); --rule-strong:var(--line-strong); --accent:var(--brand);
@@ -22,7 +24,9 @@
 .search-motion .seg {display:flex;max-width:100%;overflow-x:auto;border:1px solid var(--border);}
 .search-motion .seg button {height:28px;padding:0 10px;border-right:1px solid var(--border);white-space:nowrap;}
 .search-motion .seg button:last-child {border:0;}
-.search-motion .seg button[aria-checked=true] {background:var(--foreground);color:var(--background);font-weight:600;}
+.search-motion .seg button[aria-current=true] {background:var(--foreground);color:var(--background);font-weight:600;}
+.search-motion .nb-actions {position:absolute;display:flex;gap:var(--motion-action-gap);z-index:3;}
+.search-motion .nb-actions .btn {height:var(--motion-action-height);font-size:14px;}
 .search-motion .search-workspace {flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
 .search-motion .toolbar {display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .search-motion .tool, .search-motion .btn, .search-motion .dock-nav-btn {display:inline-flex;align-items:center;justify-content:center;height:28px;border:1px solid var(--border);background:var(--background);color:var(--foreground);padding:0 8px;white-space:nowrap;}

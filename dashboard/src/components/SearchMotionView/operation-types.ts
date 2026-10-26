@@ -56,6 +56,7 @@ export interface VisualSearchNeighborsResponse {
   source?: {
     card_id: string;
     node_id: string;
+    card_type: CardData['card_type'];
     title: string;
     path: Array<{ node_id: string; title: string }>;
   };
@@ -74,7 +75,7 @@ export interface EvaluationResult {
 export interface EvaluationResponse {
   evaluation_id: string;
   query: string;
-  model: string;
+  model: 'jev-latest';
   results: EvaluationResult[];
   skipped: Array<{ card_id: string; reason: 'CARD_NOT_FOUND' | 'NO_BODY' | 'NO_CANONICAL_NODE' }>;
   audit: { calls: JevAuditCall[] };
@@ -93,6 +94,7 @@ export interface VisualOperationStarted {
 export type VisualOperationEvent =
   | VisualOperationStarted
   | { type: 'index_loading'; operationId: string }
+  | { type: 'evaluation_retry_started'; operationId: string }
   | { type: 'expansion_succeeded'; operationId: string; response: VisualSearchNeighborsResponse }
   | { type: 'evaluations_reused'; operationId: string; cardIds: string[] }
   | { type: 'evaluation_batch_succeeded'; operationId: string; response: EvaluationResponse }
@@ -100,6 +102,10 @@ export type VisualOperationEvent =
   | { type: 'failed'; operationId: string; errorCode: string; auditCalls?: JevAuditCall[] };
 
 export interface OperationSnapshot {
+  revision: number;
+  graphCardIds: string[];
+  cachedEvaluations: Map<string, { score: number }>;
+  continueSearch: boolean;
   selectedCardId: string | null;
   live: boolean;
   initialSearchComplete: boolean;

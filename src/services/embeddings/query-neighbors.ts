@@ -4,7 +4,6 @@ import { countIndexEmbeddings, listCurrentEligibleVersions, listIndexEmbeddings 
 import { getOpenAIKeyForWorker } from "../../db/queries/openai-settings.js";
 import type { EmbeddingErrorKind } from "../../shared/embeddings.js";
 import type { QueryExpansionInput, QueryExpansionResponse } from "../../shared/query-expansion.js";
-import type { CardType } from "../../shared/types.js";
 import { toOutlineExcerpt } from "../outline-excerpt.js";
 import { EmbeddingClientError, requestEmbeddings } from "./client.js";
 import { createEmbeddingInputFromText } from "./input.js";
@@ -35,8 +34,6 @@ const LOADING_RESULT: QueryNeighborServiceResult = {
   statusCode: 202,
   body: { status: "loading", retry_after_ms: 1000 },
 };
-
-type V6NeighborCardRow = Awaited<ReturnType<typeof getNeighborCardRows>>[number] & { card_type: CardType };
 
 export function createQueryNeighborService({ db, index, fetcher = fetch }: QueryNeighborServiceOptions): QueryNeighborService {
   let loadFailed = false;
@@ -129,7 +126,7 @@ export function createQueryNeighborService({ db, index, fetcher = fetch }: Query
         getNeighborCardRows(db, cardIds),
         getNeighborPathRows(db, cardIds),
       ]);
-      const cardById = new Map(cards.map(row => [row.card_id, row as V6NeighborCardRow]));
+      const cardById = new Map(cards.map(row => [row.card_id, row]));
       const paths = new Map<string, Array<{ node_id: string; title: string }>>();
       for (const row of pathRows) {
         const path = paths.get(row.card_id) ?? [];
