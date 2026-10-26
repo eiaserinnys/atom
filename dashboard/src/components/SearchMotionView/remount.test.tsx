@@ -35,6 +35,70 @@ function display(host: HTMLElement) {
 }
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+const neighborBody = { status: 'ready' as const, model: 'text-embedding-3-large', dimensions: 3072, key_configured: true,
+  index: { indexed_cards: 1 }, neighbors: [{ card_id: 'retry-card', node_id: 'retry-node', card_type: 'knowledge' as const, title: 'Retry candidate', path: [], excerpt: '', similarity: .8, tree_relation: null }] };
+const evaluationBody = { evaluation_id: 'retry-evaluation', query: 'query', model: 'jev-latest' as const,
+  results: [{ card_id: 'retry-card', node_id: 'retry-node', card_version: 1, score: .99, call_id: 'retry-call', question_key: 'card' }], skipped: [], audit: { calls: [] } };
+
+function failedFixture(query: boolean, evaluation: boolean) {
+  const fixture = initial();
+  (samples.atom as unknown as MotionEvent[]).forEach(event => fixture.player.receive(event));
+  const snapshot = fixture.player.getSnapshot(); const source = snapshot.graphCardIds[0];
+  const fromCardId = query ? null : source;
+  fixture.player.applyOperation({ type: 'started', id: 'lookup', kind: 'expand', fromCardId, query: query ? 'query' : null, viaOperationId: null, requestedCardIds: [] });
+  if (evaluation) {
+    fixture.player.applyOperation({ type: 'expansion_succeeded', operationId: 'lookup', response: neighborBody });
+    if (!query) {
+      fixture.player.applyOperation({ type: 'completed', operationId: 'lookup' });
+      fixture.player.applyOperation({ type: 'started', id: 'evaluation', kind: 'evaluate', fromCardId, query: null, viaOperationId: 'lookup', requestedCardIds: ['retry-card'] });
+    }
+  }
+  fixture.player.applyOperation({ type: 'failed', operationId: evaluation && !query ? 'evaluation' : 'lookup', errorCode: 'JEV_UNAVAILABLE' });
+  const record = fixture.player.getRecord(); fixture.player.dispose(); fixture.host.remove();
+  return { record, source, exclude: snapshot.graphCardIds };
+}
+
+test('restored neighbor lookup failures call the original expansion API once and add candidates', async () => {
+  environment();
+  for (const query of [false, true]) {
+    const { record, source, exclude } = failedFixture(query, false);
+    const fetch = vi.fn().mockImplementation(async (url: string, _init: RequestInit = {}) => ({ status: 200, json: async () => String(url).endsWith('/search/evaluate') ? evaluationBody : neighborBody }));
+    vi.stubGlobal('fetch', fetch);
+    const explorationState: NonNullable<SearchMotionViewProps['explorationState']> = { current: { requestId: 7, record } };
+    const host = document.createElement('div'); document.body.append(host); const root = createRoot(host); const results = vi.fn();
+    try {
+      await act(async () => root.render(<SearchMotionView explorationState={explorationState} request={{ query: 'query', requestId: 7 }} onSelectNode={vi.fn()} onResults={results} />));
+      expect(fetch).not.toHaveBeenCalled();
+      await act(async () => host.querySelector<HTMLButtonElement>('[role=alert] button')!.click());
+      const lookup = fetch.mock.calls.filter(([url]) => !String(url).endsWith('/search/evaluate'));
+      expect(lookup).toHaveLength(1);
+      if (query) {
+        expect(lookup[0][0]).toBe('/search/expand');
+        expect(JSON.parse(String(lookup[0][1]?.body))).toEqual({ query: 'query', exclude_card_ids: exclude, limit: 12 });
+      } else expect(lookup[0][0]).toBe(`/cards/${source}/neighbors?limit=12`);
+      expect(results.mock.calls.some(([nodes]) => nodes.some((node: { cardId: string }) => node.cardId === 'retry-card'))).toBe(true);
+    } finally { await act(async () => root.unmount()); host.remove(); }
+    expect(explorationState.current!.record.log.entries.at(-1)!.events.at(-1).type).toBe('completed');
+  }
+});
+
+test('restored evaluation failures call only the evaluation API once', async () => {
+  environment();
+  for (const query of [false, true]) {
+    const { record } = failedFixture(query, true);
+    const fetch = vi.fn().mockResolvedValue({ status: 200, json: async () => evaluationBody }); vi.stubGlobal('fetch', fetch);
+    const explorationState: NonNullable<SearchMotionViewProps['explorationState']> = { current: { requestId: 7, record } };
+    const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+    try {
+      await act(async () => root.render(<SearchMotionView explorationState={explorationState} request={{ query: 'query', requestId: 7 }} onSelectNode={vi.fn()} onResults={vi.fn()} />));
+      await act(async () => host.querySelector<HTMLButtonElement>('[role=alert] button')!.click());
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0][0]).toBe('/search/evaluate');
+      expect(JSON.parse(fetch.mock.calls[0][1].body).card_ids).toEqual(['retry-card']);
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  }
+});
+
 test('completed exploration remount makes zero fetches and keeps chapters, cursor and camera', async () => {
   environment();
   const fixture = initial();

@@ -12,6 +12,7 @@ function setup() {
   let revision = 0;
   const eventTypes: string[] = [];
   const player = {
+    getRecord: () => ({ log: history.exportLog(), cursor: history.timeline().frames.length, complete: true, camera: { x: 0, y: 0, z: 1 } }),
     getSnapshot(): OperationSnapshot {
       const { projection } = history.project(history.timeline().frames.length);
       return {
