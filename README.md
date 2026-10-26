@@ -1,291 +1,368 @@
 # atom
-**A knowledge base of the agents, by the agents, for the agents.** 
 
-Atomic knowledge cards in a tree with symlinks — think Zettelkasten, but for agents.<br/>
-Exposed over MCP so AI agents can read, write, and reorganize knowledge directly.
+**A knowledge base of the agents, by the agents, for the agents.**
 
-## Why atom
+`atom` organizes knowledge as a tree for AI agents to read and write. Agents read and update the tree through 17 Model Context Protocol (MCP) tools or a Fastify REST API. Humans inspect and edit the same tree in a three-panel React dashboard that updates in real time over Server-Sent Events (`GET /events`).
 
-Most knowledge tools are built for humans first, then bolted on with an API.
-atom is the opposite — **MCP is the primary interface**. The dashboard exists for oversight, but agents are the first-class citizens.
+![atom three-panel dashboard](docs/screenshots/overview.png)
 
-An agent can:
-- **Create** a knowledge card and place it in a tree hierarchy — in one call
-- **Compile** any subtree into depth-controlled markdown — feed a 200-node knowledge tree into a single prompt
-- **Symlink** a card into multiple locations without duplication
-- **Batch** dozens of creates, updates, moves, deletes, and symlinks in a single atomic transaction
-- **Search** by BM25 full-text across titles, content, and tags — scoped to any subtree
-- **Unfurl** external references inline during compilation — Trello cards, and more
-- **Track provenance** — every card records its source, snapshot, checksum, and staleness
+## Core Design
 
-Humans get a React dashboard with a 3-panel layout (tree / compiled view / card detail) and real-time SSE updates. But the system is designed so an agent can operate it end-to-end without human intervention.
+### Card and TreeNode Separation
 
-<p align="center">
-  <img src="atom.jpg" alt="atom" width="100%" />
-</p>
+`atom` keeps content and hierarchy in two separate database tables:
 
-## Architecture
+- **`cards`** store the content. Each card has a `title` (up to 50 characters), a `card_type` (`structure` for section headings, `knowledge` for notes), Markdown `content`, `tags`, and `references` (an array of referenced card UUIDs). Cards also track timestamps (`card_timestamp`, `content_timestamp`, `updated_at`), source provenance (`source_type`, `source_ref`, `source_snapshot`), and a `version` number for optimistic concurrency control.
+- **`tree_nodes`** organize cards into a parent-child hierarchy. Each node stores a `parent_node_id`, a 10-digit LexoRank `position`, an `is_symlink` flag, and an optional `journal_limit`. `position` is stored as text in the database and returned as a number in API and MCP responses.
 
-```
-PostgreSQL 16
-    ├── cards           — atomic knowledge units
-    ├── tree_nodes      — hierarchical placement (symlinks, BFS-safe)
-    ├── unfurl_snapshots — cached external resource snapshots
-    └── agents          — API key credentials for agent access
+### Symlinks Without Duplicating Content
 
-Fastify server
-    ├── REST API        — 17 endpoints, used by the dashboard
-    ├── MCP HTTP        — POST /mcp, Streamable HTTP, stateless
-    ├── MCP stdio       — local agent transport
-    ├── Batch API       — POST /batch, atomic multi-op transactions
-    ├── Unfurl service  — external URL/card expansion pipeline
-    └── SSE             — GET /events, real-time change stream
+A card can appear under more than one parent. One placement is the canonical node (`is_symlink = false`); every other placement is a symlink node (`is_symlink = true`) that references the same `card_id`.
 
-React dashboard
-    — tree / compile / card detail panels
-    — live updates via SSE (useAtomEvents hook)
-    — Google + Slack OAuth authentication
-    — unfurl toggle with credentials management
+When `compile_subtree` encounters a symlink node, it expands the children of that card's canonical node. The traversal is depth-first: it finishes each child's subtree before moving on to the next sibling. It tracks the `card_id` values on the current path. If a node's card is already on that path, the traversal marks the node with `*(cycle)*` instead of expanding it again.
+
+### Subtree Compilation for Agent Context Windows
+
+`compile_subtree` turns a branch into one Markdown document, starting from any `node_id`. Heading levels (`#` through `######`) follow tree depth. Setting `titles_only: true` returns an indented title outline with character counts so agents can inspect a branch before compiling full card content.
+
+### Orphan-Free Deletion Rules
+
+- **Deleting a card** (`delete_card`, `DELETE /cards/:id`, or `batch_op.deletes`) cascades to every `tree_nodes` row referencing that card, including symlinks.
+- **Deleting a tree node** (`delete_node` or `DELETE /tree/:nodeId`) removes the node and its descendants in a single transaction. Cards from that subtree are deleted too, unless a canonical or symlink node in another branch still references them.
+
+## Quick Start
+
+`atom` defaults to a SQLite file. You can run the server and dashboard locally without PostgreSQL or OAuth credentials.
+
+### Prerequisites
+
+- Node.js 20.19+ or 22.12+, and npm
+- pnpm (used for the `dashboard/` frontend workspace)
+
+### 1. Install Dependencies
+
+```bash
+npm install
+pnpm --dir dashboard install
 ```
 
-## Data model
+### 2. Create Your Local `.env`
 
-Two tables. Content and placement are separated by design.
-
-**Card** — the atomic unit of knowledge:
-
-```sql
-cards (
-  id, card_type ('structure' | 'knowledge'),
-  title (≤50 chars), content,
-  tags[], references[],
-  card_timestamp, content_timestamp,
-  source_type, source_ref, source_snapshot, source_checksum, source_checked_at,
-  staleness ('unverified' | 'fresh' | 'stale' | 'outdated'),
-  version, fts_vector (auto-generated tsvector for BM25)
-)
+```bash
+cp .env.example .env
 ```
 
-**TreeNode** — where a card lives in the hierarchy:
+In `.env.example`, `DATABASE_URL` is commented out, so the server uses SQLite at `./atom.db`. Set `SQLITE_PATH` to use a different file path. The example file also sets `API_PORT=4200`.
 
-```sql
-tree_nodes (
-  id, card_id → cards,
-  parent_node_id → tree_nodes (self-ref, CASCADE),
-  position, is_symlink,
-  created_at
-)
+To use the dashboard without setting up Google or Slack OAuth, turn on the local auth bypass in `.env`:
+
+```dotenv
+AUTH_BYPASS=1
 ```
 
-One card can appear in multiple tree locations via symlinks.
-Deleting a card cascades all its nodes. Deleting a node preserves the card.
+> [!WARNING]
+> `AUTH_BYPASS=1` turns off browser sign-in: every request that would otherwise need a session cookie runs with `admin` access. Because the server listens on `0.0.0.0` by default, any device that can reach the port gets the same `admin` access. Use `AUTH_BYPASS=1` only on a machine that other devices cannot reach. The server refuses to start if `AUTH_BYPASS=1` is set together with `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
 
-## MCP tools (17)
+### 3. Seed Synthetic Demo Data
 
-| Tool | Description |
-|------|-------------|
-| `create_card` | Create card + tree node in one call |
-| `get_card` | Retrieve card by UUID |
-| `update_card` | Partial update (content changes bump `content_timestamp`) |
-| `delete_card` | Delete card and all its tree nodes |
-| `get_backlinks` | Find cards that reference this card |
-| `get_tree` | List root-level nodes |
-| `get_node` | Single node with embedded card data |
-| `list_children` | Direct children of a node |
-| `compile_subtree` | BFS markdown compilation with depth/filter options |
-| `create_symlink` | Place a card at another tree location |
-| `move_node` | Relocate a node to a new parent/position |
-| `update_node` | Update a node's `journal_limit` |
-| `delete_node` | Remove node only (card preserved, children cascade) |
-| `search_cards` | BM25 full-text search with snippets; scope by `rootNodeId`; opt into Jev with `engine: "jev"` |
-| `get_card_neighbors` | Return embedding neighbors with canonical paths and card types (HTTP MCP only) |
-| `evaluate_cards` | Score how directly card content answers the original Jev query |
-| `batch_op` | Atomic multi-operation transaction (creates/updates/moves/deletes/symlinks) |
+```bash
+npx tsx scripts/seed-demo.ts
+```
 
-### batch_op
+The script runs database migrations, then loads `examples/demo/seed.json` into a sample tree of structure cards, knowledge cards, and a symlink. Pass `--file <path>` to load your own seed file instead. If `tree_nodes` already has rows, the script exits and leaves existing data untouched.
 
-The most powerful tool. Executes creates, updates, moves, deletes, and symlink operations in a single PostgreSQL transaction.
+> [!NOTE]
+> `scripts/seed-demo.ts` reads `DATABASE_URL` and `SQLITE_PATH` directly from the process environment without loading `.env`. If you changed `SQLITE_PATH` in `.env`, pass it inline: `SQLITE_PATH=./custom.db npx tsx scripts/seed-demo.ts`.
 
-- **temp_id references** — new cards can reference each other within the same batch via `temp_id` / `parent_temp_id`
-- **Topological sort** — parent nodes are created before children, with cycle detection
-- **Symlinks operation** — create multiple symlinks in one atomic batch
-- **Atomic** — everything succeeds or everything rolls back
+### 4. Start the API Server and Dashboard
 
-### compile_subtree
+Start the Fastify API and MCP server in one terminal:
 
-Renders a subtree as markdown via BFS traversal. Options:
+```bash
+npm run dev
+```
 
-| Option | Description |
-|--------|-------------|
-| `depth` | Max traversal depth (default: 2) |
-| `titles_only` | Extract headings only, skip card bodies. Each line carries `[node:<uuid> card:<uuid>] (N chars)` by default; pass `include_ids=false` for minimal output. |
-| `include_ids` | Tri-state. Omit (default) for ID-annotated output (short label in `titles_only`, full HTML metadata in heading mode). `true` forces full HTML metadata in `titles_only` mode as well. `false` for minimal output (no IDs, legacy). |
-| `max_chars` | Truncate output at N characters |
-| `exclude_nodes` | Skip specific node IDs |
-| `numbering` | Auto-assign hierarchical numbers (1.2.3) |
+Start the React dashboard in a second terminal, pointing `VITE_API_BASE_URL` to port `4200`:
 
-Symlink nodes are marked with `~`. Cycles are detected by `card_id` and marked with `*(cycle)*`.
+```bash
+VITE_API_BASE_URL=http://localhost:4200 pnpm --dir dashboard dev
+```
 
-Ideal for feeding structured knowledge into an agent's context window.
+Open `http://localhost:5173` in your browser.
 
-### Connecting
+## Connecting Agents via MCP
 
-**Claude Desktop / Claude Code** (`claude_desktop_config.json`):
+Agents can connect to 17 MCP tools via stateless Streamable HTTP (`POST /mcp`) or local `stdio`.
+
+### Streamable HTTP MCP (Recommended)
+
+1. Open the dashboard and click the **Settings** gear icon in the header.
+2. Select the **API Keys** tab, enter an `agent_id` (and an optional display name), choose a scope, and click **Generate**. The scope menu starts at `read`; switch it to `write` for an agent that edits the tree.
+3. Copy the API key now; it is shown once on creation, and `atom` stores only its bcrypt hash (`secret_hash`) in the `agents` table.
+4. Register the endpoint in an MCP client that supports Streamable HTTP (for example, `.mcp.json` in Claude Code):
 
 ```json
 {
   "mcpServers": {
     "atom": {
-      "url": "https://your-domain.example.com/mcp",
-      "headers": { "x-api-key": "<MCP_SECRET>" }
+      "type": "http",
+      "url": "http://localhost:4200/mcp",
+      "headers": {
+        "x-api-key": "YOUR_AGENT_API_KEY"
+      }
     }
   }
 }
 ```
 
-**stdio** (local):
+After a key's first successful request, the server caches it in memory under its SHA-256 digest. Every call is still checked against active `agents` rows.
+
+### Local stdio MCP
+
+The `stdio` transport connects directly to the database configured in `.env` (`SQLITE_PATH` or `DATABASE_URL`) without API key authentication. Use `stdio` when the client and database run on the same machine (for example, in `claude_desktop_config.json`).
+
+Build the TypeScript sources first, then launch `dist/mcp/server.js`:
 
 ```bash
-npm run mcp        # built
-npm run mcp:dev    # tsx watch
+npm run build
+npm run mcp
 ```
 
-## REST API (21 endpoints)
+`npm run mcp:dev` runs the TypeScript entry point directly during development. Writes over `stdio` are attributed to `MCP_AGENT_ID` (default `"stdio-agent"`) in `created_by` and `updated_by`.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/cards/:id` | Get card |
-| POST | `/cards` | Create card (+ tree node) |
-| PUT | `/cards/:id` | Update card |
-| DELETE | `/cards/:id` | Delete card (cascades nodes) |
-| GET | `/backlinks/:cardId` | Reverse references |
-| GET | `/tree` | Root-level nodes |
-| GET | `/tree/:nodeId` | Single node with card |
-| GET | `/tree/:nodeId/children` | Direct children (agent key auth supported) |
-| GET | `/tree/:nodeId/compile` | BFS markdown (`?depth=N`, default 2) |
-| GET | `/tree/outline` | Body-free structural outline — children + counts (also `/api/tree/outline` with agent key auth, see below) |
-| POST | `/tree/symlink` | Create symlink |
-| PUT | `/tree/:nodeId/move` | Move node |
-| DELETE | `/tree/:nodeId` | Delete node (card preserved) |
-| GET | `/search?q=` | BM25 full-text search (`?rootNodeId=` for scoped search); opt into Jev with `?engine=jev` |
-| POST | `/search/evaluate` | Evaluate card content against an original query and context (JWT viewer role) |
-| GET | `/cards/:cardId/neighbors` | Get embedding neighbors (JWT session auth; limit defaults to 20, maximum 50) |
-| GET | `/api/cards/:cardId/neighbors` | Get embedding neighbors through agent key auth (`x-api-key`) |
-| POST | `/api/cards` | Create card via agent key auth |
-| POST | `/mcp` | Streamable HTTP MCP endpoint |
-| POST | `/batch` | Batch operation (atomic transaction) |
-| GET | `/events` | SSE real-time event stream |
+> [!NOTE]
+> `get_card_neighbors` requires the HTTP server's OpenAI embedding service and returns `NEIGHBORS_HTTP_ONLY` when invoked over `stdio`.
 
-### Jev search
+### MCP Tool Reference (17 Tools)
 
-Jev is opt-in. `/search` without `engine` and MCP `search_cards` without `engine` keep the existing BM25 result array. Set `engine=jev` to receive a trace-bearing response envelope.
+Keys with the `write` scope can call all 17 tools. For `read` keys, the server registers only the query tools marked `read` below.
 
-- Inputs: `query`/`q`, optional structure `root_node_id` (REST also accepts `rootNodeId`), `limit` from 1 to 6, and optional `context_agent`, `context_project`, and `context_task` (MCP `context` object). REST `exhaustive=1` or MCP `exhaustive: true` records sufficiency but continues until exhaustion or a run limit. REST rejects other supplied values; MCP requires a boolean. The complete response and `run` event include `exhaustive`.
-- Jev does not accept BM25 filters such as tags, card type, date range, source type, or strategy.
-- The schema version 2 response contains `status`, `complete`, `stop_reason` (`sufficient` or `exhausted` on completion), selected `results`, and `trace` with candidate occurrences, steps, and safe audit calls. `limited` means the time, candidate, or Jev call ceiling stopped traversal; `complete` is false and results come only from cards already scored.
-- Server configuration uses `TYPESAFE_API_KEY` and `TYPESAFE_BASE_URL`. Jev uses `jev-latest`, v3 prompts, at most 48 candidates and 60,000 serialized characters per judgment, at most 20,000 candidate occurrences and 45 seconds per run, and at most two shared search/evaluation runs per process.
-- Selection uses `max(0.30, min(0.50, highest_score - 0.10))`: cards at 0.50 or above qualify, while lower top scores retain the relative window and 0.30 floor. Results are sorted by score, then discovery order, with at most six cards (or the requested lower limit). Sufficiency checks use this same selection.
-- Queries start with up to 12 distinct words joined with OR, taking 24 lexical seeds. Each hop judges structures and content with at most three concurrent Jev calls. Knowledge hits at 0.50 open their parent without a gate. A sufficiency score of 0.70 means the requested subject has been found. Each run sends at most 32 Jev calls.
-- Unscoped root widening opens virtual-root structure children without a Jev gate (`opened_root`); scoped children still receive structure judgments, and direct root knowledge is scored normally.
-- Structures with more than 96 direct children are deferred before expansion, using `child_count` from outline metadata or a depth-1 summary read for seeds, symlinks, and hit parents. Knowledge occurrences have `child_count: null`. The opening decision retains its action and lists deferred structures in `deferred_refs`. Empty frontiers resume one structure before root widening or exhaustion, prioritizing hit-opened structures, higher gate scores, then discovery order. `deferred_scan` identifies that structure; its children are then discovered and judged in full, subject to the call budget. Unresumed children never enter the candidate trace. Large child structures can be deferred in turn.
-- REST `GET /search?q=…&engine=jev&stream=1` streams `run`, `step_started`, `step_completed`, and `done` as SSE. Use a credentialed fetch body stream. Completed steps include newly discovered candidates and the same full safe audit call as the REST JSON response. `seq` orders starts; replay completions by `completed_at`, then `seq`. Pre-stream errors remain JSON. Disconnecting cancels the run. MCP Jev responses omit `trace` by default and add `summary` with `jev_calls`, `input_tokens`, `elapsed_ms`, `hops`, `candidates`, and the last `selection_threshold` (`null` if no selection step); `include_trace: true` returns the full response. REST always retains the full trace.
-- Continue a search manually by calling `get_card_neighbors` for a selected card, then `evaluate_cards` with the original query/context and returned card IDs. Compare each score with the first `search_cards(engine="jev")` response's `summary.selection_threshold`, using `0.5` when it is `null`. Neighbors return the API's ready/loading/error body and include `card_type` for the source and each neighbor; the tool is available through HTTP MCP, while stdio returns `NEIGHBORS_HTTP_ONLY`. `evaluate_cards` omits audit calls by default; `include_trace: true` includes the sanitized audit.
-- To evaluate a query set, run `node scripts/jev-search-eval.mjs path/to/queryset.json` with `ATOM_MCP_URL` and `ATOM_API_KEY` supplied by the environment. The tool requests `include_trace: true` for evaluation metrics. Items accept `id`, `category`, `query`, `targets`, and optional `expect` (`hit`, `some`, or `none`). Each query runs once, sequentially. JSON lines report target selection/scores, result count/highest score, calls, input tokens, elapsed time, status, stop reason, and hops; the final summary groups matches by category and reports median/max call counts and time. Bodies, excerpts, and key values are never printed.
+| Category | Tool | Scope | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Card** | `create_card` | `write` | Create a `structure` or `knowledge` card (`title`, `content`, `tags`, `references`, source fields) and place it in the tree (`parent_node_id`, `position`). |
+| | `get_card` | `read` | Fetch a card's fields by `card_id`. |
+| | `update_card` | `write` | Update `title`, `content`, `tags`, `references`, `content_timestamp`, or source fields, with optional `expected_version` for optimistic locking. |
+| | `delete_card` | `write` | Delete a card and cascade-delete all `tree_nodes` pointing to it. |
+| | `get_backlinks` | `read` | Find all cards whose `references` array contains `card_id`. |
+| **Tree** | `get_tree` | `read` | Return a flat list of root-level tree nodes. |
+| | `get_node` | `read` | Fetch a single `tree_nodes` row and its associated card data. |
+| | `list_children` | `read` | List direct child nodes of `parent_node_id` (or the root nodes if omitted) ordered by `position`. |
+| | `compile_subtree` | `read` | Compile a node and its descendants into a single Markdown document. |
+| | `create_symlink` | `write` | Create a symlink node (`is_symlink = true`) that places an existing card (`card_id`) under `parent_node_id`. |
+| | `move_node` | `write` | Move `node_id` to `parent_node_id` (or keep its current parent) and position it via `before`, `after`, `to`, or the deprecated `position`. |
+| | `update_node` | `write` | Set or clear a node's `journal_limit` (`null` or `0` for unlimited, or a positive integer `N` for the latest `N` children by descending `position`). |
+| | `delete_node` | `write` | Delete `node_id`, its descendant nodes, and any cards in that subtree that have no remaining tree nodes elsewhere. |
+| **Search & Eval** | `search_cards` | `read` | Search card titles and content via full-text search (SQLite `fts5` or PostgreSQL `tsvector`/`ts_rank`, default `limit` `20`) or Jev (`engine: "jev"`, default `limit` `6`). |
+| | `get_card_neighbors` | `read` | Return nearest-neighbor cards by OpenAI embedding cosine similarity (default `limit` `20`, max `50`; HTTP MCP only). |
+| | `evaluate_cards` | `read` | Evaluate 1 to 48 candidate `card_ids` against a Jev query and context, returning a relevance `score` (`0` to `1`) for each card. |
+| **Batch** | `batch_op` | `write` | Run multiple card and tree mutations in one database transaction. |
 
-### Tree outline
+### Progressive Disclosure with `compile_subtree`
 
-`GET /api/tree/outline` (agent key, `x-api-key`) and `GET /tree/outline` (dashboard session) return the shape of a subtree without card bodies: direct children expanded to `depth` levels, and for every returned node its direct-child count and total descendant count (unlimited depth). Use it instead of `compile?titles_only=true` when you only need structure metadata.
+Read a branch outline first, then compile full card content only for the nodes you need.
 
-**No card bodies, and not N+1** — one recursive CTE serves the whole outline (plus a node lookup when `node_id` is given). An optional short plain-text `excerpt` of each direct child comes from the same query, so one outline call is enough to judge what a subtree holds.
+| Parameter | Default | Description |
+| :--- | :--- | :--- |
+| `node_id` | (required) | Root tree node UUID of the subtree to compile. |
+| `depth` | `3` | Maximum traversal depth (`null` compiles the full tree without a depth limit). In the REST API, `GET /tree/:nodeId/compile` also defaults to `3`, while `GET /api/tree/:nodeId/compile` defaults to `2`. |
+| `include_ids` | (omitted) | Controls ID annotations. Leave it unset for the defaults (`[node:X card:Y]` in `titles_only` mode, HTML metadata comments in heading mode), set `true` to force full HTML metadata in `titles_only` mode, or set `false` to drop IDs entirely. |
+| `titles_only` | `false` | When `true`, outputs an indented outline of card titles and character counts without card `content`. |
+| `numbering` | `false` | When `true`, prepends hierarchical numbers (`1`, `1.1`, `1.1.1`) to compiled headings below the root node. |
+| `max_chars` | (omitted) | Truncates output to at most `N` characters on a line boundary (`0` or negative means unlimited). |
+| `exclude_nodes` | (omitted) | Array of `node_id` UUIDs whose subtrees are skipped. |
+| `limit` | (omitted) | Restricts direct children (`depth = 1`) to the latest `N` items by `card_timestamp`. |
+| `resolve_refs` | (omitted) | External reference unfurl mode: `"cached"` (use `cards.source_snapshot` if present, otherwise fetch) or `"fresh"` (always fetch). Omit to skip unfurling. |
+| `credentials` | (omitted) | Per-source credentials map for external reference unfurling (for example, `{ trello: { apiKey: "...", token: "..." } }`). |
 
-| Query | Description |
-|-------|-------------|
-| `node_id` | Node UUID. Omit for the virtual root (`parent_node_id IS NULL`). A symlink resolves to its canonical node's children. |
-| `depth` | `1`–`3` (default `2`) — how many levels `children` is filled. Anything else is `400`. |
-| `excerpt_chars` | `0`–`400` (default `0`). Above `0`, **level-1 nodes only** (the entries of `nodes`, i.e. direct children of `node_id`) get `excerpt`: the card body as plain text — fenced code blocks, table delimiter rows and horizontal rules dropped, the symbols `` ` * _ > # | `` removed, whitespace collapsed — cut to that many characters with `…` appended when cut; `null` when the card has no body, `""` when the body is only markup. Nodes inside `children` (level 2–3) never carry `excerpt` and their bodies are not read. A symlink node carries its target card's excerpt. `0` omits the field and does not read card bodies at all. Anything else is `400`. |
+### Atomic Multi-Step Updates with `batch_op`
 
-Unknown `node_id` → `404`. Below the depth limit a node has `children: []` and is summarized by `child_count` / `descendant_count`. Symlink nodes are leaves (counts `0`, never expanded). `canonical_node_id` is the node whose children were listed (differs from `node_id` only for a symlink; `null` for the virtual root).
+`batch_op` runs up to seven operation arrays inside one transaction in a fixed execution order:
 
-```jsonc
-// GET /api/tree/outline?node_id=544f…&depth=2
-{
-  "node_id": "544f…",
-  "canonical_node_id": "544f…",
-  "depth": 2,
-  "nodes": [
-    {
-      "id": "9064…", "card_id": "b5df…", "parent_node_id": "544f…", "position": 300,
-      "is_symlink": false, "title": "설계 원칙", "card_type": "structure",
-      "child_count": 2, "descendant_count": 3,
-      "children": [
-        {
-          "id": "a4c9…", "card_id": "4d73…", "parent_node_id": "9064…", "position": 400,
-          "is_symlink": false, "title": "정본은 하나", "card_type": "knowledge",
-          "child_count": 1, "descendant_count": 1, "children": []
-        },
-        {
-          "id": "7c30…", "card_id": "8b9c…", "parent_node_id": "9064…", "position": 600,
-          "is_symlink": false, "title": "명시적 실패", "card_type": "knowledge",
-          "child_count": 0, "descendant_count": 0, "children": []
-        }
-      ]
-    },
-    {
-      "id": "420f…", "card_id": "066d…", "parent_node_id": "544f…", "position": 800,
-      "is_symlink": true, "title": "모듈 깊이", "card_type": "knowledge",
-      "child_count": 0, "descendant_count": 0, "children": []
-    }
-  ]
-}
+1. `creates` (new cards placed in the tree, each labeled with a caller-assigned `temp_id`)
+2. `symlinks` (new symlink nodes for existing `card_id` values)
+3. `updates` (card field updates by `card_id`)
+4. `node_updates` (`journal_limit` updates on existing nodes by `node_id`)
+5. `moves` (node reparenting and reordering)
+6. `child_orders` (bulk reordering of direct children under `parent_node_id`)
+7. `deletes` (card deletions by `card_id`, removing each card and all of its tree nodes)
+
+Each item in `creates` requires a caller-assigned `temp_id` string. Other items in `creates`, `symlinks`, and `moves` within the same request can pass that string in `parent_temp_id` to place nodes under the newly created card. `symlinks.card_id` and `child_orders.parent_node_id` do not accept `temp_id` values and require real UUIDs. The call returns `{ created, symlinked, updated, node_updated, moved, child_ordered, deleted }`, where `created` is an array of `{ temp_id, card_id, node_id }` objects. If any step fails, the whole transaction rolls back.
+
+## Web Dashboard
+
+`dashboard/` is a single-page app built with React 19 and Vite. It supports nine UI languages (`en`, `ko`, `zh`, `ja`, `es`, `de`, `fr`, `ru`, `pt`) through `react-i18next`. It also listens to the `GET /events` SSE stream and refreshes open panels whenever an agent or a user changes a card or tree node.
+
+![Card detail editor](docs/screenshots/card-detail.png)
+
+![Compile view and depth menu](docs/screenshots/compile.png)
+
+![Search results dropdown](docs/screenshots/search.png)
+
+![Settings window](docs/screenshots/settings.png)
+
+![Mobile tree view](docs/screenshots/mobile.png)
+
+## Authentication and Permissions
+
+### Browser Authentication
+
+Browser API access is denied by default:
+
+- **Default 401 when unconfigured**: If neither `GOOGLE_CLIENT_ID` nor `SLACK_CLIENT_ID` is configured and `AUTH_BYPASS` is not `1`, browser API routes that need a session cookie return `401`. This rule does not cover public routes such as `/api/health` and `/api/auth/*`. Agent routes (`/mcp`, `/api/cards`, `/api/tree`) authenticate with an API key instead.
+- **Startup configuration validation**: At startup, `src/api/startup-config.ts` checks these settings:
+  - `AUTH_BYPASS=1` is never set at the same time as `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
+  - When `GOOGLE_CLIENT_ID` is set, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `JWT_SECRET`, and `FRONTEND_URL` are also present.
+  - When `SLACK_CLIENT_ID` is set, `SLACK_CLIENT_SECRET`, `SLACK_CALLBACK_URL`, `JWT_SECRET`, and `FRONTEND_URL` are also present.
+- **Google OAuth admission (`ALLOWED_EMAIL`)**: A new Google user can sign in only if their email matches `ALLOWED_EMAIL`. The value can be a single address (`alice@example.com`) or a domain suffix (`@example.com`). If the `users` table is empty at startup and `ALLOWED_EMAIL` is a full address, `seedMigration()` creates that user as the first `admin`. Users who sign in through Google after that are created as `editor`.
+- **Slack OAuth admission (`SLACK_ALLOWED_TEAM_ID`)**: Creating a new user via Slack sign-in requires `SLACK_ALLOWED_TEAM_ID` to be set and to match the user's Slack workspace team ID. If the variable is empty, new Slack users are rejected. Admitted Slack users are created with the `editor` role.
+
+### Permissions Model
+
+- **Instance-wide visibility**: `atom` does not partition visibility by card or subtree. Every authenticated browser user (`admin`, `editor`, `viewer`) and every active agent key (`read`, `write`) can read the entire tree in that instance.
+- **Sharing a single subtree publicly**: If an instance holds private branches, do not hand out `viewer` accounts or `read` agent keys for public sharing. Compile the branch with `compile_subtree` and `include_ids: false`, then publish the resulting Markdown as a static page.
+- **Browser user roles (`users.role`)**:
+  - `admin`: Full read/write access to cards and tree nodes, plus these admin endpoints:
+    - User roles and activation (`/api/config/users`)
+    - Agent key issuance and deactivation (`/api/config/agents`)
+    - `.env` editing (`/api/config/env`)
+    - OpenAI key management (`/api/config/openai`)
+    - Database connection testing and SQLite-to-PostgreSQL migration (`/api/config/db-test`, `/api/config/migrate-to-pg`)
+    - Server restart (`/api/system/restart`)
+  - `editor`: Can create, edit, move, or delete cards and tree nodes. Can also run searches, compile subtrees, read database status (`/api/config/db-info`), and list agent keys. Cannot issue, reissue, or modify agent keys. Cannot manage users or change any other admin setting.
+  - `viewer`: Read-only. Mutating browser requests (`POST`, `PUT`, `PATCH`, `DELETE`) return `403`, except for two read-only `POST` endpoints: `POST /tree/:nodeId/compile` and `POST /search/evaluate`.
+- **Immediate enforcement**: Changing a user's role or deactivating a user (`is_active = false`) in **Settings > Users** takes effect on the very next HTTP request.
+- **Agent key scopes (`agents.scope`)**:
+  - `write`: Can invoke all 17 MCP tools and call mutating agent REST endpoints (`POST /api/cards`, `PATCH /api/cards/:cardId`). Keys created before scopes existed have `write`, and so does a key issued through the API without a `scope` field.
+  - `read`: Can see and call only the read-only query MCP tools, and gets `403` from mutating agent REST endpoints. The dashboard issues `read` keys by default.
+  - Only `admin` users can issue or deactivate agent keys.
+
+## Running with PostgreSQL
+
+Use PostgreSQL in production or when many agents search at the same time. Its full-text search uses the built-in `tsvector`, `websearch_to_tsquery`, and `ts_rank`.
+
+1. Set `DATABASE_URL` in `.env`:
+
+```dotenv
+DATABASE_URL=postgresql://postgres:password@localhost:5432/atom_db
 ```
 
-```jsonc
-// GET /api/tree/outline?node_id=9064…&depth=1&excerpt_chars=60
-{
-  "node_id": "9064…", "canonical_node_id": "9064…", "depth": 1,
-  "nodes": [
-    {
-      "id": "a4c9…", "card_id": "4d73…", "parent_node_id": "9064…", "position": 400,
-      "is_symlink": false, "title": "정본은 하나", "card_type": "knowledge",
-      "child_count": 1, "descendant_count": 1,
-      "excerpt": "3. 정본은 하나 모든 정보는 정확히 하나의 정본(canonical source)을 가진다. 소유자가 모호하…",
-      "children": []
-    }
-  ]
-}
-```
-
-Auth endpoints: `GET /api/auth/google`, `GET /api/auth/google/callback`, `GET /api/auth/slack`, `GET /api/auth/slack/callback`, `GET /api/auth/status`, `POST /api/auth/logout`
-
-## Getting started
+2. Start the server (`npm run dev` or `npm start`). At startup, the SQLite adapter runs only the files in `src/db/migrations-sqlite/` that are not yet recorded in `schema_migrations`. The PostgreSQL adapter, by contrast, runs every SQL file in `src/db/migrations/` in filename order each time it starts. All of those files are idempotent. To run migrations separately:
 
 ```bash
-docker run -d --name atom-postgres -p 5434:5432 -e POSTGRES_PASSWORD=atom postgres:16
-cp .env.example .env   # DATABASE_URL=postgresql://atom:atom@localhost:5434/atom_db, MCP_SECRET, etc.
-npm install
-npm run dev            # API on localhost:3000
+npm run build
+npm run migrate
 ```
 
-Dashboard (optional):
+### Migrating an Existing SQLite Instance to PostgreSQL
+
+To move an existing SQLite database to PostgreSQL from the dashboard:
+
+1. Sign in to the dashboard as an `admin` and open **Settings > Database**.
+2. Enter your `postgresql://` connection string and click **Test Connection** (`POST /api/config/db-test`).
+3. Click **Save URL** (`PUT /api/config/env`) to write `DATABASE_URL` to `.env`, then restart the server so it boots on PostgreSQL.
+4. Reopen **Settings > Database** and click **Migrate** (`POST /api/config/migrate-to-pg`). The server copies `users`, `agents`, `cards`, and `tree_nodes` from the local SQLite file into PostgreSQL, then renames the SQLite file with a `.deprecated` suffix (`app_settings` and `card_embeddings` are not copied).
+
+## Optional Features
+
+### OpenAI Embeddings and Similar Cards
+
+An `admin` can configure an OpenAI API key in **Settings > OpenAI** (`PUT /api/config/openai/key`):
+
+- The key is stored in the `app_settings` table (`openai_api_key`), not in `.env`. `PUT /api/config/env` rejects `OPENAI_API_KEY`, so the key can only be set in one place.
+- `GET /api/config/openai` returns the key status (`configured`, `last_saved_at`) along with the embedding model, dimensions, progress counts, and worker status. It never sends the raw key back to the browser.
+- When a key is configured, a background worker embeds non-empty canonical cards with `text-embedding-3-large` (`3072` dimensions) into `card_embeddings`.
+- `get_card_neighbors` (HTTP MCP), `GET /cards/:cardId/neighbors`, and `GET /api/cards/:cardId/neighbors` return nearest-neighbor cards.
+
+### Jev Search and Card Evaluation
+
+Set both `TYPESAFE_API_KEY` and `TYPESAFE_BASE_URL` in `.env` to enable Jev search and card evaluation:
+
+- `search_cards` with `engine: "jev"` and `GET /search?q=...&engine=jev` retrieve candidate cards using Jev. The REST route also accepts `stream=1` for SSE progress events in the dashboard.
+- `evaluate_cards` (MCP) and `POST /search/evaluate` evaluate 1 to 48 candidate `card_ids` against the query and context, returning a relevance `score` (`0` to `1`) for each card.
+
+### External Reference Unfurl
+
+To link a card to an external resource, set `source_ref` to the URL and `source_type` to `"link"` (or an adapter name). When `compile_subtree` runs with `resolve_refs: "cached"` or `"fresh"`, `atom` fetches external metadata through registered adapters and caches the result in `cards.source_snapshot`. Over REST, send `resolveRefs` and `credentials` in the body of `POST /tree/:nodeId/compile`.
+
+- **Built-in Trello adapter**: Resolves `https://trello.com/c/...` card links using per-request `credentials` (`{ trello: { apiKey: "...", token: "..." } }`).
+- **Custom adapter packages**: Set `ADAPTER_PACKAGES` in `.env` to a comma-separated list of npm packages. At startup, `atom` dynamically imports each package and calls its exported `register(registry)` function.
+
+## Data Model and HTTP Surfaces
+
+### Database Tables
+
+| Table | Purpose |
+| :--- | :--- |
+| `cards` | Card titles, Markdown `content`, tags, card-to-card `references`, provenance fields, timestamps, and optimistic concurrency versions. |
+| `tree_nodes` | Parent-child tree placements, LexoRank positions, symlink flags, and per-node `journal_limit` settings. |
+| `users` | Browser user accounts, roles (`admin`, `editor`, `viewer`), and active status. |
+| `agents` | Agent records for issued keys: bcrypt key hashes (`secret_hash`), scopes, and active status. |
+| `app_settings` | Instance-level settings stored in the database, such as the OpenAI API key. |
+| `card_embeddings` | Vector embeddings and indexing metadata generated for canonical cards. |
+
+### HTTP Surfaces
+
+- **Browser API**: Cookie-authenticated routes used by the React dashboard for sign-in, card and tree operations, search, live events (`GET /events`), and instance settings.
+- **Agent REST API**: Key-authenticated routes (`x-api-key` header) under `/api/cards` and `/api/tree` for HTTP clients.
+- **Streamable HTTP MCP**: Stateless MCP endpoint at `POST /mcp`, authenticated with the `x-api-key` header.
+
+See `src/api/routes/` for route definitions and request schemas.
+
+## Operational Notes
+
+### Process Manager Required for `POST /api/system/restart`
+
+When an `admin` saves `.env` changes in the dashboard and clicks the restart banner, `POST /api/system/restart` responds with `{ ok: true }` and calls `process.exit(0)` two seconds later. It does not start a new process itself. Run the API server under a process manager that automatically restarts the process when it exits.
+
+### `.env` Secret Masking in Settings
+
+`GET /api/config/env` never sends raw secrets to the browser. It masks every non-empty `.env` value as `***` unless its key is on this 15-key allowlist:
+
+`API_PORT`, `NODE_ENV`, `FRONTEND_URL`, `AUTH_BYPASS`, `ALLOWED_EMAIL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CALLBACK_URL`, `SLACK_CLIENT_ID`, `SLACK_CALLBACK_URL`, `SLACK_ALLOWED_TEAM_ID`, `ADAPTER_PACKAGES`, `TYPESAFE_BASE_URL`, `SQLITE_PATH`, `SEARCH_MOTION_PAGE_URL`, `MCP_AGENT_ID`.
+
+Empty values stay empty, and `OPENAI_API_KEY` is left out of the response entirely. When `PUT /api/config/env` receives `***` for a masked key, it preserves the existing value in `.env` on disk.
+
+### Environment Variables Summary
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | (unset) | PostgreSQL connection URL. When unset, `atom` uses SQLite at `SQLITE_PATH`. |
+| `SQLITE_PATH` | `./atom.db` | File path for the SQLite database when `DATABASE_URL` is unset. |
+| `API_PORT` | (required; `4200` in `.env.example`) | Port for the Fastify HTTP and MCP server (startup fails if unset). |
+| `VITE_API_BASE_URL` | `""` (same origin) | API base URL used by the dashboard when running the Vite dev server on a separate port. |
+| `FRONTEND_URL` | (unset) | Allowed CORS origin and post-OAuth redirect URL (required when Google or Slack OAuth is enabled). |
+| `AUTH_BYPASS` | (unset) | Set to `1` for local unauthenticated `admin` access when no OAuth provider is configured. |
+| `JWT_SECRET` | (required with OAuth) | Secret used to sign and verify browser session JWT cookies. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` | (unset) | Google OAuth 2.0 credentials. |
+| `ALLOWED_EMAIL` | (unset) | Email (`user@example.com`) or domain (`@example.com`) allowed to sign in via Google OAuth; seeds the first `admin` when set to a full email on an empty `users` table. |
+| `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_CALLBACK_URL` | (unset) | Slack OAuth credentials. |
+| `SLACK_ALLOWED_TEAM_ID` | (unset) | Slack workspace Team ID required to admit new Slack OAuth users. |
+| `MCP_AGENT_ID` | `stdio-agent` | Attribution ID recorded in `created_by` and `updated_by` for `stdio` MCP mutations. |
+| `ADAPTER_PACKAGES` | (unset) | Comma-separated npm package names providing external reference unfurl adapters. |
+| `TYPESAFE_API_KEY` | (unset) | API key for Jev search and card evaluation (required together with `TYPESAFE_BASE_URL`). |
+| `TYPESAFE_BASE_URL` | (unset) | Base URL for the Jev API (required together with `TYPESAFE_API_KEY`). |
+| `SEARCH_MOTION_PAGE_URL` | (unset) | URL where you host `published/atom-search-motion/`, a static page that shows search results as a node graph. When set, that page can read the API through CORS, and an OAuth sign-in started from that page returns to it afterward. When unset, neither is allowed. |
+
+## Development and Testing
 
 ```bash
-cd dashboard && pnpm install && pnpm dev   # localhost:5173
+# Run the API server in watch mode
+npm run dev
+
+# Build backend TypeScript to dist/
+npm run build
+
+# Run unit tests
+npm run test:unit
+
+# Run integration tests
+npm run test:integration
+
+# Build and lint the dashboard
+pnpm --dir dashboard build
+pnpm --dir dashboard lint
 ```
 
-Run tests with `npm test` (requires Docker for integration tests).
+## License
 
-## Design decisions
-
-**Content ≠ Placement.** A card is *what you know*. A tree node is *where you put it*. This separation enables symlinks — one card, many locations, zero duplication.
-
-**compileNode() is pure.** No DB access. Takes three callbacks (`getNodeCard`, `getChildren`, `getCard`) so the caller pre-loads data. Testable, composable, predictable.
-
-**HTTP MCP is stateless.** Each `POST /mcp` creates a fresh `McpServer` + transport pair. The DB pool is shared with REST. No session state to manage.
-
-**Event bus + SSE.** Every mutation emits typed events (`card:created`, `card:updated`, `card:deleted`, `node:created`, `node:deleted`, `node:moved`). The dashboard subscribes via `/events` for live updates.
-
-**Provenance tracking.** Every card can record `source_type`, `source_ref`, `source_snapshot`, `source_checksum`, and `source_checked_at`. Combined with 4-level `staleness`, agents can audit where knowledge came from and whether it's still current.
-
-**Unfurl pipeline.** When `source_ref` contains an external URL (e.g. a Trello card), `compile_subtree` can expand it inline. Adapters fetch and cache snapshots in `unfurl_snapshots`; cached mode reuses DB data, fresh mode always hits the source. The dashboard exposes a toggle with per-provider credentials input.
-
-**Multi-agent auth.** Named agents register with bcrypt-hashed API keys in the `agents` table. Each request carries `x-api-key`; the audit log records `agent_id` alongside every mutation. The dashboard shows `agent_id` in card detail and compile metadata. A key runs bcrypt only on its first request per process: verified keys are cached by sha256 digest, and every request still reads the active agents and honors a cached key only while its agent is active with the same `secret_hash` — so reissuing or deactivating an agent rejects the old key on its next request.
+MIT
