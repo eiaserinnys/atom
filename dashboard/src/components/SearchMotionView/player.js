@@ -641,9 +641,23 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (v.a < 0.03) { v.a = va; return; }
     ctx.globalAlpha = v.a;
     if (n.referenceTarget) {
-      ctx.globalAlpha = v.a * 0.45; ctx.font = wfont(500, 14); ctx.fillStyle = css(T.ink2); ctx.textBaseline = 'middle';
-      ctx.fillText(fitText(`↗ ${n.rank ? '#' + n.rank + ' ' : ''}${n.title}`, w - 64, wfont(500, 14)), x + 8, y + h / 2);
-      if (n.score != null) { ctx.font = wfont(500, 13); ctx.textAlign = 'right'; ctx.fillText(n.score.toFixed(2), x + w - 8, y + h / 2); ctx.textAlign = 'left'; }
+      rr(x, y, w, h, 0); ctx.fillStyle = css(mix(T.node, T.plot, .5)); ctx.fill();
+      ctx.strokeStyle = css(T.nodeLine); ctx.lineWidth = 1; ctx.stroke();
+      if (text) {
+        const layout = nodeTextLayout(n.path || [], cam.z, h); const cy = y + layout.titleY;
+        ctx.font = wfont(500, 14); ctx.fillStyle = css(T.ink2); ctx.textBaseline = 'middle';
+        const scoreWidth = n.score == null ? 0 : ctx.measureText(n.score.toFixed(2)).width + 8;
+        ctx.fillText(fitText(`${n.rank ? '#' + n.rank + ' ' : ''}${n.title}`, w - 40 - scoreWidth, wfont(500, 14)), x + 30, cy);
+        if (layout.showPath) {
+          const path = (n.path || []).slice(0, -1).join(' › '); ctx.font = wfont(500, 13);
+          ctx.fillText(fitText(path, w - 38, wfont(500, 13)), x + 30, y + 35);
+        }
+        if (n.score != null) { ctx.font = wfont(500, 13); ctx.textAlign = 'right'; ctx.fillText(n.score.toFixed(2), x + w - 8, cy); ctx.textAlign = 'left'; }
+        ctx.save(); ctx.translate(x + 8, cy - 7 / cam.z); ctx.scale(1 / cam.z, 1 / cam.z);
+        ctx.strokeStyle = css(T.ink2); ctx.lineWidth = 1.5; ctx.beginPath();
+        ctx.arc(5, 7, 4, Math.PI / 2, Math.PI * 1.5); ctx.moveTo(9, 3); ctx.arc(9, 7, 4, -Math.PI / 2, Math.PI / 2);
+        ctx.moveTo(4, 7); ctx.lineTo(10, 7); ctx.stroke(); ctx.restore();
+      }
       ctx.globalAlpha = 1; v.a = va; return;
     }
     rr(x, y, w, h, 5);
