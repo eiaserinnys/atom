@@ -38,7 +38,7 @@ function mergeSearch(exploration, segment, id, label, scene) {
     });
   }
   const results = [...segment.nodes.values()].filter(n => n.selected).sort((a, b) => a.rank - b.rank);
-  for (const n of results) if (n.score >= exploration.selectionThreshold && !exploration.resultOrder.includes(n.cardId)) exploration.resultOrder.push(n.cardId);
+  for (const n of results) if (exploration.cards.get(n.cardId)?.displayColumnId === id && n.score >= exploration.selectionThreshold && !exploration.resultOrder.includes(n.cardId)) exploration.resultOrder.push(n.cardId);
   for (const [step, call] of segment.calls) scene.calls.set(`${id}:${step}`, call);
 }
 
