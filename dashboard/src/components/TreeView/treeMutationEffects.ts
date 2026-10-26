@@ -1,5 +1,3 @@
-const DELETE_ERROR_FALLBACK = '삭제 중 오류가 발생했습니다.';
-
 export interface TreeMutationSideEffects {
   expandParent: (nodeId: string) => void;
   selectNode: (nodeId: string | null) => void;
@@ -44,12 +42,12 @@ export function applyDeleteSuccess(
   effects.clearDeleteError();
 }
 
-export function getDeleteErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : DELETE_ERROR_FALLBACK;
+export function getDeleteErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
-export function applyDeleteError(error: unknown, effects: TreeMutationSideEffects): void {
-  effects.setDeleteError(getDeleteErrorMessage(error));
+export function applyDeleteError(error: unknown, effects: TreeMutationSideEffects, fallback: string): void {
+  effects.setDeleteError(getDeleteErrorMessage(error, fallback));
 }
 
 export function applyMoveSuccess(): void {

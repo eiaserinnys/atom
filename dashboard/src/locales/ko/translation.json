@@ -134,7 +134,7 @@
     "header": "카드 상세",
     "deleted": "이 카드는 삭제되었습니다.",
     "no_selection": "노드를 선택하면 카드 정보가 표시됩니다.",
-    "unsaved_changes": "편집 중 외부에서 변경되었을 수 있습니다. 저장하지 않은 내용이 있습니다.",
+    "unsaved_changes": "편집하는 동안 다른 곳에서 바뀌었습니다.",
     "refresh": "새로고침",
     "title_label": "제목",
     "content_label": "내용",
@@ -145,6 +145,9 @@
     "source_ref_label": "출처 참조",
     "tags_label": "태그",
     "refs_label": "참조",
+    "journal_limit_label": "하위 표시",
+    "journal_limit_all": "전체",
+    "journal_limit_latest": "최근 {{count}}개",
     "version_label": "버전",
     "updated_at_label": "수정일",
     "created_by_label": "작성자",
@@ -168,7 +171,9 @@
     "no_selection": "노드를 선택하면 컴파일된 문서가 표시됩니다.",
     "loading": "컴파일 중...",
     "toc_title": "문서 개요",
-    "depth_label": "컴파일 깊이: {{depth}}"
+    "depth_label": "컴파일 깊이: {{depth}}",
+    "depth_option_other": "{{count}}단계",
+    "depth_all": "전체 단계"
   },
   "unfurl": {
     "failure": "외부 참조 조회 실패",
@@ -192,6 +197,7 @@
     "empty": "이동 가능한 구조 카드 없음"
   },
   "delete_modal": {
+    "failed": "삭제하지 못했습니다.",
     "title": "카드 삭제",
     "desc": "\"{{name}}\" 항목을 삭제하시겠습니까?",
     "confirm_text": "\"{{name}}\"을(를) 삭제하시겠습니까?",

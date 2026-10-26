@@ -1,5 +1,6 @@
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import type { TreeMovePayload } from '../../utils/treeMoveIntent';
 import {
@@ -33,6 +34,7 @@ export function useTreeMutations({
   closeModal,
   setDeleteError,
 }: UseTreeMutationsArgs) {
+  const { t } = useTranslation();
   const expandParent = useCallback((nodeId: string) => {
     setExpandedNodes(prev => {
       const next = new Set(prev);
@@ -77,7 +79,7 @@ export function useTreeMutations({
       }, mutationEffects);
     },
     onError: (err) => {
-      applyDeleteError(err, mutationEffects);
+      applyDeleteError(err, mutationEffects, t('delete_modal.failed'));
     },
   });
 

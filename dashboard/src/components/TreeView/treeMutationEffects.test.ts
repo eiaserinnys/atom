@@ -77,11 +77,11 @@ describe('tree mutation side effects', () => {
   });
 
   test('delete error preserves Error messages and falls back for non-Error values', () => {
-    expect(getDeleteErrorMessage(new Error('cannot delete'))).toBe('cannot delete');
-    expect(getDeleteErrorMessage({ message: 'plain object' })).toBe('삭제 중 오류가 발생했습니다.');
+    expect(getDeleteErrorMessage(new Error('cannot delete'), 'Delete failed')).toBe('cannot delete');
+    expect(getDeleteErrorMessage({ message: 'plain object' }, 'Delete failed')).toBe('Delete failed');
 
     const { calls, effects } = recordEffects();
-    applyDeleteError(new Error('cannot delete'), effects);
+    applyDeleteError(new Error('cannot delete'), effects, 'Delete failed');
 
     expect(calls).toEqual(['setDeleteError:cannot delete']);
   });
