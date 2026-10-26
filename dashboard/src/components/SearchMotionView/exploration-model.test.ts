@@ -54,8 +54,8 @@ describe('exploration model', () => {
     expect(view.cards.map((entry: any) => entry.cardId)).toEqual([A, C, X, B]);
     expect(view.cards.find((entry: any) => entry.cardId === X)).toMatchObject({ nodeId: 'node-x-first', sourceLabel: '입구' });
     expect(view.cards.find((entry: any) => entry.cardId === B)).toMatchObject({ nodeId: 'node-b', sourceLabel: '확장 1', cardType: 'knowledge' });
-    expect(view.columns).toContainEqual(expect.objectContaining({ id: 'expand-1', label: '확장 1', cardIds: [B], referenceIds: ['expand-1:ref:0'] }));
-    expect(view.references).toEqual([expect.objectContaining({ id: 'expand-1:ref:0', fromCardId: A, toCardId: X, similarity: 0.77 })]);
+    expect(view.columns).toContainEqual(expect.objectContaining({ id: 'expand-1', label: '확장 1', cardIds: [B], referenceIds: ['expand-1:ref:1'] }));
+    expect(view.references).toEqual([expect.objectContaining({ id: 'expand-1:ref:1', fromCardId: A, toCardId: X, similarity: 0.77 })]);
     expect(view.resultOrder).toEqual([A, C]);
     expect(projectExploration(initial).cards).toHaveLength(3);
   });
