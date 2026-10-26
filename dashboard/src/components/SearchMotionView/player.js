@@ -355,9 +355,13 @@ export function createMotionPlayer(root, callbacks, samples) {
 
   // ------------------------------------------------------------------ 4. 카메라
   const plot = $("plot"); const cv = $("cv"); const ctx = cv.getContext("2d");
+  function overlayRoom() {
+    const legend = root.querySelector('.legend');
+    return Math.max(38, legend ? legend.offsetHeight + Number.parseFloat(getComputedStyle(legend).bottom || '0') : 0) + M.actionGap;
+  }
   function badgeRoom() { return 0; }
   function bounds(z = cam.z) {
-    const vw = W / z; const vh = (H - M.headerH) / z; const L = view.L;
+    const vw = W / z; const vh = (H - M.headerH - overlayRoom()) / z; const L = view.L;
     // 입구만 있는 넓은 배치는 판 가운데에 둔다
     const free = vw - L.width - badgeRoom();
     const minX = L.wide && free > 2 * M.padX ? -free / 2 : -M.padX; const maxX = Math.max(minX, L.width + M.padX + badgeRoom() - vw);
@@ -1252,6 +1256,8 @@ export function createMotionPlayer(root, callbacks, samples) {
     $('node-expand').textContent = tr('visual_search.expand');
     $('node-evaluate').textContent = tr(state.activeOperation?.kind === 'evaluate' || state.activeOperation?.fromCardId === null ? 'visual_search.evaluating' : 'visual_search.evaluate');
     $('node-tree').setAttribute('aria-label', tr('visual_search.open_tree'));
+    if (actionWidth !== group.offsetWidth) { actionWidth = group.offsetWidth; sync(performance.now(), false, null); invalidate(); }
+    if (cam.mode === 'idle' && sy + M.rowH * cam.z + M.actionGap + group.offsetHeight > H - overlayRoom()) ensureVisible(selectedRef);
   }
   let summaryTimer = 0;
   function tickSummary() {
@@ -1403,9 +1409,10 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   function ensureVisible(key) {
     const v = key[0] === "@" ? view.piles.get(key.slice(1)) : view.nodes.get(key); if (!v) return;
-    const t = v.t || { x: v.tx, y: v.ty }; const z = cam.tz; const vw = (W - sheetInset()) / z; const vh = (H - M.headerH) / z; let x = cam.tx; let y = cam.ty;
-    if (t.x + M.colW + 16 > x + vw) x = t.x + M.colW + 16 - vw; if (t.x - 16 < x) x = t.x - 16;
-    const bottom = M.rowH + (key === selectedRef ? (M.actionH + M.actionGap * 2) / z : 0) + 30;
+    const t = v.t || { x: v.tx, y: v.ty }; const z = cam.tz; const vw = (W - sheetInset()) / z; const vh = (H - M.headerH - overlayRoom()) / z; let x = cam.tx; let y = cam.ty;
+    const width = key === selectedRef ? Math.max(M.colW, actionWidth / z) : M.colW;
+    if (t.x + width + 16 > x + vw) x = t.x + width + 16 - vw; if (t.x - 16 < x) x = t.x - 16;
+    const bottom = M.rowH + (key === selectedRef ? (M.actionH + M.actionGap * 2) / z : 0);
     if (t.y + bottom > y + vh) y = t.y + bottom - vh; if (t.y - 10 < y) y = t.y - 10;
     if (x !== cam.tx || y !== cam.ty) { const b = bounds(z); cam.tx = clamp(x, b.minX, b.maxX + sheetInset() / z); cam.ty = clamp(y, b.minY, b.maxY); if (reduced()) { cam.x = cam.tx; cam.y = cam.ty; } else cam.mode = "spring"; invalidate(); }
   }
