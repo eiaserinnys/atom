@@ -41,7 +41,7 @@ export async function runVisualOperation(
   const apply = (event: VisualOperationEvent) => !signal.aborted && player.applyOperation(event, revision);
   let evaluationOnly = Boolean(retry);
   try {
-    let targets = retry?.resultCardIds ?? snapshot.evaluationTargetCardIds;
+    let targets = retry ? (retry.kind === 'evaluate' ? retry.requestedCardIds : retry.resultCardIds) : snapshot.evaluationTargetCardIds;
     if (kind !== 'evaluate' && !retry) {
       let response: VisualSearchNeighborsResponse;
       for (;;) {

@@ -82,3 +82,15 @@ test('a response from a discarded branch cannot add cards to the current project
   expect(player.getSnapshot().graphCardIds).not.toContain('stale');
   expect(api.evaluate).not.toHaveBeenCalled();
 });
+
+test('B10: failed manual evaluation retries its requested cards without expanding again', async () => {
+  const { player, api } = setup();
+  const snapshot = { ...player.getSnapshot(), evaluationTargetCardIds: ['new-card'] };
+  vi.mocked(api.evaluate).mockResolvedValueOnce({ status: 503, body: { error: { code: 'JEV_UNAVAILABLE' } } });
+  const failure = await runVisualOperation(player, 'evaluate', snapshot, new AbortController().signal, api);
+  const retry = player.getSnapshot().operations.find(op => op.id === failure?.retry)!;
+  await runVisualOperation(player, 'evaluate', player.getSnapshot(), new AbortController().signal, api, retry);
+  expect(api.evaluate).toHaveBeenCalledTimes(2);
+  expect(vi.mocked(api.evaluate).mock.calls[1][0].card_ids).toEqual(['new-card']);
+  expect(api.neighbors).not.toHaveBeenCalled();
+});
