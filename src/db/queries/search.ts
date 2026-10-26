@@ -153,12 +153,26 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
   const params: unknown[] = [];
   let idx = 1;
 
-  // $1: FTS query (always first)
+  // Bind parameters in generated SQL order: subtree CTE, FTS query, filters, LIMIT.
+  let subtreeCte = "";
+  if (filters.root_node_id) {
+    const subtreeIdx = idx++;
+    params.push(filters.root_node_id);
+    subtreeCte = `WITH RECURSIVE subtree AS (
+       SELECT id FROM tree_nodes WHERE id = $${subtreeIdx}
+       UNION ALL
+       SELECT tn.id FROM tree_nodes tn
+       INNER JOIN subtree s ON tn.parent_node_id = s.id
+     )
+     `;
+  }
+
+  // FTS query follows the CTE placeholder, when present.
   params.push(filters.query);
   const matchIdx = idx++;
 
   // Additional WHERE conditions beyond FTS MATCH
-  // NOTE: limit is pushed LAST to keep params in SQL appearance order.
+  // LIMIT is pushed last to keep params in SQL appearance order.
   // translateQuery replaces $N → ? positionally, so params must match
   // the order $N placeholders appear in the generated SQL.
   const extraConditions: string[] = [];
@@ -198,18 +212,7 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
     idx++;
   }
 
-  // Optional subtree CTE
-  let subtreeCte = "";
   if (filters.root_node_id) {
-    subtreeCte = `WITH RECURSIVE subtree AS (
-       SELECT id FROM tree_nodes WHERE id = $${idx}
-       UNION ALL
-       SELECT tn.id FROM tree_nodes tn
-       INNER JOIN subtree s ON tn.parent_node_id = s.id
-     )
-     `;
-    params.push(filters.root_node_id);
-    idx++;
     extraConditions.push(`EXISTS (
       SELECT 1 FROM tree_nodes tn2
       WHERE tn2.card_id = c.id AND tn2.id IN (SELECT id FROM subtree)
