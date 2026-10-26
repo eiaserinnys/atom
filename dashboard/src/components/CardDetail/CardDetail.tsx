@@ -3,6 +3,7 @@ import type { MotionNode } from '../SearchMotionView/types';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Check, Copy, FileText, Folder } from 'lucide-react';
 import { api, type TreeNodeData } from '../../api/client';
 import i18n from '../../i18n';
 import { CardEditableFields } from './CardEditableFields';
@@ -24,6 +25,7 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   const [contentDraft, setContentDraft] = useState('');
   const [editingJournalLimit, setEditingJournalLimit] = useState(false);
   const [journalLimitDraft, setJournalLimitDraft] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const sample = verdict?.sample;
   const isDirty = editingTitle || editingContent || editingJournalLimit;
@@ -36,6 +38,17 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   });
 
   const card = node?.card;
+
+  const copyId = async () => {
+    if (!nodeId) return;
+    try {
+      await navigator.clipboard.writeText(nodeId);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be unavailable in insecure contexts.
+    }
+  };
 
   const {
     saving,
@@ -56,8 +69,7 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   if (isError && nodeId && !isLoading && !sample) {
     return (
       <div className="h-full flex flex-col bg-background">
-        <div className="h-10 px-4 flex items-center text-[13px] font-semibold uppercase tracking-[0.5px] text-muted-foreground border-b border-border bg-card shrink-0">
-          {t('card.header')}
+        <div className="h-10 max-md:h-12 px-4 flex items-center gap-1.5 border-b border-border bg-card shrink-0">
         </div>
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
           <div className="text-muted-foreground text-sm py-4">{t('card.deleted')}</div>
@@ -94,8 +106,17 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <div className="h-10 px-4 flex items-center text-[13px] font-semibold uppercase tracking-[0.5px] text-muted-foreground border-b border-border bg-card shrink-0">
-        {t('card.header')}
+      <div className="h-10 max-md:h-12 px-4 flex items-center gap-1.5 border-b border-border bg-card shrink-0">
+        {node && card && <>
+          {card.card_type === 'structure'
+            ? <Folder className="w-3.5 h-3.5 text-[var(--blue)] shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            : <FileText className="w-3.5 h-3.5 text-brand shrink-0" strokeWidth={1.75} aria-hidden="true" />}
+          <span className="text-[13px] font-semibold text-muted-foreground">{t(card.card_type === 'structure' ? 'searchbar.type_structure' : 'searchbar.type_knowledge')}</span>
+          {node.is_symlink && <span className="text-[13px] text-muted-foreground" title={node.canonical_path} aria-label={t('card.symlink_label')}>↗</span>}
+          <button type="button" onClick={copyId} className="ml-auto -mr-2 w-8 h-8 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" aria-label={copied ? t('common.copied') : t('compile.copy_id')} title={copied ? t('common.copied') : t('compile.copy_id')}>
+            {copied ? <Check className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" /> : <Copy className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />}
+          </button>
+        </>}
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
         {verdict && <JevVerdict verdict={verdict} />}

@@ -25,8 +25,8 @@ export function CompileToolbar({
   const { t } = useTranslation();
 
   return (
-    <div className="h-10 flex items-center px-3.5 gap-2 border-b border-border bg-card text-[13px] font-semibold text-muted-foreground shrink-0">
-      {headerTabs ?? t('compile.header')}
+    <div className="h-10 max-md:h-12 flex items-center px-4 gap-2 border-b border-border bg-card shrink-0">
+      {headerTabs}
       {nodeId && (
         <div className="ml-auto min-w-0 flex items-center gap-1">
           <div className="flex items-center gap-1">
