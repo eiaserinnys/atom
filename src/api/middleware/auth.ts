@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { jwtVerify } from 'jose';
 import type { UserRole } from '../../shared/types.js';
+import { isAuthBypassEnabled } from '../auth-mode.js';
 
 // Module-level lazy init to avoid re-creating on every request
 let _jwtSecret: Uint8Array | null = null;
@@ -19,8 +20,7 @@ function getJwtSecret(): Uint8Array {
  * It applies to ALL Fastify routes regardless of how nginx routes requests.
  * Auth routes (/api/auth/*) are explicitly exempted below.
  *
- * Bypass mode: if no OAuth provider is configured (neither GOOGLE_CLIENT_ID
- * nor SLACK_CLIENT_ID), all requests are allowed (dev mode).
+ * Bypass mode requires AUTH_BYPASS=1 and no configured OAuth provider.
  */
 export async function authMiddleware(
   req: FastifyRequest,
@@ -32,10 +32,15 @@ export async function authMiddleware(
   // /api/cards and /api/tree use agent key auth (handled in the route's own preHandler)
   if (req.url.startsWith('/api/auth/') || req.url === '/api/version' || req.url.startsWith('/mcp') || req.url.startsWith('/.well-known/') || req.url === '/register' || req.url.startsWith('/api/cards') || req.url.startsWith('/api/tree') || req.url === '/api/health') return;
 
-  // Bypass mode: no OAuth configured → allow all requests
+  // Without a login provider, only explicit local bypass can authenticate browser APIs.
   const googleClientId = process.env['GOOGLE_CLIENT_ID'];
   const slackClientId = process.env['SLACK_CLIENT_ID'];
   if (!googleClientId && !slackClientId) {
+    if (!isAuthBypassEnabled()) {
+      reply.code(401).send({ error: 'Unauthorized' });
+      return;
+    }
+
     req.jwtUser = { id: 'bypass', email: 'bypass@local', name: 'Bypass Admin', role: 'admin' };
     return;
   }

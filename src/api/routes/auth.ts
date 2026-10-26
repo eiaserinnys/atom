@@ -6,16 +6,16 @@ import { getDb } from '../../db/client.js';
 import {
   JWT_COOKIE_NAME,
   STATE_COOKIE_NAME,
-  ATOM_SEARCH_MOTION_FRONTEND_URL,
   ATOM_SEARCH_MOTION_RETURN_TO,
-  ATOM_SEARCH_MOTION_SUCCESS_URL,
   buildBypassAuthStatus,
   buildGoogleAuthRedirectUrl,
   buildSlackAuthRedirectUrl,
+  getSearchMotionPageUrl,
   getProviderAvailability,
   getStateCookieOptions,
   isAtomSearchMotionState,
 } from './auth_helpers.js';
+import { isAuthBypassEnabled } from '../auth-mode.js';
 import type { AuthCallbackDeps } from './auth_callback_handlers.js';
 import { handleGoogleCallback, handleSlackCallback } from './auth_callback_handlers.js';
 
@@ -44,9 +44,6 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
     const slackCallbackUrl = process.env['SLACK_CALLBACK_URL'] ?? '';
     const slackAllowedTeamId = process.env['SLACK_ALLOWED_TEAM_ID'];
 
-    // At least one OAuth provider must be configured
-    const authConfigured = !!googleClientId || !!slackClientId;
-
     // ── Google OAuth routes ───────────────────────────────────────────────────
 
     // GET /api/auth/google — redirect to Google OAuth
@@ -54,7 +51,12 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
       '/api/auth/google',
       async (req, reply) => {
         const returnTo = req.query.return_to;
-        if (Array.isArray(returnTo) || (returnTo !== undefined && returnTo !== ATOM_SEARCH_MOTION_RETURN_TO)) {
+        const searchMotionPageUrl = getSearchMotionPageUrl();
+        if (
+          Array.isArray(returnTo) ||
+          (returnTo !== undefined &&
+            (returnTo !== ATOM_SEARCH_MOTION_RETURN_TO || !searchMotionPageUrl))
+        ) {
           return reply.code(400).send({ error: 'Invalid return_to' });
         }
 
@@ -80,12 +82,15 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
       async (req, reply) => {
         const { code, state, error } = req.query;
         const storedState = req.cookies[STATE_COOKIE_NAME];
-        const motionReturn = isAtomSearchMotionState(state) && storedState === state;
+        const searchMotionPageUrl = getSearchMotionPageUrl();
+        const motionReturn = Boolean(searchMotionPageUrl) &&
+          isAtomSearchMotionState(state) &&
+          storedState === state;
 
         if (motionReturn && (error || !code)) {
           reply.clearCookie(STATE_COOKIE_NAME, { path: '/' });
           const authError = error ? 'google_error' : 'missing_code';
-          return reply.redirect(ATOM_SEARCH_MOTION_FRONTEND_URL + '/?auth_error=' + authError);
+          return reply.redirect(searchMotionPageUrl + '/?auth_error=' + authError);
         }
 
         if (error || !code || !state) {
@@ -101,8 +106,8 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
         return handleGoogleCallback({
           deps,
           reply,
-          frontendUrl: motionReturn ? ATOM_SEARCH_MOTION_FRONTEND_URL : frontendUrl,
-          successRedirectUrl: motionReturn ? ATOM_SEARCH_MOTION_SUCCESS_URL : undefined,
+          frontendUrl: motionReturn ? searchMotionPageUrl! : frontendUrl,
+          successRedirectUrl: motionReturn ? searchMotionPageUrl + '/' : undefined,
           jwtSecret,
           code,
           googleClientId: googleClientId!,
@@ -172,8 +177,12 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
 
     // GET /api/auth/status — return current auth state
     app.get('/api/auth/status', async (req, reply) => {
-      if (!authConfigured) {
+      if (isAuthBypassEnabled()) {
         return reply.send(buildBypassAuthStatus());
+      }
+
+      if (!googleClientId && !slackClientId) {
+        return reply.send({ authenticated: false });
       }
 
       const token = req.cookies[JWT_COOKIE_NAME];

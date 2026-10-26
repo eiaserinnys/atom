@@ -1,4 +1,20 @@
-const MASKED_KEY_PATTERNS = ["SECRET", "PASSWORD", "TOKEN"];
+const PLAINTEXT_CONFIG_KEYS = new Set([
+  "API_PORT",
+  "NODE_ENV",
+  "FRONTEND_URL",
+  "AUTH_BYPASS",
+  "ALLOWED_EMAIL",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CALLBACK_URL",
+  "SLACK_CLIENT_ID",
+  "SLACK_CALLBACK_URL",
+  "SLACK_ALLOWED_TEAM_ID",
+  "ADAPTER_PACKAGES",
+  "TYPESAFE_BASE_URL",
+  "SQLITE_PATH",
+  "SEARCH_MOTION_PAGE_URL",
+  "MCP_AGENT_ID",
+]);
 
 export interface ConfigEnvEntry {
   key: string;
@@ -6,8 +22,7 @@ export interface ConfigEnvEntry {
 }
 
 export function isSensitiveEnvKey(key: string): boolean {
-  const upper = key.toUpperCase();
-  return MASKED_KEY_PATTERNS.some((pattern) => upper.includes(pattern));
+  return !PLAINTEXT_CONFIG_KEYS.has(key);
 }
 
 export function isDbOwnedConfigEnvKey(key: string): boolean {

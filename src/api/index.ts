@@ -21,13 +21,12 @@ import { config } from "dotenv";
 import { loadAdapters } from "../unfurl/loader.js";
 import { adapterRegistry } from "../unfurl/registry.js";
 import { userExists, insertUser } from "../db/queries/users.js";
-import { findAgentByAgentId, insertAgent } from "../db/queries/agents.js";
-import bcrypt from "bcryptjs";
 import { FlatEmbeddingIndex } from "../services/embeddings/flat-index.js";
 import { createEmbeddingSync } from "../services/embeddings/sync.js";
 import { createNeighborService } from "../services/embeddings/neighbors.js";
 import { createOpenAIConfigRoutes } from "./routes/openai-config.js";
 import { createNeighborsRoutes } from "./routes/neighbors.js";
+import { inspectStartupConfig } from "./startup-config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,20 +87,17 @@ async function seedMigration(): Promise<void> {
     console.log(`[seed] Migrated ALLOWED_EMAIL=${allowedEmail} as admin user`);
   }
 
-  // MCP_SECRET → agents.legacy 마이그레이션
-  const mcpSecret = process.env["MCP_SECRET"];
-  if (mcpSecret && (await findAgentByAgentId(db, "legacy")) === null) {
-    const secretHash = await bcrypt.hash(mcpSecret, 10);
-    await insertAgent(db, {
-      agent_id: "legacy",
-      secret_hash: secretHash,
-      display_name: "Legacy Agent (migrated from MCP_SECRET)",
-    });
-    console.log("[seed] Migrated MCP_SECRET as legacy agent");
-  }
 }
 
 const start = async (): Promise<void> => {
+  const startupConfig = inspectStartupConfig(process.env);
+  if (startupConfig.errors.length > 0) {
+    throw new Error(startupConfig.errors.join(" "));
+  }
+  if (startupConfig.warning) {
+    app.log.warn(startupConfig.warning);
+  }
+
   const db = getDb();
   const migrationsDir = db.dbType === 'sqlite'
     ? path.join(__dirname, "../db/migrations-sqlite")
