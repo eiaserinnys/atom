@@ -95,8 +95,9 @@ describe("auth route safety boundaries", () => {
     expect(JWT_COOKIE_NAME).toBe("atom_auth");
     expect(STATE_COOKIE_NAME).toBe("atom_oauth_state");
     expect(JWT_EXPIRY_SECONDS).toBe(7 * 24 * 60 * 60);
-    expect(getStateCookieOptions()).toEqual({
+    expect(getStateCookieOptions("development")).toEqual({
       httpOnly: true,
+      secure: false,
       sameSite: "lax",
       path: "/",
       maxAge: 300,

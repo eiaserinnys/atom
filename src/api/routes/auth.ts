@@ -66,7 +66,7 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
 
         const nonce = crypto.randomBytes(16).toString('hex');
         const state = returnTo ? nonce + '.' + ATOM_SEARCH_MOTION_RETURN_TO : nonce;
-        reply.setCookie(STATE_COOKIE_NAME, state, getStateCookieOptions());
+        reply.setCookie(STATE_COOKIE_NAME, state, getStateCookieOptions(process.env['NODE_ENV']));
 
         return reply.redirect(buildGoogleAuthRedirectUrl({
           clientId: googleClientId,
@@ -127,7 +127,7 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
       }
 
       const state = crypto.randomBytes(16).toString('hex');
-      reply.setCookie(STATE_COOKIE_NAME, state, getStateCookieOptions());
+      reply.setCookie(STATE_COOKIE_NAME, state, getStateCookieOptions(process.env['NODE_ENV']));
 
       return reply.redirect(buildSlackAuthRedirectUrl({
         clientId: slackClientId,

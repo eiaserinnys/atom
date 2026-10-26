@@ -301,9 +301,11 @@ export type AtomEvent =
 // ---------------------------------------------------------------------------
 
 export type UserRole = 'admin' | 'editor' | 'viewer';
+export type AgentScope = 'read' | 'write';
 
 declare module 'fastify' {
   interface FastifyRequest {
+    agentScope?: AgentScope;
     jwtUser?: {
       id: string;
       email: string;

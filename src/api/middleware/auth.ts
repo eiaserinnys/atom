@@ -1,7 +1,12 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { jwtVerify } from 'jose';
+import { jwtVerify, type JWTPayload } from 'jose';
 import type { UserRole } from '../../shared/types.js';
 import { isAuthBypassEnabled } from '../auth-mode.js';
+import { getDb } from '../../db/client.js';
+import { findUserById } from '../../db/queries/users.js';
+
+const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const READ_ONLY_POST_ROUTES = ['/tree/:nodeId/compile', '/search/evaluate'];
 
 // Module-level lazy init to avoid re-creating on every request
 let _jwtSecret: Uint8Array | null = null;
@@ -51,15 +56,36 @@ export async function authMiddleware(
     return;
   }
 
+  let payload: JWTPayload;
   try {
-    const { payload } = await jwtVerify(token, getJwtSecret());
-    req.jwtUser = {
-      id: payload['id'] as string,
-      email: payload['email'] as string,
-      name: payload['name'] as string,
-      role: (payload['role'] as UserRole) ?? 'viewer',
-    };
+    ({ payload } = await jwtVerify(token, getJwtSecret()));
   } catch {
     reply.code(401).send({ error: 'Invalid token' });
+    return;
+  }
+
+  const userId = payload['id'];
+  if (typeof userId !== 'string') {
+    reply.code(401).send({ error: 'Invalid token' });
+    return;
+  }
+  const user = await findUserById(getDb(), userId);
+  if (!user || !user.is_active) {
+    reply.code(401).send({ error: 'Unauthorized' });
+    return;
+  }
+  req.jwtUser = {
+    id: user.id,
+    email: user.email,
+    name: user.display_name ?? (typeof payload['name'] === 'string' ? payload['name'] : ''),
+    role: user.role as UserRole,
+  };
+
+  if (
+    user.role === 'viewer' &&
+    !READ_ONLY_METHODS.has(req.method) &&
+    !(req.method === 'POST' && READ_ONLY_POST_ROUTES.includes(req.routeOptions.url ?? ''))
+  ) {
+    reply.code(403).send({ error: 'Forbidden' });
   }
 }

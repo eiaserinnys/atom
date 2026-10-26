@@ -13,6 +13,7 @@ describe("card API patch input", () => {
       secret_hash: "hash",
       display_name: null,
       is_active: true,
+      scope: "write",
       created_by: null,
       created_at: "2026-01-01T00:00:00.000Z",
     } as Agent);

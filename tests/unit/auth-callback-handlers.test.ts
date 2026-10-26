@@ -296,9 +296,82 @@ describe("auth callback handlers", () => {
     await app.close();
   });
 
+  it("GET /api/auth/slack/callback rejects new users when no allowed team is configured", async () => {
+    configureSlackCallbackEnv();
+    process.env["FRONTEND_URL"] = "https://dashboard.example";
+    delete process.env["SLACK_ALLOWED_TEAM_ID"];
+    const harness = makeFakeAuthDeps({
+      fetchResponses: [
+        slackTokenResponse("slack-access"),
+        slackIdentityResponse({ email: "unrestricted-slack@example.com", name: "New Slack User" }),
+      ],
+    });
+    const app = await makeInjectedAuthApp(harness.deps);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/auth/slack/callback?code=code-1&state=state-1",
+      headers: { cookie: `${STATE_COOKIE_NAME}=state-1` },
+    });
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("https://dashboard.example/?auth_error=unauthorized");
+    expect(harness.findCalls).toEqual(["unrestricted-slack@example.com"]);
+    expect(harness.inserts).toEqual([]);
+    await app.close();
+  });
+
+  it("GET /api/auth/slack/callback still permits existing users when no allowed team is configured", async () => {
+    configureSlackCallbackEnv();
+    process.env["FRONTEND_URL"] = "https://dashboard.example";
+    delete process.env["SLACK_ALLOWED_TEAM_ID"];
+    const existingUser = makeUser({
+      id: "existing-slack-user",
+      email: "existing-slack@example.com",
+      name: "Existing Slack User",
+      role: "editor",
+    });
+    const harness = makeFakeAuthDeps({
+      users: { "existing-slack@example.com": existingUser },
+      fetchResponses: [
+        slackTokenResponse("slack-access"),
+        slackIdentityResponse({ email: "existing-slack@example.com", name: "Existing Slack User" }),
+      ],
+    });
+    const app = await makeInjectedAuthApp(harness.deps);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/auth/slack/callback?code=code-1&state=state-1",
+      headers: { cookie: `${STATE_COOKIE_NAME}=state-1` },
+    });
+    const setCookie = findSetCookieHeader(response.headers["set-cookie"], JWT_COOKIE_NAME);
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("https://dashboard.example");
+    expect(setCookie).toContain(`${JWT_COOKIE_NAME}=`);
+    expect(harness.inserts).toEqual([]);
+    await app.close();
+  });
+
+  it("GET /api/auth/slack sets a secure OAuth state cookie in production", async () => {
+    configureSlackCallbackEnv();
+    process.env["NODE_ENV"] = "production";
+    const harness = makeFakeAuthDeps({ fetchResponses: [] });
+    const app = await makeInjectedAuthApp(harness.deps);
+
+    const response = await app.inject({ method: "GET", url: "/api/auth/slack" });
+    const stateCookie = findSetCookieHeader(response.headers["set-cookie"], STATE_COOKIE_NAME);
+
+    expect(response.statusCode).toBe(302);
+    expect(stateCookie).toContain("Secure");
+    await app.close();
+  });
+
   it("GET /api/auth/slack/callback auto-creates new users as editor without ALLOWED_EMAIL and sets the JWT cookie", async () => {
     configureSlackCallbackEnv();
     process.env["FRONTEND_URL"] = "https://dashboard.example";
+    process.env["SLACK_ALLOWED_TEAM_ID"] = "T_ALLOWED";
     delete process.env["ALLOWED_EMAIL"];
     const harness = makeFakeAuthDeps({
       fetchResponses: [

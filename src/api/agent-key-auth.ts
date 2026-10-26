@@ -91,7 +91,15 @@ export async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyRepl
   if (!secret) {
     return reply.code(401).send({ error: "x-api-key header required" });
   }
-  if (!(await agentKeyVerifier.verify(secret))) {
+  const agent = await agentKeyVerifier.verify(secret);
+  if (!agent) {
     return reply.code(401).send({ error: "Unauthorized" });
+  }
+  req.agentScope = agent.scope;
+}
+
+export async function requireAgentWriteScope(req: FastifyRequest, reply: FastifyReply): Promise<unknown> {
+  if (req.agentScope !== 'write') {
+    return reply.code(403).send({ error: "Forbidden" });
   }
 }
