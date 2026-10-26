@@ -225,6 +225,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   function sync(now, animate, delta) {
     if (reduced()) animate = false;
     for (const n of model.nodes.values()) if (!n.referenceTarget) n.path = resolveDisplayPath(n, model.nodes, callbacks.getCachedTreeNodes?.() ?? []);
+    for (const n of model.nodes.values()) if (n.referenceTarget) n.path = model.nodes.get(n.referenceTarget).path;
     const L = layout(model); view.L = L;
     const addedAt = new Map(); const scoredAt = new Map();
     if (delta) { delta.added.forEach((r, i) => addedAt.set(r, i)); delta.scored.forEach((r, i) => scoredAt.set(r, i)); }
@@ -1650,7 +1651,7 @@ export function createMotionPlayer(root, callbacks, samples) {
         if (event.type === 'completed' || event.type === 'expansion_succeeded') {
           const operation = model.exploration.operations.find(op => op.id === event.operationId);
           const node = [...model.nodes.values()].find(n => n.displayColumn === (operation?.kind === 'evaluate' ? operation.viaOperationId : operation?.id));
-          if (node) { setFollow(true); followHop(node.hop, reduced()); setFollow(false); }
+          if (node) { setFollow(true); followHop(node.hop, reduced()); setFollow(false); ensureVisible(node.ref); }
         }
       }
       else chrome();

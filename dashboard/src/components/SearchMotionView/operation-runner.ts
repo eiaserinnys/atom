@@ -34,7 +34,7 @@ export async function runVisualOperation(
     fromCardId: retry.fromCardId, query: retry.query, viaOperationId: retry.viaOperationId, requestedCardIds: retry.requestedCardIds });
   else player.applyOperation({ type: 'started', id, kind: kind === 'evaluate' ? 'evaluate' : 'expand',
     fromCardId: kind === 'query' ? null : snapshot.selectedCardId, query: kind === 'query' ? snapshot.query : null,
-    viaOperationId: snapshot.selectedArrivalOperationId,
+    viaOperationId: kind === 'evaluate' ? snapshot.operations.findLast(op => op.kind === 'expand' && op.fromCardId === snapshot.selectedCardId && op.status === 'succeeded')?.id ?? snapshot.selectedArrivalOperationId : snapshot.selectedArrivalOperationId,
     requestedCardIds: kind === 'evaluate' ? snapshot.evaluationTargetCardIds : [],
   });
   const revision = player.getSnapshot().revision;
