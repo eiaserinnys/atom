@@ -130,7 +130,7 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
   return <div className="h-full min-h-0 flex flex-col">
     {error && <div role="alert" className="border-b border-border px-3 py-2 text-sm text-[var(--danger)]">{error} <button className="underline" onClick={() => retryRef.current()}>{t('visual_search.retry')}</button></div>}
     {phase === 'idle' && <div data-search-phase="idle" className="flex-1 min-h-0 flex"><PanelState><Search className="w-5 h-5 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" /></PanelState></div>}
-    {phase === 'unconfigured' && <div data-search-phase="unconfigured" className="flex-1 min-h-0 flex"><PanelState><p className="text-sm text-foreground">{t('visual_search.unconfigured')}</p><p className="text-[13px] text-muted-foreground">{t('visual_search.unconfigured_hint')}</p></PanelState></div>}
+    {phase === 'unconfigured' && <div data-search-phase="unconfigured" className="flex-1 min-h-0 flex"><PanelState><p className="text-sm text-foreground">{t('visual_search.unconfigured')}</p><p className="text-[13px] text-muted-foreground break-keep text-balance">{t('visual_search.unconfigured_hint')}</p></PanelState></div>}
     <div className="search-motion flex-1" hidden={phase !== 'active'} ref={host} dangerouslySetInnerHTML={motionMarkup} />
   </div>;
 }

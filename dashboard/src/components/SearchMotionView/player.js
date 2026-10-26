@@ -15,8 +15,8 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   const requestAnimationFrame = (fn) => { const id = window.requestAnimationFrame(t => { animationFrames.delete(id); if (!disposed) fn(t); }); animationFrames.add(id); return id; };
   const listen = (el, type, fn, options) => { el.addEventListener(type, fn, options); cleanup.push(() => el.removeEventListener(type, fn, options)); };
   const dashboard = {
-    syncSearchOutcome(m, sent, verdict) { callbacks.onResults([...m.nodes.values()].filter(n => !n.referenceTarget).map(n => ({ ...n, columnLabel: translateLabel(n.columnLabel || hopName(n.hop)), reason: verdict(n).word, sentText: sent(n, true)?.text || '', sample: !live }))); },
-    selectFromSearch(n, reason, sent) { callbacks.onSelect({ ...n, columnLabel: translateLabel(n.columnLabel || hopName(n.hop)), reason, sentText: sent?.text || '', sample: !live }); }
+    syncSearchOutcome(m, sent, verdict) { callbacks.onResults([...m.nodes.values()].filter(n => !n.referenceTarget).map(n => ({ ...displayNode(n), columnLabel: translateLabel(n.columnLabel || hopName(n.hop)), reason: verdict(n).word, sentText: sent(n, true)?.text || '', sample: !live }))); },
+    selectFromSearch(n, reason, sent) { callbacks.onSelect({ ...displayNode(n), columnLabel: translateLabel(n.columnLabel || hopName(n.hop)), reason, sentText: sent?.text || '', sample: !live }); }
   };
   let live = false;
   let lastQuery = '';
@@ -34,6 +34,8 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   let continuation = false;
   let revision = 0;
   const tr = (key, values) => callbacks.translate?.(key, values) ?? key;
+  const nodeTitle = n => n.type === 'root' ? tr('visual_search.root') : n.title;
+  const displayNode = n => n.type === 'root' ? { ...n, title: nodeTitle(n), path: [nodeTitle(n)] } : n;
 
   "use strict";
   // =====================================================================
@@ -371,10 +373,10 @@ export function createMotionPlayer(root, callbacks, samples = null) {
 
   // ------------------------------------------------------------------ 4. 카메라
   const plot = $("plot"); const cv = $("cv"); const ctx = cv.getContext("2d");
-  function overlayRoom() {
+  function overlayRoom(raisedBadge = false) {
     const legend = root.querySelector('.legend');
     const failed = model.exploration?.operations.at(-1)?.status === 'failed';
-    return Math.max(38, legend ? legend.offsetHeight + Number.parseFloat(getComputedStyle(legend).bottom || '0') : 0) + M.actionGap + (failed ? M.actionH + M.actionGap : 0);
+    return Math.max(38, legend ? legend.offsetHeight + Number.parseFloat(getComputedStyle(legend).bottom || '0') : 0) + M.actionGap + (failed || raisedBadge ? M.actionH + M.actionGap : 0);
   }
   function badgeRoom() { return 0; }
   function bounds(z = cam.z) {
@@ -682,7 +684,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
         const layout = nodeTextLayout(n.path || [], cam.z, h); const cy = y + layout.titleY;
         ctx.font = wfont(500, 14); ctx.fillStyle = css(T.ink2); ctx.textBaseline = 'middle';
         const scoreWidth = n.score == null ? 0 : ctx.measureText(n.score.toFixed(2)).width + 8;
-        ctx.fillText(fitText(`${n.rank ? '#' + n.rank + ' ' : ''}${n.title}`, w - 40 - scoreWidth, wfont(500, 14)), x + 30, cy);
+        ctx.fillText(fitText(`${n.rank ? '#' + n.rank + ' ' : ''}${nodeTitle(n)}`, w - 40 - scoreWidth, wfont(500, 14)), x + 30, cy);
         if (layout.showPath) {
           const path = (n.path || []).slice(0, -1).join(' › '); ctx.font = wfont(500, 13);
           ctx.fillText(fitText(path, w - 38, wfont(500, 13)), x + 30, y + 35);
@@ -720,7 +722,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       const scoreW = n.score != null ? ctx.measureText(n.score.toFixed(2)).width + 8 : n.byHit || n.judging ? 36 : 4;
       const availableWidth = w - (tx - x) - 8 - scoreW - portPad;
       const key = `${f}/${availableWidth}`;
-      if (!v.fit || v.fitKey !== key) { v.fit = fitText(n.title, availableWidth, f); v.fitKey = key; }
+      if (!v.fit || v.fitKey !== key) { v.fit = fitText(nodeTitle(n), availableWidth, f); v.fitKey = key; }
       ctx.font = f; ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.fillStyle = isRoot ? css(T.shell) : css(mix(T.ink, T.lowText, dim));
       ctx.fillText(v.fit, tx, cy);
@@ -860,7 +862,9 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       const tw = ctx.measureText(label).width + 30;
       const bx = Math.max(8, W - tw - 14);
       const failed = model.exploration?.operations.at(-1)?.status === 'failed';
-      const by = failed ? H - overlayRoom() + 12 : H - 26;
+      const legendRight = root.querySelector('.legend').getBoundingClientRect().right - plot.getBoundingClientRect().left;
+      const overlapsLegend = legendRight >= bx;
+      const by = failed || overlapsLegend ? H - overlayRoom(overlapsLegend) + 12 : H - 26;
       let s = 1; for (const f of view.fx) if (f.type === "stamp" && now >= f.at) s = 1 + 0.22 * (1 - easeOut((now - f.at) / f.dur));
       ctx.save(); ctx.translate(bx + tw / 2, by); ctx.scale(s, s); ctx.globalAlpha = view.stop;
       const good = !failed && model.terminal && model.terminal.stop === "sufficient";

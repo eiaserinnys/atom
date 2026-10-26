@@ -88,7 +88,6 @@
     "node": "Node {{id}}",
     "result_label": "{{rank}}. {{title}}, {{kind}}, {{hop}}, score {{score}}",
     "no_results": "No cards selected",
-    "status_done": "Search finished: {{stop}}. {{count}} cards selected.",
     "seconds": "{{value}} s",
     "jev_calls": "{{count}} Jev calls",
     "v_root": "Widened from the root",
@@ -124,7 +123,8 @@
     "err_failed": "Search failed.",
     "err_interrupted": "Connection lost before the search finished.",
     "unconfigured": "Jev search is not set up.",
-    "unconfigured_hint": "Set TYPESAFE_API_KEY and TYPESAFE_BASE_URL on the server."
+    "unconfigured_hint": "Set TYPESAFE_API_KEY and TYPESAFE_BASE_URL on the server.",
+    "workspace": "Center workspace"
   },
   "common": {
     "close": "Close",

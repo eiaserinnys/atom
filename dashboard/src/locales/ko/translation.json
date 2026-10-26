@@ -88,7 +88,6 @@
     "node": "노드 {{id}}",
     "result_label": "{{rank}}번 {{title}}, {{kind}}, {{hop}}, 점수 {{score}}",
     "no_results": "선정된 카드가 없습니다",
-    "status_done": "검색 끝. {{stop}}. 카드 {{count}}장 선정.",
     "seconds": "{{value}}초",
     "jev_calls": "Jev {{count}}회",
     "v_root": "루트에서 그물을 넓힘",
@@ -124,7 +123,8 @@
     "err_failed": "검색을 완료하지 못했습니다.",
     "err_interrupted": "검색 연결이 중단되었습니다.",
     "unconfigured": "Jev 검색이 설정되지 않았습니다.",
-    "unconfigured_hint": "서버에 TYPESAFE_API_KEY와 TYPESAFE_BASE_URL을 설정하세요."
+    "unconfigured_hint": "서버에 TYPESAFE_API_KEY와 TYPESAFE_BASE_URL을 설정하세요.",
+    "workspace": "중앙 워크스페이스"
   },
   "common": {
     "close": "닫기",
