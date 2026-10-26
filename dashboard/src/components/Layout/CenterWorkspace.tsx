@@ -9,7 +9,7 @@ interface Props {
   mode: CenterMode;
   onModeChange(mode: CenterMode): void;
   request: SearchRequest | null;
-  onSelectNode(nodeId: string, verdict: MotionNode): void;
+  onSelectNode(nodeId: string | null, verdict: MotionNode | null): void;
   onResults(nodes: MotionNode[]): void;
   onOpenInTree?(nodeId: string): void;
 }

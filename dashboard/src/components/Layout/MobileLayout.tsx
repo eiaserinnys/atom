@@ -16,7 +16,7 @@ interface Props {
   request: SearchRequest | null;
   searchResults: MotionNode[];
   verdict: MotionNode | null;
-  onSearchSelect(nodeId: string, verdict: MotionNode): void;
+  onSearchSelect(nodeId: string | null, verdict: MotionNode | null): void;
   onSubmitSearch(query: string, options: { rootNodeId?: string }): void;
   onResults(nodes: MotionNode[]): void;
   revealRequest?: number;

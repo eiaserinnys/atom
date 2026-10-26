@@ -13,7 +13,7 @@ export interface MotionPlayer {
 export function createMotionPlayer(root: HTMLElement, callbacks: {
   onSummary?(summary: string): void;
   onResults(nodes: MotionNode[]): void;
-  onSelect(node: MotionNode): void;
+  onSelect(node: MotionNode | null): void;
   onMore(query: string, snapshot: OperationSnapshot): void;
   onOperationRequest?(kind: 'expand' | 'evaluate', snapshot: OperationSnapshot): void;
   onOpenInTree?(nodeId: string): void;

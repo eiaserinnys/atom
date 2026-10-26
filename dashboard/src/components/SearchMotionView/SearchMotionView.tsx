@@ -16,7 +16,7 @@ const motionMarkup = { __html: markup };
 export interface SearchMotionViewProps {
   request: SearchRequest | null;
   onSummary?(summary: string): void;
-  onSelectNode(nodeId: string, verdict: MotionNode): void;
+  onSelectNode(nodeId: string | null, verdict: MotionNode | null): void;
   onResults(nodes: MotionNode[]): void;
   onOpenInTree?(nodeId: string): void;
 }
@@ -54,7 +54,7 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
         .filter(query => ['tree', 'children', 'node'].includes(String(query.queryKey[0])))
         .flatMap(query => Array.isArray(query.state.data) ? query.state.data : query.state.data ? [query.state.data] : []) ?? [],
       onSummary: text => callbacks.current.onSummary?.(text),
-      onSelect: (node) => { if (node.nodeId) callbacks.current.onSelectNode(node.nodeId, node); },
+      onSelect: (node) => { if (!node || node.nodeId) callbacks.current.onSelectNode(node?.nodeId ?? null, node); },
       onResults: (nodes) => callbacks.current.onResults(nodes),
       onMore: (query, snapshot) => snapshot.continueSearch ? startRef.current(query, true, true) : operationRef.current('query', snapshot),
       onOperationRequest: (kind, snapshot) => operationRef.current(kind, snapshot),

@@ -42,3 +42,13 @@ test('B11/B13: another branch cannot replace first score/evidence and cached car
   expect(projected.scene.nodes.get('a').score).toBe(.9);
   expect(projected.scene.nodes.get('a').asked).toEqual({ step: 'score', key: 'a' });
 });
+
+test('B14: frame selection clears at the beginning, returns on replay, and is cut with a branch', () => {
+  const session = createExplorationSession(); session.begin('q'); search(session, { a: .9 }, ['a']);
+  const end = session.timeline().frames.length; session.select('a', end);
+  expect(session.project(end).selectionCardId).toBe('a');
+  expect(session.project(0).selectionCardId).toBeNull();
+  expect(session.project(end).selectionCardId).toBe('a');
+  session.truncate(end - 1);
+  expect(session.project(end - 1).selectionCardId).toBeNull();
+});

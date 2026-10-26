@@ -53,9 +53,9 @@ function AppInner() {
     const url = new URL(location.href); url.hash = nodeId ?? '';
     window.history.replaceState(null, '', url.pathname + url.search + url.hash);
   }, []);
-  const selectSearchNode = useCallback((nodeId: string, verdict: MotionNode) => {
+  const selectSearchNode = useCallback((nodeId: string | null, verdict: MotionNode | null) => {
     setSelectedNodeId(nodeId); setSelectionVerdict(verdict);
-    if (!verdict.sample) { const url = new URL(location.href); url.hash = nodeId; window.history.replaceState(null, '', url); }
+    if (!verdict?.sample) { const url = new URL(location.href); url.hash = nodeId ?? ''; window.history.replaceState(null, '', url); }
   }, []);
   const submitSearch = useCallback((query: string, options: { rootNodeId?: string }) => {
     setSelectionVerdict(null);

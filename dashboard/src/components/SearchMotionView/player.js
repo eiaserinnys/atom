@@ -1055,7 +1055,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       if ($("dock-next")) $("dock-next").disabled = true;
       return null;
     }
-    const safeIdx = Math.max(0, Math.min(total - 1, idx));
+    const safeIdx = idx < 0 ? -1 : Math.max(0, Math.min(total - 1, idx));
     chips.forEach((c, i) => c.classList.toggle("active", i === safeIdx));
     if ($("dock-pos")) $("dock-pos").textContent = `${safeIdx + 1} / ${total}`;
     if ($("dock-prev")) $("dock-prev").disabled = safeIdx <= 0;
@@ -1127,7 +1127,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     const activeCard = selectedRef && model.nodes.get(selectedRef)?.cardId;
     const results = [...model.nodes.values()].filter(n => n.selected && !n.referenceTarget).sort((a, b) => a.rank - b.rank);
     const d = { results: results.map(n => ({ card_id: n.cardId, node_id: n.nodeId, title: n.title, score: n.score ?? 0 })) };
-    const fingerprint = JSON.stringify(d.results.map(r => [r.card_id, r.score]));
+    const fingerprint = JSON.stringify([activeCard, d.results.map(r => [r.card_id, r.score])]);
     if ($('tray').dataset.projection === fingerprint) return;
     $('tray').dataset.projection = fingerprint;
     const tray = $("tray"); tray.replaceChildren();
@@ -1202,10 +1202,10 @@ export function createMotionPlayer(root, callbacks, samples) {
       li.className = "none";
       li.textContent = "선정된 카드가 없습니다";
       tray.append(li);
-      syncDockActive(0, false);
+      syncDockActive(-1, false);
     } else {
       tray.scrollLeft = 0;
-      syncDockActive(0, false);
+      syncDockActive(-1, false);
     }
     const activeIndex = results.findIndex(n => n.cardId === activeCard);
     if (activeIndex >= 0) syncDockActive(activeIndex, false);
@@ -1215,7 +1215,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (!keepPlaying) { clearTimeout(player.timer); player.playing = false; }
     projected = true; cursor = clamp(position, 0, history.timeline().frames.length);
     const result = history.project(cursor, evaluating); model = result.scene;
-    if (selectedRef && !model.nodes.has(selectedRef)) selectedRef = null;
+    selectedRef = [...model.nodes.values()].find(n => n.cardId === result.selectionCardId)?.ref ?? null;
     if (selectedArrival && !model.exploration.operations.some(op => op.id === selectedArrival)) selectedArrival = null;
     sync(performance.now(), animate, null);
     dashboard.syncSearchOutcome(model, sentText, verdictOf);
@@ -1223,7 +1223,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (selectedRef) {
       const n = model.nodes.get(selectedRef);
       dashboard.selectFromSearch(n, verdictOf(n).word, sentText(n, true));
-    }
+    } else callbacks.onSelect(null);
     chrome();
   }
   function snapshot() {
@@ -1406,7 +1406,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       const el = document.createElement("p"); el.className = "pop-verdict no"; const s = document.createElement("span"); s.textContent = p.info.expanded ? "눌러서 접기" : `접어 둔 후보 ${p.info.count}개, 눌러서 펼치기`; el.append(s); pop.append(el);
     } else {
       const n = model.nodes.get(key); const v = view.nodes.get(key); if (!n || !v) return hidePop(); box = { x: v.x, y: v.y, h: M.rowH };
-      pop.append(verdictEl(n));
+      pop.append(verdictEl(n.referenceTarget ? model.nodes.get(n.referenceTarget) : n));
       if (n.snippet && n.type !== "root") { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = "낱말이 걸린 곳: " + n.snippet; pop.append(m); }
       if (n.again.length) { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = `${hopName(n.again[0])}에서 다시 만남`; pop.append(m); }
       if (view.L.dorm.get(key)) { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = `자식 ${view.L.dorm.get(key)}개는 미뤄 둠. 열 곳이 떨어지면 훑는다`; pop.append(m); }
@@ -1456,6 +1456,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       openSheet(n.referenceTarget, opener, n.arrivalOperationId); return;
     }
     selectedRef = ref;
+    history.select(n.cardId, projected ? cursor : frameOf(player.applied));
     hidePop();
     selectedArrival = arrival ?? [...(model.exploration?.operations ?? [])].reverse().find(op => op.kind === 'expand' && op.status === 'succeeded' && op.resultCardIds.includes(n.cardId))?.id ?? null;
     sync(performance.now(), false, null);

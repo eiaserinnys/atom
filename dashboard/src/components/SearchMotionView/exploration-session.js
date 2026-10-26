@@ -105,6 +105,7 @@ function materialize(scene, exploration) {
 // This log is the sole source for both the scene and operation snapshots. No requests or timers.
 export function createExplorationSession() {
   let entries = []; let query = ''; let revision = 0; let serial = 0;
+  let selections = [];
   function timeline() {
     const frames = []; const operations = [];
     for (const entry of entries) {
@@ -152,10 +153,15 @@ export function createExplorationSession() {
       }
     }
     if (!exploration) exploration = createExplorationModel({ query, selectionThreshold: null, initialCards: [] });
-    return materialize(scene, exploration);
+    const result = materialize(scene, exploration);
+    const selectionFrame = frames.findLast(frame => selections.some(selection => selection.frameId === frame.id));
+    const selected = selections.find(selection => selection.frameId === selectionFrame?.id);
+    result.selectionCardId = selected && exploration.cards.has(selected.cardId) ? selected.cardId : null;
+    return result;
   }
   function truncate(cursor) {
     const frames = timeline().frames.slice(0, cursor);
+    selections = selections.filter(selection => frames.some(frame => frame.id === selection.frameId));
     entries = entries.flatMap(entry => {
       const kept = frames.filter(frame => frame.entry === entry);
       if (!kept.length) return [];
@@ -165,7 +171,7 @@ export function createExplorationSession() {
   }
   return {
     begin(text, { resume = false } = {}) {
-      if (!resume) { entries = []; query = text; revision += 1; }
+      if (!resume) { entries = []; selections = []; query = text; revision += 1; }
       const id = `search-${++serial}`;
       entries.push({ type: 'search', id, events: [] });
     },
@@ -173,6 +179,11 @@ export function createExplorationSession() {
     apply(event) {
       if (event.type === 'started' && !entries.some(entry => entry.id === event.id)) entries.push({ type: 'operation', id: event.id, events: [] });
       entries.find(entry => entry.id === (event.operationId ?? event.id))?.events.push(event);
+    },
+    select(cardId, cursor) {
+      const frameId = timeline().frames[cursor - 1]?.id;
+      selections = selections.filter(selection => selection.frameId !== frameId);
+      if (frameId) selections.push({ frameId, cardId });
     },
     timeline, project, truncate,
     chapters() { return groupExplorationChapters(timeline()); },
