@@ -38,7 +38,7 @@ export function ConfigActionButton({ children, disabled, tone = "brand", onClick
     ? "bg-brand text-primary-foreground"
     : tone === "danger"
       ? "bg-node-error text-primary-foreground"
-      : "border border-border bg-transparent text-foreground hover:bg-muted";
+      : "outline outline-1 -outline-offset-1 outline-border bg-transparent text-foreground hover:bg-muted";
   return (
     <button
       className={`px-4 py-2 text-sm font-medium rounded-none ${color} ${tone === "secondary" ? "" : "hover:opacity-90"} disabled:opacity-50`}

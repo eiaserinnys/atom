@@ -165,7 +165,7 @@ describe('OpenAI settings tab', () => {
     expect(model?.className).toContain('text-muted-foreground');
 
     const remove = [...host.querySelectorAll('button')].find(button => button.textContent === 'common.delete');
-    expect(remove?.className).toContain('border-border');
+    expect(remove?.className).toContain('outline-border');
     expect(remove?.className).toContain('bg-transparent');
     expect(remove?.className).toContain('text-foreground');
     expect(remove?.className).toContain('hover:bg-muted');
