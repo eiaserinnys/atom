@@ -24,7 +24,7 @@ export function CenterWorkspace({ nodeId, mode, onModeChange, request, onSelectN
       <CompileView nodeId={nodeId} headerTabs={tabs} />
     </div>
     <div className="h-full min-h-0 flex flex-col" hidden={mode !== 'search'}>
-      <div className="h-10 px-3.5 flex items-center justify-between border-b border-border bg-card shrink-0">
+      <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-card shrink-0">
         {tabs}
       </div>
       <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView explorationState={explorationState} request={request} onSelectNode={onSelectNode} onResults={onResults} onOpenInTree={onOpenInTree} />}</div>

@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { readSearchStream, searchUrl } from './stream';
+import { readSearchStream, SearchStreamInterruptedError, searchUrl } from './stream';
 
 describe('Jev stream contract', () => {
   test('uses the dashboard API, scope and exhaustive continuation', () => {
@@ -14,6 +14,6 @@ describe('Jev stream contract', () => {
     await readSearchStream(body, receive, new AbortController().signal);
     expect(receive.mock.calls).toEqual([[{ event: 'run', data: { query: '장미' } }], [{ event: 'done', data: { results: [] } }]]);
     const incomplete = new ReadableStream({ start(c) { c.close(); } });
-    await expect(readSearchStream(incomplete, receive, new AbortController().signal)).rejects.toThrow('중단');
+    await expect(readSearchStream(incomplete, receive, new AbortController().signal)).rejects.toThrow(SearchStreamInterruptedError);
   });
 });

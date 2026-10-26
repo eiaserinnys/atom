@@ -31,4 +31,4 @@ export function createMotionPlayer(root: HTMLElement, callbacks: {
   translate?(key: string, values?: Record<string, unknown>): string;
   onCancel(): void;
   getCachedTreeNodes?(): unknown[];
-}, samples: unknown): MotionPlayer;
+}, samples?: unknown): MotionPlayer;

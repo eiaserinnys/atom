@@ -4,7 +4,7 @@ import { createExplorationSession } from './exploration-session.js';
 import type { MotionPlayer } from './player.js';
 import type { OperationSnapshot } from './operation-types';
 import type { visualSearchApi } from '../../api/visualSearchApi';
-import samples from './samples.json';
+import samples from './fixtures/samples.json';
 
 function setup() {
   const history = createExplorationSession(); history.begin('original');

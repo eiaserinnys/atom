@@ -5,7 +5,7 @@ import { createExplorationSession } from './exploration-session.js';
 import { fitZoom, operationGroups, nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
 import { motionIcon } from './motion-icons.js';
 
-export function createMotionPlayer(root, callbacks, samples) {
+export function createMotionPlayer(root, callbacks, samples = null) {
   let disposed = false;
   const cleanup = [];
   const timers = new Set();
@@ -58,17 +58,17 @@ export function createMotionPlayer(root, callbacks, samples) {
   const isDim = (n) => !n.selected && (n.verdict === "closed" || n.verdict === "low" || n.verdict === "nobody");
   function stopLabel(t) {
     if (!t) return "";
-    if (t.stop === "sufficient") return "충분함";
-    if (t.stop === "exhausted") return "탐색 완료";
-    return { CALL_BUDGET: "호출 상한", RUN_TIME_LIMIT: "시간 상한", CANDIDATE_LIMIT: "후보 상한", CANCELLED: "취소" }[t.code] || (t.status === "error" ? "오류" : "끝");
+    if (t.stop === "sufficient") return tr('visual_search.stop_sufficient');
+    if (t.stop === "exhausted") return tr('visual_search.stop_exhausted');
+    return { CALL_BUDGET: tr('visual_search.stop_call_budget'), RUN_TIME_LIMIT: tr('visual_search.stop_time'), CANDIDATE_LIMIT: tr('visual_search.stop_candidates'), CANCELLED: tr('visual_search.stop_cancelled') }[t.code] || (t.status === "error" ? tr('visual_search.stop_error') : tr('visual_search.stop_end'));
   }
-  const hopName = (h) => (h === 0 ? "입구" : "홉 " + h);
+  const hopName = (h) => tr(h === 0 ? 'visual_search.entry' : 'visual_search.hop', { count: h });
   function narrate(m) {
     const l = m.last; if (!l) return "";
     if (l.stage === "run_terminal") return stopLabel(m.terminal);
-    if (l.stage === "selection") return "선정";
-    const name = { lexical_seed: "낱말 씨앗", structure_noul: "문", content_noul: "채점", sufficiency_noul: "찾았나", hit_parent: "윗구조", atom_outline: "펼침", widen: "그물 넓히기", deferred_scan: "큰 모음 훑기" }[l.stage] || l.stage;
-    return hopName(l.hop) + " " + name;
+    if (l.stage === "selection") return tr('visual_search.selected');
+    const stageKey = { lexical_seed: 'stage_lexical_seed', structure_noul: 'stage_structure', content_noul: 'stage_content', sufficiency_noul: 'stage_sufficiency', hit_parent: 'stage_hit_parent', atom_outline: 'stage_outline', widen: 'stage_widen', deferred_scan: 'stage_deferred_scan' }[l.stage];
+    return tr('visual_search.narrate', { hop: hopName(l.hop), stage: stageKey ? tr(`visual_search.${stageKey}`) : l.stage });
   }
 
   // ------------------------------------------------------------------ 2. 자리 잡기
@@ -606,9 +606,9 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (text && M.gap >= 52) for (const e of view.edges.values()) {
       if (e.kind !== "climb" || !e.primary || e.grow < 1) continue;
       const a = anchorOut(e.from); const b = anchorIn(e.to); if (!a || !b) continue;
-      const p = pointOn(a, b, 0.5); ctx.font = font(600, 13); const tw = ctx.measureText("윗구조").width + 14;
+      const p = pointOn(a, b, 0.5); ctx.font = font(600, 13); const tw = ctx.measureText(tr('visual_search.parent')).width + 14;
       ctx.globalAlpha = Math.min(a.a, b.a); rr(p.x - tw / 2, p.y - 11, tw, 22, 6); ctx.fillStyle = css(T.node); ctx.fill(); ctx.strokeStyle = css(T.path); ctx.lineWidth = 1.2; ctx.stroke();
-      ctx.fillStyle = css(T.path); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("윗구조", p.x, p.y + 0.5); ctx.textAlign = "left";
+      ctx.fillStyle = css(T.path); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tr('visual_search.parent'), p.x, p.y + 0.5); ctx.textAlign = "left";
     }
     // 선을 타고 가는 빛
     for (const f of view.fx) {
@@ -774,7 +774,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     // 미뤄 둔 묶음: 구조 아래의 칩. 열 곳이 떨어지면 꺼내 훑는다
     const put = view.L.dorm.get(n.ref);
     if (put && text) {
-      ctx.globalAlpha = v.a; ctx.font = font(600, 13); const label = "안 본 " + put; const cw = ctx.measureText(label).width + 34; const cx = x + 10; const cyy = y + h + 3; const ch = M.chipH - 4;
+      ctx.globalAlpha = v.a; ctx.font = font(600, 13); const label = tr('visual_search.unseen', { count: put }); const cw = ctx.measureText(label).width + 34; const cx = x + 10; const cyy = y + h + 3; const ch = M.chipH - 4;
       for (let i = 1; i >= 0; i -= 1) { rr(cx + 6 + i * 3, cyy + 4 - i * 2, 11, ch - 8, 2); ctx.fillStyle = css(T.node); ctx.fill(); ctx.strokeStyle = css(T.ink2); ctx.lineWidth = 1; ctx.stroke(); }
       rr(cx + 0.5, cyy + 0.5, cw - 1, ch - 1, 6); ctx.strokeStyle = css(T.ink2, 0.7); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = css(T.ink2); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(label, cx + 26, cyy + ch / 2 + 0.5);
@@ -790,7 +790,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     ctx.globalAlpha = p.a * 0.9;
     for (let i = 2; i >= 0; i -= 1) { rr(x + 8 + i * 3, y + top - 8 - i * 2 + 2, 16, 12, 3); ctx.fillStyle = css(T.node); ctx.fill(); ctx.strokeStyle = css(T.lowLine); ctx.lineWidth = 1; ctx.stroke(); }
     rr(x + 0.5, y + 0.5, w - 1, h - 1, 5); ctx.strokeStyle = css(T.lowLine); ctx.lineWidth = 1; ctx.setLineDash([2, 4]); ctx.stroke(); ctx.setLineDash([]);
-    if (text) { ctx.font = wfont(600, 13); ctx.fillStyle = css(T.ink2); ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillText(info.expanded ? "접기" : "+" + Math.round(p.n), x + 38, y + top + 0.5); }
+    if (text) { ctx.font = wfont(600, 13); ctx.fillStyle = css(T.ink2); ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillText(info.expanded ? tr('visual_search.collapse') : "+" + Math.round(p.n), x + 38, y + top + 0.5); }
     if (info.grid) {
       // 점 하나가 카드 하나. 회색은 아직, 주황은 Jev가 보는 중, 흐린 색은 낮음, 진한 색은 맞음, 노랑은 선정
       const c = M.cell; const colors = { pend: css(T.nodeLine), jev: css(T.jev), k: css(T.know), s: css(T.struct), kl: css(T.know, 0.3), sl: css(T.struct, 0.3), none: css(T.lowLine, 0.55), sel: css(T.evidence) };
@@ -845,7 +845,7 @@ export function createMotionPlayer(root, callbacks, samples) {
         ctx.stroke();
         const ta = -Math.PI / 2 + 6.2832 * g.th; ctx.strokeStyle = css(T.ink, 0.55); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(gx + Math.cos(ta) * 4, cy + Math.sin(ta) * 4); ctx.lineTo(gx + Math.cos(ta) * 10.5, cy + Math.sin(ta) * 10.5); ctx.stroke();
         if (g.score != null) { ctx.textAlign = "right"; ctx.font = font(650, 14); ctx.fillStyle = css(col); ctx.fillText(g.score.toFixed(2), sx + sw, cy); }
-        if (sw >= 196) { ctx.textAlign = "right"; ctx.font = font(500, 13); ctx.fillStyle = css(col, 0.9); ctx.fillText("찾음", gx - 15, cy); }
+        if (sw >= 196) { ctx.textAlign = "right"; ctx.font = font(500, 13); ctx.fillStyle = css(col, 0.9); ctx.fillText(tr('visual_search.found'), gx - 15, cy); }
         ctx.textAlign = "left";
       }
     }
@@ -998,7 +998,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     sync(performance.now(), false, null);
     player.liveStart = performance.now() - (first ? eventTime(source[first - 1]) - t0 : 0); player.clock0 = player.liveStart; player.lastApply = first ? performance.now() : 0;
     player.playing = !instant; setFollow(true);
-    $("status").textContent = resume ? "더 찾아보는 중" : "검색을 시작했다";
+    $("status").textContent = resume ? tr('visual_search.status_more') : tr('visual_search.status_started');
     const next = () => {
       const now = performance.now();
       while (i < source.length && (instant || reduced() || now - player.liveStart >= eventTime(source[i]) - t0)) { receive(source[i]); i += 1; }
@@ -1172,14 +1172,14 @@ export function createMotionPlayer(root, callbacks, samples) {
     d.results.forEach((r, i) => {
       const n = [...model.nodes.values()].find((x) => x.nodeId === r.node_id) || candMap.get(r.node_id);
       const dashNode = dashMap ? dashMap.get(r.node_id) : null;
-      const kindLabel = ((n && n.type === "structure") || (dashNode && dashNode.type === "structure")) ? "구조" : "지식";
+      const kindLabel = ((n && n.type === "structure") || (dashNode && dashNode.type === "structure")) ? tr('visual_search.structure') : tr('visual_search.knowledge');
       const hopNum = n && typeof n.hop === "number" ? n.hop : 2;
-      const hopLabel = translateLabel(n?.columnLabel || (hopNum === 0 ? "입구" : "홉 " + hopNum));
+      const hopLabel = translateLabel(n?.columnLabel || hopName(hopNum));
       const pathArr = n && Array.isArray(n.path) && n.path.length > 1 ? n.path.slice(0, -1) : [];
       const summaryStr = (n && n.summary) || (dashNode && dashNode.summary) || "";
       const subText = pathArr.length
         ? (pathArr.join(" › ") + (summaryStr ? " / " + summaryStr : ""))
-        : (summaryStr || ("노드 " + String(r.node_id).slice(0, 8)));
+        : (summaryStr || tr('visual_search.node', { id: String(r.node_id).slice(0, 8) }));
 
       const li = document.createElement("li");
       const b = document.createElement("button");
@@ -1216,7 +1216,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       sub.textContent = subText;
 
       b.append(head, title, sub);
-      b.setAttribute("aria-label", `${i + 1}번 ${r.title}, ${kindLabel}, ${hopLabel}, 점수 ${r.score.toFixed(2)}`);
+      b.setAttribute("aria-label", tr('visual_search.result_label', { rank: i + 1, title: r.title, kind: kindLabel, hop: hopLabel, score: r.score.toFixed(2) }));
       listen(b, "click", (e) => {
         if (dockDragMoved) { e.preventDefault(); return; }
         syncDockActive(i, true);
@@ -1229,7 +1229,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (d.results.length === 0) {
       const li = document.createElement("li");
       li.className = "none";
-      li.textContent = "선정된 카드가 없습니다";
+      li.textContent = tr('visual_search.no_results');
       tray.append(li);
       syncDockActive(-1, false);
     } else {
@@ -1362,27 +1362,27 @@ export function createMotionPlayer(root, callbacks, samples) {
     const waiting = active && (active.kind === 'evaluate' ? active.requestedCardIds : active.fromCardId === null ? active.resultCardIds : []).some(id => !model.exploration.evaluations.has(id));
     const duration = model.run && model.done ? Math.max(0, Date.parse(model.done.completed_at) - Date.parse(model.run.started_at)) : 0;
     const extra = operations.flatMap(op => op.auditCalls).reduce((sum, call) => sum + (call.latency_ms ?? 0), 0);
-    $('sum-time').textContent = `${((duration + extra) / 1000 || 0).toFixed(1)}초`;
-    $('sum-jev').textContent = `, Jev ${calls.size + (waiting ? 1 : 0)}회`;
+    $('sum-time').textContent = tr('visual_search.seconds', { value: ((duration + extra) / 1000 || 0).toFixed(1) });
+    $('sum-jev').textContent = ', ' + tr('visual_search.jev_calls', { count: calls.size + (waiting ? 1 : 0) });
   }
   function tickSummary() {
     clearTimeout(summaryTimer);
     const run = player.events[0]; if (!run) { $("sum-time").textContent = ""; $("sum-jev").textContent = ""; return; }
     const jev = player.events.filter((e) => e.event === "step_started" && JEV.has(e.data.stage)).length;
-    if (player.serverDone) { const done = player.events[player.events.length - 1].data; $("sum-time").textContent = `${((Date.parse(done.completed_at) - Date.parse(run.data.started_at)) / 1000).toFixed(1)}초`; $("sum-jev").textContent = `, Jev ${jev}회`; return; }
-    $("sum-time").textContent = `${((performance.now() - player.liveStart) / 1000).toFixed(1)}초`; $("sum-jev").textContent = "";
+    if (player.serverDone) { const done = player.events[player.events.length - 1].data; $("sum-time").textContent = tr('visual_search.seconds', { value: ((Date.parse(done.completed_at) - Date.parse(run.data.started_at)) / 1000).toFixed(1) }); $("sum-jev").textContent = ', ' + tr('visual_search.jev_calls', { count: jev }); return; }
+    $("sum-time").textContent = tr('visual_search.seconds', { value: ((performance.now() - player.liveStart) / 1000).toFixed(1) }); $("sum-jev").textContent = "";
     summaryTimer = setTimeout(tickSummary, 100);
   }
   function chrome() {
     if (projected) projectionReadout();
-    callbacks.onSummary?.(`홉 ${model.maxHop} · ${$("sum-jev").textContent.replace(/^, /, "")} · ${$("sum-time").textContent}`);
+    callbacks.onSummary?.([tr('visual_search.hop', { count: model.maxHop }), $("sum-jev").textContent.replace(/^, /, ""), $("sum-time").textContent].filter(Boolean).join(', '));
     const f = projected ? cursor : frameOf(player.applied); const total = receivedDone ? history.timeline().frames.length : player.total;
     $("count").textContent = total ? `${f}/${total}` : String(f);
     $("narr").textContent = operationNarration() || narrate(model);
     const lastOperation = model.exploration?.operations.at(-1);
     if (lastOperation?.kind === 'expand' && lastOperation.status === 'succeeded' && lastOperation.resultCardIds.length === 0) $('narr').textContent = tr('visual_search.empty');
-    const scrub = $("scrub"); scrub.max = String(total ?? player.frameEnds.length); scrub.value = String(f); scrub.setAttribute("aria-valuetext", `${f}단계 ${narrate(model)}`);
-    const pl = $("t-play"); pl.setAttribute("aria-label", player.playing ? "일시정지" : "재생"); pl.title = player.playing ? "일시정지" : "재생";
+    const scrub = $("scrub"); scrub.max = String(total ?? player.frameEnds.length); scrub.value = String(f); scrub.setAttribute("aria-valuetext", tr('visual_search.step_value', { step: f, narration: narrate(model) }));
+    const pl = $("t-play"); pl.setAttribute("aria-label", player.playing ? tr('visual_search.pause') : tr('visual_search.play')); pl.title = player.playing ? tr('visual_search.pause') : tr('visual_search.play');
     $("play-icon").setAttribute("d", player.playing ? "M4 3h3v10H4zM9 3h3v10H9z" : "M5 3l8 5-8 5z");
     $("t-first").disabled = $("t-prev").disabled = f === 0; $("t-next").disabled = $("t-last").disabled = projected ? cursor >= total : player.applied >= player.received && player.serverDone;
     $("t-skip").disabled = !player.playing; $("t-skip").checked = player.fast;
@@ -1403,20 +1403,20 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   function verdictOf(n) {
     const th = (model.policy && model.policy.structure_threshold) ?? 0.5; const sc = n.score != null ? n.score.toFixed(2) : "";
-    if (n.type === "root") return { score: "", word: "루트에서 그물을 넓힘", ok: true };
-    if (n.selected) return { score: sc, word: `선정 ${n.rank}`, ok: true };
+    if (n.type === "root") return { score: "", word: tr('visual_search.v_root'), ok: true };
+    if (n.selected) return { score: sc, word: tr('visual_search.v_selected', { rank: n.rank }), ok: true };
     if (n.evaluation?.origin === 'manual_content') {
       const threshold = model.exploration.selectionThreshold;
       return { score: sc, word: tr(n.score >= threshold ? 'visual_search.relevance_above' : 'visual_search.relevance_below', { threshold: threshold.toFixed(2) }), ok: n.score >= threshold };
     }
-    if (n.byHit) return { score: "", word: "맞은 카드의 윗구조라 묻지 않고 엶", ok: true };
-    if (n.byRoot) return { score: "", word: "최상위라 묻지 않고 엶", ok: true };
-    if (n.verdict === "open") return { score: sc, word: `열림 (${th.toFixed(2)} 이상)`, ok: true };
-    if (n.verdict === "closed") return { score: sc, word: `닫힘 (${th.toFixed(2)} 미만)`, ok: false };
-    if (n.verdict === "hit") return { score: sc, word: model.selThreshold != null ? `맞음, 선정 기준 ${model.selThreshold.toFixed(2)} 미만` : "맞음", ok: true };
-    if (n.verdict === "low") return { score: sc, word: model.selThreshold != null && n.score >= 0.3 ? `선정 기준 ${model.selThreshold.toFixed(2)} 미만` : "낮음", ok: false };
-    if (n.verdict === "nobody") return { score: "", word: "본문이 없어 묻지 않음", ok: false };
-    return { score: "", word: n.judging ? "묻는 중" : "아직 묻지 않음", ok: false };
+    if (n.byHit) return { score: "", word: tr('visual_search.v_by_hit'), ok: true };
+    if (n.byRoot) return { score: "", word: tr('visual_search.v_by_root'), ok: true };
+    if (n.verdict === "open") return { score: sc, word: tr('visual_search.v_open', { threshold: th.toFixed(2) }), ok: true };
+    if (n.verdict === "closed") return { score: sc, word: tr('visual_search.v_closed', { threshold: th.toFixed(2) }), ok: false };
+    if (n.verdict === "hit") return { score: sc, word: model.selThreshold != null ? tr('visual_search.v_hit_below', { threshold: model.selThreshold.toFixed(2) }) : tr('visual_search.v_hit'), ok: true };
+    if (n.verdict === "low") return { score: sc, word: model.selThreshold != null && n.score >= 0.3 ? tr('visual_search.v_below', { threshold: model.selThreshold.toFixed(2) }) : tr('visual_search.v_low'), ok: false };
+    if (n.verdict === "nobody") return { score: "", word: tr('visual_search.v_no_body'), ok: false };
+    return { score: "", word: n.judging ? tr('visual_search.v_asking') : tr('visual_search.v_not_asked'), ok: false };
   }
   function verdictEl(n) {
     const v = verdictOf(n); const p = document.createElement("p"); p.className = "pop-verdict " + (v.ok ? "ok" : "no");
@@ -1425,7 +1425,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   function sentEl(sent, label = true) {
     const pre = document.createElement("div"); pre.className = "sent";
-    if (label) { const l = document.createElement("span"); l.className = "sent-label"; l.textContent = "Jev에 보낸 글"; pre.append(l); }
+    if (label) { const l = document.createElement("span"); l.className = "sent-label"; l.textContent = tr('visual_search.sent'); pre.append(l); }
     pre.append(document.createTextNode(sent.text)); return pre;
   }
   const pop = $("pop"); let popTimer = 0;
@@ -1436,7 +1436,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     let box;
     if (key[0] === "#") {
       const hop = Number(key.slice(1)); const sf = model.suff.get(hop); const c = view.L.cols.find((cc) => cc.hop === hop); if (!sf || !c) return hidePop();
-      const el = document.createElement("p"); el.className = "pop-verdict " + (sf.ok ? "ok" : "no"); const b = document.createElement("b"); b.textContent = sf.score.toFixed(2); const sp = document.createElement("span"); sp.textContent = sf.ok ? `찾는 것이 있다 (${sf.threshold.toFixed(2)} 이상)` : `아직 없다 (${sf.threshold.toFixed(2)} 미만)`; el.append(b, sp); pop.append(el);
+      const el = document.createElement("p"); el.className = "pop-verdict " + (sf.ok ? "ok" : "no"); const b = document.createElement("b"); b.textContent = sf.score.toFixed(2); const sp = document.createElement("span"); sp.textContent = sf.ok ? tr('visual_search.suff_yes', { threshold: sf.threshold.toFixed(2) }) : tr('visual_search.suff_no', { threshold: sf.threshold.toFixed(2) }); el.append(b, sp); pop.append(el);
       const call = model.calls.get(sf.step); const q = call && call.request && call.request.questions && call.request.questions.sufficiency_0;
       if (q) pop.append(sentEl({ text: String(q.instructions).split("\n").slice(1).join("\n") }));
       pop.hidden = false;
@@ -1446,13 +1446,13 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     if (key[0] === "@") {
       const p = view.piles.get(key.slice(1)); if (!p) return hidePop(); box = { x: p.x, y: p.y, h: p.info.h };
-      const el = document.createElement("p"); el.className = "pop-verdict no"; const s = document.createElement("span"); s.textContent = p.info.expanded ? "눌러서 접기" : `접어 둔 후보 ${p.info.count}개, 눌러서 펼치기`; el.append(s); pop.append(el);
+      const el = document.createElement("p"); el.className = "pop-verdict no"; const s = document.createElement("span"); s.textContent = p.info.expanded ? tr('visual_search.pile_collapse') : tr('visual_search.pile_expand', { count: p.info.count }); el.append(s); pop.append(el);
     } else {
       const n = model.nodes.get(key); const v = view.nodes.get(key); if (!n || !v) return hidePop(); box = { x: v.x, y: v.y, h: M.rowH };
       pop.append(verdictEl(n.referenceTarget ? model.nodes.get(n.referenceTarget) : n));
-      if (n.snippet && n.type !== "root") { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = "낱말이 걸린 곳: " + n.snippet; pop.append(m); }
-      if (n.again.length) { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = `${hopName(n.again[0])}에서 다시 만남`; pop.append(m); }
-      if (view.L.dorm.get(key)) { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = `자식 ${view.L.dorm.get(key)}개는 미뤄 둠. 열 곳이 떨어지면 훑는다`; pop.append(m); }
+      if (n.snippet && n.type !== "root") { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = tr('visual_search.matched_at', { snippet: n.snippet }); pop.append(m); }
+      if (n.again.length) { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = tr('visual_search.seen_again', { hop: hopName(n.again[0]) }); pop.append(m); }
+      if (view.L.dorm.get(key)) { const m = document.createElement("p"); m.className = "pop-match"; m.textContent = tr('visual_search.deferred', { count: view.L.dorm.get(key) }); pop.append(m); }
       const sent = sentText(n, false); if (sent) pop.append(sentEl(sent));
       else if (n.type !== "root") { const t = document.createElement("p"); t.className = "pop-match"; t.textContent = n.path.join(" › "); pop.append(t); }
     }
@@ -1604,12 +1604,12 @@ export function createMotionPlayer(root, callbacks, samples) {
   function focusKey(key) {
     if (!key) return; view.focus = key; if (key[0] !== "#") ensureVisible(key); updateHoverKeys(); clearTimeout(popTimer); popTimer = setTimeout(() => showPop(key), 200);
     let say;
-    if (key[0] === "#") { const sf = model.suff.get(Number(key.slice(1))); say = sf ? `${hopName(Number(key.slice(1)))}까지 찾은 정도 ${sf.score.toFixed(2)}, ${sf.ok ? "찾는 것이 있다" : "아직 없다"}` : ""; }
-    else if (key[0] === "@") { const p = view.L.piles.get(key.slice(1)); say = p ? `접어 둔 후보 ${p.count}개` : ""; }
+    if (key[0] === "#") { const sf = model.suff.get(Number(key.slice(1))); say = sf ? tr('visual_search.suff_live', { hop: hopName(Number(key.slice(1))), score: sf.score.toFixed(2), state: tr(sf.ok ? 'visual_search.suff_state_yes' : 'visual_search.suff_state_no') }) : ""; }
+    else if (key[0] === "@") { const p = view.L.piles.get(key.slice(1)); say = p ? tr('visual_search.pile_count', { count: p.count }) : ""; }
     else {
       const focused = model.nodes.get(key); const n = focused.referenceTarget ? model.nodes.get(focused.referenceTarget) : focused;
       const v = verdictOf(n); const column = translateLabel(n.columnLabel || hopName(n.hop));
-      say = `${n.title}, ${n.type === "structure" ? "구조" : n.type === "root" ? "루트" : "지식"}, ${column}, ${v.score} ${v.word}`;
+      say = tr('visual_search.node_live', { title: n.title, kind: tr(`visual_search.${n.type === 'structure' ? 'structure' : n.type === 'root' ? 'root' : 'knowledge'}`), hop: column, score: v.score, verdict: v.word });
     }
     $("graph-live").textContent = say; invalidate();
   }
@@ -1652,16 +1652,15 @@ export function createMotionPlayer(root, callbacks, samples) {
   listen($("t-fit"), "click", fitAll);
   listen($("t-follow"), "click", () => { setFollow(true); if (model.last) followHop(model.last.hop); });
   listen($("sheet-close"), "click", () => closeSheet());
-  listen($("more"), "click", () => callbacks.onMore(lastQuery || samples[current][0].data.query, snapshot()));
+  listen($("more"), "click", () => { if (lastQuery) callbacks.onMore(lastQuery, snapshot()); });
   listen($('node-expand'), 'click', () => callbacks.onOperationRequest?.('expand', snapshot()));
   listen($('node-evaluate'), 'click', () => callbacks.onOperationRequest?.('evaluate', snapshot()));
   listen($('node-tree'), 'click', () => { const n = model.nodes.get(selectedRef); if (n) callbacks.onOpenInTree?.(n.nodeId); });
   listen($('node-actions'), 'keydown', e => { if (e.key === 'Escape') { e.preventDefault(); plot.focus(); } });
 
   // ------------------------------------------------------------------ 8. 시안의 표본
-  let current = null;
   function choose(name, autoplay = true) {
-    callbacks.onCancel(); live = false; current = name; callbacks.onResults([]);
+    callbacks.onCancel(); live = false; callbacks.onResults([]);
     $("query-title").textContent = "“" + samples[name][0].data.query + "”";
     startLive(samples[name], true);
     if (autoplay && !reduced()) {
@@ -1676,13 +1675,13 @@ export function createMotionPlayer(root, callbacks, samples) {
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTokens(); invalidate(); });
   readTokens(); resize();
   const refit = () => { for (const v of view.nodes.values()) v.fit = null; invalidate(); };
-  if (document.fonts) { listen(document.fonts, "loadingdone", refit); const all = Object.values(samples).flat().flatMap((e) => (e.event === "step_completed" ? e.data.candidates.map((c) => c.title) : [])).join("") + "입구홉충분성루트윗구조접기더열곳없음호출시간후보상한0123456789.+"; Promise.all([document.fonts.load(font(650, 14), all), document.fonts.load(font(500, 14), all)]).then(refit, () => {}); }
-
-  const first = Object.hasOwn(samples, params.get('sample')) ? params.get('sample') : 'atom';
-  const auto = params.get("auto") !== "0" && !reduced();
-  if (Object.hasOwn(samples, first)) choose(first, auto);
-  if (params.has("event")) seekEvent(Number(params.get("event")));
-  else if (params.has("frame")) seek(Number(params.get("frame")), false);
+  const canvasKeys = ['entry', 'hop', 'parent', 'unseen', 'collapse', 'found', 'stop_sufficient', 'stop_exhausted', 'stop_call_budget', 'stop_time', 'stop_candidates', 'stop_cancelled', 'stop_error', 'stop_end'];
+  if (document.fonts) {
+    listen(document.fonts, "loadingdone", refit);
+    const glyphs = canvasKeys.map(key => tr(`visual_search.${key}`, { count: 0 })).join('') + '0123456789.+';
+    Promise.all([document.fonts.load(font(650, 14), glyphs), document.fonts.load(font(500, 14), glyphs)]).then(refit, () => {});
+  }
+  if (samples?.atom) choose('atom', false);
   return {
     begin(query, { resume = false } = {}) {
       if (resume) {
@@ -1698,7 +1697,6 @@ export function createMotionPlayer(root, callbacks, samples) {
       player.clock0 = player.liveStart; resetView(); shownAt.clear(); callbacks.onResults([]);
       $("tray").replaceChildren(); syncDockActive(0, false); $("more").hidden = true;
       $("query-title").textContent = "“" + query + "”";
-      root.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-checked', 'false'));
       setFollow(true); sync(performance.now(), false, null);
       tickSummary(); chrome();
     },

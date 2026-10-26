@@ -1,9 +1,10 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { QueryClientContext } from '@tanstack/react-query';
 import { createMotionPlayer, type ExplorationRecord, type MotionPlayer } from './player.js';
-import { readSearchStream, searchUrl, type SearchRequest } from './stream';
+import { readSearchStream, SearchStreamInterruptedError, searchUrl, type SearchRequest } from './stream';
 import type { MotionNode } from './types';
-import sampleUrl from './samples.json?url';
+import { Search } from 'lucide-react';
+import { PanelState } from '../PanelState';
 import markup from './motion.html?raw';
 import './motion.css';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +33,7 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
   const requestRef = useRef(request);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
+  const [phase, setPhase] = useState<'idle' | 'active' | 'unconfigured'>(request ? 'active' : 'idle');
   const lastQuery = useRef('');
   const startRef = useRef<(query: string, exhaustive?: boolean, resume?: boolean) => void>(() => {});
   const operationRef = useRef<(kind: 'expand' | 'evaluate' | 'query', snapshot: OperationSnapshot, retryId?: string) => void>(() => {});
@@ -44,15 +46,11 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
   useEffect(() => {
     host.current?.querySelectorAll<HTMLElement>('[data-i18n]').forEach(node => { node.textContent = t(node.dataset.i18n!); });
     host.current?.querySelectorAll<HTMLElement>('[data-i18n-label]').forEach(node => { node.setAttribute('aria-label', t(node.dataset.i18nLabel!)); });
+    host.current?.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach(node => { node.setAttribute('title', t(node.dataset.i18nTitle!)); });
+    host.current?.querySelectorAll<HTMLElement>('[data-i18n-roledescription]').forEach(node => { node.setAttribute('aria-roledescription', t(node.dataset.i18nRoledescription!)); });
   }, [t, ready]);
   useEffect(() => {
     let instance: MotionPlayer | null = null;
-    const controller = new AbortController();
-    const saved = explorationState?.current;
-    const restoring = saved?.requestId === requestRef.current?.requestId && saved?.record.complete;
-    const sampleData = restoring ? Promise.resolve({}) : fetch(sampleUrl, { signal: controller.signal }).then(response => { if (!response.ok) throw new Error('표본을 불러오지 못했습니다.'); return response.json(); });
-    void sampleData.then(samples => {
-    if (controller.signal.aborted) return;
     instance = createMotionPlayer(host.current!, {
       getCachedTreeNodes: () => queryClient?.getQueryCache().getAll()
         .filter(query => ['tree', 'children', 'node'].includes(String(query.queryKey[0])))
@@ -65,12 +63,11 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
       onOpenInTree: nodeId => callbacks.current.onOpenInTree?.(nodeId),
       translate: (key, values) => callbacks.current.t(key, values ?? {}),
       onCancel: () => { active.current?.abort(); setError(''); },
-    }, samples);
+    });
     player.current = instance; setReady(true);
-    }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '표본을 불러오지 못했습니다.'); });
     return () => {
       if (instance && explorationState && requestRef.current) explorationState.current = { requestId: requestRef.current.requestId, record: instance.getRecord() };
-      controller.abort(); active.current?.abort(); instance?.dispose(); player.current = null;
+      active.current?.abort(); instance?.dispose(); player.current = null;
     };
   }, []);
 
@@ -92,26 +89,35 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
       const controller = new AbortController();
       active.current = controller;
       setError('');
+      setPhase('active');
       player.current!.begin(query, { resume });
       retryRef.current = () => startRef.current(query, exhaustive, resume);
       try {
         const response = await fetch(searchUrl(query, { rootNodeId: requestRef.current?.rootNodeId, exhaustive }), {
           credentials: 'include', cache: 'no-store', headers: { Accept: 'text/event-stream' }, signal: controller.signal,
         });
-        if (!response.ok) throw new Error(response.status === 401 ? '로그인이 필요합니다.' : response.status === 403 ? '검색에 접근할 수 없습니다.' : response.status === 429 ? '검색이 많습니다. 잠시 뒤 다시 시도해 주세요.' : '검색을 사용할 수 없습니다. 다시 시도해 주세요.');
-        if (!response.body) throw new Error('검색 스트림을 열 수 없습니다.');
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          if (response.status === 503 && body?.error?.code === 'JEV_NOT_CONFIGURED') {
+            setPhase('unconfigured'); player.current?.error(''); callbacks.current.onResults([]); callbacks.current.onSummary?.('');
+            return;
+          }
+          throw new Error(callbacks.current.t(`visual_search.${response.status === 401 ? 'err_auth' : response.status === 403 ? 'err_forbidden' : response.status === 429 ? 'err_busy' : 'err_failed'}`));
+        }
+        if (!response.body) throw new Error(callbacks.current.t('visual_search.err_failed'));
         await readSearchStream(response.body, event => {
           if (!controller.signal.aborted) player.current?.receive(event);
         }, controller.signal);
       } catch (cause) {
         if (controller.signal.aborted) return;
-        const message = cause instanceof Error ? cause.message : '검색을 완료하지 못했습니다.';
+        const message = cause instanceof SearchStreamInterruptedError ? callbacks.current.t('visual_search.err_interrupted') : cause instanceof Error ? cause.message : callbacks.current.t('visual_search.err_failed');
         setError(message); player.current?.error(message);
       }
     };
     startRef.current = (query, exhaustive, resume) => { void start(query, exhaustive, resume); };
     const saved = explorationState?.current;
     if (request && saved?.requestId === request.requestId && player.current!.restoreRecord(saved.record)) {
+      setPhase('active');
       const failed = player.current!.getSnapshot().operations.at(-1);
       if (failed?.status === 'failed') {
         setError(callbacks.current.t('visual_search.error', { code: failed.errorCode }));
@@ -123,6 +129,8 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
 
   return <div className="h-full min-h-0 flex flex-col">
     {error && <div role="alert" className="border-b border-border px-3 py-2 text-sm text-[var(--danger)]">{error} <button className="underline" onClick={() => retryRef.current()}>{t('visual_search.retry')}</button></div>}
-    <div className="search-motion flex-1" ref={host} dangerouslySetInnerHTML={motionMarkup} />
+    {phase === 'idle' && <div data-search-phase="idle" className="flex-1 min-h-0 flex"><PanelState><Search className="w-5 h-5 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" /></PanelState></div>}
+    {phase === 'unconfigured' && <div data-search-phase="unconfigured" className="flex-1 min-h-0 flex"><PanelState><p className="text-sm text-foreground">{t('visual_search.unconfigured')}</p><p className="text-[13px] text-muted-foreground">{t('visual_search.unconfigured_hint')}</p></PanelState></div>}
+    <div className="search-motion flex-1" hidden={phase !== 'active'} ref={host} dangerouslySetInnerHTML={motionMarkup} />
   </div>;
 }

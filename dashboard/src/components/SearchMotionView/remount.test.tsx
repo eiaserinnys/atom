@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { SearchMotionView, type SearchMotionViewProps } from './SearchMotionView';
 import { createMotionPlayer } from './player.js';
 import type { MotionEvent } from './stream';
-import samples from './samples.json';
+import samples from './fixtures/samples.json';
 import markup from './motion.html?raw';
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));

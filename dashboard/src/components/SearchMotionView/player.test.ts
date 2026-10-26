@@ -2,7 +2,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { createMotionPlayer } from './player.js';
 import markup from './motion.html?raw';
-import samples from './samples.json';
+import samples from './fixtures/samples.json';
 import type { MotionEvent } from './stream';
 
 function settleFrames(frames: FrameRequestCallback[]) {
