@@ -30,8 +30,12 @@ describe("migration 014 on SQLite", () => {
       secret_hash: "hash",
     });
     expect(agent.scope).toBe("write");
+    // better-sqlite3 retains the first Jest realm's SqliteError constructor in
+    // its native addon. Later realms' rejects.toThrow cannot recognize it.
     await expect(getDb().query("UPDATE agents SET scope = 'admin' WHERE id = $1", [agent.id]))
-      .rejects.toThrow();
+      .rejects.toMatchObject({ code: "SQLITE_CONSTRAINT_CHECK" });
+    expect((await getDb().query("SELECT scope FROM agents WHERE id = $1", [agent.id])).rows)
+      .toEqual([{ scope: "write" }]);
   });
 
   it("keeps existing agents at write and records migration 014 once", async () => {

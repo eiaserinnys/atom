@@ -1,8 +1,8 @@
 -- The inline status CHECK prevents dropping its column directly.
 -- Rebuild cards while preserving rowids so the external-content FTS index stays
 -- associated with the same rows. Foreign keys are disabled only for the table
--- swap; tree_nodes keeps its rows and cards target after the rename.
-PRAGMA foreign_keys = OFF;
+-- swap by the migration runner, outside its transaction; tree_nodes keeps its
+-- rows and cards target after the rename.
 
 DROP TRIGGER IF EXISTS cards_fts_insert;
 DROP TRIGGER IF EXISTS cards_fts_update;
@@ -63,4 +63,3 @@ BEGIN
 END;
 
 INSERT INTO cards_fts(cards_fts) VALUES ('rebuild');
-PRAGMA foreign_keys = ON;

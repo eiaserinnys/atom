@@ -162,6 +162,9 @@ describe("migrateSqliteToPostgres", () => {
     };
 
     const txQuery: Queryable["query"] = async (queryText, values) => {
+      if (queryText.startsWith("SELECT id FROM users")) {
+        return { rows: [], rowCount: 0, command: "SELECT", oid: 0, fields: [] };
+      }
       insertCalls.push({ table: tableFromInsert(queryText), values });
       return { rows: [], rowCount: 1, command: "INSERT", oid: 0, fields: [] };
     };

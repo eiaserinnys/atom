@@ -120,8 +120,31 @@ export class SqliteAdapter implements DatabaseAdapter {
     for (const file of files) {
       if (applied.has(file)) continue;
       const sql = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
-      this.db.exec(sql);
-      this.db.prepare("INSERT INTO schema_migrations (name) VALUES (?)").run(file);
+      // PRAGMA foreign_keys cannot change inside a transaction. Keep the table
+      // swap and its completion record atomic, checking references before commit.
+      const foreignKeys = this.db.pragma("foreign_keys", { simple: true });
+      this.db.pragma("foreign_keys = OFF");
+      try {
+        this.db.transaction(() => {
+          if (file === "013_drop_unused_card_fields.sql") {
+            // Older runners could stop after DROP cards, leaving the only copy
+            // in cards_new. Recover it before 013 removes its scratch table.
+            const hasTable = (name: string) => this.db.prepare(
+              "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"
+            ).get(name);
+            if (!hasTable("cards") && hasTable("cards_new")) {
+              this.db.exec("ALTER TABLE cards_new RENAME TO cards");
+            }
+          }
+          this.db.exec(sql);
+          if (this.db.prepare("PRAGMA foreign_key_check").all().length > 0) {
+            throw new Error(`Foreign key violation after SQLite migration ${file}`);
+          }
+          this.db.prepare("INSERT INTO schema_migrations (name) VALUES (?)").run(file);
+        })();
+      } finally {
+        this.db.pragma(`foreign_keys = ${foreignKeys}`);
+      }
     }
   }
 }
