@@ -25,7 +25,7 @@
 .search-motion .seg button {height:28px;padding:0 10px;border-right:1px solid var(--border);white-space:nowrap;}
 .search-motion .seg button:last-child {border:0;}
 .search-motion .seg button[aria-current=true] {background:var(--foreground);color:var(--background);font-weight:600;}
-.search-motion .nb-actions {position:absolute;display:flex;gap:var(--motion-action-gap);z-index:3;}
+.search-motion .nb-actions {position:absolute;display:flex;gap:var(--motion-action-gap);z-index:6;}
 .search-motion .nb-actions .btn {height:var(--motion-action-height);font-size:14px;}
 .search-motion .search-workspace {flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
 .search-motion .toolbar {display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
