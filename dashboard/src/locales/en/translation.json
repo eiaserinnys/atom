@@ -1,5 +1,9 @@
 {
   "visual_search": {
+    "index_loading": "Loading index",
+    "joined": "Selected +{{count}}",
+    "scoring": "Evaluating",
+    "expanding": "Expanding",
     "same_branch": "Same branch {{count}}",
     "other_branch": "Other branches {{count}}",
     "title": "Visual search",

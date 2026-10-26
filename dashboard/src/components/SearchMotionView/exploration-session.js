@@ -74,7 +74,7 @@ function materialize(scene, exploration) {
       evaluation: card.evaluation,
       layoutScore: original?.score,
     };
-    const active = projection.operations.find(op => op.status === 'running' && (op.requestedCardIds.includes(card.cardId) || (op.fromCardId === null && op.resultCardIds.includes(card.cardId))));
+    const active = !projection.evaluations.has(card.cardId) && projection.operations.find(op => op.status === 'running' && (op.requestedCardIds.includes(card.cardId) || (op.fromCardId === null && op.resultCardIds.includes(card.cardId))));
     node.judging = active?.id ?? original?.judging ?? null;
     if (card.evaluation?.operationId) {
       const op = projection.operations.find(op => op.id === card.evaluation.operationId);

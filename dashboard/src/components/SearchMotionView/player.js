@@ -831,7 +831,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     // 끝난 까닭 (우측 하단 스탬프 배지 - 상단 홉 눈금과 절대 겹치지 않도록 배치)
     if (view.stop > 0.02 && L.cols.length) {
-      const label = stopLabel(model.terminal); ctx.font = font(700, 13);
+      const label = operationNarration() || stopLabel(model.terminal); ctx.font = font(700, 13);
       const tw = ctx.measureText(label).width + 30;
       const bx = Math.max(8, W - tw - 14);
       const by = H - 26;
@@ -1301,6 +1301,27 @@ export function createMotionPlayer(root, callbacks, samples) {
     if (cam.mode === 'idle' && sy + M.rowH * cam.z + M.actionGap + group.offsetHeight > H - overlayRoom()) ensureVisible(selectedRef);
   }
   let summaryTimer = 0;
+  function operationNarration() {
+    const projection = model.exploration; const operation = projection?.operations.at(-1);
+    if (!operation) return '';
+    if (operation.loadingIndex && operation.status === 'running') return tr('visual_search.index_loading');
+    if (operation.status === 'failed') return tr('visual_search.error', { code: operation.errorCode });
+    if (operation.status === 'succeeded' && (operation.kind === 'evaluate' || operation.fromCardId === null)) return tr('visual_search.joined', { count: operation.pendingAccepted.length });
+    const column = projection.columns.find(column => column.id === (operation.kind === 'evaluate' ? operation.viaOperationId : operation.id));
+    const label = column ? translateLabel(column.label) : tr('visual_search.expand');
+    const evaluating = operation.kind === 'evaluate' || (operation.fromCardId === null && operation.resultCardIds.length > 0);
+    return `${label} ${tr(evaluating ? 'visual_search.scoring' : 'visual_search.expanding')}`;
+  }
+  function projectionReadout() {
+    const operations = model.exploration?.operations ?? [];
+    const calls = new Map([...model.calls.values(), ...operations.flatMap(op => op.auditCalls)].filter(call => JEV.has(call.stage)).map(call => [call.call_id, call]));
+    const active = operations.find(op => op.status === 'running');
+    const waiting = active && (active.kind === 'evaluate' ? active.requestedCardIds : active.fromCardId === null ? active.resultCardIds : []).some(id => !model.exploration.evaluations.has(id));
+    const duration = model.run && model.done ? Math.max(0, Date.parse(model.done.completed_at) - Date.parse(model.run.started_at)) : 0;
+    const extra = operations.flatMap(op => op.auditCalls).reduce((sum, call) => sum + (call.latency_ms ?? 0), 0);
+    $('sum-time').textContent = `${((duration + extra) / 1000 || 0).toFixed(1)}초`;
+    $('sum-jev').textContent = `, Jev ${calls.size + (waiting ? 1 : 0)}회`;
+  }
   function tickSummary() {
     clearTimeout(summaryTimer);
     const run = player.events[0]; if (!run) { $("sum-time").textContent = ""; $("sum-jev").textContent = ""; return; }
@@ -1310,10 +1331,11 @@ export function createMotionPlayer(root, callbacks, samples) {
     summaryTimer = setTimeout(tickSummary, 100);
   }
   function chrome() {
+    if (projected) projectionReadout();
     callbacks.onSummary?.(`홉 ${model.maxHop} · ${$("sum-jev").textContent.replace(/^, /, "")} · ${$("sum-time").textContent}`);
     const f = projected ? cursor : frameOf(player.applied); const total = receivedDone ? history.timeline().frames.length : player.total;
     $("count").textContent = total ? `${f}/${total}` : String(f);
-    $("narr").textContent = narrate(model);
+    $("narr").textContent = operationNarration() || narrate(model);
     const lastOperation = model.exploration?.operations.at(-1);
     if (lastOperation?.kind === 'expand' && lastOperation.status === 'succeeded' && lastOperation.resultCardIds.length === 0) $('narr').textContent = tr('visual_search.empty');
     const scrub = $("scrub"); scrub.max = String(total ?? player.frameEnds.length); scrub.value = String(f); scrub.setAttribute("aria-valuetext", `${f}단계 ${narrate(model)}`);

@@ -1,5 +1,9 @@
 {
   "visual_search": {
+    "index_loading": "색인 적재 중",
+    "joined": "선정 +{{count}}",
+    "scoring": "채점",
+    "expanding": "펼침",
     "same_branch": "같은 가지 {{count}}",
     "other_branch": "다른 가지 {{count}}",
     "title": "시각적 검색",
