@@ -72,7 +72,7 @@ function AppInner() {
     <RestartBanner /><ReconnectOverlay />
     <header className="index-header">
       <div className="index-brand" style={{ width: isMobile ? undefined : widths?.leftPx ?? '25%' }}>atom</div>
-      <div className="index-search" data-header-search><SearchBar currentNodeId={actualNodeId} onSelectNode={handleSelectNode} onSubmitJevSearch={submitSearch} /></div>
+      {!isMobile ? <div className="index-search" data-header-search><SearchBar currentNodeId={actualNodeId} onSelectNode={handleSelectNode} onSubmitJevSearch={submitSearch} /></div> : <div className="flex-1" />}
       <div className="index-actions" style={{ width: isMobile ? undefined : widths?.rightPx ?? '30%' }}>
         {!isMobile && showConfigButton && <button className="index-action w-8 h-8 !p-0 text-muted-foreground hover:text-foreground transition-colors shrink-0" onClick={() => setIsConfigOpen(true)} aria-label={t('app.settings')}>
           <Settings className="w-4 h-4" strokeWidth={1.75} />
@@ -82,7 +82,7 @@ function AppInner() {
     </header>
     {!isMobile && showConfigButton && <ConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} />}
     <main className="flex-1 min-h-0 overflow-hidden">
-      {isMobile ? <MobileLayout selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onResults={handleSearchResults} /> :
+      {isMobile ? <MobileLayout selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onSubmitSearch={submitSearch} onResults={handleSearchResults} /> :
         <ThreePanelLayout onLayoutWidthsChange={setWidths}
           left={<TreeView selectedNodeId={actualNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} />}
           center={<CenterWorkspace nodeId={actualNodeId} mode={centerMode} onModeChange={setCenterMode} request={request} onSelectNode={selectSearchNode} onResults={handleSearchResults} />}

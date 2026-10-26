@@ -24,8 +24,8 @@ export function MobileTabBar({ activeTab, onTabChange, showSettings }: Props) {
 
   return (
     <div
-      className="h-14 shrink-0 z-50 flex border-t border-border bg-card"
-      role="tablist" aria-label="모바일 탐색"
+      className="h-14 shrink-0 flex border-t border-border bg-card"
+      role="tablist"
     >
       {visibleTabs.map((tab) => (
         <button
