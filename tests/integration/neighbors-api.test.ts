@@ -40,10 +40,10 @@ function vector(first: number): Buffer {
   return serializeEmbedding(values);
 }
 
-async function seedCard(cardId: string, nodeId: string, title: string, content: string, position: number, parentNodeId: string | null, value: number) {
+async function seedCard(cardId: string, nodeId: string, title: string, content: string, position: number, parentNodeId: string | null, value: number, cardType: "structure" | "knowledge" = "knowledge") {
   await getDb().query(
-    `INSERT INTO cards (id, card_type, title, content, tags, "references") VALUES ($1, 'knowledge', $2, $3, '[]', '[]')`,
-    [cardId, title, content]
+    `INSERT INTO cards (id, card_type, title, content, tags, "references") VALUES ($1, $2, $3, $4, '[]', '[]')`,
+    [cardId, cardType, title, content]
   );
   await getDb().query(
     `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink) VALUES ($1, $2, $3, $4, FALSE)`,
@@ -63,10 +63,10 @@ describe("card neighbor APIs", () => {
     await runMigrations(migrations);
     agentKeyVerifier.clear();
     const rootAContent = "root";
-    await seedCard(ids.rootA, nodes.rootA, "Root A", rootAContent, 1, null, 0);
+    await seedCard(ids.rootA, nodes.rootA, "Root A", rootAContent, 1, null, 0, "structure");
     await seedCard(ids.source, nodes.source, "Source card", "source **body**", 1, nodes.rootA, 1);
     await seedCard(ids.near, nodes.near, "Near card", "near **excerpt**", 2, nodes.rootA, 0.8);
-    await seedCard(ids.rootB, nodes.rootB, "Root B", "root", 2, null, 0);
+    await seedCard(ids.rootB, nodes.rootB, "Root B", "root", 2, null, 0, "structure");
     await seedCard(ids.other, nodes.other, "Other card", "other body", 1, nodes.rootB, 0.4);
     await saveOpenAIKey(getDb(), "neighbors-test-key", "2026-10-26T00:00:00.000Z");
     const secretHash = await bcrypt.hash(agentSecret, 4);
@@ -115,16 +115,22 @@ describe("card neighbor APIs", () => {
     expect(jwt.json()).toMatchObject({
       status: "ready",
       key_configured: true,
-      source: { card_id: ids.source, node_id: nodes.source, path: [{ node_id: nodes.rootA, title: "Root A" }] },
+      source: { card_id: ids.source, node_id: nodes.source, card_type: "knowledge", path: [{ node_id: nodes.rootA, title: "Root A" }] },
       neighbors: [{
         card_id: ids.near,
         node_id: nodes.near,
+        card_type: "knowledge",
         title: "Near card",
         excerpt: "near excerpt",
         path: [{ node_id: nodes.rootA, title: "Root A" }],
         tree_relation: { common_ancestor_depth: 1, tree_distance: 2, same_top_level_branch: true },
       }],
     });
+    const allNeighbors = await app.inject(`/cards/${ids.source}/neighbors?limit=4`);
+    expect(allNeighbors.json().neighbors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ card_id: ids.rootA, card_type: "structure" }),
+      expect.objectContaining({ card_id: ids.near, card_type: "knowledge" }),
+    ]));
     expect(jwt.json().neighbors[0].similarity).toBeCloseTo(0.8, 6);
     expect(jwt.json().neighbors.some((row: { card_id: string }) => row.card_id === ids.source)).toBe(false);
     const broader = await app.inject(`/cards/${ids.source}/neighbors?limit=2`);

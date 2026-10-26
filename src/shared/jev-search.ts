@@ -165,6 +165,7 @@ export interface JevSearchSummary {
   elapsed_ms: number;
   hops: number;
   candidates: number;
+  selection_threshold: number | null;
 }
 
 export type JevSearchCompactResponse = Omit<JevSearchResponse, "trace"> & { summary: JevSearchSummary };

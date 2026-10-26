@@ -32,7 +32,14 @@ const jevResponse = {
     seed_limit: 24, seed_max_terms: 12, sufficiency_threshold: 0.7, max_jev_calls: 32, max_parallel_jev_calls: 3, defer_candidates: 96,
   },
   results: [],
-  trace: { candidates: [], steps: [], calls: [] },
+  trace: {
+    candidates: [],
+    steps: [{
+      id: "step-selection", seq: 1, hop: 0, stage: "selection", started_at: "2026-10-11T00:00:01.000Z",
+      completed_at: "2026-10-11T00:00:01.000Z", call_id: null, candidate_refs: [], decisions: [], selection_threshold: 0.42,
+    }],
+    calls: [],
+  },
   error: null,
 } as JevSearchResponse;
 
@@ -52,8 +59,16 @@ describe("search_cards Jev opt-in", () => {
     const reply = await handler({ query: "질의", engine: "jev" }, {}) as { content: Array<{ text: string }> };
     const compact = JSON.parse(reply.content[0].text);
     expect(compact).not.toHaveProperty("trace");
-    expect(compact.summary).toEqual({ jev_calls: 0, input_tokens: 0, elapsed_ms: 1000, hops: 0, candidates: 0 });
+    expect(compact.summary).toEqual({ jev_calls: 0, input_tokens: 0, elapsed_ms: 1000, hops: 0, candidates: 0, selection_threshold: 0.42 });
     expect(compact.results).toEqual(jevResponse.results);
+  });
+  it("uses null when the run has no selection step", async () => {
+    const handler = captureTool({ searchCards: async () => [bm25Result], runJev: async () => ({
+      ...jevResponse,
+      trace: { ...jevResponse.trace, steps: [] },
+    }) });
+    const reply = await handler({ query: "질의", engine: "jev" }, {}) as { content: Array<{ text: string }> };
+    expect(JSON.parse(reply.content[0].text).summary.selection_threshold).toBeNull();
   });
   it("leaves the default BM25 result array intact", async () => {
     const handler = captureTool({ searchCards: async () => [bm25Result], runJev: async () => jevResponse });
@@ -81,6 +96,7 @@ describe("search_cards Jev opt-in", () => {
     });
     expect(calls[0].signal).toBe(controller.signal);
     expect(result).toEqual({ content: [{ type: "text", text: JSON.stringify(jevResponse) }] });
+    expect(JSON.parse((result as { content: Array<{ text: string }> }).content[0]!.text).trace.steps[0].selection_threshold).toBe(0.42);
   });
 
   it("rejects meaningless context on a BM25 call", async () => {

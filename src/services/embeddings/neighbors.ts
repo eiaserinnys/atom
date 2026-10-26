@@ -33,7 +33,7 @@ export function createNeighborService(db: DatabaseAdapter, index: FlatEmbeddingI
 
   async function get(cardId: string, limit: number): Promise<NeighborServiceResult> {
     const sourceCard = await db.query(
-      `SELECT id AS card_id, title, content, version,
+      `SELECT id AS card_id, card_type, title, content, version,
               (TRIM(COALESCE(content, '')) <> '') AS has_content
        FROM cards WHERE id = $1`,
       [cardId]
@@ -108,6 +108,7 @@ export function createNeighborService(db: DatabaseAdapter, index: FlatEmbeddingI
       return [{
         card_id: score.cardId,
         node_id: row.node_id,
+        card_type: row.card_type,
         title: row.title,
         similarity: Math.max(-1, Math.min(1, score.similarity)),
         excerpt,
@@ -127,7 +128,7 @@ export function createNeighborService(db: DatabaseAdapter, index: FlatEmbeddingI
         dimensions: EMBEDDING_POLICY.dimensions,
         key_configured: keyMetadata.configured,
         index: { indexed_cards: [...currentVersions].filter(([id, version]) => index.versionOf(id) === version).length },
-        source: { card_id: cardId, node_id: source.node_id, title: source.title, path: sourcePath.slice(0, -1) },
+        source: { card_id: cardId, node_id: source.node_id, card_type: source.card_type, title: source.title, path: sourcePath.slice(0, -1) },
         neighbors,
       },
     };

@@ -80,7 +80,7 @@ tree_nodes (
 One card can appear in multiple tree locations via symlinks.
 Deleting a card cascades all its nodes. Deleting a node preserves the card.
 
-## MCP tools (14)
+## MCP tools (17)
 
 | Tool | Description |
 |------|-------------|
@@ -95,8 +95,11 @@ Deleting a card cascades all its nodes. Deleting a node preserves the card.
 | `compile_subtree` | BFS markdown compilation with depth/filter options |
 | `create_symlink` | Place a card at another tree location |
 | `move_node` | Relocate a node to a new parent/position |
+| `update_node` | Update a node's `journal_limit` |
 | `delete_node` | Remove node only (card preserved, children cascade) |
 | `search_cards` | BM25 full-text search with snippets; scope by `rootNodeId`; opt into Jev with `engine: "jev"` |
+| `get_card_neighbors` | Return embedding neighbors with canonical paths and card types (HTTP MCP only) |
+| `evaluate_cards` | Score how directly card content answers the original Jev query |
 | `batch_op` | Atomic multi-operation transaction (creates/updates/moves/deletes/symlinks) |
 
 ### batch_op
@@ -147,7 +150,7 @@ npm run mcp        # built
 npm run mcp:dev    # tsx watch
 ```
 
-## REST API (18 endpoints)
+## REST API (21 endpoints)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -165,6 +168,9 @@ npm run mcp:dev    # tsx watch
 | PUT | `/tree/:nodeId/move` | Move node |
 | DELETE | `/tree/:nodeId` | Delete node (card preserved) |
 | GET | `/search?q=` | BM25 full-text search (`?rootNodeId=` for scoped search); opt into Jev with `?engine=jev` |
+| POST | `/search/evaluate` | Evaluate card content against an original query and context (JWT viewer role) |
+| GET | `/cards/:cardId/neighbors` | Get embedding neighbors (JWT session auth; limit defaults to 20, maximum 50) |
+| GET | `/api/cards/:cardId/neighbors` | Get embedding neighbors through agent key auth (`x-api-key`) |
 | POST | `/api/cards` | Create card via agent key auth |
 | POST | `/mcp` | Streamable HTTP MCP endpoint |
 | POST | `/batch` | Batch operation (atomic transaction) |
@@ -177,12 +183,13 @@ Jev is opt-in. `/search` without `engine` and MCP `search_cards` without `engine
 - Inputs: `query`/`q`, optional structure `root_node_id` (REST also accepts `rootNodeId`), `limit` from 1 to 6, and optional `context_agent`, `context_project`, and `context_task` (MCP `context` object). REST `exhaustive=1` or MCP `exhaustive: true` records sufficiency but continues until exhaustion or a run limit. REST rejects other supplied values; MCP requires a boolean. The complete response and `run` event include `exhaustive`.
 - Jev does not accept BM25 filters such as tags, card type, date range, source type, or strategy.
 - The schema version 2 response contains `status`, `complete`, `stop_reason` (`sufficient` or `exhausted` on completion), selected `results`, and `trace` with candidate occurrences, steps, and safe audit calls. `limited` means the time, candidate, or Jev call ceiling stopped traversal; `complete` is false and results come only from cards already scored.
-- Server configuration uses `TYPESAFE_API_KEY` and `TYPESAFE_BASE_URL`. Jev uses `jev-latest`, v3 prompts, at most 48 candidates and 60,000 serialized characters per judgment, at most 20,000 candidate occurrences and 45 seconds per run, and at most two concurrent runs per process.
+- Server configuration uses `TYPESAFE_API_KEY` and `TYPESAFE_BASE_URL`. Jev uses `jev-latest`, v3 prompts, at most 48 candidates and 60,000 serialized characters per judgment, at most 20,000 candidate occurrences and 45 seconds per run, and at most two shared search/evaluation runs per process.
 - Selection uses `max(0.30, min(0.50, highest_score - 0.10))`: cards at 0.50 or above qualify, while lower top scores retain the relative window and 0.30 floor. Results are sorted by score, then discovery order, with at most six cards (or the requested lower limit). Sufficiency checks use this same selection.
 - Queries start with up to 12 distinct words joined with OR, taking 24 lexical seeds. Each hop judges structures and content with at most three concurrent Jev calls. Knowledge hits at 0.50 open their parent without a gate. A sufficiency score of 0.70 means the requested subject has been found. Each run sends at most 32 Jev calls.
 - Unscoped root widening opens virtual-root structure children without a Jev gate (`opened_root`); scoped children still receive structure judgments, and direct root knowledge is scored normally.
 - Structures with more than 96 direct children are deferred before expansion, using `child_count` from outline metadata or a depth-1 summary read for seeds, symlinks, and hit parents. Knowledge occurrences have `child_count: null`. The opening decision retains its action and lists deferred structures in `deferred_refs`. Empty frontiers resume one structure before root widening or exhaustion, prioritizing hit-opened structures, higher gate scores, then discovery order. `deferred_scan` identifies that structure; its children are then discovered and judged in full, subject to the call budget. Unresumed children never enter the candidate trace. Large child structures can be deferred in turn.
-- REST `GET /search?q=…&engine=jev&stream=1` streams `run`, `step_started`, `step_completed`, and `done` as SSE. Use a credentialed fetch body stream. Completed steps include newly discovered candidates and the same full safe audit call as the REST JSON response. `seq` orders starts; replay completions by `completed_at`, then `seq`. Pre-stream errors remain JSON. Disconnecting cancels the run. MCP Jev responses omit `trace` by default and add `summary` with `jev_calls`, `input_tokens`, `elapsed_ms`, `hops`, and `candidates`; `include_trace: true` returns the full response. REST always retains the full trace.
+- REST `GET /search?q=…&engine=jev&stream=1` streams `run`, `step_started`, `step_completed`, and `done` as SSE. Use a credentialed fetch body stream. Completed steps include newly discovered candidates and the same full safe audit call as the REST JSON response. `seq` orders starts; replay completions by `completed_at`, then `seq`. Pre-stream errors remain JSON. Disconnecting cancels the run. MCP Jev responses omit `trace` by default and add `summary` with `jev_calls`, `input_tokens`, `elapsed_ms`, `hops`, `candidates`, and the last `selection_threshold` (`null` if no selection step); `include_trace: true` returns the full response. REST always retains the full trace.
+- Continue a search manually by calling `get_card_neighbors` for a selected card, then `evaluate_cards` with the original query/context and returned card IDs. Compare each score with the first `search_cards(engine="jev")` response's `summary.selection_threshold`, using `0.5` when it is `null`. Neighbors return the API's ready/loading/error body and include `card_type` for the source and each neighbor; the tool is available through HTTP MCP, while stdio returns `NEIGHBORS_HTTP_ONLY`. `evaluate_cards` omits audit calls by default; `include_trace: true` includes the sanitized audit.
 - To evaluate a query set, run `node scripts/jev-search-eval.mjs path/to/queryset.json` with `ATOM_MCP_URL` and `ATOM_API_KEY` supplied by the environment. The tool requests `include_trace: true` for evaluation metrics. Items accept `id`, `category`, `query`, `targets`, and optional `expect` (`hit`, `some`, or `none`). Each query runs once, sequentially. JSON lines report target selection/scores, result count/highest score, calls, input tokens, elapsed time, status, stop reason, and hops; the final summary groups matches by category and reports median/max call counts and time. Bodies, excerpts, and key values are never printed.
 
 ### Tree outline

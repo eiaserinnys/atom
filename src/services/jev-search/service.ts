@@ -10,6 +10,7 @@ import { meaningAuditRequest } from "./audit.js";
 import { buildContentPayload, buildStructurePayload, buildSufficiencyPayload, JevAnswerError, noul, selectFeedCards, takePayloadBatch } from "./prompts.js";
 import { JevRunError, JevRunTrace } from "./run.js";
 import { JevSearchCatalog, type SearchCandidate } from "./discovery.js";
+import { tryAcquireJevRunSlot } from "./run-slots.js";
 
 export interface JevSearchDependencies {
   getNode(nodeId: string): Promise<TreeNodeWithCard | null>;
@@ -20,13 +21,12 @@ export interface JevSearchDependencies {
 }
 
 interface ScoredContent { candidate: SearchCandidate; score: number }
-let activeRuns = 0;
 
 export async function searchWithJev(rawInput: JevSearchInput, deps: JevSearchDependencies, callerSignal?: AbortSignal, observer?: JevSearchObserver): Promise<JevSearchResponse> {
   const policy = deps.policy ?? JEV_SEARCH_POLICY;
   const input = normalizeJevSearchInput(rawInput, policy);
-  if (activeRuns >= policy.maxConcurrentRuns) throw new JevSearchRequestError("Jev search is at its concurrent run limit.", "JEV_SEARCH_BUSY", 429);
-  activeRuns += 1;
+  const releaseSlot = tryAcquireJevRunSlot(policy.maxConcurrentRuns);
+  if (!releaseSlot) throw new JevSearchRequestError("Jev search is at its concurrent run limit.", "JEV_SEARCH_BUSY", 429);
   const startedAt = new Date().toISOString();
   const controller = new AbortController();
   let cancelled = callerSignal?.aborted ?? false;
@@ -202,7 +202,7 @@ export async function searchWithJev(rawInput: JevSearchInput, deps: JevSearchDep
   } finally {
     clearTimeout(timeout);
     callerSignal?.removeEventListener("abort", onCallerAbort);
-    activeRuns -= 1;
+    releaseSlot();
   }
 
   let results: JevSearchResponse["results"] = [];

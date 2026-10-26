@@ -2,6 +2,7 @@ import type { Queryable } from "../queryable.js";
 
 export interface NeighborCardRow {
   card_id: string;
+  card_type: "structure" | "knowledge";
   title: string;
   content: string;
   version: number;
@@ -24,13 +25,14 @@ export async function getNeighborCardRows(db: Queryable, cardIds: string[]): Pro
               ROW_NUMBER() OVER (PARTITION BY tn.card_id ORDER BY tn.created_at, tn.id) AS rn
        FROM tree_nodes tn WHERE tn.is_symlink = FALSE AND tn.card_id IN (${ids})
      )
-     SELECT c.id AS card_id, c.title, substr(c.content, 1, 4000) AS content, c.version, chosen.node_id
+     SELECT c.id AS card_id, c.card_type, c.title, substr(c.content, 1, 4000) AS content, c.version, chosen.node_id
      FROM cards c JOIN chosen ON chosen.card_id = c.id AND chosen.rn = 1
      WHERE TRIM(COALESCE(c.content, '')) <> ''`,
     cardIds
   );
   return result.rows.map(row => ({
     card_id: String(row["card_id"]),
+    card_type: row["card_type"] as NeighborCardRow["card_type"],
     title: String(row["title"]),
     content: String(row["content"]),
     version: Number(row["version"]),
