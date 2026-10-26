@@ -111,6 +111,12 @@ export function createMotionPlayer(root, callbacks, samples) {
         for (const group of groups.values()) {
           const source = group[0].fromRef && pos.get(group[0].fromRef);
           y = Math.max(y, source?.y ?? 0);
+          const operation = m.exploration?.operations.find(op => op.id === group[0].displayColumn);
+          if (!operation?.fromCardId) {
+            for (const n of group) { pos.set(n.ref, { x, y }); y += M.pitch + reserve(n); }
+            y += M.bandGap;
+            continue;
+          }
           group.sort((a, b) => Number(a.sameBranch) - Number(b.sameBranch) || (b.similarity ?? 0) - (a.similarity ?? 0) || a.order - b.order);
           for (const sameBranch of [false, true]) {
             const rows = group.filter(n => Boolean(n.sameBranch) === sameBranch);
