@@ -22,7 +22,7 @@ test('graph selection stays in search, detail follows it, and only explicit tree
   const reveal = vi.fn();
   function Harness() {
     const [id, setId] = useState<string | null>(null);
-    return <MobileLayout selectedNodeId={id} onSelectNode={setId} request={{ query: 'q', requestId: 1 }} searchResults={[]} verdict={null} onSearchSelect={setId} onResults={vi.fn()} onOpenInTree={reveal} />;
+    return <MobileLayout selectedNodeId={id} onSelectNode={setId} request={{ query: 'q', requestId: 1 }} searchResults={[]} verdict={null} onSearchSelect={setId} onSubmitSearch={vi.fn()} onResults={vi.fn()} onOpenInTree={reveal} />;
   }
   const click = async (text: string) => act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === text)!.click());
   try {
