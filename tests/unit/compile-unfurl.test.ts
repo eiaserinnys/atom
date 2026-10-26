@@ -92,7 +92,8 @@ describe("resolveCompileRefs", () => {
         onSnapshotWrite: (id) => {
           snapshotWrites.push(id);
         },
-      })
+      }),
+      true
     );
 
     const resolved = result.get("card-1");
@@ -120,7 +121,8 @@ describe("resolveCompileRefs", () => {
         onSnapshotWrite: (id) => {
           snapshotWrites.push(id);
         },
-      })
+      }),
+      true
     );
 
     const resolved = result.get("card-2");
@@ -149,7 +151,8 @@ describe("resolveCompileRefs", () => {
       { trello: { apiKey: "k", token: "t" } },
       makeCompileUnfurlDeps({
         findAdapter: (t) => (t === "trello" ? mockAdapter : undefined),
-      })
+      }),
+      true
     );
 
     const resolved = result.get("card-3");
@@ -181,7 +184,8 @@ describe("resolveCompileRefs", () => {
       { trello: { apiKey: "k", token: "t" } },
       makeCompileUnfurlDeps({
         findAdapter: (t) => (t === "trello" ? mockAdapter : undefined),
-      })
+      }),
+      true
     );
 
     expect(result.has("card-4")).toBe(false);
@@ -204,7 +208,8 @@ describe("resolveCompileRefs", () => {
       {},
       makeCompileUnfurlDeps({
         findAdapter: (t) => (t === "trello" ? mockAdapter : undefined),
-      })
+      }),
+      true
     );
 
     const resolved = result.get("card-bad-snapshot");
@@ -248,7 +253,8 @@ describe("resolveCompileRefs", () => {
           if (t === "trello") return mockAdapter;
           return undefined;
         },
-      })
+      }),
+      true
     );
 
     const broken = result.get("card-broken");
@@ -277,7 +283,8 @@ describe("resolveCompileRefs", () => {
           throw new Error("write failed");
         },
         onLogError: (message, error) => errors.push({ message, error }),
-      })
+      }),
+      true
     );
 
     expect(result.get("card-write-fail")?.ok).toBe(true);
@@ -326,7 +333,8 @@ describe("resolveCompileRefs — canHandle fallback", () => {
         onSourceTypeRepair: (cardId, sourceType) => {
           sourceTypeRepairs.push({ cardId, sourceType });
         },
-      })
+      }),
+      true
     );
 
     const resolved = result.get("card-fallback-1");
@@ -352,7 +360,8 @@ describe("resolveCompileRefs — canHandle fallback", () => {
       makeCompileUnfurlDeps({
         findAdapter: (_t) => undefined,
         findAdapterByRef: (ref) => (ref.includes("trello.com/c/") ? trelloAdapter : undefined),
-      })
+      }),
+      true
     );
 
     expect(result.has("card-fallback-2")).toBe(false);
@@ -379,7 +388,8 @@ describe("resolveCompileRefs — canHandle fallback", () => {
           throw new Error("repair failed");
         },
         onLogError: (message, error) => errors.push({ message, error }),
-      })
+      }),
+      true
     );
 
     expect(result.get("card-fallback-repair-fail")?.ok).toBe(true);

@@ -31,7 +31,7 @@ export const mcpRoutes: FastifyPluginAsync<McpRoutesOptions> = async (app, { nei
     const server = new McpServer({ name: "atom", version: "0.1.0" });
     const scopedServer = createScopedMcpServer(server, agent.scope);
     registerCardTools(scopedServer, agent.agent_id);
-    registerTreeTools(scopedServer, agent.agent_id);
+    registerTreeTools(scopedServer, agent.agent_id, agent.scope);
     registerSearchTools(scopedServer);
     registerBatchTools(scopedServer, agent.agent_id);
     registerExpansionTools(scopedServer, { neighbors: neighborService, evaluate: runConfiguredJevEvaluation });

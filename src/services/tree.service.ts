@@ -95,7 +95,8 @@ export async function compileSubtree(
   depth: number = 3,
   options: CompileOptions = {},
   resolveRefsMode?: false | "cached" | "fresh",
-  credentials?: Record<string, UnfurlCredentials>
+  credentials?: Record<string, UnfurlCredentials>,
+  canWriteRefs: boolean = false
 ): Promise<CompileResult> {
   const db = getDb();
   const compileContext = await loadTreeCompileContext(db, nodeId, depth);
@@ -106,7 +107,8 @@ export async function compileSubtree(
       compileContext.cardCache,
       resolveRefsMode,
       credentials ?? {},
-      createCompileUnfurlDeps(db)
+      createCompileUnfurlDeps(db),
+      canWriteRefs
     );
     options = { ...options, resolvedRefs: resolvedRefsMap };
   }
