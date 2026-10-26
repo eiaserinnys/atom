@@ -9,12 +9,26 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock('@tanstack/react-query', () => ({
   useQuery: ({ initialData }: { initialData?: TreeNodeData[] }) => ({
     data: initialData,
-    isFetched: true,
+    isFetched: initialData !== undefined,
     isFetching: false,
     isError: false,
     error: null,
   }),
 }));
+
+function renderToggleIcon(nodeData: TreeNodeData) {
+  const markup = renderToStaticMarkup(
+    <TreeNode
+      node={nodeData}
+      selectedNodeId={null}
+      onSelect={() => {}}
+      isExpanded={false}
+      expandedNodes={new Set()}
+      onToggle={() => {}}
+    />
+  );
+  return parseMarkup(markup).querySelector('svg.lucide-chevron-right');
+}
 vi.mock('@dnd-kit/core', () => ({
   useDraggable: () => ({ attributes: {}, listeners: {}, setNodeRef: () => {}, transform: null }),
   useDroppable: () => ({ setNodeRef: () => {} }),
@@ -57,7 +71,7 @@ function parseMarkup(markup: string) {
 }
 
 test('tree structure, knowledge, and expand controls render monochrome SVG icons', () => {
-  const knowledge = node('knowledge', 'knowledge');
+  const knowledge = node('knowledge', 'knowledge', []);
   const structure = node('structure', 'structure', [knowledge]);
   const markup = renderToStaticMarkup(
     <TreeNode
@@ -98,6 +112,13 @@ test('tree rows expose mobile touch targets for rows and expand controls', () =>
   expect(row?.className).toContain('touch-pan-y');
   expect(toggle?.className).toContain('max-md:w-9');
   expect(toggle?.className).toContain('max-md:h-9');
+});
+
+test('expand arrows follow known child counts and retain the structure and unknown fallbacks', () => {
+  expect(renderToggleIcon({ ...node('knowledge-zero', 'knowledge'), child_count: 0 })).toBeNull();
+  expect(renderToggleIcon(node('knowledge-unknown', 'knowledge'))).not.toBeNull();
+  expect(renderToggleIcon({ ...node('structure-zero', 'structure'), child_count: 0 })).not.toBeNull();
+  expect(renderToggleIcon({ ...node('knowledge-many', 'knowledge'), child_count: 3 })).not.toBeNull();
 });
 
 test('mobile navigation renders five monochrome SVG icons with the theme color classes', () => {

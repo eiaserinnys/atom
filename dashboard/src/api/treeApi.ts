@@ -31,4 +31,8 @@ export const treeApi = {
   listChildren(nodeId: string): Promise<TreeNodeData[]> {
     return request(`/tree/${nodeId}/children`);
   },
+
+  getOutlineChildCounts(nodeId: string): Promise<{ nodes: { id: string; child_count: number }[] }> {
+    return request(`/tree/outline?node_id=${encodeURIComponent(nodeId)}&depth=1`);
+  },
 };

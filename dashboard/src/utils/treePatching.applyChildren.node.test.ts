@@ -20,7 +20,7 @@ describe('applyChildrenPatch — node:created', () => {
     const result = applyChildrenPatch(initial, event, parent);
 
     expect(result.map((n) => n.id)).toEqual(['n1', 'n2', 'n3']);
-    expect(result[1]).toEqual(symlink);
+    expect(result[1]).toEqual({ ...symlink, child_count: 0 });
   });
 
   test('이미 있는 node:created 이벤트는 중복 삽입하지 않고 최신 node로 교체한다', () => {
@@ -40,6 +40,7 @@ describe('applyChildrenPatch — node:created', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].journal_limit).toBe(3);
+    expect(result[0].child_count).toBe(0);
   });
 });
 

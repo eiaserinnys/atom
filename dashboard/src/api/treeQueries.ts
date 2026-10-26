@@ -1,4 +1,15 @@
 import { api, type TreeNodeData } from './client';
+import { treeApi } from './treeApi';
+
+export async function fetchChildrenWithCounts(parentId: string): Promise<TreeNodeData[]> {
+  const [children, outline] = await Promise.all([
+    api.listChildren(parentId),
+    treeApi.getOutlineChildCounts(parentId).catch(() => null),
+  ]);
+  if (!outline) return children;
+  const counts = new Map(outline.nodes.map((node) => [node.id, node.child_count]));
+  return children.map((child) => child.is_symlink ? child : { ...child, child_count: counts.get(child.id) });
+}
 
 /**
  * 루트 노드 목록을 가져오고 각 루트의 직계 자식을 함께 로드한다.
@@ -9,7 +20,7 @@ export async function fetchRootsWithChildren(): Promise<TreeNodeData[]> {
   return Promise.all(
     roots.map(async (root) => {
       try {
-        const children = await api.listChildren(root.id);
+        const children = await fetchChildrenWithCounts(root.id);
         return { ...root, children };
       } catch {
         return { ...root, children: [] };

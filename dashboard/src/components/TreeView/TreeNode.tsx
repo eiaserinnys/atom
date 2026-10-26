@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { AlertTriangle, ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Loader2 } from 'lucide-react';
-import { api, type TreeNodeData } from '../../api/client';
+import { type TreeNodeData } from '../../api/client';
+import { fetchChildrenWithCounts } from '../../api/treeQueries';
 import { useTreeDnd } from './TreeDndContext';
 import { childrenQueryKey } from '../../query/queryKeys';
 
@@ -27,7 +28,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
   const propsChildren = node.children;
   const { data: children = [], isFetched, isFetching, isError, error } = useQuery<TreeNodeData[]>({
     queryKey: childrenQueryKey(node.id),
-    queryFn: () => api.listChildren(node.id),
+    queryFn: () => fetchChildrenWithCounts(node.id),
     enabled: isExpanded,
     ...(propsChildren !== undefined && {
       initialData: propsChildren,
@@ -37,11 +38,13 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
     gcTime: 0,
   });
 
+  const isStructure = node.card.card_type === 'structure';
   const childrenLoaded = isFetched || propsChildren !== undefined;
-  const hasChildren = childrenLoaded ? children.length > 0 : true;
+  const hasChildren = childrenLoaded
+    ? children.length > 0
+    : isStructure || node.is_symlink || node.child_count === undefined || node.child_count > 0;
   const loading = isFetching;
   const isSelected = node.id === selectedNodeId;
-  const isStructure = node.card.card_type === 'structure';
 
   // DnD 상태 (컨텍스트에서 읽음)
   const { activeId, overId, dropZone } = useTreeDnd();
@@ -130,7 +133,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
         >
           {loading ? <Loader2 className="w-3.5 h-3.5 max-md:w-4 max-md:h-4 animate-spin text-muted-foreground" strokeWidth={1.75} /> : hasChildren ? (isExpanded ? <ChevronDown className="w-3.5 h-3.5 max-md:w-4 max-md:h-4" strokeWidth={1.75} /> : <ChevronRight className="w-3.5 h-3.5 max-md:w-4 max-md:h-4" strokeWidth={1.75} />) : ' '}
         </span>
-        <span className="inline-flex items-center justify-center shrink-0" title={isStructure ? 'structure' : 'knowledge'}>
+        <span className="inline-flex items-center justify-center shrink-0" title={t(isStructure ? 'searchbar.type_structure' : 'searchbar.type_knowledge')}>
           {isStructure
             ? isExpanded
               ? <FolderOpen className="w-3.5 h-3.5 max-md:w-4 max-md:h-4 text-[var(--blue)]" strokeWidth={1.75} />
@@ -138,7 +141,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
             : <FileText className="w-3.5 h-3.5 max-md:w-4 max-md:h-4 text-brand" strokeWidth={1.75} />}
         </span>
         {node.is_symlink && (
-          <span className="text-[13px] text-muted-foreground shrink-0" title="symlink">↗</span>
+          <span className="text-[13px] text-muted-foreground shrink-0" title={t('card.symlink_label')}>↗</span>
         )}
         <span className="flex-1 min-w-0 text-sm max-md:text-[15px] truncate">
           {node.card.title}
