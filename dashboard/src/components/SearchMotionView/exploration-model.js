@@ -141,7 +141,8 @@ export function applyExplorationEvent(model, event) {
     const queryExpansion = operation.fromCardId === null;
     const count = next.operations.slice(0, operationPosition + 1)
       .filter(item => item.kind === 'expand' && (item.fromCardId === null) === queryExpansion).length;
-    const label = queryExpansion ? `질의 확장 ${count}` : `확장 ${count}`;
+    const depth = (next.cards.get(operation.fromCardId)?.expansionDepth ?? 0) + 1;
+    const label = queryExpansion ? `질의 확장 ${count}` : `확장 ${depth}`;
     const column = { id: operation.id, label, cardIds: [], referenceIds: [] };
     next.columns.push(column);
     operation.loadingIndex = false;
@@ -186,6 +187,7 @@ export function applyExplorationEvent(model, event) {
         initialRank: null,
         initialScore: null,
         discoveryOrder: next.nextDiscoveryOrder++,
+        expansionDepth: depth,
       };
       next.cards.set(cardId, card);
       next.cardOrder.push(cardId);

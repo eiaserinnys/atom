@@ -103,8 +103,14 @@ export function createMotionPlayer(root, callbacks, samples) {
       const nodes = byHop.get(hop) || [];
       if (m.columnLabels?.has(hop)) {
         let y = 0;
-        nodes.sort((a, b) => Number(a.sameBranch) - Number(b.sameBranch) || (b.similarity ?? 0) - (a.similarity ?? 0) || a.order - b.order);
-        for (const n of nodes) { pos.set(n.ref, { x, y }); y += M.pitch + reserve(n); }
+        const groups = Map.groupBy(nodes, n => n.displayColumn);
+        for (const group of groups.values()) {
+          const source = group[0].fromRef && pos.get(group[0].fromRef);
+          y = Math.max(y, source?.y ?? 0);
+          group.sort((a, b) => Number(a.sameBranch) - Number(b.sameBranch) || (b.similarity ?? 0) - (a.similarity ?? 0) || a.order - b.order);
+          for (const n of group) { pos.set(n.ref, { x, y }); y += M.pitch + reserve(n); }
+          y += M.bandGap;
+        }
         cols.push({ hop, x, height: y, w: M.colW }); height = Math.max(height, y); continue;
       }
       const groups = new Map();
@@ -508,7 +514,11 @@ export function createMotionPlayer(root, callbacks, samples) {
       if (e.kind === 'expansion') {
         const trunk = a.x + 14;
         ctx.globalAlpha = alpha * 0.65; ctx.strokeStyle = css(T.thin); ctx.lineWidth = 1.1;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(trunk, a.y); ctx.lineTo(trunk, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(trunk, a.y);
+        if (model.nodes.get(e.to).hop - model.nodes.get(e.from).hop > 1) {
+          ctx.lineTo(trunk, M.laneY); ctx.lineTo(b.x - 14, M.laneY); ctx.lineTo(b.x - 14, b.y);
+        } else ctx.lineTo(trunk, b.y);
+        ctx.lineTo(b.x, b.y); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - 6, b.y - 3); ctx.lineTo(b.x - 6, b.y + 3); ctx.fillStyle = css(T.thin); ctx.fill();
         const n = model.nodes.get(e.to);
         if (n?.similarity != null && z >= 0.8) { ctx.font = font(500, 13); ctx.fillStyle = css(T.lowText); ctx.textAlign = 'right'; ctx.fillText(n.similarity.toFixed(2), b.x - 8, b.y - 6); ctx.textAlign = 'left'; }

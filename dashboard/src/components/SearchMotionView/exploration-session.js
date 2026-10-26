@@ -49,7 +49,12 @@ function materialize(scene, exploration) {
   let nextHop = scene.maxHop + 1;
   for (const column of projection.columns.slice(1)) {
     if (column.cardIds.length + column.referenceIds.length === 0) continue;
-    columns.set(column.id, nextHop++);
+    const operation = projection.operations.find(op => op.id === column.id);
+    const source = projection.cards.find(card => card.cardId === operation?.fromCardId);
+    const sourceHop = source && columns.get(source.displayColumnId);
+    const hop = operation?.fromCardId ? (sourceHop == null ? scene.maxHop + 1 : sourceHop + 1) : nextHop;
+    columns.set(column.id, hop);
+    nextHop = Math.max(nextHop, hop + 1);
   }
   scene.columnLabels = new Map();
   for (const card of projection.cards) {
