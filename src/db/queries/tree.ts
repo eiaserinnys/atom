@@ -150,22 +150,52 @@ export async function getNodeBreadcrumb(
   db: Queryable,
   nodeId: string
 ): Promise<string[]> {
+  // UUID-delimited paths work on both PostgreSQL and SQLite without imposing
+  // a depth limit on valid trees. A repeated physical node ends recursion.
   const result = await db.query(
     `WITH RECURSIVE ancestors AS (
-       SELECT tn.id, tn.parent_node_id, c.title, 0 AS depth
+       SELECT tn.id, tn.parent_node_id, c.title, 0 AS depth,
+              '|' || CAST(tn.id AS TEXT) || '|' AS visited
        FROM tree_nodes tn
        JOIN cards c ON c.id = tn.card_id
        WHERE tn.id = $1
        UNION ALL
-       SELECT tn.id, tn.parent_node_id, c.title, a.depth + 1
+       SELECT tn.id, tn.parent_node_id, c.title, a.depth + 1,
+              a.visited || CAST(tn.id AS TEXT) || '|'
        FROM tree_nodes tn
        JOIN cards c ON c.id = tn.card_id
        JOIN ancestors a ON tn.id = a.parent_node_id
+       WHERE a.visited NOT LIKE '%|' || CAST(tn.id AS TEXT) || '|%'
      )
      SELECT title FROM ancestors ORDER BY depth DESC`,
     [nodeId]
   );
   return result.rows.map((r: any) => r.title as string);
+}
+
+export class TreeCycleError extends Error {
+  readonly code = "TREE_CYCLE";
+  readonly statusCode = 400;
+
+  constructor(nodeId: string) {
+    super(`TREE_CYCLE: parent chain for node ${nodeId} contains a cycle`);
+  }
+}
+
+/** Validate physical parent links only; symlink card references are unrelated. */
+export async function assertTreeParent(
+  db: Queryable,
+  nodeId: string,
+  parentNodeId: string | null
+): Promise<void> {
+  const visited = new Set([nodeId]);
+  let current = parentNodeId;
+  while (current !== null) {
+    if (visited.has(current)) throw new TreeCycleError(nodeId);
+    visited.add(current);
+    const parent = await selectNodeById(db, current);
+    current = parent?.parent_node_id ?? null;
+  }
 }
 
 export async function selectNodesByCardId(

@@ -77,7 +77,7 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   if (filters.root_node_id) {
     subtreeCte = `subtree AS (
       SELECT id FROM tree_nodes WHERE id = $${idx}
-      UNION ALL
+      UNION
       SELECT tn.id FROM tree_nodes tn
       INNER JOIN subtree s ON tn.parent_node_id = s.id
     ), `;
@@ -117,15 +117,16 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   ) canonical_node ON TRUE
   LEFT JOIN LATERAL (
     WITH RECURSIVE anc AS (
-      SELECT tn.parent_node_id, ac.title, 1 AS depth
+      SELECT tn.parent_node_id, ac.title, 1 AS depth, ARRAY[tn.id] AS visited
       FROM tree_nodes tn
       JOIN cards ac ON ac.id = tn.card_id
       WHERE tn.id = canonical_node.node_id
       UNION ALL
-      SELECT tn.parent_node_id, ac.title, a.depth + 1
+      SELECT tn.parent_node_id, ac.title, a.depth + 1, a.visited || tn.id
       FROM tree_nodes tn
       JOIN cards ac ON ac.id = tn.card_id
       INNER JOIN anc a ON tn.id = a.parent_node_id
+      WHERE NOT tn.id = ANY(a.visited)
     )
     SELECT array_agg(title ORDER BY depth DESC) AS path
     FROM anc
@@ -160,7 +161,7 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
     params.push(filters.root_node_id);
     subtreeCte = `WITH RECURSIVE subtree AS (
        SELECT id FROM tree_nodes WHERE id = $${subtreeIdx}
-       UNION ALL
+       UNION
        SELECT tn.id FROM tree_nodes tn
        INNER JOIN subtree s ON tn.parent_node_id = s.id
      )

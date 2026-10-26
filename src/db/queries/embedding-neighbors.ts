@@ -49,13 +49,16 @@ export async function getNeighborPathRows(db: Queryable, cardIds: string[]): Pro
               ROW_NUMBER() OVER (PARTITION BY tn.card_id ORDER BY tn.created_at, tn.id) AS rn
        FROM tree_nodes tn WHERE tn.is_symlink = FALSE AND tn.card_id IN (${ids})
      ),
-     chain(card_id, node_id, parent_node_id, title, hops) AS (
-       SELECT n.card_id, n.id, n.parent_node_id, c.title, 0
+     chain(card_id, node_id, parent_node_id, title, hops, visited) AS (
+       SELECT n.card_id, n.id, n.parent_node_id, c.title, 0,
+              '|' || CAST(n.id AS TEXT) || '|'
        FROM chosen n JOIN cards c ON c.id = n.card_id WHERE n.rn = 1
        UNION ALL
-       SELECT a.card_id, p.id, p.parent_node_id, c.title, a.hops + 1
+       SELECT a.card_id, p.id, p.parent_node_id, c.title, a.hops + 1,
+              a.visited || CAST(p.id AS TEXT) || '|'
        FROM chain a JOIN tree_nodes p ON p.id = a.parent_node_id
        JOIN cards c ON c.id = p.card_id
+       WHERE a.visited NOT LIKE '%|' || CAST(p.id AS TEXT) || '|%'
      )
      SELECT card_id, node_id, title, hops FROM chain
      ORDER BY card_id, hops DESC`,

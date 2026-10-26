@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { TreeCycleError } from "../../db/queries/tree.js";
 import {
   getNode,
   listChildren,
@@ -133,20 +134,28 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
       position: z.number().int().nonnegative().optional().describe("DEPRECATED — use before/after/to instead. Absolute 0-based position."),
     },
     async ({ node_id, parent_node_id, before, after, to, position }) => {
-      const { node: moved, warnings } = await moveNode(node_id, {
-        parent_node_id,
-        before,
-        after,
-        to,
-        position,
-      });
-      if (!moved) {
-        return { content: [{ type: "text", text: `Node not found: ${node_id}` }], isError: true };
+      try {
+        const { node: moved, warnings } = await moveNode(node_id, {
+          parent_node_id,
+          before,
+          after,
+          to,
+          position,
+        });
+        if (!moved) {
+          return { content: [{ type: "text", text: `Node not found: ${node_id}` }], isError: true };
+        }
+        const response = warnings.length > 0
+          ? { ...moved, _warnings: warnings }
+          : moved;
+        return { content: [{ type: "text", text: JSON.stringify(response) }] };
+      } catch (error) {
+        if (!(error instanceof TreeCycleError)) throw error;
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: { code: error.code, message: error.message } }) }],
+          isError: true,
+        };
       }
-      const response = warnings.length > 0
-        ? { ...moved, _warnings: warnings }
-        : moved;
-      return { content: [{ type: "text", text: JSON.stringify(response) }] };
     }
   );
 

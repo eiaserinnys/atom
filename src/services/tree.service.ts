@@ -6,6 +6,7 @@ import {
   insertNode,
   moveNode as moveNodeQuery,
   getNodeBreadcrumb,
+  assertTreeParent,
   updateNodeProperties as updateNodePropertiesQuery,
 } from "../db/queries/tree.js";
 import { selectCardById } from "../db/queries/cards.js";
@@ -185,26 +186,25 @@ export async function moveNode(
   opts: MoveNodeOptions
 ): Promise<{ node: TreeNode | null; warnings: string[] }> {
   const db = getDb();
-  const oldNode = await selectNodeById(db, nodeId);
-  if (!oldNode) return { node: null, warnings: [] };
-
-  // Resolve parent: undefined = keep current, null = root
-  let effectiveParent: string | null;
-  if (opts.parent_node_id === undefined) {
-    effectiveParent = oldNode.parent_node_id;
-  } else {
-    effectiveParent = opts.parent_node_id;
-  }
-
-  // Resolve position key
-  const { key, warnings } = await resolvePositionKey(db, effectiveParent, nodeId, {
-    before: opts.before,
-    after: opts.after,
-    to: opts.to,
-    position: opts.position,
+  const moved = await db.transaction(async (client) => {
+    const oldNode = await selectNodeById(client, nodeId);
+    if (!oldNode) return null;
+    const effectiveParent = opts.parent_node_id === undefined
+      ? oldNode.parent_node_id
+      : opts.parent_node_id;
+    // Validate before position resolution, which may rekey siblings.
+    await assertTreeParent(client, nodeId, effectiveParent);
+    const { key, warnings } = await resolvePositionKey(client, effectiveParent, nodeId, {
+      before: opts.before,
+      after: opts.after,
+      to: opts.to,
+      position: opts.position,
+    });
+    const node = await moveNodeQuery(client, nodeId, effectiveParent, key);
+    return { oldNode, effectiveParent, node, warnings };
   });
-
-  const node = await moveNodeQuery(db, nodeId, effectiveParent, key);
+  if (!moved) return { node: null, warnings: [] };
+  const { oldNode, effectiveParent, node, warnings } = moved;
   if (node) {
     eventBus.emit("atom:event", {
       type: "node:moved",

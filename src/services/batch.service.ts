@@ -1,4 +1,5 @@
 import { getDb } from "../db/client.js";
+import { assertTreeParent, selectNodeById } from "../db/queries/tree.js";
 import type {
   AtomPatchEvent,
   BatchOpInput,
@@ -137,6 +138,17 @@ export async function executeBatchOp(
         patches,
         actor: agentId,
       });
+    }
+
+    // Validate the final topology once: later operations can undo a temporary
+    // cycle created by an earlier move in the same transaction.
+    const changedNodeIds = new Set([
+      ...result.moved,
+      ...(input.child_orders ?? []).flatMap((item) => item.order),
+    ]);
+    for (const nodeId of changedNodeIds) {
+      const node = await selectNodeById(client, nodeId);
+      if (node) await assertTreeParent(client, node.id, node.parent_node_id);
     }
 
     return { result, patches };
