@@ -4,7 +4,7 @@ import { nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
 test('B3/B4: compact titles stay 14 screen px, center without a path, and hide together below 50%', () => {
   for (const zoom of [.5, .72, .76]) {
     const layout = nodeTextLayout(['Folder', 'Card'], zoom);
-    expect(layout.titleSize * zoom).toBe(14);
+    expect(layout.titleSize * zoom).toBeCloseTo(14, 8);
     expect(layout.titleY).toBe(24);
     expect(layout.showPath).toBe(false);
   }
