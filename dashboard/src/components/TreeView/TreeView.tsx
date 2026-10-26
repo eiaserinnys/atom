@@ -33,6 +33,7 @@ interface TreeViewProps {
   onSelect: (nodeId: string | null) => void;
   initialSelectedNodeId?: string;
   searchResults?: MotionNode[];
+  showLogout?: boolean;
 }
 
 interface ContextMenuState {
@@ -41,7 +42,7 @@ interface ContextMenuState {
   node: TreeNodeData;
 }
 
-export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, searchResults = [] }: TreeViewProps) {
+export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, searchResults = [], showLogout = true }: TreeViewProps) {
   const { t } = useTranslation();
   const { data: roots, isLoading, error } = useQuery({
     queryKey: rootTreeQueryKey(),
@@ -223,17 +224,18 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
             )}
           </div>
 
-          {/* 하단 로그아웃 */}
-          <div className="shrink-0 border-t border-border px-2 py-2">
-            <button
-              onClick={() => api.logout().then(() => { window.location.href = '/'; })}
-              className="flex items-center gap-2 w-full px-3 py-2 max-md:py-2.5 min-h-[36px] max-md:min-h-[42px] text-[13px] text-muted-foreground rounded-none hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              title={t('app.logout')}
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              {t('app.logout')}
-            </button>
-          </div>
+          {showLogout && (
+            <div className="shrink-0 border-t border-border px-2 py-2">
+              <button
+                onClick={() => api.logout().then(() => { window.location.href = '/'; })}
+                className="flex items-center gap-2 w-full px-3 py-2 max-md:py-2.5 min-h-[36px] max-md:min-h-[42px] text-[13px] text-muted-foreground rounded-none hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                title={t('app.logout')}
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                {t('app.logout')}
+              </button>
+            </div>
+          )}
 
           {/* 컨텍스트 메뉴 */}
           {contextMenu && (

@@ -1,14 +1,12 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { UserRole } from '../../hooks/useAuth';
-import { UserManagementTab } from './UserManagementTab';
-import { AgentManagementTab } from './AgentManagementTab';
-import { CredentialsTab } from './CredentialsTab';
-import { LanguageTab } from './LanguageTab';
-import { DatabaseTab } from './DatabaseTab';
-import { AuthTab } from './AuthTab';
-import { OpenAITab } from './OpenAITab';
+import { useSystem } from '../../contexts/systemContext';
+import { ConfigCategoryNav, getDefaultConfigTab, type ConfigTab } from './ConfigCategoryNav';
+import { ConfigFooter } from './ConfigFooter';
+import { ConfigTabPanel } from './ConfigTabPanel';
+import type { AuthFooterState } from './AuthTab';
 
 interface Props {
   isOpen: boolean;
@@ -17,134 +15,92 @@ interface Props {
   currentUserEmail: string;
 }
 
-type ConfigTab = 'users' | 'agents' | 'credentials' | 'language' | 'database' | 'auth' | 'openai';
-
 export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail }: Props) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<ConfigTab>(
-    currentUserRole === 'admin' ? 'users' : 'agents'
-  );
-  const isAdmin = currentUserRole === 'admin';
-  const visibleTab: ConfigTab = isAdmin || !['users', 'database', 'auth', 'openai'].includes(activeTab)
-    ? activeTab
-    : 'agents';
+  const { pendingRestart, triggerRestart } = useSystem();
+  const [activeTab, setActiveTab] = useState<ConfigTab>(() => getDefaultConfigTab(currentUserRole));
+  const [authFooter, setAuthFooter] = useState<AuthFooterState | null>(null);
+  const selectedTabRef = useRef<HTMLButtonElement>(null);
+
+  const handleClose = useCallback(() => {
+    setActiveTab(getDefaultConfigTab(currentUserRole));
+    setAuthFooter(null);
+    onClose();
+  }, [currentUserRole, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveTab(getDefaultConfigTab(currentUserRole));
+      setAuthFooter(null);
+      return;
+    }
+    selectedTabRef.current?.focus();
+  }, [currentUserRole, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleClose, isOpen]);
+
+  const handleTabSelect = (tab: ConfigTab) => {
+    if (tab === activeTab) return;
+    setAuthFooter(null);
+    setActiveTab(tab);
+  };
 
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 dark:bg-black/70"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) handleClose();
       }}
     >
-      <div className="bg-card border border-border rounded-none shadow-card dark:shadow-[rgba(0,0,0,0.5)_3px_5px_30px_0px] w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('config.settings')}
+        className="flex h-[min(48rem,calc(100dvh-64px))] w-full max-w-5xl flex-col overflow-hidden border border-border bg-card"
+      >
+        <header className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <span className="text-base font-semibold text-foreground">{t('config.settings')}</span>
           <button
-            className="text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer text-lg leading-none"
-            onClick={onClose}
+            type="button"
+            className="index-action w-8 h-8 !p-0 text-muted-foreground hover:text-foreground"
+            onClick={handleClose}
             aria-label={t('common.close')}
           >
-            <X className="w-4 h-4" strokeWidth={1.75} />
+            <X className="h-4 w-4" strokeWidth={1.75} />
           </button>
+        </header>
+
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,3fr)] grid-rows-[minmax(0,1fr)] overflow-hidden">
+          <ConfigCategoryNav
+            currentUserRole={currentUserRole}
+            activeTab={activeTab}
+            onSelect={handleTabSelect}
+            selectedTabRef={selectedTabRef}
+          />
+          <ConfigTabPanel
+            tab={activeTab}
+            currentUserRole={currentUserRole}
+            currentUserEmail={currentUserEmail}
+            onAuthFooterChange={setAuthFooter}
+          />
         </div>
 
-        {/* 탭 */}
-        <div className="flex overflow-x-auto border-b border-border shrink-0">
-          {isAdmin && (
-            <button
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                visibleTab === 'users'
-                  ? 'border-brand text-brand'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-              onClick={() => setActiveTab('users')}
-            >
-              {t('config.tab_users')}
-            </button>
-          )}
-          <button
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-              visibleTab === 'agents'
-                ? 'border-brand text-brand'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setActiveTab('agents')}
-          >
-            {t('config.tab_agents')}
-          </button>
-          <button
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-              visibleTab === 'credentials'
-                ? 'border-brand text-brand'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setActiveTab('credentials')}
-          >
-            {t('config.tab_credentials')}
-          </button>
-          <button
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-              visibleTab === 'language'
-                ? 'border-brand text-brand'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setActiveTab('language')}
-          >
-            {t('config.tab_language')}
-          </button>
-          {isAdmin && (
-            <button
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                visibleTab === 'database'
-                  ? 'border-brand text-brand'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-              onClick={() => setActiveTab('database')}
-            >
-              {t('config.tab_database')}
-            </button>
-          )}
-          {isAdmin && (
-            <button
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                visibleTab === 'auth'
-                  ? 'border-brand text-brand'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-              onClick={() => setActiveTab('auth')}
-            >
-              {t('config.tab_auth')}
-            </button>
-          )}
-          {isAdmin && (
-            <button
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                visibleTab === 'openai'
-                  ? 'border-brand text-brand'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-              onClick={() => setActiveTab('openai')}
-            >
-              {t('config.tab_openai')}
-            </button>
-          )}
-        </div>
-
-        {/* 탭 컨텐츠 */}
-        <div className="flex-1 overflow-y-auto p-5">
-          {visibleTab === 'users' && isAdmin && (
-            <UserManagementTab currentUserEmail={currentUserEmail} />
-          )}
-          {visibleTab === 'agents' && <AgentManagementTab />}
-          {visibleTab === 'credentials' && <CredentialsTab />}
-          {visibleTab === 'language' && <LanguageTab />}
-          {visibleTab === 'database' && isAdmin && <DatabaseTab />}
-          {visibleTab === 'auth' && isAdmin && <AuthTab />}
-          {visibleTab === 'openai' && isAdmin && <OpenAITab />}
-        </div>
+        <ConfigFooter
+          activeTab={activeTab}
+          pendingRestart={pendingRestart}
+          triggerRestart={triggerRestart}
+          onClose={handleClose}
+          authFooter={authFooter}
+        />
       </div>
     </div>
   );

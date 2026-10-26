@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfig } from '../../hooks/useConfig';
+import { ConfigActionButton, ConfigField } from './ConfigFields';
 
 export function AgentManagementTab() {
   const { t } = useTranslation();
@@ -29,7 +30,7 @@ export function AgentManagementTab() {
 
   const handleCreate = async () => {
     if (!newAgentId.trim()) {
-      setCreateError('agent_id를 입력하세요.');
+      setCreateError(t('agents.agent_id_required'));
       return;
     }
     setCreating(true);
@@ -79,13 +80,12 @@ export function AgentManagementTab() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // clipboard API 실패 시 무시
+      // The browser may not grant clipboard access.
     }
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* 시크릿 1회 표시 배너 */}
+    <div className="space-y-6">
       {lastCreatedSecret && (
         <div className="flex flex-col gap-2 bg-brand/8 border border-brand/25 rounded-none px-3 py-3">
           <div className="text-[13px] font-semibold text-brand">
@@ -95,58 +95,48 @@ export function AgentManagementTab() {
             <code className="flex-1 text-[13px] bg-card border border-border rounded-none px-2 py-1.5 font-mono text-foreground break-all">
               {lastCreatedSecret}
             </code>
-            <button
-              className="text-[13px] rounded-none px-2.5 py-1 border border-brand/40 bg-transparent text-brand cursor-pointer hover:bg-brand/10 font-sans whitespace-nowrap"
-              onClick={handleCopy}
-            >
+            <ConfigActionButton tone="secondary" onClick={handleCopy}>
               {copied ? t('common.copied') : t('common.copy')}
-            </button>
+            </ConfigActionButton>
           </div>
-          <button
-            className="self-start text-[13px] rounded-none px-2.5 py-1 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
-            onClick={clearSecret}
-          >
-            {t('agents.acknowledged')}
-          </button>
+          <div className="self-start">
+            <ConfigActionButton tone="secondary" onClick={clearSecret}>
+              {t('agents.acknowledged')}
+            </ConfigActionButton>
+          </div>
         </div>
       )}
 
-      {/* 새 에이전트 생성 */}
-      <div className="flex flex-col gap-2">
-        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t('agents.create_section')}
-        </div>
-        <div className="flex flex-col gap-2">
-          <input
-            className="w-full bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
-            placeholder={t('agents.name_placeholder')}
-            value={newAgentId}
-            onChange={(e) => setNewAgentId(e.target.value)}
-          />
-          <input
-            className="w-full bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
-            placeholder={t('agents.display_name_placeholder')}
-            value={newDisplayName}
-            onChange={(e) => setNewDisplayName(e.target.value)}
-          />
-          <button
-            className="self-start bg-brand text-primary-foreground border-none rounded-none px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleCreate}
-            disabled={creating}
-          >
+        </h3>
+        <ConfigField
+          label={t('agents.name_label')}
+          placeholder={t('agents.name_placeholder')}
+          value={newAgentId}
+          onChange={setNewAgentId}
+        />
+        <ConfigField
+          label={t('agents.display_name_label')}
+          placeholder={t('agents.display_name_placeholder')}
+          value={newDisplayName}
+          onChange={setNewDisplayName}
+        />
+        <div className="self-start">
+          <ConfigActionButton onClick={handleCreate} disabled={creating}>
             {creating ? t('agents.creating') : t('agents.generate_btn')}
-          </button>
-          {createError && (
-            <div className="text-node-error text-[13px]">{createError}</div>
-          )}
+          </ConfigActionButton>
         </div>
-      </div>
+        {createError && (
+          <div className="mt-2 text-node-error text-[13px]">{createError}</div>
+        )}
+      </section>
 
-      {/* 에이전트 목록 */}
-      <div className="flex flex-col gap-2">
-        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t('agents.list_section')}
-        </div>
+        </h3>
         {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
         {!loading && agents.length === 0 && (
           <div className="text-muted-foreground text-sm">{t('agents.no_agents')}</div>
@@ -175,18 +165,12 @@ export function AgentManagementTab() {
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  className="text-[13px] rounded-none px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
-                  onClick={() => handleReissue(agent.id)}
-                >
+                <ConfigActionButton tone="secondary" onClick={() => handleReissue(agent.id)}>
                   {t('agents.reissue')}
-                </button>
-                <button
-                  className="text-[13px] rounded-none px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted font-sans"
-                  onClick={() => handleToggleActive(agent.id, !agent.is_active)}
-                >
+                </ConfigActionButton>
+                <ConfigActionButton tone="secondary" onClick={() => handleToggleActive(agent.id, !agent.is_active)}>
                   {agent.is_active ? t('agents.deactivate') : t('agents.activate')}
-                </button>
+                </ConfigActionButton>
               </div>
               {reissueErrors[agent.id] && (
                 <div className="text-node-error text-[13px]">{reissueErrors[agent.id]}</div>
@@ -197,7 +181,7 @@ export function AgentManagementTab() {
             </div>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

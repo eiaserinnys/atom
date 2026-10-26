@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfig } from '../../hooks/useConfig';
 import type { UserRole } from '../../api/client';
+import { ConfigActionButton, ConfigField, CONFIG_CONTROL_CLASS } from './ConfigFields';
 
 interface Props {
   currentUserEmail: string;
@@ -29,7 +30,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
 
   const handleAdd = async () => {
     if (!newEmail.trim()) {
-      setAddError('이메일을 입력하세요.');
+      setAddError(t('users.email_required'));
       return;
     }
     setAdding(true);
@@ -75,28 +76,31 @@ export function UserManagementTab({ currentUserEmail }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* 새 사용자 추가 */}
-      <div className="flex flex-col gap-2">
-        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+    <div className="space-y-6">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t('users.add_section')}
-        </div>
-        <div className="flex flex-col gap-2">
-          <input
-            className="w-full bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
-            placeholder={t('users.invite_placeholder')}
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-          />
-          <input
-            className="w-full bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
-            placeholder={t('users.display_name_placeholder')}
-            value={newDisplayName}
-            onChange={(e) => setNewDisplayName(e.target.value)}
-          />
-          <div className="flex gap-2 items-center">
+        </h3>
+        <ConfigField
+          label={t('users.email_label')}
+          placeholder={t('users.invite_placeholder')}
+          value={newEmail}
+          onChange={setNewEmail}
+        />
+        <ConfigField
+          label={t('users.display_name_label')}
+          placeholder={t('users.display_name_placeholder')}
+          value={newDisplayName}
+          onChange={setNewDisplayName}
+        />
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col">
+            <label htmlFor="new-user-role" className="mb-1 block text-[13px] text-muted-foreground">
+              {t('users.role_label')}
+            </label>
             <select
-              className="bg-card border border-border rounded-none px-2.5 py-1.5 text-foreground text-sm outline-none focus:border-brand font-sans"
+              id="new-user-role"
+              className={`w-auto h-9 ${CONFIG_CONTROL_CLASS}`}
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as UserRole)}
             >
@@ -104,25 +108,20 @@ export function UserManagementTab({ currentUserEmail }: Props) {
               <option value="editor">editor</option>
               <option value="viewer">viewer</option>
             </select>
-            <button
-              className="bg-brand text-primary-foreground border-none rounded-none px-3 py-1.5 text-sm cursor-pointer font-sans disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleAdd}
-              disabled={adding}
-            >
-              {adding ? t('users.adding') : t('users.invite_btn')}
-            </button>
           </div>
-          {addError && (
-            <div className="text-node-error text-[13px]">{addError}</div>
-          )}
+          <ConfigActionButton onClick={handleAdd} disabled={adding}>
+            {adding ? t('users.adding') : t('users.invite_btn')}
+          </ConfigActionButton>
         </div>
-      </div>
+        {addError && (
+          <div className="mt-2 text-node-error text-[13px]">{addError}</div>
+        )}
+      </section>
 
-      {/* 사용자 목록 */}
-      <div className="flex flex-col gap-2">
-        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t('users.list_section')}
-        </div>
+        </h3>
         {loading && <div className="text-muted-foreground text-sm">{t('common.loading')}</div>}
         {!loading && users.length === 0 && (
           <div className="text-muted-foreground text-sm">{t('users.no_users')}</div>
@@ -150,9 +149,11 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                     {user.is_active ? t('users.active') : t('users.inactive')}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex flex-wrap items-center gap-2">
                   <select
-                    className="bg-card border border-border rounded-none px-2 py-0.5 text-foreground text-[13px] outline-none focus:border-brand font-sans disabled:opacity-50 disabled:cursor-not-allowed"
+                    id={`user-role-${user.id}`}
+                    aria-label={t('users.role_label')}
+                    className={`w-auto h-9 ${CONFIG_CONTROL_CLASS}`}
                     value={user.role}
                     disabled={isSelf}
                     title={isSelf ? t('users.self_role_tooltip') : undefined}
@@ -164,14 +165,14 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                       </option>
                     ))}
                   </select>
-                  <button
-                    className="text-[13px] rounded-none px-2 py-0.5 border border-border bg-transparent text-muted-foreground cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed font-sans"
+                  <ConfigActionButton
+                    tone="secondary"
                     disabled={isSelf}
                     title={isSelf ? t('users.self_account_tooltip') : undefined}
                     onClick={() => handleToggleActive(user.id, !user.is_active)}
                   >
                     {user.is_active ? t('users.deactivate') : t('users.activate')}
-                  </button>
+                  </ConfigActionButton>
                 </div>
                 {updateErrors[user.id] && (
                   <div className="text-node-error text-[13px]">{updateErrors[user.id]}</div>
@@ -180,7 +181,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
             );
           })}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

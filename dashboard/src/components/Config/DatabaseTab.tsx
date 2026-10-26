@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Folder, XCircle } from 'lucide-react';
+import { CheckCircle2, TriangleAlert, XCircle } from 'lucide-react';
 import { configApi } from '../../api/client';
 import { useSystem } from '../../contexts/systemContext';
+import { ConfigActionButton, CONFIG_CONTROL_CLASS } from './ConfigFields';
 
 interface DbInfo {
   dbType: 'postgres' | 'sqlite';
@@ -19,12 +20,12 @@ export function DatabaseTab() {
   const [error, setError] = useState<string | null>(null);
   const [migrating, setMigrating] = useState(false);
   const [migrateResult, setMigrateResult] = useState<{ ok: boolean; message: string } | null>(null);
-
-  // Connection test state
+  const [showMigrationConfirm, setShowMigrationConfirm] = useState(false);
   const [connUrl, setConnUrl] = useState('');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
   const [savingUrl, setSavingUrl] = useState(false);
+  const migrationDialogRef = useRef<HTMLDivElement>(null);
 
   const fetchInfo = useCallback(async () => {
     setLoading(true);
@@ -39,23 +40,28 @@ export function DatabaseTab() {
     }
   }, []);
 
-  useEffect(() => { fetchInfo(); }, [fetchInfo]);
+  useEffect(() => { void fetchInfo(); }, [fetchInfo]);
+
+  useEffect(() => {
+    if (showMigrationConfirm) {
+      migrationDialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    }
+  }, [showMigrationConfirm]);
 
   const handleMigrate = async () => {
-    if (!window.confirm(t('database.migration_confirm'))) return;
     setMigrating(true);
     setMigrateResult(null);
     try {
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
-      const res = await fetch(`${BASE_URL}/api/config/migrate-to-pg`, {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+      const response = await fetch(`${baseUrl}/api/config/migrate-to-pg`, {
         method: 'POST', credentials: 'same-origin',
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await response.json();
+      if (!response.ok) {
         setMigrateResult({ ok: false, message: data.error ?? 'Unknown error' });
       } else {
         setMigrateResult({ ok: true, message: data.message ?? 'Migration completed.' });
-        fetchInfo();
+        void fetchInfo();
       }
     } catch (err) {
       setMigrateResult({ ok: false, message: err instanceof Error ? err.message : String(err) });
@@ -90,107 +96,81 @@ export function DatabaseTab() {
   };
 
   if (loading) return <div className="text-muted-foreground text-sm">{t('common.loading')}</div>;
-  if (error) return <div className="text-red-400 text-sm">{t('common.error')}: {error}</div>;
+  if (error) return <div className="text-node-error text-sm">{t('common.error')}: {error}</div>;
   if (!info) return null;
 
   const isPostgres = info.dbType === 'postgres';
   const canMigrate = isPostgres && info.sqliteFileExists && !info.deprecatedFileExists;
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="text-[13px] text-muted-foreground">{t('database.desc')}</div>
+    <div className="space-y-6">
+      <p className="text-sm text-foreground">
+        {t('database.mode_label')}: {isPostgres ? 'PostgreSQL' : 'SQLite'}
+      </p>
 
-      {/* DB Mode */}
-      <div className="flex flex-col gap-2">
-        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
-          {t('database.mode_label')}
-        </div>
-        <div className="flex items-center gap-2 bg-card border border-border rounded-none px-3 py-3">
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-none text-[13px] font-medium ${
-            isPostgres
-              ? 'bg-brand/10 text-brand border border-brand/30'
-              : 'bg-[var(--amber-soft)] text-[var(--amber)] border border-[var(--amber)]/30'
-          }`}>
-            <span className="w-2 h-2 bg-current inline-block" />
-            {isPostgres ? 'PostgreSQL' : 'SQLite'}
-          </span>
-        </div>
-      </div>
-
-      {/* Connection test (shown when in SQLite mode — to switch to PG) */}
       {!isPostgres && (
-        <div className="flex flex-col gap-2">
-          <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
-            {t('database.connection_string')}
-          </div>
-          <div className="flex flex-col gap-3 bg-card border border-border rounded-none px-3 py-3">
+        <section>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">{t('database.connection_string')}</h3>
+          <div className="flex flex-col gap-3">
             <input
               type="text"
-              className="w-full px-3 py-1.5 text-sm rounded-none border border-border bg-background text-foreground"
+              aria-label={t('database.connection_string')}
+              className={`w-full ${CONFIG_CONTROL_CLASS}`}
               placeholder="postgresql://user:pass@host:5432/dbname"
               value={connUrl}
-              onChange={(e) => { setConnUrl(e.target.value); setTestResult(null); }}
+              onChange={(event) => { setConnUrl(event.target.value); setTestResult(null); }}
               disabled={pendingRestart}
             />
-            <div className="flex gap-2">
-              <button
-                className="px-3 py-1.5 text-[13px] font-medium rounded-none bg-brand text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            <div className="flex flex-wrap gap-2">
+              <ConfigActionButton
                 onClick={handleTestConnection}
                 disabled={!connUrl || testing || pendingRestart}
               >
                 {testing ? t('common.loading') : t('database.test_connection')}
-              </button>
+              </ConfigActionButton>
               {testResult?.ok && (
-                <button
-                  className="px-3 py-1.5 text-[13px] font-medium rounded-none bg-green-600 text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                  onClick={handleSaveUrl}
-                  disabled={savingUrl || pendingRestart}
-                >
+                <ConfigActionButton onClick={handleSaveUrl} disabled={savingUrl || pendingRestart}>
                   {savingUrl ? t('common.loading') : t('database.save_url')}
-                </button>
+                </ConfigActionButton>
               )}
             </div>
             {testResult && (
-              <div className={`text-[13px] ${testResult.ok ? 'text-brand' : 'text-[var(--danger)]'}`}>
+              <div className={`text-[13px] ${testResult.ok ? 'text-brand' : 'text-node-error'}`}>
                 {testResult.ok
-                  ? <><CheckCircle2 className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('database.test_success')}</>
-                  : <><XCircle className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('database.test_failed')}: {testResult.error}</>}
+                  ? <><CheckCircle2 className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.test_success')}</>
+                  : <><XCircle className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.test_failed')}: {testResult.error}</>}
               </div>
             )}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* SQLite file info */}
-      <div className="flex flex-col gap-2">
-        <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
-          {t('database.file_label')}
-        </div>
-        <div className="flex flex-col gap-1.5 bg-card border border-border rounded-none px-3 py-3">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">{t('database.file_path')}</span>
-            <code className="text-[13px] bg-background px-1.5 py-0.5 rounded-none text-foreground">{info.sqliteFile}</code>
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">{t('database.file_label')}</h3>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-start gap-2 text-sm">
+            <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t('database.file_path')}</span>
+            <code className="min-w-0 break-words text-[13px] text-foreground [overflow-wrap:anywhere]">{info.sqliteFile}</code>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">{t('database.file_status')}:</span>
-            {info.deprecatedFileExists ? (
-              <span className="text-brand text-[13px]"><CheckCircle2 className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('database.file_migrated')}</span>
-            ) : info.sqliteFileExists ? (
-              <span className="text-[var(--amber)] text-[13px]"><Folder className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{t('database.file_exists')}</span>
-            ) : (
-              <span className="text-muted-foreground text-[13px]">{t('database.file_none')}</span>
-            )}
-          </div>
+          {isPostgres && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t('database.file_status')}:</span>
+              {info.deprecatedFileExists ? (
+                <span className="text-brand text-[13px]"><CheckCircle2 className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{t('database.file_migrated')}</span>
+              ) : info.sqliteFileExists ? (
+                <span className="flex items-center gap-2 text-foreground text-[13px]"><TriangleAlert className="h-4 w-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />{t('database.file_exists')}</span>
+              ) : (
+                <span className="text-muted-foreground text-[13px]">{t('database.file_none')}</span>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* Migration */}
       {isPostgres && (
-        <div className="flex flex-col gap-2">
-          <div className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
-            {t('database.migration_label')}
-          </div>
-          <div className="flex flex-col gap-3 bg-card border border-border rounded-none px-3 py-3">
+        <section>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">{t('database.migration_label')}</h3>
+          <div className="flex flex-col gap-3">
             {info.deprecatedFileExists ? (
               <div className="text-[13px] text-muted-foreground">{t('database.migration_done')}</div>
             ) : !info.sqliteFileExists ? (
@@ -198,30 +178,58 @@ export function DatabaseTab() {
             ) : (
               <>
                 <div className="text-[13px] text-muted-foreground">{t('database.migration_desc')}</div>
-                <button
-                  className={`self-start px-4 py-2 rounded-none text-sm font-medium transition-colors ${
-                    canMigrate && !migrating
-                      ? 'bg-brand text-primary-foreground hover:opacity-90 cursor-pointer'
-                      : 'bg-muted text-muted-foreground cursor-not-allowed'
-                  }`}
-                  disabled={!canMigrate || migrating}
-                  onClick={handleMigrate}
-                >
-                  {migrating ? t('database.migration_running') : t('database.migration_btn')}
-                </button>
+                <div className="self-start">
+                  <ConfigActionButton
+                    disabled={!canMigrate || migrating}
+                    onClick={() => setShowMigrationConfirm(true)}
+                  >
+                    {migrating ? t('database.migration_running') : t('database.migration_btn')}
+                  </ConfigActionButton>
+                </div>
               </>
             )}
             {migrateResult && (
-              <div className={`text-[13px] px-3 py-2 rounded-none ${
-                migrateResult.ok
-                  ? 'bg-brand/10 text-brand border border-brand/30'
-                  : 'bg-muted text-[var(--danger)] border border-[var(--danger)]/30'
-              }`}>
+              <div className={`border px-3 py-2 text-[13px] ${migrateResult.ok ? 'border-brand/30 bg-brand/10 text-brand' : 'border-node-error/30 bg-muted text-node-error'}`}>
                 {migrateResult.ok
-                  ? <><CheckCircle2 className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{migrateResult.message}</>
-                  : <><XCircle className="w-3.5 h-3.5 inline-block mr-1 align-text-bottom" strokeWidth={1.75} />{migrateResult.message}</>}
+                  ? <><CheckCircle2 className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{migrateResult.message}</>
+                  : <><XCircle className="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" strokeWidth={1.75} />{migrateResult.message}</>}
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {showMigrationConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 dark:bg-black/70"
+          role="presentation"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              setShowMigrationConfirm(false);
+            }
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setShowMigrationConfirm(false);
+          }}
+        >
+          <div ref={migrationDialogRef} role="dialog" aria-modal="true" aria-labelledby="database-migration-title" className="flex w-full max-w-sm flex-col gap-4 border border-border bg-card p-6">
+            <h2 id="database-migration-title" className="text-base font-semibold text-foreground">{t('database.migration_label')}</h2>
+            <p className="whitespace-pre-line text-sm text-foreground">{t('database.migration_confirm')}</p>
+            <div className="flex justify-end gap-2">
+              <ConfigActionButton tone="secondary" onClick={() => setShowMigrationConfirm(false)}>
+                {t('common.cancel')}
+              </ConfigActionButton>
+              <ConfigActionButton
+                onClick={() => {
+                  setShowMigrationConfirm(false);
+                  void handleMigrate();
+                }}
+              >
+                {t('common.confirm')}
+              </ConfigActionButton>
+            </div>
           </div>
         </div>
       )}
