@@ -157,6 +157,10 @@ Keys with the `write` scope can call all 17 tools. For `read` keys, the server r
 | | `evaluate_cards` | `read` | Evaluate 1 to 48 candidate `card_ids` against a Jev query and context, returning a relevance `score` (`0` to `1`) for each card. |
 | **Batch** | `batch_op` | `write` | Run multiple card and tree mutations in one database transaction. |
 
+`update_card`, browser `PUT /cards/:id`, and agent `PATCH /api/cards/:cardId` accept optional `expected_version`. A mismatch leaves the card unchanged. HTTP returns `409` with `{ "error": "VERSION_CONFLICT", "current_version": N }`; MCP reports `VersionConflict`, as `batch_op` does. Omitting the version keeps last-write-wins behavior.
+
+The card detail editor sends the version from the start of editing. On a conflict it keeps the draft and shows the existing change warning; pressing Save again overwrites against the version returned by the server. Unsaved title, content, and journal-limit drafts stay with their card while switching cards and are cleared by a page reload.
+
 ### Progressive Disclosure with `compile_subtree`
 
 Read a branch outline first, then compile full card content only for the nodes you need.

@@ -1,6 +1,6 @@
 import { JevVerdict } from './JevVerdict';
 import type { MotionNode } from '../SearchMotionView/types';
-import { useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Check, Copy, FileText, Folder } from 'lucide-react';
@@ -18,20 +18,31 @@ interface CardDetailProps {
   verdict?: MotionNode | null;
 }
 
+interface EditDraft {
+  editingTitle: boolean;
+  titleDraft: string;
+  editingContent: boolean;
+  contentDraft: string;
+  editingJournalLimit: boolean;
+  journalLimitDraft: string;
+  editBaseVersion: number | null;
+  versionConflict: boolean;
+  saving: boolean;
+  saveErrors: { title: string | null; content: string | null; journalLimit: string | null };
+}
+
+const emptyDraft: EditDraft = {
+  editingTitle: false, titleDraft: '', editingContent: false, contentDraft: '',
+  editingJournalLimit: false, journalLimitDraft: '', editBaseVersion: null,
+  versionConflict: false, saving: false,
+  saveErrors: { title: null, content: null, journalLimit: null },
+};
+
 export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   const { t } = useTranslation();
 
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
-  const [editingContent, setEditingContent] = useState(false);
-  const editingContentRef = useRef(false);
-  const [contentDraft, setContentDraft] = useState('');
-  const [editingJournalLimit, setEditingJournalLimit] = useState(false);
-  const editingTitleRef = useRef(false);
-  const [journalLimitDraft, setJournalLimitDraft] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, EditDraft>>({});
   const [copied, setCopied] = useState(false);
-  const [editBaseVersion, setEditBaseVersion] = useState<number | null>(null);
-  const [saveErrors, setSaveErrors] = useState({ title: null as string | null, content: null as string | null, journalLimit: null as string | null });
 
   const sample = verdict?.sample;
 
@@ -43,12 +54,22 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   });
 
   const card = node?.card;
+  const cardId = card?.id;
+  const draft = (cardId && drafts[cardId]) || emptyDraft;
+  const { editingTitle, titleDraft, editingContent, contentDraft, editingJournalLimit,
+    journalLimitDraft, editBaseVersion, versionConflict, saving, saveErrors } = draft;
+
+  // Each callback captures its card id, including callbacks finishing after a selection change.
+  const updateDraft = useCallback((update: (current: EditDraft) => EditDraft) => {
+    if (!cardId) return;
+    setDrafts(current => ({ ...current, [cardId]: update(current[cardId] ?? emptyDraft) }));
+  }, [cardId]);
 
   const setSaveError = (field: 'title' | 'content' | 'journalLimit', message: string) => {
-    setSaveErrors((current) => ({ ...current, [field]: message }));
+    updateDraft(current => ({ ...current, saveErrors: { ...current.saveErrors, [field]: message } }));
   };
   const clearSaveError = (field: 'title' | 'content' | 'journalLimit') => {
-    setSaveErrors((current) => ({ ...current, [field]: null }));
+    updateDraft(current => ({ ...current, saveErrors: { ...current.saveErrors, [field]: null } }));
   };
 
   const copyId = async () => {
@@ -63,33 +84,33 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   };
 
   const {
-    saving,
     invalidateNode,
     saveTitle,
     saveContent,
     saveJournalLimit,
   } = useCardDetailSaves({
     nodeId,
+    editBaseVersion,
+    onSavingChange: (saving) => updateDraft(current => ({ ...current, saving })),
+    onVersionConflict: (currentVersion) => updateDraft(current => ({ ...current, editBaseVersion: currentVersion, versionConflict: true })),
     saveFailedLabel: t('card.save_failed'),
     onSaveError: setSaveError,
     onTitleSaved: (updatedCard) => {
-      editingTitleRef.current = false;
-      setEditingTitle(false);
-      setEditBaseVersion((baseVersion) => {
-        if (!editingContentRef.current) return null;
-        return baseVersion !== null && updatedCard.version === baseVersion + 1 ? updatedCard.version : baseVersion;
-      });
+      updateDraft(current => ({
+        ...current, editingTitle: false, versionConflict: false,
+        editBaseVersion: !current.editingContent ? null
+          : current.editBaseVersion !== null && updatedCard.version === current.editBaseVersion + 1 ? updatedCard.version : current.editBaseVersion,
+      }));
     },
     onContentSaved: (updatedCard) => {
-      editingContentRef.current = false;
-      setEditingContent(false);
-      setEditBaseVersion((baseVersion) => {
-        if (!editingTitleRef.current) return null;
-        return baseVersion !== null && updatedCard.version === baseVersion + 1 ? updatedCard.version : baseVersion;
-      });
+      updateDraft(current => ({
+        ...current, editingContent: false, versionConflict: false,
+        editBaseVersion: !current.editingTitle ? null
+          : current.editBaseVersion !== null && updatedCard.version === current.editBaseVersion + 1 ? updatedCard.version : current.editBaseVersion,
+      }));
     },
-    onJournalLimitSaved: () => setEditingJournalLimit(false),
-    onJournalLimitIgnored: () => setEditingJournalLimit(false),
+    onJournalLimitSaved: () => updateDraft(current => ({ ...current, editingJournalLimit: false })),
+    onJournalLimitIgnored: () => updateDraft(current => ({ ...current, editingJournalLimit: false })),
   });
 
   // 삭제된 카드 처리 — api.getNode가 404 시 throw하므로 isError로 감지
@@ -105,40 +126,30 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   }
 
   const handleRefresh = () => {
-    editingTitleRef.current = false;
-    editingContentRef.current = false;
-    setEditingTitle(false);
-    setEditingContent(false);
-    setEditingJournalLimit(false);
-    setEditBaseVersion(null);
-    setSaveErrors({ title: null, content: null, journalLimit: null });
+    updateDraft(() => emptyDraft);
     invalidateNode();
   };
 
   const startTitleEdit = () => {
     if (!card) return;
-    setTitleDraft(card.title);
     clearSaveError('title');
-    if (!editingContentRef.current) setEditBaseVersion(card.version);
-    editingTitleRef.current = true;
-    setEditingTitle(true);
+    updateDraft(current => ({ ...current, titleDraft: card.title, editingTitle: true,
+      editBaseVersion: current.editingContent ? current.editBaseVersion : card.version,
+      versionConflict: current.editingContent && current.versionConflict }));
   };
 
   const startContentEdit = () => {
     if (!card) return;
-    setContentDraft(card.content ?? '');
     clearSaveError('content');
-    if (!editingTitleRef.current) setEditBaseVersion(card.version);
-    editingContentRef.current = true;
-    setEditingContent(true);
+    updateDraft(current => ({ ...current, contentDraft: card.content ?? '', editingContent: true,
+      editBaseVersion: current.editingTitle ? current.editBaseVersion : card.version,
+      versionConflict: current.editingTitle && current.versionConflict }));
   };
 
   const startJournalLimitEdit = () => {
     if (!node) return;
-    const current = node.journal_limit;
-    setJournalLimitDraft(current !== null && current !== undefined ? String(current) : '');
     clearSaveError('journalLimit');
-    setEditingJournalLimit(true);
+    updateDraft(current => ({ ...current, editingJournalLimit: true, journalLimitDraft: node.journal_limit != null ? String(node.journal_limit) : '' }));
   };
 
   return (
@@ -161,7 +172,7 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
         {isLoading && <PanelState><Spinner label={t('common.loading')} /></PanelState>}
 
         {/* Dirty State Guard — 편집 중 외부 변경 감지 배너 */}
-        {!saving && !!card && editBaseVersion !== null && card.version > editBaseVersion && (editingTitle || editingContent) && (
+        {!saving && !!card && editBaseVersion !== null && (versionConflict || card.version > editBaseVersion) && (editingTitle || editingContent) && (
           <div className="flex items-center justify-between gap-2 bg-brand/8 border border-brand/25 rounded-none px-3 py-2 text-sm text-foreground shrink-0">
             <span className="flex-1">
               {t('card.unsaved_changes')}
@@ -185,16 +196,16 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
               contentSaveError={saveErrors.content}
               editingTitle={editingTitle}
               titleDraft={titleDraft}
-              setTitleDraft={setTitleDraft}
+              setTitleDraft={titleDraft => updateDraft(current => ({ ...current, titleDraft }))}
               onStartTitleEdit={startTitleEdit}
               onSaveTitle={() => { clearSaveError('title'); void saveTitle(card.id, titleDraft); }}
-              onCancelTitle={() => { clearSaveError('title'); editingTitleRef.current = false; setEditingTitle(false); if (!editingContentRef.current) setEditBaseVersion(null); }}
+              onCancelTitle={() => { clearSaveError('title'); updateDraft(current => ({ ...current, editingTitle: false, editBaseVersion: current.editingContent ? current.editBaseVersion : null, versionConflict: current.editingContent && current.versionConflict })); }}
               editingContent={editingContent}
               contentDraft={contentDraft}
-              setContentDraft={setContentDraft}
+              setContentDraft={contentDraft => updateDraft(current => ({ ...current, contentDraft }))}
               onStartContentEdit={startContentEdit}
               onSaveContent={() => { clearSaveError('content'); void saveContent(card.id, contentDraft); }}
-              onCancelContent={() => { clearSaveError('content'); editingContentRef.current = false; setEditingContent(false); if (!editingTitleRef.current) setEditBaseVersion(null); }}
+              onCancelContent={() => { clearSaveError('content'); updateDraft(current => ({ ...current, editingContent: false, editBaseVersion: current.editingTitle ? current.editBaseVersion : null, versionConflict: current.editingTitle && current.versionConflict })); }}
             />
             <CardMetadata
               card={card}
@@ -205,10 +216,10 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
               journalLimitSaveError={saveErrors.journalLimit}
               editingJournalLimit={editingJournalLimit}
               journalLimitDraft={journalLimitDraft}
-              setJournalLimitDraft={setJournalLimitDraft}
+              setJournalLimitDraft={journalLimitDraft => updateDraft(current => ({ ...current, journalLimitDraft }))}
               onStartJournalLimitEdit={startJournalLimitEdit}
               onSaveJournalLimit={() => { clearSaveError('journalLimit'); void saveJournalLimit(journalLimitDraft); }}
-              onCancelJournalLimit={() => { clearSaveError('journalLimit'); setEditingJournalLimit(false); }}
+              onCancelJournalLimit={() => { clearSaveError('journalLimit'); updateDraft(current => ({ ...current, editingJournalLimit: false })); }}
             />
           </>
         )}

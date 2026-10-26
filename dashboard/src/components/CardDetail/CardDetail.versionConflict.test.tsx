@@ -36,6 +36,22 @@ describe('CardDetail edit version tracking', () => {
   let container: HTMLDivElement;
   let queryClient: QueryClient;
   let currentNode: TreeNodeData;
+  let i18n: ReturnType<typeof i18next.createInstance>;
+
+  async function select(nodeId: string) {
+    await act(async () => {
+      root.render(<StrictMode><I18nextProvider i18n={i18n}><QueryClientProvider client={queryClient}>
+        <CardDetail nodeId={nodeId} />
+      </QueryClientProvider></I18nextProvider></StrictMode>);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+  }
+
+  function cacheSecondCard() {
+    const other = { ...currentNode, id: 'node-2', card_id: 'card-2', card: { ...currentNode.card, id: 'card-2', title: 'Other title', content: 'Other body' } };
+    queryClient.setQueryData(nodeQueryKey('node-2'), other);
+    vi.mocked(api.getNode).mockImplementation(async id => id === 'node-2' ? other : currentNode);
+  }
 
   beforeEach(async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -61,7 +77,7 @@ describe('CardDetail edit version tracking', () => {
       defaultOptions: { queries: { gcTime: Infinity, retry: false, staleTime: Infinity }, mutations: { gcTime: Infinity, retry: false } },
     });
     queryClient.setQueryData(nodeQueryKey('node-1'), currentNode);
-    const i18n = i18next.createInstance();
+    i18n = i18next.createInstance();
     await i18n.init({ lng: 'en', resources: { en: { translation: english } }, initAsync: false });
     container = document.createElement('div');
     document.body.append(container);
@@ -81,6 +97,82 @@ describe('CardDetail edit version tracking', () => {
     queryClient.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  test('card switches isolate title, body and journal drafts and restore them on return', async () => {
+    cacheSecondCard();
+    click(container.querySelector(`[aria-label="${english.card.edit_title}"]`)!);
+    setInput(container.querySelector('input')!, 'A title draft');
+    click(container.querySelector(`[aria-label="${english.card.edit_content}"]`)!);
+    setInput(container.querySelector('textarea')!, 'A body draft');
+    const journal = [...container.querySelectorAll('span')].find(el => el.textContent === english.card.journal_limit_all)!;
+    click(journal);
+    setInput(container.querySelector('input[inputmode="numeric"]')!, '7');
+
+    await select('node-2');
+    expect(container.querySelector('textarea')).toBeNull();
+    expect(container.querySelector('input')).toBeNull();
+    expect(container.textContent).toContain('Other body');
+    click(container.querySelector(`[aria-label="${english.card.edit_content}"]`)!);
+    setInput(container.querySelector('textarea')!, 'B body draft');
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ card: { ...currentNode.card, id: 'card-2', content: 'B body draft', version: 2 }, conflict: false }) } as Response);
+    await act(async () => {
+      click([...container.querySelectorAll('button')].find(el => el.textContent === english.common.save)!);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(JSON.parse(vi.mocked(fetch).mock.calls.at(-1)![1]!.body as string)).toEqual({ content: 'B body draft', expected_version: 1 });
+    expect(vi.mocked(fetch).mock.calls.at(-1)![0]).toBe('/cards/card-2');
+
+    await select('node-1');
+    expect(container.querySelector('input')?.value).toBe('A title draft');
+    expect(container.querySelector('textarea')?.value).toBe('A body draft');
+    expect(container.querySelector<HTMLInputElement>('input[inputmode="numeric"]')?.value).toBe('7');
+  });
+
+  test.each(['title', 'content'])('409 preserves the %s draft and warns, then a second save uses current_version', async (field) => {
+    click(container.querySelector(`[aria-label="${field === 'title' ? english.card.edit_title : english.card.edit_content}"]`)!);
+    const input = container.querySelector<HTMLInputElement | HTMLTextAreaElement>(field === 'title' ? 'input' : 'textarea')!;
+    setInput(input, 'Kept draft');
+    const conflict = { error: 'VERSION_CONFLICT', current_version: 4 };
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 409, text: async () => JSON.stringify(conflict) } as Response);
+    const save = () => [...container.querySelectorAll('button')].find(button => button.textContent === english.common.save)!;
+    await act(async () => {
+      click(save());
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.querySelector(field === 'title' ? 'input' : 'textarea')).toBe(input);
+    expect(input.value).toBe('Kept draft');
+    expect(container.textContent).toContain(english.card.unsaved_changes);
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ [field]: 'Kept draft', expected_version: 1 });
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ card: { ...currentNode.card, [field]: 'Kept draft', version: 5 }, conflict: false }) } as Response);
+    await act(async () => {
+      click(save());
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[1][1]!.body as string)).toEqual({ [field]: 'Kept draft', expected_version: 4 });
+    expect(container.querySelector(field === 'title' ? 'input' : 'textarea')).toBeNull();
+    expect(container.textContent).not.toContain(english.card.unsaved_changes);
+  });
+
+  test('finishing A save after switching to B leaves B editing and its draft unchanged', async () => {
+    cacheSecondCard();
+    let finishPut!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise<Response>(resolve => { finishPut = resolve; }));
+    click(container.querySelector(`[aria-label="${english.card.edit_title}"]`)!);
+    const titleDraft = container.querySelector('input')!;
+    setInput(titleDraft, 'Saved A');
+    act(() => titleDraft.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await select('node-2');
+    click(container.querySelector(`[aria-label="${english.card.edit_title}"]`)!);
+    setInput(container.querySelector('input')!, 'Unsaved B');
+    await act(async () => {
+      finishPut({ ok: true, status: 200, json: async () => ({ card: { ...currentNode.card, title: 'Saved A', version: 2 }, conflict: false }) } as Response);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.querySelector('input')?.value).toBe('Unsaved B');
+    await select('node-1');
+    expect(container.querySelector('input')).toBeNull();
   });
 
   test('saving the title while editing the body keeps the body draft without a false conflict', async () => {

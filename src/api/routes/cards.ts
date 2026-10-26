@@ -44,8 +44,11 @@ export async function cardRoutes(app: FastifyInstance): Promise<void> {
       content_timestamp: body["content_timestamp"] as string | null | undefined,
       source_type: body["source_type"] as string | null | undefined,
       source_ref: body["source_ref"] as string | null | undefined,
-    });
+    }, body["expected_version"] as number | undefined);
     if (!updated) return reply.code(404).send({ error: "Card not found" });
+    if (updated.conflict) {
+      return reply.code(409).send({ error: "VERSION_CONFLICT", current_version: updated.actualVersion });
+    }
     return updated;
   });
 

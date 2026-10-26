@@ -1,11 +1,15 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, type CardData } from '../../api/client';
 import { parseJournalLimitDraft } from './cardDetailLogic';
 import { nodeQueryKey } from '../../query/queryKeys';
+import { VersionConflictError } from '../../api/request';
 
 interface UseCardDetailSavesArgs {
   nodeId: string | null;
+  editBaseVersion: number | null;
+  onSavingChange: (saving: boolean) => void;
+  onVersionConflict: (currentVersion: number) => void;
   saveFailedLabel: string;
   onSaveError: (field: 'title' | 'content' | 'journalLimit', message: string) => void;
   onTitleSaved: (card: CardData) => void;
@@ -20,6 +24,9 @@ function getErrorMessage(error: unknown): string {
 
 export function useCardDetailSaves({
   nodeId,
+  editBaseVersion,
+  onSavingChange,
+  onVersionConflict,
   saveFailedLabel,
   onSaveError,
   onTitleSaved,
@@ -28,43 +35,46 @@ export function useCardDetailSaves({
   onJournalLimitIgnored,
 }: UseCardDetailSavesArgs) {
   const queryClient = useQueryClient();
-  const [saving, setSaving] = useState(false);
 
   const invalidateNode = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: nodeQueryKey(nodeId) });
   }, [nodeId, queryClient]);
 
   const showSaveError = useCallback((field: 'title' | 'content' | 'journalLimit', error: unknown) => {
+    if (error instanceof VersionConflictError) {
+      onVersionConflict(error.currentVersion);
+      return;
+    }
     onSaveError(field, `${saveFailedLabel}: ${getErrorMessage(error)}`);
-  }, [onSaveError, saveFailedLabel]);
+  }, [onSaveError, onVersionConflict, saveFailedLabel]);
 
   const saveTitle = useCallback(async (cardId: string | undefined, titleDraft: string) => {
     if (!cardId) return;
-    setSaving(true);
+    onSavingChange(true);
     try {
-      const updatedCard = await api.updateCard(cardId, { title: titleDraft });
+      const updatedCard = await api.updateCard(cardId, { title: titleDraft, expected_version: editBaseVersion ?? undefined });
       onTitleSaved(updatedCard);
       invalidateNode();
     } catch (error: unknown) {
       showSaveError('title', error);
     } finally {
-      setSaving(false);
+      onSavingChange(false);
     }
-  }, [invalidateNode, onTitleSaved, showSaveError]);
+  }, [editBaseVersion, invalidateNode, onSavingChange, onTitleSaved, showSaveError]);
 
   const saveContent = useCallback(async (cardId: string | undefined, contentDraft: string) => {
     if (!cardId) return;
-    setSaving(true);
+    onSavingChange(true);
     try {
-      const updatedCard = await api.updateCard(cardId, { content: contentDraft });
+      const updatedCard = await api.updateCard(cardId, { content: contentDraft, expected_version: editBaseVersion ?? undefined });
       onContentSaved(updatedCard);
       invalidateNode();
     } catch (error: unknown) {
       showSaveError('content', error);
     } finally {
-      setSaving(false);
+      onSavingChange(false);
     }
-  }, [invalidateNode, onContentSaved, showSaveError]);
+  }, [editBaseVersion, invalidateNode, onSavingChange, onContentSaved, showSaveError]);
 
   const saveJournalLimit = useCallback(async (journalLimitDraft: string) => {
     if (!nodeId) return;
@@ -75,7 +85,7 @@ export function useCardDetailSaves({
       return;
     }
 
-    setSaving(true);
+    onSavingChange(true);
     try {
       await api.updateNode(nodeId, { journal_limit: parsed.value });
       onJournalLimitSaved();
@@ -83,12 +93,11 @@ export function useCardDetailSaves({
     } catch (error: unknown) {
       showSaveError('journalLimit', error);
     } finally {
-      setSaving(false);
+      onSavingChange(false);
     }
-  }, [invalidateNode, nodeId, onJournalLimitIgnored, onJournalLimitSaved, showSaveError]);
+  }, [invalidateNode, nodeId, onJournalLimitIgnored, onJournalLimitSaved, onSavingChange, showSaveError]);
 
   return {
-    saving,
     invalidateNode,
     saveTitle,
     saveContent,
