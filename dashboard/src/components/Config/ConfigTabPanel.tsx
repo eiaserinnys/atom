@@ -56,7 +56,7 @@ export function ConfigTabPanel({
         </button>
       )}
       <h2 className="mb-6 text-base font-semibold text-foreground">{label}</h2>
-      {tab === 'agents' && <AgentManagementTab />}
+      {tab === 'agents' && <AgentManagementTab currentUserRole={currentUserRole} />}
       {tab === 'users' && currentUserRole === 'admin' && (
         <UserManagementTab currentUserEmail={currentUserEmail} />
       )}

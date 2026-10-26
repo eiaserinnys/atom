@@ -1,5 +1,5 @@
 import { request } from './request';
-import type { Agent, User, UserRole } from './types';
+import type { Agent, AgentScope, User, UserRole } from './types';
 import type { OpenAIConfigResponse } from '../../../src/shared/embeddings';
 
 export const configApi = {
@@ -19,7 +19,7 @@ export const configApi = {
     return request('/api/config/agents');
   },
 
-  createAgent(body: { agent_id: string; display_name?: string }): Promise<Agent & { secret?: string }> {
+  createAgent(body: { agent_id: string; display_name?: string; scope: AgentScope }): Promise<Agent & { secret?: string }> {
     return request('/api/config/agents', { method: 'POST', body: JSON.stringify(body) });
   },
 
@@ -27,7 +27,7 @@ export const configApi = {
     return request(`/api/config/agents/${id}/reissue`, { method: 'POST' });
   },
 
-  updateAgent(id: string, body: { is_active: boolean }): Promise<Agent> {
+  updateAgent(id: string, body: { is_active?: boolean; scope?: AgentScope }): Promise<Agent> {
     return request(`/api/config/agents/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   },
 
