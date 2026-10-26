@@ -1,4 +1,36 @@
 {
+  "visual_search": {
+    "index_loading": "색인 적재 중",
+    "joined": "선정 +{{count}}",
+    "scoring": "채점",
+    "expanding": "펼침",
+    "same_branch": "같은 가지 {{count}}",
+    "other_branch": "다른 가지 {{count}}",
+    "title": "시각적 검색",
+    "loading": "시각적 검색 불러오는 중…",
+    "chapters": "탐색 기록",
+    "actions": "고른 카드 오퍼레이션",
+    "expand": "이웃 확장",
+    "evaluate": "연관성 평가",
+    "evaluating": "평가 중",
+    "failed_evaluate": "평가 실패",
+    "failed_expand": "확장 실패",
+    "failed_query": "추가 탐색 실패",
+    "failed_search": "검색 실패",
+    "open_tree": "트리에서 열기",
+    "chapter_search": "0 검색",
+    "chapter_continue": "추가 검색",
+    "query_column": "질의 확장 {{count}}",
+    "expand_column": "확장 {{count}}",
+    "evaluate_column": "평가 {{count}}",
+    "entry": "입구",
+    "hop": "홉 {{count}}",
+    "empty": "새 후보 없음",
+    "relevance_above": "선정 기준 {{threshold}} 이상",
+    "relevance_below": "선정 기준 {{threshold}} 미만",
+    "error": "탐색을 완료하지 못했습니다. ({{code}})",
+    "retry": "다시 시도"
+  },
   "common": {
     "close": "닫기",
     "save": "저장",
@@ -284,6 +316,6 @@
     "tab_detail": "상세",
     "tab_settings": "설정",
     "settings_back": "← 설정",
-    "tab_search": "검색 모션"
+    "tab_search": "시각적 검색"
   }
 }

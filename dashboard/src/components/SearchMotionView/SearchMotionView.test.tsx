@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { test, expect, vi } from 'vitest';
 import { SearchMotionView } from './SearchMotionView';
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 vi.mock('./player.js', () => ({ createMotionPlayer: (host: HTMLElement) => {
   const node = host.querySelector('[data-motion-id=query-title]')!;

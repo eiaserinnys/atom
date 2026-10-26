@@ -37,6 +37,7 @@ interface TreeViewProps {
   initialSelectedNodeId?: string;
   searchResults?: MotionNode[];
   showLogout?: boolean;
+  revealRequest?: number;
 }
 
 interface ContextMenuState {
@@ -45,7 +46,7 @@ interface ContextMenuState {
   node: TreeNodeData;
 }
 
-export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, searchResults = [], showLogout = true }: TreeViewProps) {
+export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, searchResults = [], showLogout = true, revealRequest }: TreeViewProps) {
   const { t } = useTranslation();
   const { data: roots, isLoading, error } = useQuery({
     queryKey: rootTreeQueryKey(),
@@ -109,7 +110,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
       requestAnimationFrame(() => document.querySelector(`[data-testid="tree-node-${selectedNodeId}"]`)?.scrollIntoView?.({ block: 'nearest' }));
     });
     return () => { cancelled = true; };
-  }, [selectedNodeId]);
+  }, [selectedNodeId, revealRequest]);
   const searchRanks = Object.fromEntries(searchResults.filter(n => n.selected && n.nodeId).map(n => [n.nodeId!, n.rank]));
 
   const {

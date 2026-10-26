@@ -23,7 +23,10 @@ export function createEmbeddingHash(
 }
 
 export function createEmbeddingInput(title: string, content: string): EmbeddingInput {
-  const text = `${title}\n\n${content}`;
+  return createEmbeddingInputFromText(`${title}\n\n${content}`);
+}
+
+export function createEmbeddingInputFromText(text: string): EmbeddingInput {
   const contentHash = createEmbeddingHash(text);
   encoder ??= getEncoding("cl100k_base");
   const allTokens = encoder.encode(text, [], []);
