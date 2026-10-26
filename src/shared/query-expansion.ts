@@ -32,4 +32,3 @@ export interface QueryExpansionError {
   error: { code: string };
   key_configured?: boolean;
 }
-
