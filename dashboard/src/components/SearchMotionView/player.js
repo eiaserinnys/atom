@@ -2,6 +2,7 @@
 // to preserve the reviewed drawing and playback behavior; the pure reducer is model.js.
 import { createModel, applyEvent } from "./model.js";
 import { createExplorationSession } from './exploration-session.js';
+import { nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
 
 export function createMotionPlayer(root, callbacks, samples) {
   let disposed = false;
@@ -442,7 +443,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   const FONT = '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif';
   const font = (w, px) => `${w} ${px}px ${FONT}`;
-  const wfont = (w, px) => `${w} ${Math.ceil(Math.max(13, px) / Math.min(1, cam.z || 1))}px ${FONT}`;
+  const wfont = (w, px) => `${w} ${Math.max(13, px) / Math.min(1, cam.z || 1)}px ${FONT}`;
   function fitText(text, max, f) {
     ctx.font = f; if (ctx.measureText(text).width <= max) return text;
     let lo = 0; let hi = text.length;
@@ -652,10 +653,11 @@ export function createMotionPlayer(root, callbacks, samples) {
       if (n.type === "structure") ctx.fillRect(x + 7, y + 5, 1.6, h - 10);
     }
     const rankW = n.selected ? 34 : 0;
-    const tx = x + (n.type === "structure" ? 15 : 12) + rankW; const cy = y + 15;
+    const textLayout = nodeTextLayout(n.path || [], cam.z, h);
+    const tx = x + (n.type === "structure" ? 15 : 12) + rankW; const cy = y + textLayout.titleY;
     const portPad = n.type === "structure" ? 4 : 0;
     if (text) {
-      const bold = alive > 0.5; const f = wfont(bold ? 650 : 500, cam.z < 0.8 ? 14 / cam.z : 14);
+      const bold = alive > 0.5; const f = wfont(bold ? 650 : 500, 14);
       const scoreFont = wfont(bold ? 600 : 500, 13);
       ctx.font = scoreFont;
       const scoreW = n.score != null ? ctx.measureText(n.score.toFixed(2)).width + 8 : n.byHit || n.judging ? 36 : 4;
@@ -665,7 +667,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       ctx.font = f; ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.fillStyle = isRoot ? css(T.shell) : css(mix(T.ink, T.lowText, dim));
       ctx.fillText(v.fit, tx, cy);
-      if (cam.z >= 0.8) {
+      if (textLayout.showPath) {
         const path = (n.path || []).slice(0, -1).join(' › ');
         ctx.font = wfont(500, 13); ctx.fillStyle = css(T.lowText);
         ctx.fillText(fitText(path, w - (tx - x) - 8, wfont(500, 13)), tx, y + 35);
@@ -707,7 +709,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     // 순위는 마디 안쪽에서 결과 도크와 같은 번호를 쓴다.
     if (v.sel > 0.02 && text) {
-      const k = easeOut(v.sel); ctx.globalAlpha = v.a * k; const cx = x + 10; const cyy = y + 6;
+      const k = easeOut(v.sel); ctx.globalAlpha = v.a * k; const cx = x + 10; const cyy = cy - (M.chipH - 4) / 2;
       rr(cx, cyy, 30, M.chipH - 4, 6); ctx.fillStyle = css(T.evidence); ctx.fill();
       ctx.fillStyle = css(T.evidenceInk); ctx.font = wfont(700, 13); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(n.rank), cx + 15, cyy + (M.chipH - 4) / 2 + 0.5); ctx.textAlign = "left";
     }
