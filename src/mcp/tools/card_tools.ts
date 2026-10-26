@@ -80,10 +80,7 @@ export function registerCardTools(server: McpServer, agentId: string): void {
         return { content: [{ type: "text", text: `Card not found: ${card_id}` }], isError: true };
       }
       if (result.conflict) {
-        return {
-          content: [{ type: "text", text: JSON.stringify({ error: "VersionConflict", actualVersion: result.actualVersion }) }],
-          isError: true,
-        };
+        throw new Error(`VersionConflict: card ${card_id} expected version ${expected_version}, actual ${result.actualVersion}`);
       }
       return { content: [{ type: "text", text: JSON.stringify(result.card) }] };
     }

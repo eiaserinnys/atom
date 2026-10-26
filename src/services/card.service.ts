@@ -70,7 +70,7 @@ export async function updateCard(
   inputOrExpected?: UpdateCardInput | number,
   expectedVersionOrUndefined?: number
 ): Promise<UpdateCardServiceResult> {
-  // Overload resolution: support both updateCard(id, input) and updateCard(agentId, id, input, expectedVersion?)
+  // Support updateCard(id, input, expectedVersion?) and updateCard(agentId, id, input, expectedVersion?).
   let agentId: string | null;
   let id: string;
   let input: UpdateCardInput;
@@ -83,11 +83,11 @@ export async function updateCard(
     input = inputOrExpected as UpdateCardInput;
     expectedVersion = expectedVersionOrUndefined;
   } else {
-    // updateCard(id, input) — legacy call, agentIdOrId is actually the id
+    // Legacy call: agentIdOrId is the card id.
     agentId = null;
     id = agentIdOrId as string;
     input = idOrInput;
-    expectedVersion = undefined;
+    expectedVersion = inputOrExpected as number | undefined;
   }
 
   const contentChanged = input.content !== undefined;

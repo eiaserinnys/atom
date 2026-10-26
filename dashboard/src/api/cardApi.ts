@@ -11,7 +11,7 @@ export const cardApi = {
     return request(`/cards/${cardId}`);
   },
 
-  async updateCard(cardId: string, data: { title?: string; content?: string }): Promise<CardData> {
+  async updateCard(cardId: string, data: { title?: string; content?: string; expected_version?: number }): Promise<CardData> {
     const result = await request<UpdateCardResponse>(`/cards/${cardId}`, {
       method: 'PUT',
       body: JSON.stringify(data),

@@ -69,7 +69,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [agentKeyPreHandler, requireAgentWriteScope] },
     async (req, reply) => {
       const body = req.body as Record<string, unknown>;
-      const allowedFields = new Set(["content", "title", "tags", "source_ref"]);
+      const allowedFields = new Set(["content", "title", "tags", "source_ref", "expected_version"]);
       if (Object.keys(body).some((key) => !allowedFields.has(key))) {
         return reply.code(400).send({ error: "Unknown card update field" });
       }
@@ -80,10 +80,10 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
       if ("tags" in body) input.tags = body["tags"] as string[];
       if ("source_ref" in body) input.source_ref = body["source_ref"] as string | null;
 
-      const result = await updateCard(req.params.cardId, input);
+      const result = await updateCard(req.params.cardId, input, body["expected_version"] as number | undefined);
       if (!result) return reply.code(404).send({ error: "Card not found" });
       if ("conflict" in result && result.conflict) {
-        return reply.code(409).send({ error: "Version conflict", actualVersion: result.actualVersion });
+        return reply.code(409).send({ error: "VERSION_CONFLICT", current_version: result.actualVersion });
       }
       return result.card;
     }
