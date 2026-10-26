@@ -1,16 +1,22 @@
 import { request } from './request';
 import type { CardData } from './types';
 
+interface UpdateCardResponse {
+  card: CardData;
+  conflict: false;
+}
+
 export const cardApi = {
   getCard(cardId: string): Promise<CardData> {
     return request(`/cards/${cardId}`);
   },
 
-  updateCard(cardId: string, data: { title?: string; content?: string }): Promise<CardData> {
-    return request(`/cards/${cardId}`, {
+  async updateCard(cardId: string, data: { title?: string; content?: string }): Promise<CardData> {
+    const result = await request<UpdateCardResponse>(`/cards/${cardId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    return result.card;
   },
 
   createCard(data: {

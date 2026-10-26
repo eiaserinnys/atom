@@ -43,7 +43,7 @@ export function formatBreadcrumb(nodePath?: string[]): string | null {
 }
 
 export function snippetParts(snippet: string): { text: string; match: boolean }[] {
-  const cleaned = snippet
+  const rawCleaned = snippet
     .replace(/<b>/g, '\u0001')
     .replace(/<\/b>/g, '\u0002')
     .split('\n')
@@ -62,6 +62,7 @@ export function snippetParts(snippet: string): { text: string; match: boolean }[
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
+  const cleaned = formatJsonStringArray(rawCleaned) ?? rawCleaned;
 
   const parts: { text: string; match: boolean }[] = [];
   let match = false;
@@ -75,6 +76,24 @@ export function snippetParts(snippet: string): { text: string; match: boolean }[
     }
   }
   return parts;
+}
+
+function formatJsonStringArray(value: string): string | null {
+  const markerValues: string[] = [];
+  const json = value.replace(/[\u0001\u0002]/g, (marker) => {
+    const placeholder = `\uE000${markerValues.length}\uE001`;
+    markerValues.push(marker);
+    return placeholder;
+  });
+
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === 'string')) return null;
+    return parsed.map((item: string) => item.replace(/\uE000(\d+)\uE001/g, (_match, index: string) => markerValues[Number(index)] ?? ''))
+      .join(', ');
+  } catch {
+    return null;
+  }
 }
 
 function parseTags(tagsText: string): string[] {

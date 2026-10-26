@@ -108,6 +108,28 @@ describe('dashboard API client transport contracts', () => {
     await expect(api.getTree()).rejects.toThrow('API 500: broken');
   });
 
+  test('unwraps the card from the PUT update response envelope', async () => {
+    const card = {
+      id: 'card-1',
+      card_type: 'knowledge' as const,
+      title: 'Updated title',
+      content: 'Current body',
+      references: [],
+      tags: [],
+      card_timestamp: '2026-10-26T00:00:00.000Z',
+      content_timestamp: null,
+      source_type: null,
+      source_ref: null,
+      version: 2,
+      updated_at: '2026-10-26T00:00:00.000Z',
+      created_by: null,
+      updated_by: null,
+    };
+    fetchMock.mockResolvedValueOnce(responseWithJson({ card, conflict: false }));
+
+    await expect(api.updateCard(card.id, { title: card.title })).resolves.toEqual(card);
+  });
+
   test('serializes compile query options', async () => {
     fetchMock.mockResolvedValueOnce(responseWithJson({ markdown: '# title' }));
 

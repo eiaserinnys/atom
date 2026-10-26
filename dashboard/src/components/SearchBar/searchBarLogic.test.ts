@@ -59,4 +59,11 @@ describe('snippetParts', () => {
   test('returns one unmarked part when the snippet has no server emphasis', () => {
     expect(snippetParts('Plain snippet')).toEqual([{ text: 'Plain snippet', match: false }]);
   });
+
+  test('formats JSON string array snippets and keeps server match emphasis', () => {
+    expect(snippetParts('["incident","<b>postgresql</b>"]')).toEqual([
+      { text: 'incident, ', match: false },
+      { text: 'postgresql', match: true },
+    ]);
+  });
 });

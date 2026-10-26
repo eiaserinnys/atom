@@ -177,7 +177,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
       onDragCancel={treeDrag.handleDragCancel}
     >
       <TreeDndContext.Provider value={treeDrag.dndState}>
-        <div className="h-full flex flex-col bg-background border-r border-border">
+        <div className="h-full flex flex-col bg-background">
           {/* 헤더 */}
           <div className="h-10 max-md:h-12 px-4 flex items-center border-b border-border bg-card shrink-0">
             <div className="flex items-center gap-1 -ml-1.5 max-md:-ml-2.5 min-w-0 overflow-hidden whitespace-nowrap">
