@@ -212,8 +212,7 @@ describe("Tree operations", () => {
   });
 
   it("orphan symlink: canonical 노드 없을 때 canonical_path 미포함", async () => {
-    // canonical 노드 없이 직접 symlink 노드만 삽입 (orphan 시뮬레이션)
-    // card는 있지만 non-symlink 노드가 없으면 orphan
+    // canonical 노드를 지운 뒤에도 symlink가 남아 카드는 보존된다.
     const { card: cardX, node_id: nodeX } = await cardService.createCard({
       card_type: "knowledge",
       title: "OrphanCard",
@@ -223,11 +222,9 @@ describe("Tree operations", () => {
       title: "OrphanParent",
     });
 
-    // non-symlink 노드(nodeX)를 삭제하여 orphan 상태 만들기
-    await treeService.deleteNode(nodeX);
-
-    // cardX의 symlink를 nodeParent 아래에 생성 (orphan: canonical 없음)
+    // 다른 곳에 symlink를 먼저 만들고 canonical 노드를 지워 orphan 상태를 만든다.
     await treeService.createSymlink(cardX.id, nodeParent, undefined);
+    await treeService.deleteNode(nodeX);
 
     const children = await treeService.listChildren(nodeParent);
     expect(children.length).toBe(1);

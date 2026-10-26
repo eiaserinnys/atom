@@ -41,7 +41,7 @@ async function selectSubtreeNodes(
      subtree(id, card_id, parent_node_id) AS (
        SELECT node.id, node.card_id, node.parent_node_id
        FROM tree_nodes node
-       JOIN roots root ON root.id = node.id
+       JOIN roots root ON root.id = CAST(node.id AS TEXT)
        UNION
        SELECT child.id, child.card_id, child.parent_node_id
        FROM tree_nodes child
