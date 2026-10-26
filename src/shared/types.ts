@@ -1,7 +1,5 @@
 export type CardType = "structure" | "knowledge";
 
-export type Staleness = "unverified" | "fresh" | "stale" | "outdated";
-
 export interface Card {
   id: string;
   card_type: CardType;
@@ -15,9 +13,6 @@ export interface Card {
   source_type: string | null;
   source_ref: string | null;
   source_snapshot: string | null;
-  source_checksum: string | null;
-  source_checked_at: string | null;
-  staleness: Staleness;
   version: number;
   updated_at: string;
   created_by: string | null;
@@ -99,9 +94,6 @@ export interface UpdateCardInput {
   source_type?: string | null;
   source_ref?: string | null;
   source_snapshot?: string | null;
-  source_checksum?: string | null;
-  source_checked_at?: string | null;
-  staleness?: Staleness;
 }
 
 export interface SearchFilters {
@@ -157,9 +149,6 @@ export interface BatchUpdateItem {
   content_timestamp?: string | null;
   source_type?: string | null;
   source_ref?: string | null;
-  source_snapshot?: string | null;
-  source_checksum?: string | null;
-  source_checked_at?: string | null;
   /** Optimistic locking: if set, update will fail (409) when current version differs. */
   expected_version?: number;
 }

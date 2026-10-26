@@ -179,6 +179,29 @@ describe("Event Bus — batch:completed patch cases", () => {
     }
   });
 
+  it("executeBatchOp emits card:deleted patches for orphaned descendants", async () => {
+    const { card: parent, node_id: parentNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Batch delete parent with child",
+    });
+    const { card: child } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Batch deleted child",
+      parent_node_id: parentNodeId,
+    });
+
+    const eventPromise = nextAtomEvent();
+    await batchService.executeBatchOp({ deletes: [{ card_id: parent.id }] });
+    const event = await eventPromise;
+
+    expect(event.type).toBe("batch:completed");
+    if (event.type === "batch:completed") {
+      expect(event.result.deleted).toEqual([parent.id]);
+      expect(event.patches.map((patch) => patch.type === "card:deleted" ? patch.cardId : null))
+        .toEqual([parent.id, child.id]);
+    }
+  });
+
   it("executeBatchOp appends delete patches after child_order patches", async () => {
     const { card: deleteTarget } = await cardService.createCard({
       card_type: "knowledge",

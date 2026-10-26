@@ -1,4 +1,7 @@
-import { batchNodeUpdateItemSchema } from "../../src/mcp/tools/batch_tools.js";
+import {
+  batchNodeUpdateItemSchema,
+  batchUpdateItemSchema,
+} from "../../src/mcp/tools/batch_tools.js";
 
 /**
  * P1-2 Zod rejection regression.
@@ -79,6 +82,18 @@ describe("batchNodeUpdateItemSchema (P1-2 Zod rejection)", () => {
     const result = batchNodeUpdateItemSchema.safeParse({
       node_id: "not-a-uuid",
       journal_limit: 5,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("batchUpdateItemSchema retired inputs", () => {
+  const retiredKeys = ["source_" + "snapshot", "source_" + "checksum", "source_" + "checked_at"];
+
+  it.each(retiredKeys)("rejects removed update key %s", (key) => {
+    const result = batchUpdateItemSchema.safeParse({
+      card_id: "550e8400-e29b-41d4-a716-446655440000",
+      [key]: "value",
     });
     expect(result.success).toBe(false);
   });

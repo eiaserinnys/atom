@@ -92,7 +92,7 @@ export function registerCardTools(server: McpServer, agentId: string): void {
   // delete_card
   server.tool(
     "delete_card",
-    "Delete a card and all its tree nodes (including symlinks). This is permanent. To remove only a tree node while keeping the card, use delete_node instead.",
+    "Delete a card and all its tree nodes (including symlinks). This is permanent. To keep a card while removing one tree node, ensure another node still points to it.",
     { card_id: z.string().uuid().describe("The card UUID to delete permanently.") },
     async ({ card_id }) => {
       const deleted = await deleteCard(card_id);

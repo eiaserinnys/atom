@@ -27,7 +27,6 @@ function makeNode(
       content_timestamp: null,
       source_type: null,
       source_ref: null,
-      staleness: 'unverified',
       version: 1,
       updated_at: '2026-01-01T00:00:00Z',
       created_by: null,

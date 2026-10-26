@@ -104,8 +104,8 @@ async function copyCards(sqliteDb: SqliteMigrationDatabase, tx: Queryable): Prom
     const refs = parseSqliteJsonArrayField(c['references']);
     const tags = parseSqliteJsonArrayField(c['tags']);
     await tx.query(
-      `INSERT INTO cards (id, card_type, title, content, "references", tags, card_timestamp, content_timestamp, source_type, source_ref, source_snapshot, source_checksum, source_checked_at, staleness, version, updated_at, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      `INSERT INTO cards (id, card_type, title, content, "references", tags, card_timestamp, content_timestamp, source_type, source_ref, source_snapshot, version, updated_at, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (id) DO NOTHING`,
       [
         c['id'],
@@ -119,9 +119,6 @@ async function copyCards(sqliteDb: SqliteMigrationDatabase, tx: Queryable): Prom
         c['source_type'] ?? null,
         c['source_ref'] ?? null,
         c['source_snapshot'] ?? null,
-        c['source_checksum'] ?? null,
-        c['source_checked_at'] ?? null,
-        c['staleness'] ?? 'unverified',
         c['version'] ?? 1,
         c['updated_at'],
         c['created_by'] ?? null,

@@ -67,6 +67,32 @@ describe("Event Bus — emit cases", () => {
     }
   });
 
+  it("deleteCard emits card:deleted for orphaned descendants", async () => {
+    const { card: parent, node_id: parentNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Delete parent event",
+    });
+    const { card: child } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Delete child event",
+      parent_node_id: parentNodeId,
+    });
+    const events: AtomEvent[] = [];
+    const listener = (event: AtomEvent) => events.push(event);
+    eventBus.on("atom:event", listener);
+
+    try {
+      await cardService.deleteCard(parent.id);
+    } finally {
+      eventBus.off("atom:event", listener);
+    }
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "card:deleted", cardId: parent.id }),
+      expect.objectContaining({ type: "card:deleted", cardId: child.id }),
+    ]));
+  });
+
   it("createSymlink emits node:created", async () => {
     const { card: cardA, node_id: nodeA } = await cardService.createCard({
       card_type: "structure",
@@ -109,6 +135,35 @@ describe("Event Bus — emit cases", () => {
       expect(event.cardId).toBeDefined();
       expect(event.parentNodeId).toBeNull();
     }
+  });
+
+  it("deleteNode emits card:deleted for orphaned descendant cards", async () => {
+    const { node_id: parentNodeId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Delete subtree event parent",
+    });
+    const { card: child } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Delete subtree event child",
+      parent_node_id: parentNodeId,
+    });
+    const events: AtomEvent[] = [];
+    const listener = (event: AtomEvent) => events.push(event);
+    eventBus.on("atom:event", listener);
+
+    try {
+      await treeService.deleteNode(parentNodeId);
+    } finally {
+      eventBus.off("atom:event", listener);
+    }
+
+    const childEvent = events.find(
+      (event) => event.type === "card:deleted" && event.cardId === child.id
+    );
+    expect(childEvent).toEqual(expect.objectContaining({
+      type: "card:deleted",
+      cardId: child.id,
+    }));
   });
 
   it("updateNodeProperties emits node:updated", async () => {

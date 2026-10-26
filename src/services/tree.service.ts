@@ -3,7 +3,6 @@ import {
   selectNodeById,
   selectChildren,
   selectCanonicalNodeByCardId,
-  deleteNodeById,
   insertNode,
   moveNode as moveNodeQuery,
   getNodeBreadcrumb,
@@ -26,6 +25,7 @@ import {
   type CompileUnfurls,
 } from "./compile-unfurl.service.js";
 import { loadTreeCompileContext } from "./tree-compile-context.service.js";
+import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
 
 /**
  * Resolve the node whose children are listed "under" `nodeId`: a symlink
@@ -156,18 +156,28 @@ export async function createSymlink(
 
 export async function deleteNode(nodeId: string): Promise<boolean> {
   const db = getDb();
-  const node = await selectNodeById(db, nodeId);
-  const deleted = await deleteNodeById(db, nodeId);
-  if (deleted) {
+  const result = await db.transaction((client) =>
+    deleteTreeAndOrphanCards(client, { nodeId })
+  );
+  if (result.deleted) {
     eventBus.emit("atom:event", {
       type: "node:deleted",
       nodeId,
-      cardId: node?.card_id ?? "",
-      parentNodeId: node?.parent_node_id ?? null,
+      cardId: result.rootNode?.card_id ?? "",
+      parentNodeId: result.rootNode?.parent_node_id ?? null,
       actor: null,
     });
+    for (const card of result.deletedCards) {
+      eventBus.emit("atom:event", {
+        type: "card:deleted",
+        cardId: card.cardId,
+        nodeIds: card.nodeIds,
+        parentNodeIds: card.parentNodeIds,
+        actor: null,
+      });
+    }
   }
-  return deleted;
+  return result.deleted;
 }
 
 export async function moveNode(

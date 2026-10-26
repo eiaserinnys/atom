@@ -26,7 +26,6 @@ function treeNode(id: string, cardType: 'structure' | 'knowledge' = 'structure')
       content_timestamp: null,
       source_type: null,
       source_ref: null,
-      staleness: 'unverified',
       version: 1,
       updated_at: '2026-05-24T00:00:00.000Z',
       created_by: null,

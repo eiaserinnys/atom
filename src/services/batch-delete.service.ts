@@ -1,5 +1,4 @@
-import { deleteCardById } from "../db/queries/cards.js";
-import { selectNodesByCardId } from "../db/queries/tree.js";
+import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
 import type { Queryable } from "../db/queryable.js";
 import type {
   AtomPatchEvent,
@@ -34,18 +33,26 @@ async function deleteBatchCard(
   patches: AtomPatchEvent[],
   actor: string | null
 ): Promise<void> {
-  const nodes = await selectNodesByCardId(db, item.card_id);
-
-  // Cascade semantics live in the DB constraints. The batch patch records the
-  // direct nodes of the deleted card as they existed before the cascade runs.
-  await deleteCardById(db, item.card_id);
+  const deletion = await deleteTreeAndOrphanCards(db, { cardId: item.card_id });
+  const requestedCard = deletion.deletedCards.find((card) => card.cardId === item.card_id);
 
   result.deleted.push(item.card_id);
   patches.push({
     type: "card:deleted",
     cardId: item.card_id,
-    nodeIds: nodes.map((node) => node.id),
-    parentNodeIds: nodes.map((node) => node.parent_node_id),
+    nodeIds: requestedCard?.nodeIds ?? [],
+    parentNodeIds: requestedCard?.parentNodeIds ?? [],
     actor,
   });
+
+  for (const card of deletion.deletedCards) {
+    if (card.cardId === item.card_id) continue;
+    patches.push({
+      type: "card:deleted",
+      cardId: card.cardId,
+      nodeIds: card.nodeIds,
+      parentNodeIds: card.parentNodeIds,
+      actor,
+    });
+  }
 }

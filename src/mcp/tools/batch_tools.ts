@@ -24,7 +24,7 @@ const batchSymlinkItemSchema = z.object({
   position: z.number().int().nonnegative().optional(),
 });
 
-const batchUpdateItemSchema = z.object({
+export const batchUpdateItemSchema = z.object({
   card_id: z.string().uuid(),
   title: z.string().max(50).optional(),
   content: z.string().nullable().optional(),
@@ -33,11 +33,8 @@ const batchUpdateItemSchema = z.object({
   content_timestamp: z.string().nullable().optional(),
   source_type: z.string().nullable().optional(),
   source_ref: z.string().nullable().optional(),
-  source_snapshot: z.string().nullable().optional(),
-  source_checksum: z.string().nullable().optional(),
-  source_checked_at: z.string().nullable().optional(),
   expected_version: z.number().int().optional(),
-});
+}).strict();
 
 // Exported for direct schema-level unit tests
 // (P1-2 Zod rejection regression — see tests/unit/batch-tools-schema.test.ts).

@@ -15,9 +15,6 @@ function rowToCard(row: Record<string, unknown>): Card {
     source_type: (row["source_type"] as string | null) ?? null,
     source_ref: (row["source_ref"] as string | null) ?? null,
     source_snapshot: (row["source_snapshot"] as string | null) ?? null,
-    source_checksum: (row["source_checksum"] as string | null) ?? null,
-    source_checked_at: (row["source_checked_at"] as string | null) ?? null,
-    staleness: (row["staleness"] as Card["staleness"]) ?? "unverified",
     version: row["version"] as number,
     updated_at: row["updated_at"] as string,
     created_by: (row["created_by"] as string | null) ?? null,
@@ -114,18 +111,6 @@ export async function updateCardById(
     sets.push(`source_snapshot = $${idx++}`);
     values.push(input.source_snapshot);
   }
-  if (input.source_checksum !== undefined) {
-    sets.push(`source_checksum = $${idx++}`);
-    values.push(input.source_checksum);
-  }
-  if (input.source_checked_at !== undefined) {
-    sets.push(`source_checked_at = $${idx++}`);
-    values.push(input.source_checked_at);
-  }
-  if (input.staleness !== undefined) {
-    sets.push(`staleness = $${idx++}`);
-    values.push(input.staleness);
-  }
 
   // bump version
   sets.push(`version = version + 1`);
@@ -185,9 +170,7 @@ export async function updateCardSnapshot(
 ): Promise<void> {
   await db.query(
     `UPDATE cards
-     SET source_snapshot = $1,
-         source_checked_at = NOW(),
-         staleness = 'fresh'
+     SET source_snapshot = $1
      WHERE id = $2`,
     [snapshot, cardId]
   );

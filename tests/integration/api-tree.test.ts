@@ -38,7 +38,7 @@ describe("Tree operations", () => {
     expect(children[0]!.id).toBe(childId);
   });
 
-  it("delete_node removes node but keeps card", async () => {
+  it("delete_node removes a card with no other tree nodes", async () => {
     const { card, node_id } = await cardService.createCard({
       card_type: "knowledge",
       title: "Node to delete",
@@ -47,16 +47,16 @@ describe("Tree operations", () => {
     const deleted = await treeService.deleteNode(node_id);
     expect(deleted).toBe(true);
 
-    // Card should still exist
+    // A card without another tree node is removed with its node.
     const fetched = await cardService.getCard(card.id);
-    expect(fetched).not.toBeNull();
+    expect(fetched).toBeNull();
 
     // But node should be gone
     const node = await treeService.getNode(node_id);
     expect(node).toBeNull();
   });
 
-  it("delete_node cascades to child nodes", async () => {
+  it("delete_node cascades through a subtree and removes every orphaned card", async () => {
     const { node_id: parentId } = await cardService.createCard({
       card_type: "structure",
       title: "Parent",
@@ -66,16 +66,46 @@ describe("Tree operations", () => {
       title: "Child",
       parent_node_id: parentId,
     });
+    const { node_id: secondChildId, card: secondChildCard } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Second child",
+      parent_node_id: parentId,
+    });
 
     await treeService.deleteNode(parentId);
 
     // Child node should be gone due to CASCADE
     const child = await treeService.getNode(childId);
     expect(child).toBeNull();
+    expect(await treeService.getNode(secondChildId)).toBeNull();
 
-    // Child card should still exist
+    // Cards with no remaining nodes are removed with the subtree.
     const card = await cardService.getCard(childCard.id);
-    expect(card).not.toBeNull();
+    expect(card).toBeNull();
+    expect(await cardService.getCard(secondChildCard.id)).toBeNull();
+  });
+
+  it("keeps a descendant card that still has a symlink node elsewhere", async () => {
+    const { node_id: parentId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Parent with alias",
+    });
+    const { node_id: childId, card: childCard } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Child with alias",
+      parent_node_id: parentId,
+    });
+    const { node_id: otherRootId } = await cardService.createCard({
+      card_type: "structure",
+      title: "Other root",
+    });
+    const alias = await treeService.createSymlink(childCard.id, otherRootId);
+
+    await treeService.deleteNode(parentId);
+
+    expect(await treeService.getNode(childId)).toBeNull();
+    expect(await cardService.getCard(childCard.id)).not.toBeNull();
+    expect(await treeService.getNode(alias.id)).not.toBeNull();
   });
 
   it("symlink: creates a symlink and compile_subtree detects cycle", async () => {
@@ -182,8 +212,7 @@ describe("Tree operations", () => {
   });
 
   it("orphan symlink: canonical 노드 없을 때 canonical_path 미포함", async () => {
-    // canonical 노드 없이 직접 symlink 노드만 삽입 (orphan 시뮬레이션)
-    // card는 있지만 non-symlink 노드가 없으면 orphan
+    // canonical 노드를 지운 뒤에도 symlink가 남아 카드는 보존된다.
     const { card: cardX, node_id: nodeX } = await cardService.createCard({
       card_type: "knowledge",
       title: "OrphanCard",
@@ -193,11 +222,9 @@ describe("Tree operations", () => {
       title: "OrphanParent",
     });
 
-    // non-symlink 노드(nodeX)를 삭제하여 orphan 상태 만들기
-    await treeService.deleteNode(nodeX);
-
-    // cardX의 symlink를 nodeParent 아래에 생성 (orphan: canonical 없음)
+    // 다른 곳에 symlink를 먼저 만들고 canonical 노드를 지워 orphan 상태를 만든다.
     await treeService.createSymlink(cardX.id, nodeParent, undefined);
+    await treeService.deleteNode(nodeX);
 
     const children = await treeService.listChildren(nodeParent);
     expect(children.length).toBe(1);
