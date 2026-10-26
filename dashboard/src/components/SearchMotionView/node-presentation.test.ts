@@ -1,5 +1,11 @@
 import { expect, test } from 'vitest';
-import { nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
+import { fitZoom, nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
+
+test('N1: automatic fit retains readable 50%, explicit fit can reach 25%', () => {
+  expect(fitZoom(390, 300, 1300, 900, true)).toBe(.5);
+  expect(fitZoom(390, 300, 1300, 900, false)).toBeCloseTo(.3);
+  expect(fitZoom(390, 300, 2000, 2000, false)).toBe(.25);
+});
 
 test('B3/B4: compact titles stay 14 screen px, center without a path, and hide together below 50%', () => {
   for (const zoom of [.5, .72, .76]) {

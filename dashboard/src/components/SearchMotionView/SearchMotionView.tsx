@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { QueryClientContext } from '@tanstack/react-query';
-import { createMotionPlayer, type MotionPlayer } from './player.js';
+import { createMotionPlayer, type CameraPosition, type MotionPlayer } from './player.js';
 import { readSearchStream, searchUrl, type SearchRequest } from './stream';
 import type { MotionNode } from './types';
 import sampleUrl from './samples.json?url';
@@ -14,6 +14,7 @@ import type { OperationSnapshot } from './operation-types';
 const motionMarkup = { __html: markup };
 
 export interface SearchMotionViewProps {
+  cameraState?: { current: { requestId: number; camera: CameraPosition } | null };
   request: SearchRequest | null;
   onSummary?(summary: string): void;
   onSelectNode(nodeId: string | null, verdict: MotionNode | null): void;
@@ -21,7 +22,7 @@ export interface SearchMotionViewProps {
   onOpenInTree?(nodeId: string): void;
 }
 
-export function SearchMotionView({ request, onSelectNode, onResults, onSummary, onOpenInTree }: SearchMotionViewProps) {
+export function SearchMotionView({ request, onSelectNode, onResults, onSummary, onOpenInTree, cameraState }: SearchMotionViewProps) {
   const { t } = useTranslation();
   const queryClient = useContext(QueryClientContext);
   const host = useRef<HTMLDivElement>(null);
@@ -64,7 +65,10 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
     }, samples);
     player.current = instance; setReady(true);
     }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '표본을 불러오지 못했습니다.'); });
-    return () => { controller.abort(); active.current?.abort(); instance?.dispose(); player.current = null; };
+    return () => {
+      if (instance && cameraState && requestRef.current) cameraState.current = { requestId: requestRef.current.requestId, camera: instance.getCamera() };
+      controller.abort(); active.current?.abort(); instance?.dispose(); player.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -85,7 +89,8 @@ export function SearchMotionView({ request, onSelectNode, onResults, onSummary, 
       const controller = new AbortController();
       active.current = controller;
       setError('');
-      player.current!.begin(query, { resume });
+      const saved = cameraState?.current;
+      player.current!.begin(query, { resume, camera: saved?.requestId === requestRef.current?.requestId ? saved?.camera : null });
       retryRef.current = () => startRef.current(query, exhaustive, resume);
       try {
         const response = await fetch(searchUrl(query, { rootNodeId: requestRef.current?.rootNodeId, exhaustive }), {

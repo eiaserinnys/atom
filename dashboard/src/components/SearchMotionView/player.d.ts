@@ -1,8 +1,10 @@
 import type { MotionNode } from './types';
 import type { MotionEvent } from './stream';
 import type { OperationSnapshot, VisualOperationEvent } from './operation-types';
+export interface CameraPosition { x: number; y: number; z: number }
 export interface MotionPlayer {
-  begin(query: string, options?: { resume?: boolean }): void;
+  begin(query: string, options?: { resume?: boolean; camera?: CameraPosition | null }): void;
+  getCamera(): CameraPosition;
   getSnapshot(): OperationSnapshot;
   refreshPaths(): void;
   applyOperation(event: VisualOperationEvent, expectedRevision?: number): boolean;

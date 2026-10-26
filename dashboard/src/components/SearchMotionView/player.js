@@ -2,7 +2,7 @@
 // to preserve the reviewed drawing and playback behavior; the pure reducer is model.js.
 import { createModel, applyEvent } from "./model.js";
 import { createExplorationSession } from './exploration-session.js';
-import { nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
+import { fitZoom, nodeTextLayout, resolveDisplayPath } from './node-presentation.js';
 import { motionIcon } from './motion-icons.js';
 
 export function createMotionPlayer(root, callbacks, samples) {
@@ -26,6 +26,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   let selectedRef = null;
   let actionWidth = 0;
   let fullActionWidth = 0;
+  let cameraChosen = false;
   let selectedArrival = null;
   let initialStopReason = null;
   let continued = false;
@@ -408,7 +409,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   function setFollow(on) { ui.follow = on; $("t-follow").hidden = on || !playing(); }
   // 지금 진행 중인 홉과 그 앞 열이 보이게 한다. 배율은 건드리지 않는다
   function followHop(hop, instant) {
-    if (!ui.follow) return;
+    if (!ui.follow || (cameraChosen && player.playing)) return;
     const vw = W / cam.tz; const sheetW = sheetInset() / cam.tz;
     const left = colX(Math.max(0, hop - 1)) - M.padX; const right = colX(hop) + M.colW + M.padX + badgeRoom() + sheetW;
     let x = cam.tx;
@@ -422,6 +423,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     moveCamera(right - left > vw ? Math.min(right - vw, colX(Math.max(...hops)) - 16) : clamp(cam.tx, right - vw, left), -M.padTop, cam.tz, instant);
   }
   function zoomTo(z, px = W / 2, py = H / 2) {
+    cameraChosen = true;
     z = clamp(z, 0.25, 1.6);
     const wx = px / cam.z + cam.x; const wy = (py - M.headerH) / cam.z + cam.y;
     setFollow(false);
@@ -429,8 +431,10 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   function fitAll(instant = false) {
     const isAuto = instant === true;
+    if (isAuto && cameraChosen) return;
+    if (!isAuto) cameraChosen = true;
     const L = view.L; const w = L.width + 2 * M.padX + badgeRoom(); const h = L.height + M.padTop + 54;
-    const z = clamp(Math.min(W / w, (H - M.headerH - overlayRoom()) / h), .25, 1);
+    const z = fitZoom(W, H - M.headerH - overlayRoom(), w, h, isAuto);
     setFollow(false);
     $("t-follow").hidden = ui.follow || !player.playing;
     const targetX = W < w * z ? -M.padX : -M.padX - Math.max(0, (W / z - w) / 2);
@@ -882,7 +886,9 @@ export function createMotionPlayer(root, callbacks, samples) {
   }
   let frames = 0; let lastW = 0;
   function resize() {
-    const r = plot.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1); W = Math.round(r.width); H = Math.round(r.height);
+    const r = plot.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    dpr = Math.min(2, window.devicePixelRatio || 1); W = Math.round(r.width); H = Math.round(r.height);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     const colW = metric('--motion-node-width', 268);
     const gap = metric('--motion-column-gap', 64);
@@ -897,7 +903,8 @@ export function createMotionPlayer(root, callbacks, samples) {
         return;
       }
     }
-    moveCamera(cam.tx, cam.ty, cam.tz, true); invalidate();
+    if (!cameraChosen) moveCamera(cam.tx, cam.ty, cam.tz, true);
+    invalidate();
   }
 
   // ------------------------------------------------------------------ 6. 재생기
@@ -921,7 +928,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       dashboard.syncSearchOutcome(model, sentText, verdictOf);
     }
     if (animate) {
-      if (delta.stage === "selection" || ev.event === "done") fitAll(false); else if (delta.stage && delta.stage !== "run_terminal") followHop(delta.stage === "widen" ? Math.max(0, delta.hop - 1) : delta.hop);
+      if (delta.stage === "selection" || ev.event === "done") fitAll(true); else if (delta.stage && delta.stage !== "run_terminal") followHop(delta.stage === "widen" ? Math.max(0, delta.hop - 1) : delta.hop);
     }
     return delta;
   }
@@ -997,7 +1004,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       view.fx.length = 0; view.march = 0; view.askInfo = model.asking;
       sync(performance.now(), animate, null);
       for (const v of view.nodes.values()) { v.born = Math.min(v.born, performance.now()); v.selAt = 0; }
-      if (ui.follow) { if (model.terminal) fitAll(false); else if (model.last) followHop(model.last.hop); }
+      if (ui.follow) { if (model.terminal) fitAll(true); else if (model.last) followHop(model.last.hop); }
     }
     if (dashboard && model.nodes.size > 0) {
       dashboard.syncSearchOutcome(model, sentText, verdictOf);
@@ -1514,7 +1521,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     }
     if (drag && drag.id === e.pointerId) {
       const dx = p.x - drag.sx; const dy = p.y - drag.sy;
-      if (!drag.moved && Math.hypot(dx, dy) > 6) { drag.moved = true; plot.classList.add("dragging"); setFollow(false); setHover(null); hidePop(); cam.mode = "drag"; }
+      if (!drag.moved && Math.hypot(dx, dy) > 6) { cameraChosen = true; drag.moved = true; plot.classList.add("dragging"); setFollow(false); setHover(null); hidePop(); cam.mode = "drag"; }
       if (drag.moved) {
         const b = bounds(); let x = drag.cx - dx / cam.z; let y = drag.cy - dy / cam.z;
         if (x < b.minX) x = b.minX - rubber(b.minX - x, b.vw); else if (x > b.maxX) x = b.maxX + rubber(x - b.maxX, b.vw);
@@ -1538,6 +1545,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   listen(plot, "wheel", (e) => {
     if (e.target !== cv && e.target !== plot) return;
     const p = local(e);
+    cameraChosen = true;
     if (e.ctrlKey || e.metaKey) { e.preventDefault(); const z = clamp(cam.z * Math.exp(-e.deltaY * 0.012), 0.4, 1.6); const wx = p.x / cam.z + cam.x; const wy = (p.y - M.headerH) / cam.z + cam.y; cam.z = cam.tz = z; cam.x = cam.tx = wx - p.x / z; cam.y = cam.ty = wy - (p.y - M.headerH) / z; cam.mode = "idle"; setFollow(false); updateZoomLabel(); invalidate(); return; }
     const b = bounds(); const nx = clamp(cam.x + e.deltaX / cam.z, b.minX, b.maxX); const ny = clamp(cam.y + e.deltaY / cam.z, b.minY, b.maxY);
     if (Math.abs(nx - cam.x) < 0.5 && Math.abs(ny - cam.y) < 0.5) return;
@@ -1631,7 +1639,7 @@ export function createMotionPlayer(root, callbacks, samples) {
   if (params.has("event")) seekEvent(Number(params.get("event")));
   else if (params.has("frame")) seek(Number(params.get("frame")), false);
   return {
-    begin(query, { resume = false } = {}) {
+    begin(query, { resume = false, camera = null } = {}) {
       if (resume) {
         if (!projected) skip();
         history.truncate(cursor); history.begin(query, { resume: true });
@@ -1639,16 +1647,20 @@ export function createMotionPlayer(root, callbacks, samples) {
       }
       history.begin(query); projected = false; cursor = 0; selectedRef = null; initialStopReason = null; continued = false; receivedDone = false; continuation = false; revision += 1;
       live = true; lastQuery = query;
+      cameraChosen = Boolean(camera);
       clearTimeout(player.timer); clearTimeout(player.arrive); clearTimeout(summaryTimer);
       Object.assign(player, { events: [], ts: [], received: 0, applied: 0, frameEnds: [], total: null, playing: true, serverDone: false, fast: false, source: null, liveStart: performance.now(), lastApply: 0 });
       player.clock0 = player.liveStart; resetView(); shownAt.clear(); callbacks.onResults([]);
       $("tray").replaceChildren(); syncDockActive(0, false); $("more").hidden = true;
       $("query-title").textContent = "“" + query + "”";
       root.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-checked', 'false'));
-      setFollow(true); sync(performance.now(), false, null); tickSummary(); chrome();
+      setFollow(!camera); sync(performance.now(), false, null);
+      if (camera) { Object.assign(cam, { x: camera.x, tx: camera.x, y: camera.y, ty: camera.y, z: camera.z, tz: camera.z, mode: 'idle' }); updateZoomLabel(); }
+      tickSummary(); chrome();
     },
     receive,
     getSnapshot: snapshot,
+    getCamera() { return { x: cam.tx, y: cam.ty, z: cam.tz }; },
     refreshPaths() { sync(performance.now(), false, null); invalidate(); },
     applyOperation(event, expectedRevision) {
       if (expectedRevision != null && expectedRevision !== revision) return false;

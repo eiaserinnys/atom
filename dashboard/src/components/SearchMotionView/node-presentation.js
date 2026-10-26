@@ -22,3 +22,7 @@ export function nodeTextLayout(path, zoom, height = 48) {
   const showPath = zoom >= 1 && path.length > 1;
   return { showText: zoom >= .5, showPath, titleY: showPath ? 15 : height / 2, titleSize: 14 / Math.min(1, zoom) };
 }
+
+export function fitZoom(availableWidth, availableHeight, width, height, automatic) {
+  return Math.max(automatic ? .5 : .25, Math.min(1, availableWidth / width, availableHeight / height));
+}

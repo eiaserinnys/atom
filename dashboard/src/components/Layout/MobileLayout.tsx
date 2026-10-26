@@ -6,10 +6,12 @@ import { CardDetail } from '../CardDetail/CardDetail';
 import { LazySearchMotionView as SearchMotionView } from '../SearchMotionView/LazySearchMotionView';
 import type { MotionNode } from '../SearchMotionView/types';
 import type { SearchRequest } from '../SearchMotionView/stream';
+import type { SearchMotionViewProps } from '../SearchMotionView/SearchMotionView';
 import { MobileSettingsPage } from '../Config/MobileSettingsPage';
 import { MobileTabBar, type MobileTab } from './MobileTabBar';
 import { SearchBar } from '../SearchBar/SearchBar';
 interface Props {
+  cameraState?: SearchMotionViewProps['cameraState'];
   selectedNodeId: string | null;
   onSelectNode(nodeId: string | null): void;
   initialSelectedNodeId?: string;
@@ -22,7 +24,7 @@ interface Props {
   revealRequest?: number;
   onOpenInTree?(nodeId: string): void;
 }
-export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNodeId, request, searchResults, verdict, onSearchSelect, onSubmitSearch, onResults, revealRequest, onOpenInTree }: Props) {
+export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNodeId, request, searchResults, verdict, onSearchSelect, onSubmitSearch, onResults, revealRequest, onOpenInTree, cameraState }: Props) {
   const auth = useAuth();
   const [activeTab, setActiveTab] = useState<MobileTab>(request ? 'search' : 'tree');
   const [previousRequest, setPreviousRequest] = useState(request);
@@ -38,7 +40,7 @@ export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNode
         <div className="h-12 shrink-0 border-b border-border bg-background">
           <SearchBar currentNodeId={selectedNodeId} onSelectNode={handleSelectNode} onSubmitJevSearch={onSubmitSearch} />
         </div>
-        <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView request={request} onResults={onResults} onSelectNode={onSearchSelect} onOpenInTree={id => { onOpenInTree?.(id); setActiveTab('tree'); }} />}</div>
+        <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView cameraState={cameraState} request={request} onResults={onResults} onSelectNode={onSearchSelect} onOpenInTree={id => { onOpenInTree?.(id); setActiveTab('tree'); }} />}</div>
       </div>
       <div hidden={activeTab !== 'detail'} className="h-full"><CardDetail nodeId={selectedNodeId} verdict={verdict} /></div>
       {activeTab === 'settings' && <div className="h-full flex flex-col"><MobileSettingsPage currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} /></div>}
