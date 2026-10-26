@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
 import { listChildren, compileSubtree, getTreeOutline } from "../../services/tree.service.js";
 import { agentKeyPreHandler } from "../agent-key-auth.js";
-import type { Staleness, UpdateCardInput } from "../../shared/types.js";
+import type { UpdateCardInput } from "../../shared/types.js";
 import { parseCompileLimit } from "./compile-limit.js";
 import { createTreeOutlineHandler } from "./tree-outline.js";
 
@@ -69,11 +69,14 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: agentKeyPreHandler },
     async (req, reply) => {
       const body = req.body as Record<string, unknown>;
+      const allowedFields = new Set(["content", "title", "tags", "source_ref"]);
+      if (Object.keys(body).some((key) => !allowedFields.has(key))) {
+        return reply.code(400).send({ error: "Unknown card update field" });
+      }
       const input: UpdateCardInput = {};
 
       if ("content" in body) input.content = body["content"] as string | null;
       if ("title" in body) input.title = body["title"] as string;
-      if ("staleness" in body) input.staleness = body["staleness"] as Staleness;
       if ("tags" in body) input.tags = body["tags"] as string[];
       if ("source_ref" in body) input.source_ref = body["source_ref"] as string | null;
 

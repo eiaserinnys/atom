@@ -23,7 +23,6 @@ describe("Card CRUD", () => {
     expect(card.card_type).toBe("knowledge");
     expect(card.title).toBe("Test Card");
     expect(card.content).toBe("Hello World");
-    expect(card.staleness).toBe("unverified");
     expect(node_id).toBeTruthy();
 
     const fetched = await cardService.getCard(card.id);
@@ -85,21 +84,15 @@ describe("Card CRUD", () => {
     expect(raw).toBe(2020);
   });
 
-  it("staleness is present in get_card response", async () => {
-    const { card } = await cardService.createCard({
-      card_type: "knowledge",
-      title: "Staleness card",
-    });
-
-    const fetched = await cardService.getCard(card.id);
-    expect(fetched).toHaveProperty("staleness");
-    expect(fetched!.staleness).toBe("unverified");
-  });
-
   it("deletes a card and cascades tree_nodes", async () => {
     const { card, node_id } = await cardService.createCard({
       card_type: "knowledge",
       title: "To Delete",
+    });
+    const { card: childCard } = await cardService.createCard({
+      card_type: "knowledge",
+      title: "Descendant to delete",
+      parent_node_id: node_id,
     });
 
     const deleted = await cardService.deleteCard(card.id);
@@ -111,6 +104,7 @@ describe("Card CRUD", () => {
     // Tree node should also be gone (CASCADE)
     const node = await treeService.getNode(node_id);
     expect(node).toBeNull();
+    expect(await cardService.getCard(childCard.id)).toBeNull();
   });
 
   it("returns null for non-existent card", async () => {

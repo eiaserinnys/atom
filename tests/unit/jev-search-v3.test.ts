@@ -4,7 +4,7 @@ import { searchWithJev, type JevSearchDependencies } from "../../src/services/je
 function node(id: string, type: "structure" | "knowledge", parent: string | null = null): TreeNodeWithCard {
   return { id, card_id: id, parent_node_id: parent, position: 0, is_symlink: false, created_at: "", journal_limit: null,
     card: { id, card_type: type, title: id, content: "가짜 본문", references: [], tags: [], card_timestamp: null, content_timestamp: null,
-      source_type: null, source_ref: null, source_snapshot: null, source_checksum: null, source_checked_at: null, staleness: "fresh", version: 1, updated_at: "", created_by: null, updated_by: null } };
+      source_type: null, source_ref: null, source_snapshot: null, version: 1, updated_at: "", created_by: null, updated_by: null } };
 }
 function seed(n: TreeNodeWithCard): SearchResult {
   return { card_id: n.card_id, node_id: n.id, card_type: n.card.card_type, title: n.card.title, is_symlink: false, snippet: "일치", node_path: [] };

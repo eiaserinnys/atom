@@ -41,7 +41,6 @@ export interface CardData {
   content_timestamp: string | null;
   source_type: string | null;
   source_ref: string | null;
-  staleness: string;
   version: number;
   updated_at: string;
   created_by: string | null;

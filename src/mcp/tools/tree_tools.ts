@@ -186,7 +186,7 @@ export function registerTreeTools(server: McpServer, _agentId: string): void {
   // delete_node
   server.tool(
     "delete_node",
-    "Delete a tree node and all its descendants. The underlying card(s) are preserved — only the tree structure is removed. Use delete_card to remove a card entirely.",
+    "Delete a tree node and all its descendants. Cards with no remaining tree node are deleted with them.",
     { node_id: z.string().uuid().describe("The tree node UUID to delete (cascades to children).") },
     async ({ node_id }) => {
       const deleted = await deleteNode(node_id);

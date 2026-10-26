@@ -11,7 +11,7 @@ describe("BFS compileNode", () => {
           title: "Root",
           content: "Root content",
           source_type: "url",
-          staleness: "stale",
+          created_by: "editor-1",
         })],
         ["card-b", makeCard({ id: "card-b", title: "Child" })],
       ]);
@@ -36,7 +36,9 @@ describe("BFS compileNode", () => {
         { includeIds: true }
       );
 
-      expect(result).toContain("# Root <!-- node:node-a card:card-a depth:0 created:2026-01-01 stale:stale source:url -->");
+      expect(result).toContain("# Root <!-- node:node-a card:card-a depth:0 created:2026-01-01 source:url -->");
+      expect(result).not.toContain("by:");
+      expect(result).not.toContain("stale:");
       expect(result).toContain("## Child <!-- node:node-b card:card-b depth:1 created:2026-01-01 -->");
     });
 
@@ -163,9 +165,9 @@ describe("BFS compileNode", () => {
       expect(result).toContain("## Node B <!-- node:node-b card:card-b depth:1");
     });
 
-    it("omits stale field when staleness is fresh or unverified", () => {
+    it("omits removed fields from metadata", () => {
       const cards = new Map<string, Card>([
-        ["card-a", makeCard({ id: "card-a", title: "Fresh", staleness: "fresh" })],
+        ["card-a", makeCard({ id: "card-a", title: "Fresh" })],
       ]);
       const nodes = new Map<string, TreeNode>([
         ["node-a", makeNode({ id: "node-a", card_id: "card-a" })],

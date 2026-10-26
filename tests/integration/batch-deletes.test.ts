@@ -47,7 +47,7 @@ describe("executeBatchOp — deletes", () => {
     expect(result.deleted).toEqual([second.id, first.id, third.id]);
   });
 
-  it("preserves structure-card cascade semantics", async () => {
+  it("removes orphaned descendant cards when deleting a structure card", async () => {
     const { card: parentCard, node_id: parentNodeId } =
       await cardService.createCard({
         card_type: "structure",
@@ -67,7 +67,7 @@ describe("executeBatchOp — deletes", () => {
     expect(result.deleted).toEqual([parentCard.id]);
     expect(await cardService.getCard(parentCard.id)).toBeNull();
     expect(await treeService.getNode(parentNodeId)).toBeNull();
-    expect(await cardService.getCard(childCard.id)).not.toBeNull();
+    expect(await cardService.getCard(childCard.id)).toBeNull();
     expect(await treeService.getNode(childNodeId)).toBeNull();
   });
 

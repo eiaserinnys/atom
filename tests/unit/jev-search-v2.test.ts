@@ -9,7 +9,7 @@ const siblingId = "10000000-0000-4000-8000-000000000003";
 
 function node(id: string, cardType: "structure" | "knowledge", parent: string | null): TreeNodeWithCard {
   return { id, card_id: id, parent_node_id: parent, position: 0, is_symlink: false, created_at: "", journal_limit: null,
-    card: { id, card_type: cardType, title: id === parentId ? "모음" : "게임 규칙", content: "# 원문 내용", references: [], tags: [], card_timestamp: null, content_timestamp: null, source_type: null, source_ref: null, source_snapshot: null, source_checksum: null, source_checked_at: null, staleness: "fresh", version: 1, updated_at: "", created_by: null, updated_by: null } };
+    card: { id, card_type: cardType, title: id === parentId ? "모음" : "게임 규칙", content: "# 원문 내용", references: [], tags: [], card_timestamp: null, content_timestamp: null, source_type: null, source_ref: null, source_snapshot: null, version: 1, updated_at: "", created_by: null, updated_by: null } };
 }
 function outlineNode(n: TreeNodeWithCard): TreeOutlineNode {
   return { id: n.id, card_id: n.card_id, parent_node_id: n.parent_node_id, position: 0, is_symlink: n.is_symlink, title: n.card.title,

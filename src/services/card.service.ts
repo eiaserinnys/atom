@@ -3,7 +3,6 @@ import {
   insertCard,
   selectCardById,
   updateCardById,
-  deleteCardById,
 } from "../db/queries/cards.js";
 import { insertNode, selectNodesByCardId } from "../db/queries/tree.js";
 import type {
@@ -14,6 +13,7 @@ import type {
 import { eventBus } from "../events/eventBus.js";
 import { deserializeArray, deserializeBoolean } from "../db/utils.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
+import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
 
 export async function createCard(
   agentIdOrInput: string | null | CreateCardInput,
@@ -108,19 +108,21 @@ export async function updateCard(
 }
 
 export async function deleteCard(id: string): Promise<boolean> {
-  const nodes = await selectNodesByCardId(getDb(), id);
-  // Cascade deletes tree_nodes via FK
-  const deleted = await deleteCardById(getDb(), id);
-  if (deleted) {
-    eventBus.emit("atom:event", {
-      type: "card:deleted",
-      cardId: id,
-      nodeIds: nodes.map((node) => node.id),
-      parentNodeIds: nodes.map((node) => node.parent_node_id),
-      actor: null,
-    });
+  const result = await getDb().transaction((client) =>
+    deleteTreeAndOrphanCards(client, { cardId: id })
+  );
+  if (result.deleted) {
+    for (const card of result.deletedCards) {
+      eventBus.emit("atom:event", {
+        type: "card:deleted",
+        cardId: card.cardId,
+        nodeIds: card.nodeIds,
+        parentNodeIds: card.parentNodeIds,
+        actor: null,
+      });
+    }
   }
-  return deleted;
+  return result.deleted;
 }
 
 export async function getBacklinks(cardId: string): Promise<Card[]> {
@@ -150,9 +152,6 @@ export async function getBacklinks(cardId: string): Promise<Card[]> {
     source_type: (row["source_type"] as string | null) ?? null,
     source_ref: (row["source_ref"] as string | null) ?? null,
     source_snapshot: (row["source_snapshot"] as string | null) ?? null,
-    source_checksum: (row["source_checksum"] as string | null) ?? null,
-    source_checked_at: (row["source_checked_at"] as string | null) ?? null,
-    staleness: (row["staleness"] as Card["staleness"]) ?? "unverified",
     version: row["version"] as number,
     updated_at: row["updated_at"] as string,
     created_by: (row["created_by"] as string | null) ?? null,

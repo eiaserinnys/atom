@@ -12,9 +12,6 @@ CREATE TABLE IF NOT EXISTS cards (
   source_type TEXT,
   source_ref TEXT,
   source_snapshot TEXT,
-  source_checksum TEXT,
-  source_checked_at TIMESTAMPTZ,
-  staleness VARCHAR(20) DEFAULT 'unverified',
   version INTEGER NOT NULL DEFAULT 1,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   fts_vector TSVECTOR

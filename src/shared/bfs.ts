@@ -40,14 +40,8 @@ function buildMetaComment(
   if (ts) {
     parts.push(`created:${ts.slice(0, 10)}`);
   }
-  if (card.staleness === "stale" || card.staleness === "outdated") {
-    parts.push(`stale:${card.staleness}`);
-  }
   if (card.source_type) {
     parts.push(`source:${card.source_type}`);
-  }
-  if (card.created_by) {
-    parts.push(`by:${card.created_by}`);
   }
   if (chars !== undefined) {
     parts.push(`chars:${chars}`);

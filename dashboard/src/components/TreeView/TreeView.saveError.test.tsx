@@ -21,7 +21,7 @@ function treeNode(id: string): TreeNodeData {
       id: `card-${id}`, card_type: 'knowledge', title: `${id} title`, content: `${id} content`,
       references: [], tags: [], card_timestamp: '2026-05-24T00:00:00.000Z',
       content_timestamp: null, source_type: null, source_ref: null,
-      staleness: 'unverified', version: 1, updated_at: '2026-05-24T00:00:00.000Z',
+      version: 1, updated_at: '2026-05-24T00:00:00.000Z',
       created_by: null, updated_by: null,
     },
   };

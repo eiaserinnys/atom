@@ -18,6 +18,18 @@ afterEach(async () => {
 });
 
 describe("insertCard on SQLite", () => {
+  it("applies the full schema without retired card fields", async () => {
+    const names = (await getDb().query(`SELECT name FROM pragma_table_info('cards')`)).rows
+      .map((row) => row["name"] as string);
+
+    expect(names).not.toEqual(expect.arrayContaining([
+      "stale" + "ness",
+      "source_" + "checksum",
+      "source_" + "checked_at",
+    ]));
+    expect(names).toContain("source_snapshot");
+  });
+
   it("stores the actor as both creator and updater", async () => {
     const card = await insertCard(
       getDb(),

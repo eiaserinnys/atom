@@ -125,10 +125,6 @@ export function CardMetadata({
         )}
       </div>
       <div className="flex gap-2.5 items-baseline">
-        <span className="text-[13px] text-muted-foreground w-[70px] shrink-0">staleness</span>
-        <span className="text-[13px] text-foreground">{card.staleness}</span>
-      </div>
-      <div className="flex gap-2.5 items-baseline">
         <span className="text-[13px] text-muted-foreground w-[70px] shrink-0">{t('card.version_label')}</span>
         <span className="text-[13px] text-foreground">{card.version}</span>
       </div>
