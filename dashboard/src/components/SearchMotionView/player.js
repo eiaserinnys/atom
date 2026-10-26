@@ -1304,10 +1304,6 @@ export function createMotionPlayer(root, callbacks, samples) {
     group.hidden = !n?.cardId || !v || v.a < 0.4;
     if (group.hidden) return;
     const sx = (v.x - cam.x) * cam.z; const sy = M.headerH + (v.y - cam.y) * cam.z;
-    group.hidden = sx < 0 || sx + M.colW * cam.z > W - sheetInset()
-      || sy < M.headerH || sy + M.rowH * cam.z + M.actionGap + M.actionH > H - overlayRoom();
-    if (group.hidden) return;
-    group.style.left = `${sx}px`; group.style.top = `${sy + M.rowH * cam.z + M.actionGap}px`;
     const state = snapshot();
     const expanded = state.operations.some(op => op.kind === 'expand' && op.fromCardId === n.cardId && op.status === 'succeeded');
     const disabled = !live || !state.initialSearchComplete || !!state.activeOperation || continuation;
@@ -1329,6 +1325,10 @@ export function createMotionPlayer(root, callbacks, samples) {
     $('node-tree').setAttribute('aria-label', tr('visual_search.open_tree'));
     $('node-tree').title = tr('visual_search.open_tree');
     $('node-evaluate').setAttribute('aria-busy', String(state.activeOperation?.kind === 'evaluate' || state.activeOperation?.fromCardId === null));
+    group.hidden = sx < 0 || sx + M.colW * cam.z > W - sheetInset()
+      || sy < M.headerH || sy + M.rowH * cam.z + M.actionGap + M.actionH > H - overlayRoom();
+    if (group.hidden) return;
+    group.style.left = `${sx}px`; group.style.top = `${sy + M.rowH * cam.z + M.actionGap}px`;
     if (!fullActionWidth) { group.classList.remove('is-compact'); fullActionWidth = group.offsetWidth; }
     group.classList.toggle('is-compact', fullActionWidth > M.colW * cam.z);
     actionWidth = group.offsetWidth;
