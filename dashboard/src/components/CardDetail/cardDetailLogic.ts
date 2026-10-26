@@ -18,12 +18,15 @@ export function parseJournalLimitDraft(draft: string): JournalLimitDraftResult {
   return { type: 'save', value: parsed };
 }
 
-export function formatJournalLimitLabel(journalLimit: number | null | undefined): string | null {
-  if (journalLimit === null || journalLimit === undefined) {
-    return null;
+export function formatJournalLimitLabel(
+  journalLimit: number | null | undefined,
+  t: (key: 'card.journal_limit_all' | 'card.journal_limit_latest', options?: { count: number }) => string,
+): string {
+  if (journalLimit === null || journalLimit === undefined || journalLimit === 0) {
+    return t('card.journal_limit_all');
   }
 
-  return `최근 ${journalLimit === 0 ? '전체' : `${journalLimit}개`}`;
+  return t('card.journal_limit_latest', { count: journalLimit });
 }
 
 export function isHttpSourceRef(sourceRef: string): boolean {
