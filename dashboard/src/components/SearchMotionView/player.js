@@ -373,7 +373,8 @@ export function createMotionPlayer(root, callbacks, samples) {
   const plot = $("plot"); const cv = $("cv"); const ctx = cv.getContext("2d");
   function overlayRoom() {
     const legend = root.querySelector('.legend');
-    return Math.max(38, legend ? legend.offsetHeight + Number.parseFloat(getComputedStyle(legend).bottom || '0') : 0) + M.actionGap;
+    const failed = model.exploration?.operations.at(-1)?.status === 'failed';
+    return Math.max(38, legend ? legend.offsetHeight + Number.parseFloat(getComputedStyle(legend).bottom || '0') : 0) + M.actionGap + (failed ? M.actionH + M.actionGap : 0);
   }
   function badgeRoom() { return 0; }
   function bounds(z = cam.z) {
@@ -848,10 +849,11 @@ export function createMotionPlayer(root, callbacks, samples) {
       const label = operationNarration() || stopLabel(model.terminal); ctx.font = font(700, 13);
       const tw = ctx.measureText(label).width + 30;
       const bx = Math.max(8, W - tw - 14);
-      const by = H - 26;
+      const failed = model.exploration?.operations.at(-1)?.status === 'failed';
+      const by = failed ? H - overlayRoom() + 12 : H - 26;
       let s = 1; for (const f of view.fx) if (f.type === "stamp" && now >= f.at) s = 1 + 0.22 * (1 - easeOut((now - f.at) / f.dur));
       ctx.save(); ctx.translate(bx + tw / 2, by); ctx.scale(s, s); ctx.globalAlpha = view.stop;
-      const good = model.terminal && model.terminal.stop === "sufficient";
+      const good = !failed && model.terminal && model.terminal.stop === "sufficient";
       rr(-tw / 2, -12, tw, 24, 0); ctx.fillStyle = good ? css(mix(T.plot, T.ok, 0.18)) : css(T.stopFill); ctx.fill(); ctx.strokeStyle = good ? css(T.ok) : css(T.stopInk, 0.7); ctx.lineWidth = 1.2; ctx.stroke();
       ctx.fillStyle = good ? css(T.ok) : css(T.stopInk); ctx.beginPath(); ctx.arc(-tw / 2 + 12, 0, 3.4, 0, 6.2832); ctx.fill();
       ctx.textAlign = "left"; ctx.fillText(label, -tw / 2 + 21, 0.5); ctx.restore();
@@ -1330,7 +1332,7 @@ export function createMotionPlayer(root, callbacks, samples) {
     const projection = model.exploration; const operation = projection?.operations.at(-1);
     if (!operation) return '';
     if (operation.loadingIndex && operation.status === 'running') return tr('visual_search.index_loading');
-    if (operation.status === 'failed') return tr('visual_search.error', { code: operation.errorCode });
+    if (operation.status === 'failed') return tr(`visual_search.failed_${operation.kind === 'evaluate' ? 'evaluate' : operation.fromCardId ? 'expand' : 'query'}`);
     if (operation.status === 'succeeded' && (operation.kind === 'evaluate' || operation.fromCardId === null)) return tr('visual_search.joined', { count: operation.pendingAccepted.length });
     const column = projection.columns.find(column => column.id === (operation.kind === 'evaluate' ? operation.viaOperationId : operation.id));
     const label = column ? translateLabel(column.label) : tr('visual_search.expand');
@@ -1703,7 +1705,7 @@ export function createMotionPlayer(root, callbacks, samples) {
       else chrome();
       return true;
     },
-    error(message) { player.playing = false; clearTimeout(player.timer); clearTimeout(summaryTimer); $("status").textContent = message; chrome(); },
+    error() { player.playing = false; clearTimeout(player.timer); clearTimeout(summaryTimer); $("status").textContent = tr('visual_search.failed_search'); chrome(); },
     dispose() { disposed = true; cleanup.forEach(fn => fn()); timers.forEach(id => window.clearTimeout(id)); animationFrames.forEach(id => window.cancelAnimationFrame(id)); }
   };
 }
