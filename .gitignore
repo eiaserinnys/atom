@@ -1,4 +1,12 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
+!dashboard/.env.local.example
+!dashboard/.env.production
+*.db
+*.db-wal
+*.db-shm
+*.deprecated
 *.js.map

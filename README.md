@@ -37,7 +37,7 @@ When `compile_subtree` encounters a symlink node, it expands the children of tha
 ### Prerequisites
 
 - Node.js 20.19+ or 22.12+, and npm
-- pnpm (used for the `dashboard/` frontend workspace)
+- pnpm 10.33+ or 11.15+ (pnpm 11 requires Node.js 22+); the dashboard workspace explicitly permits esbuild's install script.
 
 ### 1. Install Dependencies
 
@@ -362,6 +362,13 @@ npm run test:integration
 pnpm --dir dashboard build
 pnpm --dir dashboard lint
 ```
+
+For browser tests, install Chromium with `npx playwright install chromium`, unset
+`DATABASE_URL`, then run `npm run test:e2e`. The E2E config refuses an inherited
+`DATABASE_URL` and creates a disposable workspace for the API source, SQLite DB,
+and `.env`. Test resets and auth-setting edits affect only that workspace; the
+checkout's DB and `.env` remain untouched. The temporary workspace is removed
+after the run.
 
 ## License
 

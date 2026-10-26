@@ -22,25 +22,46 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   const triggerRestart = useCallback(() => {
     setReconnecting(true);
     setPendingRestart(false);
-    systemApi.restart().catch(() => {});
-
-    // Poll /api/health until server comes back
-    const start = Date.now();
-    const poll = setInterval(() => {
-      systemApi.getHealth()
-        .then(() => {
-          clearInterval(poll);
-          window.location.reload();
-        })
-        .catch(() => {
-          if (Date.now() - start > 30_000) {
-            clearInterval(poll);
-            setReconnecting(false);
-            setPendingRestart(true);
-          }
-        });
-    }, 1000);
   }, []);
+
+  useEffect(() => {
+    if (!reconnecting) return;
+    let active = true;
+    let poll: ReturnType<typeof setInterval> | undefined;
+    const fail = () => {
+      if (!active) return;
+      setReconnecting(false);
+      setPendingRestart(true);
+    };
+    // The deadline also applies while the old process keeps returning HTTP 200.
+    const deadline = setTimeout(fail, 30_000);
+    async function restart() {
+      try {
+        const previous = await systemApi.getHealth();
+        if (!active) return;
+        await systemApi.restart();
+        if (!active) return;
+        poll = setInterval(() => {
+          systemApi.getHealth().then(health => {
+            if (active && health.bootId && health.bootId !== previous.bootId) {
+              active = false;
+              clearInterval(poll);
+              clearTimeout(deadline);
+              window.location.reload();
+            }
+          }).catch(() => {}); // Expected while the process is down.
+        }, 1000);
+      } catch {
+        fail();
+      }
+    }
+    void restart();
+    return () => {
+      active = false;
+      clearInterval(poll);
+      clearTimeout(deadline);
+    };
+  }, [reconnecting]);
 
   const refreshStatus = useCallback(() => {
     systemApi.getStatus()
