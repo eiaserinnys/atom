@@ -14,7 +14,7 @@ WORKDIR /app
 RUN npm install -g pnpm@10.14.0
 
 # Copy dashboard package files
-COPY dashboard/package.json dashboard/pnpm-lock.yaml ./
+COPY dashboard/package.json dashboard/pnpm-lock.yaml dashboard/pnpm-workspace.yaml ./
 
 RUN pnpm install --frozen-lockfile
 
