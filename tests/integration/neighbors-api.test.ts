@@ -49,7 +49,7 @@ async function seedCard(cardId: string, nodeId: string, title: string, content: 
     `INSERT INTO tree_nodes (id, card_id, parent_node_id, position, is_symlink) VALUES ($1, $2, $3, $4, FALSE)`,
     [nodeId, cardId, parentNodeId, position]
   );
-  const input = createEmbeddingInput(title, content);
+  const input = await createEmbeddingInput(title, content);
   await saveEmbedding(getDb(), {
     cardId, version: 1, contentHash: input.contentHash, tokenCount: input.tokenCount,
     truncated: input.truncated, embedding: vector(value), embeddedAt: "2026-10-26T00:00:00.000Z",

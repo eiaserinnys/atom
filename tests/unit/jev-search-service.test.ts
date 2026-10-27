@@ -251,22 +251,35 @@ describe("Jev search traversal and trace", () => {
     const controller = new AbortController();
     let started!: () => void;
     let release!: (response: JevMeaningResponse) => void;
+    let lateResponseReady!: () => void;
     const waiting = new Promise<JevMeaningResponse>((resolve) => { release = resolve; });
     const entered = new Promise<void>((resolve) => { started = resolve; });
+    const lateResponseProcessed = new Promise<void>((resolve) => { lateResponseReady = resolve; });
     const pending = searchWithJev({ query: "게임 규칙" }, {
       searchCards: async () => [],
       getNode: async () => null,
       getTreeOutline: tree.getTreeOutline,
       judge: async (payload) => {
         started();
-        return waiting.then(() => answerPayload(payload, () => 1));
+        await waiting;
+        const response = answerPayload(payload, () => 1);
+        lateResponseReady();
+        return response;
       },
     }, controller.signal);
 
     await entered;
     controller.abort();
-    release({ model: "jev-latest", answers: {}, usage: { input_tokens: 1 } });
-    const response = await pending;
+    let cancellationTimer!: NodeJS.Timeout;
+    const cancellationDeadline = new Promise<never>((_resolve, reject) => {
+      cancellationTimer = setTimeout(() => reject(new Error("Cancelled search did not return promptly.")), 250);
+    });
+    let response: Awaited<typeof pending>;
+    try {
+      response = await Promise.race([pending, cancellationDeadline]);
+    } finally {
+      clearTimeout(cancellationTimer);
+    }
 
     expect(response.status).toBe("cancelled");
     expect(response.results).toEqual([]);
@@ -274,10 +287,14 @@ describe("Jev search traversal and trace", () => {
     const step = response.trace.steps.find((item) => item.stage === "structure_noul");
     const call = response.trace.calls.find((item) => item.call_id === step?.call_id);
     expect(terminal).toMatchObject({ stage: "run_terminal", terminal_status: "cancelled", started_at: response.completed_at, completed_at: response.completed_at });
-    expect(step?.completed_at).not.toBeNull();
-    expect(call).toMatchObject({ completed_at: step?.completed_at, disposition: "skipped" });
-    expect(call?.response?.answers).toEqual({ structure_0: { type: "noul", noul: 1 }, structure_1: { type: "noul", noul: 1 } });
+    expect(step?.completed_at).toBeNull();
+    expect(call).toBeUndefined();
     expect(step?.decisions).toEqual([]);
+    const frozenTrace = JSON.stringify(response.trace);
+    release({ model: "jev-latest", answers: {}, usage: { input_tokens: 1 } });
+    await lateResponseProcessed;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(JSON.stringify(response.trace)).toBe(frozenTrace);
 
     const abortController = new AbortController();
     let abortStarted!: () => void;
@@ -302,7 +319,7 @@ describe("Jev search traversal and trace", () => {
     const abortedCall = abortedResponse.trace.calls.find((item) => item.call_id === abortedStep?.call_id);
     expect(abortedResponse.status).toBe("cancelled");
     expect(abortedStep?.completed_at).toBeNull();
-    expect(abortedCall).toMatchObject({ completed_at: null, disposition: "skipped" });
+    expect(abortedCall).toBeUndefined();
     expect(abortedTerminal).toMatchObject({ stage: "run_terminal", terminal_status: "cancelled", started_at: abortedResponse.completed_at, completed_at: abortedResponse.completed_at });
   });
 

@@ -13,6 +13,12 @@ function deferred() {
   return { promise, resolve };
 }
 
+function deferredValue<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => { resolve = done; });
+  return { promise, resolve };
+}
+
 function answer(payload: JevMeaningPayload, score = 0.8): JevMeaningResponse {
   return { model: "jev-latest", answers: Object.fromEntries(Object.keys(payload.questions).map(key => [key, { type: "noul", noul: score }])), usage: { input_tokens: 1 } };
 }
@@ -98,4 +104,42 @@ describe("shared Jev search and evaluation slots", () => {
     gate.resolve();
     await Promise.all([one, two]);
   });
+
+  it("times out stalled DB reads, returns both slots, and freezes the returned trace", async () => {
+    const firstRead = deferredValue<null>();
+    const secondRead = deferredValue<null>();
+    const timeoutPolicy = { ...JEV_SEARCH_POLICY, maxConcurrentRuns: 2, runTimeoutMs: 20 };
+    const judge = async (payload: JevMeaningPayload) => answer(payload);
+    const first = searchWithJev({ query: "첫 검색", root_node_id: nodeId }, {
+      ...searchDependencies(judge), getNode: async () => firstRead.promise, policy: timeoutPolicy,
+    });
+    const second = searchWithJev({ query: "둘째 검색", root_node_id: nodeId }, {
+      ...searchDependencies(judge), getNode: async () => secondRead.promise, policy: timeoutPolicy,
+    });
+    let deadline: NodeJS.Timeout | undefined;
+    const startedAt = performance.now();
+    const timedOutResponses = await Promise.race([
+      Promise.all([first, second]),
+      new Promise<null>(resolve => { deadline = setTimeout(() => resolve(null), 250); }),
+    ]);
+    if (deadline) clearTimeout(deadline);
+
+    const thirdOutcome = await searchWithJev({ query: "세 번째 검색" }, searchDependencies(judge))
+      .then(response => ({ response }), error => ({ error }));
+    const traceBeforeLateReads = timedOutResponses ? JSON.stringify(timedOutResponses[0].trace) : null;
+
+    firstRead.resolve(null);
+    secondRead.resolve(null);
+    await Promise.allSettled([first, second]);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    const traceAfterLateReads = timedOutResponses ? JSON.stringify(timedOutResponses[0].trace) : null;
+
+    expect("error" in thirdOutcome ? thirdOutcome.error.code : undefined).not.toBe("JEV_SEARCH_BUSY");
+    expect(timedOutResponses).not.toBeNull();
+    expect(performance.now() - startedAt).toBeLessThan(250);
+    expect(timedOutResponses?.map(response => response.error?.code)).toEqual(["RUN_TIME_LIMIT", "RUN_TIME_LIMIT"]);
+    expect("error" in thirdOutcome).toBe(false);
+    if ("response" in thirdOutcome) expect(thirdOutcome.response.status).toBe("complete");
+    expect(traceAfterLateReads).toBe(traceBeforeLateReads);
+  }, 60_000);
 });

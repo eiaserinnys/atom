@@ -135,7 +135,7 @@ export function createEmbeddingSync(deps: EmbeddingSyncDependencies): EmbeddingS
         afterId = candidates[candidates.length - 1].card_id;
         const prepared: PreparedCandidate[] = [];
         for (const candidate of candidates) {
-          const input = createEmbeddingInput(candidate.title, candidate.content);
+          const input = await createEmbeddingInput(candidate.title, candidate.content);
           if (candidate.content_hash === input.contentHash && candidate.model === EMBEDDING_POLICY.model && candidate.dimensions === EMBEDDING_POLICY.dimensions) {
             await deps.index.commitVersion(candidate.card_id, candidate.version,
               () => markEmbeddingVersion(deps.db, candidate.card_id, input.contentHash, candidate.version));
