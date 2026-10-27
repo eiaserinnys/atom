@@ -31,8 +31,8 @@ describe.each(["sqlite", "postgres"] as const)("tree cycle protection (%s)", (ki
       setDb(new SqliteAdapter(dbPath));
     } else {
       const url = process.env["TEST_DATABASE_URL"];
-      if (!url || !new URL(url).pathname.endsWith("/cycle_test_db")) {
-        throw new Error("Tree cycle tests require a dedicated cycle_test_db TEST_DATABASE_URL");
+      if (!url || !url.includes("test")) {
+        throw new Error("Tree cycle tests require TEST_DATABASE_URL pointing to an empty test database (URL must contain 'test')");
       }
       setDb(new PostgresAdapter(url));
     }

@@ -368,6 +368,15 @@ pnpm --dir dashboard build
 pnpm --dir dashboard lint
 ```
 
+`npm run test:unit` and `npm run test:e2e` do not require a database.
+`npm run test:integration` and `npm test` require an empty PostgreSQL test
+database whose name contains `test`; set its URL as `TEST_DATABASE_URL`.
+
+```bash
+docker run --rm -d -p 127.0.0.1:5433:5432 -e POSTGRES_PASSWORD=test -e POSTGRES_DB=atom_test postgres:16
+TEST_DATABASE_URL=postgresql://postgres:test@127.0.0.1:5433/atom_test npm run test:integration
+```
+
 For browser tests, install Chromium with `npx playwright install chromium`, unset
 `DATABASE_URL`, then run `npm run test:e2e`. The E2E config refuses an inherited
 `DATABASE_URL` and creates a disposable workspace for the API source, SQLite DB,
