@@ -10,6 +10,7 @@ import { executeBatchOp } from "../src/services/batch.service.js";
 import type {
   BatchCreateItem,
   BatchOpInput,
+  BatchOpResult,
   CardType,
 } from "../src/shared/types.js";
 
@@ -105,6 +106,34 @@ function flattenSeed(
   }
 }
 
+function validateSeedKeys(
+  creates: BatchCreateItem[],
+  symlinks: PendingSymlink[],
+  references: PendingReferences[],
+  journalLimits: PendingJournalLimit[]
+): void {
+  const keys = new Set<string>();
+  for (const create of creates) {
+    if (keys.has(create.temp_id)) {
+      throw new Error(`Duplicate seed key: ${create.temp_id}`);
+    }
+    keys.add(create.temp_id);
+  }
+
+  const requireKey = (key: string): void => {
+    if (!keys.has(key)) throw new Error(`Seed key not found: ${key}`);
+  };
+  for (const { targetKey, parentKey } of symlinks) {
+    requireKey(targetKey);
+    if (parentKey !== null) requireKey(parentKey);
+  }
+  for (const { key, referenceKeys } of references) {
+    requireKey(key);
+    for (const referenceKey of referenceKeys) requireKey(referenceKey);
+  }
+  for (const { key } of journalLimits) requireKey(key);
+}
+
 async function main(): Promise<void> {
   const seedPath = getSeedPath(process.argv.slice(2));
   let databaseOpened = false;
@@ -139,6 +168,7 @@ async function main(): Promise<void> {
       referenceSpecs,
       journalLimitSpecs
     );
+    validateSeedKeys(creates, symlinkSpecs, referenceSpecs, journalLimitSpecs);
 
     const created = await executeBatchOp({ creates });
     const createdByKey = new Map(
@@ -171,7 +201,15 @@ async function main(): Promise<void> {
         journal_limit: journalLimit,
       })),
     };
-    const linked = await executeBatchOp(followup);
+    let linked: BatchOpResult;
+    try {
+      linked = await executeBatchOp(followup);
+    } catch (error) {
+      await executeBatchOp({
+        deletes: created.created.map(({ card_id }) => ({ card_id })),
+      });
+      throw error;
+    }
 
     const cardCount = created.created.length;
     const symlinkCount = linked.symlinked.length;
