@@ -99,17 +99,40 @@ export async function updateCardById(
     sets.push(`"references" = $${idx++}`);
     values.push(serializeArray(input.references));
   }
+  let sourceTypeExpression = "source_type";
   if (input.source_type !== undefined) {
-    sets.push(`source_type = $${idx++}`);
+    sourceTypeExpression = `$${idx++}`;
+    sets.push(`source_type = ${sourceTypeExpression}`);
     values.push(input.source_type);
   }
+  let sourceRefExpression = "source_ref";
   if (input.source_ref !== undefined) {
-    sets.push(`source_ref = $${idx++}`);
+    sourceRefExpression = `$${idx++}`;
+    sets.push(`source_ref = ${sourceRefExpression}`);
     values.push(input.source_ref);
   }
   if (input.source_snapshot !== undefined) {
     sets.push(`source_snapshot = $${idx++}`);
     values.push(input.source_snapshot);
+  } else if (input.source_type !== undefined || input.source_ref !== undefined) {
+    let sourceTypeMatchExpression = "source_type";
+    if (input.source_type !== undefined) {
+      sourceTypeMatchExpression = `$${idx++}`;
+      values.push(input.source_type);
+    }
+    let sourceRefMatchExpression = "source_ref";
+    if (input.source_ref !== undefined) {
+      sourceRefMatchExpression = `$${idx++}`;
+      values.push(input.source_ref);
+    }
+    sets.push(
+      `source_snapshot = CASE
+         WHEN source_type IS NOT DISTINCT FROM ${sourceTypeMatchExpression}
+          AND source_ref IS NOT DISTINCT FROM ${sourceRefMatchExpression}
+         THEN source_snapshot
+         ELSE NULL
+       END`
+    );
   }
 
   // bump version
@@ -166,13 +189,15 @@ export async function deleteCardById(
 export async function updateCardSnapshot(
   db: Queryable,
   cardId: string,
-  snapshot: string
+  snapshot: string,
+  sourceRef: string
 ): Promise<void> {
   await db.query(
     `UPDATE cards
      SET source_snapshot = $1
-     WHERE id = $2`,
-    [snapshot, cardId]
+     WHERE id = $2
+       AND source_ref IS NOT DISTINCT FROM $3`,
+    [snapshot, cardId, sourceRef]
   );
 }
 

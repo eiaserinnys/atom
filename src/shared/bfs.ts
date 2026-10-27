@@ -19,6 +19,8 @@ export interface CompileOptions {
   maxChars?: number;
   excludeNodes?: Set<string>; // node_id Set
   resolvedRefs?: Map<string, ResolvedRef>; // cardId → resolved
+  /** Called when a non-cycle card body is emitted in full-content mode. */
+  onCardEmitted?: (cardId: string) => void;
   /** Limit depth-1 children (direct children of the root node) to the latest n items.
    *  Sorted by card_timestamp descending. Does not affect deeper levels. */
   limit?: number;
@@ -178,6 +180,7 @@ export function compileNode(
     }
     lines.push(`${indent}${prefix}${numberLabel}${symlinkMark}${card.title}${metaPart}`);
   } else {
+    options.onCardEmitted?.(card_id);
     const heading = "#".repeat(Math.min(headingLevel, 6));
     const symlinkMark = is_symlink ? "~ " : "";
     if (options.includeIds === false) {
