@@ -56,6 +56,38 @@ test('renders approved two-line rows and shows low candidates by default at desk
   } finally { player.dispose(); }
 });
 
+test.each([
+  { motion: 'reduced', reduced: true },
+  { motion: 'standard', reduced: false },
+])('replaying the same search preserves result chips with $motion motion', ({ reduced }) => {
+  const context = new Proxy({}, { get: (_target, key) => key === 'measureText' ? (text: string) => ({ width: text.length * 7 }) : key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {} });
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D);
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(prefers-reduced-motion: reduce)' && reduced, addEventListener() {}, removeEventListener() {} }));
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+  const host = document.createElement('div'); host.innerHTML = markup; document.body.append(host);
+  const player = createMotionPlayer(host, { onSelect: vi.fn(), onResults: vi.fn(), onMore: vi.fn(), onCancel: vi.fn() });
+  const events = samples.atom as unknown as MotionEvent[];
+  const expected = (events.at(-1)!.data as { results: { node_id: string; title: string }[] }).results;
+  const replay = () => {
+    player.begin('same query');
+    events.forEach(event => player.receive(event));
+    host.querySelector<HTMLButtonElement>('[data-motion-id=t-last]')!.click();
+    return Array.from(host.querySelectorAll<HTMLButtonElement>('.rchip')).map(chip => ({
+      nodeId: chip.dataset.nodeId,
+      title: chip.querySelector('.rchip-title')?.textContent,
+    }));
+  };
+  try {
+    const first = replay();
+    expect(first).toHaveLength(expected.length);
+    expect(first).toEqual(expected.map(result => ({ nodeId: result.node_id, title: result.title })));
+    const second = replay();
+    expect(second).toHaveLength(expected.length);
+    expect(second).toEqual(first);
+  } finally { player.dispose(); }
+});
+
 test('selection exposes DOM operations, repeated cards become references, and rewind removes future results', () => {
   const context = new Proxy({}, { get: (_target, key) => key === 'measureText' ? (text: string) => ({ width: text.length * 7 }) : key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {} });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D);
