@@ -42,6 +42,11 @@ class FakeTreeDb implements Queryable {
       return result(rows as unknown as T[]);
     }
 
+    if (sql.includes("SELECT id FROM tree_nodes")) {
+      const rows = [...this.rows].sort(compareRowOrder).map((row) => ({ id: row.id }));
+      return result(rows as unknown as T[]);
+    }
+
     if (sql.includes("SELECT * FROM tree_nodes")) {
       return result([...this.rows].sort(compareRowOrder) as unknown as T[]);
     }
@@ -111,7 +116,7 @@ function node(id: string, position: string): FakeNodeRow {
 }
 
 describe("tree position overflow fallback", () => {
-  it("adds a new child under a parent whose max stored key exceeds INT32_MAX", async () => {
+  it("rekeys before appending under a parent whose max stored key exceeds INT32_MAX", async () => {
     const db = new FakeTreeDb([
       node("existing", "0000000100"),
       node("overflow", "2147483648"),
@@ -120,11 +125,11 @@ describe("tree position overflow fallback", () => {
     const inserted = await insertNode(db, "new-card", "parent", undefined);
 
     expect(inserted.id).toBeTruthy();
-    expect(db.insertedKey).not.toBeNull();
-    expect(db.insertedKey! > "2147483648").toBe(true);
+    expect(db.insertedKey).toBe("0000000300");
+    expect(inserted.position).toBe(300);
   });
 
-  it("moves a sibling to end under a parent whose max stored key exceeds INT32_MAX", async () => {
+  it("rekeys before moving a sibling to the end when a stored key exceeds INT32_MAX", async () => {
     const db = new FakeTreeDb([
       node("first", "0000000100"),
       node("overflow", "2147483648"),
@@ -132,7 +137,7 @@ describe("tree position overflow fallback", () => {
 
     const resolved = await resolvePositionKey(db, "parent", "first", { to: "end" });
 
-    expect(resolved.key > "2147483648").toBe(true);
+    expect(resolved.key).toBe("0000000200");
   });
 
   it("reorders siblings around overflow keys in the same parent", async () => {

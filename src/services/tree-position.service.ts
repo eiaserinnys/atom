@@ -211,8 +211,9 @@ async function resolveAppendPositionKey(
   }
 
   try {
-    const key = keyBetween(siblings[siblings.length - 1].key, null);
-    if (key.length <= NORMAL_DIGIT_COUNT) {
+    const lastKey = siblings[siblings.length - 1]!.key;
+    const key = keyBetween(lastKey, null);
+    if (key.length === NORMAL_DIGIT_COUNT && key > lastKey) {
       return { key, warnings: [] };
     }
   } catch {

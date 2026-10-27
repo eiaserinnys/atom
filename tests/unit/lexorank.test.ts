@@ -124,9 +124,17 @@ describe("lexorank — keyBetween (T12, T13, T14)", () => {
     expect(compareKeys(k, "0000000200")).toBeLessThan(0);
   });
 
-  it("T14: keyBetween(k, null) produces a key larger than k", () => {
+  it("T14: keyBetween(k, null) advances by 100 inside the normal range", () => {
     const k = keyBetween("0000000100", null);
+    expect(k).toBe("0000000200");
     expect(compareKeys("0000000100", k)).toBeLessThan(0);
+  });
+
+  it("T14: keyBetween(k, null) signals rekeying near the public integer limit", () => {
+    const prev = "2147483600";
+    const k = keyBetween(prev, null);
+    expect(k).toBe(prev + "5");
+    expect(k).toHaveLength(11);
   });
 
   it("T14: keyBetween(null, null) is valid (initial key)", () => {

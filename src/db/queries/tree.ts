@@ -77,7 +77,7 @@ async function resolveAppendKey(
 
   try {
     const key = keyBetween(maxKey, null);
-    if (key.length <= NORMAL_DIGIT_COUNT) {
+    if (key.length === NORMAL_DIGIT_COUNT && key > maxKey) {
       return key;
     }
   } catch {
