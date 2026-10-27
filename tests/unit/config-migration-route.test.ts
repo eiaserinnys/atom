@@ -12,6 +12,7 @@ const fsAccessLog: string[] = [];
 const operationLog: string[] = [];
 const existingPaths = new Set<string>();
 let sqliteRowsProvider: (sql: string) => Record<string, unknown>[] = () => [];
+let checkpointBusy = 0;
 
 type FakeDb = DatabaseAdapter & {
   transactionCalls: number;
@@ -52,6 +53,10 @@ function makeDeps(db: DatabaseAdapter): MigrationRouteDeps {
     existsSync: (target) => {
       fsAccessLog.push(target);
       return existingPaths.has(target);
+    },
+    checkpointSqlite: (filename) => {
+      operationLog.push(`sqlite.checkpoint:${filename}`);
+      return { busy: checkpointBusy };
     },
     openSqliteReadonly: (filename) => {
       operationLog.push(`sqlite.open:${filename}:readonly`);
@@ -101,6 +106,7 @@ describe("POST /api/config/migrate-to-pg route safety harness", () => {
     operationLog.length = 0;
     existingPaths.clear();
     sqliteRowsProvider = () => [];
+    checkpointBusy = 0;
   });
 
   it("does not touch filesystem preconditions when current mode is not PostgreSQL", async () => {
@@ -139,7 +145,7 @@ describe("POST /api/config/migrate-to-pg route safety harness", () => {
     expect(operationLog).toEqual([]);
   });
 
-  it("opens SQLite read-only, commits before close, and renames after close on success", async () => {
+  it("checkpoints before reading, commits before close, renames, and verifies the backup", async () => {
     existingPaths.add(sqlitePath);
     const db = makeFakeDb();
 
@@ -150,23 +156,40 @@ describe("POST /api/config/migrate-to-pg route safety harness", () => {
       ok: true,
       message: "Migration completed. SQLite file renamed to .deprecated.",
     });
-    expect(fsAccessLog).toEqual([sqlitePath, deprecatedPath]);
-    expect(db.transactionCalls).toBe(1);
-    expect(operationLog).toEqual([
-      `sqlite.open:${sqlitePath}:readonly`,
-      "pg.begin",
-      "sqlite.prepare:SELECT * FROM users ORDER BY created_at",
-      "sqlite.all:SELECT * FROM users ORDER BY created_at",
-      "sqlite.prepare:SELECT * FROM agents ORDER BY created_at",
-      "sqlite.all:SELECT * FROM agents ORDER BY created_at",
-      "sqlite.prepare:SELECT * FROM cards ORDER BY card_timestamp",
-      "sqlite.all:SELECT * FROM cards ORDER BY card_timestamp",
-      "sqlite.prepare:SELECT * FROM tree_nodes ORDER BY created_at",
-      "sqlite.all:SELECT * FROM tree_nodes ORDER BY created_at",
-      "pg.commit",
-      "sqlite.close",
-      `fs.rename:${sqlitePath}:${deprecatedPath}`,
+    expect(fsAccessLog).toEqual([
+      sqlitePath,
+      deprecatedPath,
+      sqlitePath + "-wal",
+      sqlitePath + "-shm",
     ]);
+    expect(db.transactionCalls).toBe(1);
+    expect(operationLog[0]).toBe(`sqlite.checkpoint:${sqlitePath}`);
+    expect(operationLog.indexOf(`sqlite.open:${sqlitePath}:readonly`)).toBeGreaterThan(0);
+    expect(operationLog.indexOf("pg.begin")).toBeGreaterThan(
+      operationLog.indexOf("sqlite.all:SELECT * FROM tree_nodes ORDER BY created_at"),
+    );
+    expect(operationLog.indexOf("pg.commit")).toBeLessThan(operationLog.indexOf("sqlite.close"));
+    expect(operationLog.indexOf("sqlite.close")).toBeLessThan(
+      operationLog.indexOf(`fs.rename:${sqlitePath}:${deprecatedPath}`),
+    );
+    expect(operationLog.indexOf(`fs.rename:${sqlitePath}:${deprecatedPath}`)).toBeLessThan(
+      operationLog.indexOf(`sqlite.open:${deprecatedPath}:readonly`),
+    );
+    expect(operationLog.filter((entry) => entry.startsWith("sqlite.all:SELECT COUNT(*)")).length).toBe(4);
+  });
+
+  it("returns 409 before opening SQLite when its checkpoint is busy", async () => {
+    existingPaths.add(sqlitePath);
+    checkpointBusy = 1;
+    const db = makeFakeDb();
+
+    const response = await injectMigrateToPg(db);
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: expect.stringContaining("in use") });
+    expect(operationLog).toEqual([`sqlite.checkpoint:${sqlitePath}`]);
+    expect(db.transactionCalls).toBe(0);
+    expect(fsAccessLog).toEqual([sqlitePath, deprecatedPath]);
   });
 
   it("rolls back, closes SQLite, and preserves the existing failure response shape", async () => {

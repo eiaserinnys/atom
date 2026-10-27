@@ -19,6 +19,12 @@ type InsertCall = {
 const operationLog: string[] = [];
 const insertCalls: InsertCall[] = [];
 let rowsBySql: Record<string, Record<string, unknown>[]> = {};
+const selectSqlByTable = {
+  users: "SELECT * FROM users ORDER BY created_at",
+  agents: "SELECT * FROM agents ORDER BY created_at",
+  cards: "SELECT * FROM cards ORDER BY card_timestamp",
+  tree_nodes: "SELECT * FROM tree_nodes ORDER BY created_at",
+};
 
 function tableFromInsert(queryText: string): string {
   const match = queryText.match(/INSERT INTO ([a-z_]+)/);
@@ -56,6 +62,7 @@ function makeDeps(db: DatabaseAdapter): ConfigMigrationServiceDeps {
     db,
     getSqlitePath: () => sqlitePath,
     existsSync: (target) => target === sqlitePath,
+    checkpointSqlite: () => ({ busy: 0 }),
     openSqliteReadonly: (filename) => {
       operationLog.push(`sqlite.open:${filename}:readonly`);
       return {
@@ -64,6 +71,11 @@ function makeDeps(db: DatabaseAdapter): ConfigMigrationServiceDeps {
           return {
             all: () => {
               operationLog.push(`sqlite.all:${sql}`);
+              const countMatch = sql.match(/^SELECT COUNT\(\*\) AS count FROM ([a-z_]+)$/i);
+              if (countMatch) {
+                const table = countMatch[1] as keyof typeof selectSqlByTable;
+                return [{ count: rowsBySql[selectSqlByTable[table]]?.length ?? 0 }];
+              }
               return rowsBySql[sql] ?? [];
             },
           };
@@ -192,10 +204,12 @@ describe("migrateSqliteToPostgres", () => {
     expect(insertCalls[6].values?.[0]).toBe("node-child");
     expect(insertCalls[6].values?.[2]).toBe("node-parent");
     expect(insertCalls[6].values?.[3]).toBe("0000000020");
-    expect(operationLog.slice(-3)).toEqual([
-      "pg.commit",
-      "sqlite.close",
-      `fs.rename:${sqlitePath}:${deprecatedPath}`,
-    ]);
+    expect(operationLog.indexOf("pg.commit")).toBeLessThan(operationLog.indexOf("sqlite.close"));
+    expect(operationLog.indexOf("sqlite.close")).toBeLessThan(
+      operationLog.indexOf(`fs.rename:${sqlitePath}:${deprecatedPath}`),
+    );
+    expect(operationLog.indexOf(`fs.rename:${sqlitePath}:${deprecatedPath}`)).toBeLessThan(
+      operationLog.indexOf(`sqlite.open:${deprecatedPath}:readonly`),
+    );
   });
 });

@@ -44,6 +44,15 @@ const defaultMigrationRouteDeps: MigrationRouteDeps = {
   getDb,
   getSqlitePath: () => process.env['SQLITE_PATH'] ?? path.join(process.cwd(), 'atom.db'),
   existsSync: fs.existsSync,
+  checkpointSqlite: (sqlitePath) => {
+    const sqliteDb = new Database(sqlitePath);
+    try {
+      const result = sqliteDb.pragma('wal_checkpoint(TRUNCATE)') as Array<{ busy: number }>;
+      return { busy: Number(result[0]?.busy ?? 0) };
+    } finally {
+      sqliteDb.close();
+    }
+  },
   openSqliteReadonly: (sqlitePath) => new Database(sqlitePath, { readonly: true }) as SqliteMigrationDatabase,
   renameSync: fs.renameSync,
 };
@@ -57,6 +66,7 @@ export function createMigrateToPgHandler(
       db: deps.getDb(),
       getSqlitePath: deps.getSqlitePath,
       existsSync: deps.existsSync,
+      checkpointSqlite: deps.checkpointSqlite,
       openSqliteReadonly: deps.openSqliteReadonly,
       renameSync: deps.renameSync,
     });
