@@ -23,25 +23,32 @@ interface EditDraft {
   titleDraft: string;
   editingContent: boolean;
   contentDraft: string;
-  editingJournalLimit: boolean;
-  journalLimitDraft: string;
   editBaseVersion: number | null;
   versionConflict: boolean;
   saving: boolean;
-  saveErrors: { title: string | null; content: string | null; journalLimit: string | null };
+  saveErrors: { title: string | null; content: string | null };
+}
+
+interface JournalLimitDraft {
+  editing: boolean;
+  value: string;
+  saving: boolean;
+  error: string | null;
 }
 
 const emptyDraft: EditDraft = {
-  editingTitle: false, titleDraft: '', editingContent: false, contentDraft: '',
-  editingJournalLimit: false, journalLimitDraft: '', editBaseVersion: null,
+  editingTitle: false, titleDraft: '', editingContent: false, contentDraft: '', editBaseVersion: null,
   versionConflict: false, saving: false,
-  saveErrors: { title: null, content: null, journalLimit: null },
+  saveErrors: { title: null, content: null },
 };
+
+const emptyJournalLimitDraft: JournalLimitDraft = { editing: false, value: '', saving: false, error: null };
 
 export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   const { t } = useTranslation();
 
   const [drafts, setDrafts] = useState<Record<string, EditDraft>>({});
+  const [journalLimitDrafts, setJournalLimitDrafts] = useState<Record<string, JournalLimitDraft>>({});
   const [copied, setCopied] = useState(false);
 
   const sample = verdict?.sample;
@@ -56,8 +63,11 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   const card = node?.card;
   const cardId = card?.id;
   const draft = (cardId && drafts[cardId]) || emptyDraft;
-  const { editingTitle, titleDraft, editingContent, contentDraft, editingJournalLimit,
-    journalLimitDraft, editBaseVersion, versionConflict, saving, saveErrors } = draft;
+  const { editingTitle, titleDraft, editingContent, contentDraft,
+    editBaseVersion, versionConflict, saving, saveErrors } = draft;
+  const journalLimitDraft = (nodeId && journalLimitDrafts[nodeId]) || emptyJournalLimitDraft;
+  const { editing: editingJournalLimit, value: journalLimitValue, saving: journalLimitSaving,
+    error: journalLimitSaveError } = journalLimitDraft;
 
   // Each callback captures its card id, including callbacks finishing after a selection change.
   const updateDraft = useCallback((update: (current: EditDraft) => EditDraft) => {
@@ -65,10 +75,18 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
     setDrafts(current => ({ ...current, [cardId]: update(current[cardId] ?? emptyDraft) }));
   }, [cardId]);
 
-  const setSaveError = (field: 'title' | 'content' | 'journalLimit', message: string) => {
+  const updateJournalLimitDraft = useCallback((update: (current: JournalLimitDraft) => JournalLimitDraft) => {
+    if (!nodeId) return;
+    setJournalLimitDrafts(current => ({
+      ...current,
+      [nodeId]: update(current[nodeId] ?? emptyJournalLimitDraft),
+    }));
+  }, [nodeId]);
+
+  const setSaveError = (field: 'title' | 'content', message: string) => {
     updateDraft(current => ({ ...current, saveErrors: { ...current.saveErrors, [field]: message } }));
   };
-  const clearSaveError = (field: 'title' | 'content' | 'journalLimit') => {
+  const clearSaveError = (field: 'title' | 'content') => {
     updateDraft(current => ({ ...current, saveErrors: { ...current.saveErrors, [field]: null } }));
   };
 
@@ -91,26 +109,52 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
   } = useCardDetailSaves({
     nodeId,
     editBaseVersion,
-    onSavingChange: (saving) => updateDraft(current => ({ ...current, saving })),
+    onSavingChange: (field, saving) => {
+      if (field === 'journalLimit') {
+        updateJournalLimitDraft(current => ({ ...current, saving }));
+      } else {
+        updateDraft(current => ({ ...current, saving }));
+      }
+    },
     onVersionConflict: (currentVersion) => updateDraft(current => ({ ...current, editBaseVersion: currentVersion, versionConflict: true })),
     saveFailedLabel: t('card.save_failed'),
-    onSaveError: setSaveError,
-    onTitleSaved: (updatedCard) => {
-      updateDraft(current => ({
-        ...current, editingTitle: false, versionConflict: false,
-        editBaseVersion: !current.editingContent ? null
-          : current.editBaseVersion !== null && updatedCard.version === current.editBaseVersion + 1 ? updatedCard.version : current.editBaseVersion,
-      }));
+    onSaveError: (field, message) => {
+      if (field === 'journalLimit') {
+        updateJournalLimitDraft(current => ({ ...current, error: message }));
+      } else {
+        setSaveError(field, message);
+      }
     },
-    onContentSaved: (updatedCard) => {
-      updateDraft(current => ({
-        ...current, editingContent: false, versionConflict: false,
-        editBaseVersion: !current.editingTitle ? null
-          : current.editBaseVersion !== null && updatedCard.version === current.editBaseVersion + 1 ? updatedCard.version : current.editBaseVersion,
-      }));
+    onTitleSaved: (updatedCard, savedTitle) => {
+      updateDraft(current => {
+        const keepTitleEditor = current.editingTitle && current.titleDraft !== savedTitle;
+        const responseVersionIsNext = current.editBaseVersion !== null && updatedCard.version === current.editBaseVersion + 1;
+        return {
+          ...current,
+          editingTitle: keepTitleEditor,
+          versionConflict: false,
+          editBaseVersion: keepTitleEditor ? updatedCard.version
+            : current.editingContent ? responseVersionIsNext ? updatedCard.version : current.editBaseVersion
+              : null,
+        };
+      });
     },
-    onJournalLimitSaved: () => updateDraft(current => ({ ...current, editingJournalLimit: false })),
-    onJournalLimitIgnored: () => updateDraft(current => ({ ...current, editingJournalLimit: false })),
+    onContentSaved: (updatedCard, savedContent) => {
+      updateDraft(current => {
+        const keepContentEditor = current.editingContent && current.contentDraft !== savedContent;
+        const responseVersionIsNext = current.editBaseVersion !== null && updatedCard.version === current.editBaseVersion + 1;
+        return {
+          ...current,
+          editingContent: keepContentEditor,
+          versionConflict: false,
+          editBaseVersion: keepContentEditor ? updatedCard.version
+            : current.editingTitle ? responseVersionIsNext ? updatedCard.version : current.editBaseVersion
+              : null,
+        };
+      });
+    },
+    onJournalLimitSaved: () => updateJournalLimitDraft(current => ({ ...current, editing: false, error: null })),
+    onJournalLimitIgnored: () => updateJournalLimitDraft(current => ({ ...current, editing: false })),
   });
 
   // 삭제된 카드 처리 — api.getNode가 404 시 throw하므로 isError로 감지
@@ -148,8 +192,12 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
 
   const startJournalLimitEdit = () => {
     if (!node) return;
-    clearSaveError('journalLimit');
-    updateDraft(current => ({ ...current, editingJournalLimit: true, journalLimitDraft: node.journal_limit != null ? String(node.journal_limit) : '' }));
+    updateJournalLimitDraft(current => ({
+      ...current,
+      editing: true,
+      value: node.journal_limit != null ? String(node.journal_limit) : '',
+      error: null,
+    }));
   };
 
   return (
@@ -212,14 +260,14 @@ export function CardDetail({ nodeId, verdict }: CardDetailProps) {
               node={node}
               t={t}
               i18nLanguage={i18n.language}
-              saving={saving}
-              journalLimitSaveError={saveErrors.journalLimit}
+              saving={journalLimitSaving}
+              journalLimitSaveError={journalLimitSaveError}
               editingJournalLimit={editingJournalLimit}
-              journalLimitDraft={journalLimitDraft}
-              setJournalLimitDraft={journalLimitDraft => updateDraft(current => ({ ...current, journalLimitDraft }))}
+              journalLimitDraft={journalLimitValue}
+              setJournalLimitDraft={value => updateJournalLimitDraft(current => ({ ...current, value }))}
               onStartJournalLimitEdit={startJournalLimitEdit}
-              onSaveJournalLimit={() => { clearSaveError('journalLimit'); void saveJournalLimit(journalLimitDraft); }}
-              onCancelJournalLimit={() => { clearSaveError('journalLimit'); updateDraft(current => ({ ...current, editingJournalLimit: false })); }}
+              onSaveJournalLimit={() => { updateJournalLimitDraft(current => ({ ...current, error: null })); void saveJournalLimit(journalLimitValue); }}
+              onCancelJournalLimit={() => { updateJournalLimitDraft(current => ({ ...current, editing: false, error: null })); }}
             />
           </>
         )}

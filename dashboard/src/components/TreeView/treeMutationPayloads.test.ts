@@ -34,10 +34,11 @@ describe('tree mutation payload builders', () => {
     });
   });
 
-  test('preserves edit payload and empty content behavior', () => {
-    expect(buildEditCardPayload({ cardId: 'card-1', title: 'Renamed', content: '' })).toStrictEqual({
+  test('preserves an explicit empty edit body and the version captured when editing began', () => {
+    expect(buildEditCardPayload({ cardId: 'card-1', title: 'Renamed', content: '', expectedVersion: 4 })).toStrictEqual({
       title: 'Renamed',
-      content: undefined,
+      content: '',
+      expected_version: 4,
     });
   });
 

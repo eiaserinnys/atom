@@ -90,7 +90,7 @@ describe('tree view modal confirm actions', () => {
 
     expect(buildModalConfirmAction(modal, 'Renamed', '')).toStrictEqual({
       type: 'edit-card',
-      vars: { cardId: 'card-edited', title: 'Renamed', content: '' },
+      vars: { cardId: 'card-edited', title: 'Renamed', content: '', expectedVersion: 1 },
     });
   });
 

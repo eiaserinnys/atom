@@ -1,17 +1,13 @@
 import { useState, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pencil } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
-import { CardFormModal } from '../CardFormModal/CardFormModal';
 import type { SectionMap } from '../../utils/parseCompileSections';
-import { standardCompileNodeQueryKey } from '../../query/queryKeys';
 
 interface EditableHeadingProps {
   level: number;
   children: React.ReactNode;
   sectionMap: SectionMap;
-  compiledNodeId: string; // 컴파일 뷰의 루트 노드ID (캐시 invalidate 시 사용)
+  onEditCard: (cardId: string) => Promise<void>;
 }
 
 /**
@@ -43,26 +39,13 @@ function extractNodeId(children: React.ReactNode): string | null {
   return m ? m[1]! : null;
 }
 
-export function EditableHeading({ level, children, sectionMap, compiledNodeId }: EditableHeadingProps) {
+export function EditableHeading({ level, children, sectionMap, onEditCard }: EditableHeadingProps) {
   const { t } = useTranslation();
-  const [showModal, setShowModal] = useState(false);
-  const [cardData, setCardData] = useState<{ title: string; content: string } | null>(null);
   const [loadingCard, setLoadingCard] = useState(false);
-  const queryClient = useQueryClient();
 
   const displayTitle = extractDisplayTitle(children);
   const nodeId = extractNodeId(children);
   const sectionInfo = nodeId ? sectionMap.get(nodeId) : null;
-
-  const editMutation = useMutation({
-    mutationFn: (vars: { cardId: string; title: string; content: string }) =>
-      api.updateCard(vars.cardId, { title: vars.title, content: vars.content || undefined }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: standardCompileNodeQueryKey(compiledNodeId) });
-      setShowModal(false);
-      setCardData(null);
-    },
-  });
 
   async function handleEditClick(e: React.MouseEvent) {
     e.stopPropagation();
@@ -70,17 +53,10 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
 
     setLoadingCard(true);
     try {
-      const card = await api.getCard(sectionInfo.cardId);
-      setCardData({ title: card.title, content: card.content ?? '' });
-      setShowModal(true);
+      await onEditCard(sectionInfo.cardId);
     } finally {
       setLoadingCard(false);
     }
-  }
-
-  function handleConfirm(title: string, content: string) {
-    if (!sectionInfo || !cardData) return;
-    editMutation.mutate({ cardId: sectionInfo.cardId, title, content });
   }
 
   const HeadingTag = `h${level}` as ElementType;
@@ -105,16 +81,6 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
         )}
       </HeadingTag>
 
-      {showModal && cardData && sectionInfo && (
-        <CardFormModal
-          mode="edit"
-          initialTitle={cardData.title}
-          initialContent={cardData.content}
-          onConfirm={handleConfirm}
-          onClose={() => { setShowModal(false); setCardData(null); }}
-          isLoading={editMutation.isPending}
-        />
-      )}
     </>
   );
 }

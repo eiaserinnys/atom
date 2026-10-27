@@ -315,4 +315,93 @@ describe('CardDetail edit version tracking', () => {
       observer.disconnect();
     }
   });
+
+  test.each(['title', 'content'] as const)('keeps additional %s input typed during save and advances the next expected version', async (field) => {
+    let finishPut!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise<Response>(resolve => { finishPut = resolve; }));
+    const initialValue = field === 'title' ? 'Saved once' : 'Saved once';
+    const laterValue = `${initialValue} plus new input`;
+    const selector = field === 'title' ? `[aria-label="${english.card.edit_title}"]` : `[aria-label="${english.card.edit_content}"]`;
+    click(container.querySelector(selector)!);
+    const input = container.querySelector<HTMLInputElement | HTMLTextAreaElement>(field === 'title' ? 'input' : 'textarea')!;
+    setInput(input, initialValue);
+
+    const save = () => [...container.querySelectorAll('button')].find(button => button.textContent === english.common.save)!;
+    await act(async () => {
+      click(save());
+      await Promise.resolve();
+    });
+    setInput(input, laterValue);
+    const savedCard = { ...currentNode.card, [field]: initialValue, version: 2 };
+    currentNode = makeNode(savedCard);
+    await act(async () => {
+      finishPut({ ok: true, status: 200, json: async () => ({ card: savedCard, conflict: false }) } as Response);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(container.querySelector(field === 'title' ? 'input' : 'textarea')?.value).toBe(laterValue);
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0]![1]!.body as string)).toEqual({ [field]: initialValue, expected_version: 1 });
+
+    const finalCard = { ...savedCard, [field]: laterValue, version: 3 };
+    currentNode = makeNode(finalCard);
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ card: finalCard, conflict: false }) } as Response);
+    await act(async () => {
+      click(save());
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[1]![1]!.body as string)).toEqual({ [field]: laterValue, expected_version: 2 });
+    expect(container.querySelector(field === 'title' ? 'input' : 'textarea')).toBeNull();
+  });
+
+  test('keeps journal drafts, saving errors and saves with the node they belong to', async () => {
+    currentNode = { ...currentNode, journal_limit: 3 };
+    const aliasNode: TreeNodeData = { ...currentNode, id: 'node-2', journal_limit: 5, is_symlink: true };
+    await act(async () => {
+      queryClient.setQueryData(nodeQueryKey('node-1'), currentNode);
+      queryClient.setQueryData(nodeQueryKey('node-2'), aliasNode);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    vi.mocked(api.getNode).mockImplementation(async id => id === 'node-2' ? aliasNode : currentNode);
+    const updateNode = vi.spyOn(api, 'updateNode')
+      .mockRejectedValueOnce(new Error('A update failed'))
+      .mockResolvedValueOnce(aliasNode)
+      .mockResolvedValueOnce({ ...currentNode, journal_limit: 7 });
+
+    await act(async () => root.render(null));
+    await select('node-1');
+    expect(container.textContent).toContain(english.card.journal_limit_latest.replace('{{count}}', '3'));
+    const journalLabel = (limit: number) => [...container.querySelectorAll('span')].find(span =>
+      span.textContent === english.card.journal_limit_latest.replace('{{count}}', String(limit)))!;
+    click(journalLabel(3));
+    setInput(container.querySelector('input[inputmode="numeric"]')!, '7');
+    expect(container.querySelector<HTMLInputElement>('input[inputmode="numeric"]')?.value).toBe('7');
+    const save = () => [...container.querySelectorAll('button')].find(button => button.textContent?.includes(english.common.save))!;
+    await act(async () => {
+      click(save());
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(`${english.card.save_failed}: A update failed`);
+
+    await select('node-2');
+    expect(container.textContent).toContain(english.card.journal_limit_latest.replace('{{count}}', '5'));
+    expect(container.querySelector('input[inputmode="numeric"]')).toBeNull();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    click(journalLabel(5));
+    expect(container.querySelector<HTMLInputElement>('input[inputmode="numeric"]')?.value).toBe('5');
+    await act(async () => {
+      click(save());
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(updateNode).toHaveBeenNthCalledWith(2, 'node-2', { journal_limit: 5 });
+
+    await select('node-1');
+    expect(container.querySelector<HTMLInputElement>('input[inputmode="numeric"]')?.value).toBe('7');
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(`${english.card.save_failed}: A update failed`);
+    await act(async () => {
+      click(save());
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(updateNode).toHaveBeenNthCalledWith(3, 'node-1', { journal_limit: 7 });
+  });
 });

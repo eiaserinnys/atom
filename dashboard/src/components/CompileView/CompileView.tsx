@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { api } from '../../api/client';
+import { VersionConflictError } from '../../api/request';
+import { standardCompileNodeQueryKey } from '../../query/queryKeys';
 import { closeUnclosedCodeFences } from '../../utils/markdownUtils';
 import { parseCompileSections, type SectionMap } from '../../utils/parseCompileSections';
+import { CardFormModal } from '../CardFormModal/CardFormModal';
 import { CompileContent } from './CompileContent';
 import { CompileToc } from './CompileToc';
 import { CompileToolbar } from './CompileToolbar';
@@ -9,15 +15,47 @@ import { useCompileQueries } from './useCompileQueries';
 import { useCompileToc } from './useCompileToc';
 import { useEditableHeadingComponents } from './useEditableHeadingComponents';
 
+interface EditingCard {
+  cardId: string;
+  title: string;
+  content: string;
+  version: number;
+  sessionId: number;
+}
+
 interface CompileViewProps {
   nodeId: string | null;
   headerTabs?: React.ReactNode;
 }
 
 export function CompileView({ nodeId, headerTabs }: CompileViewProps) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [unfurlEnabled, setUnfurlEnabled] = useState(false);
+  const [editing, setEditing] = useState<EditingCard | null>(null);
+  const editLoadSequence = useRef(0);
   const { sliderValue, depth, depthLabel, selectDepth } = useCompileDepth();
   const { markdown, isLoading, error, unfurls } = useCompileQueries(nodeId, depth, unfurlEnabled);
+  const {
+    mutate: saveEditedCard,
+    isPending: isEditPending,
+    error: editError,
+    reset: resetEditMutation,
+  } = useMutation({
+    mutationFn: (vars: EditingCard) =>
+      api.updateCard(vars.cardId, { title: vars.title, content: vars.content, expected_version: vars.version }),
+    onSuccess: (_card, vars) => {
+      queryClient.invalidateQueries({ queryKey: standardCompileNodeQueryKey(nodeId) });
+      setEditing(current => current?.sessionId === vars.sessionId ? null : current);
+    },
+  });
+  const openCardForEdit = useCallback(async (cardId: string) => {
+    const requestSequence = ++editLoadSequence.current;
+    resetEditMutation();
+    const card = await api.getCard(cardId);
+    if (requestSequence !== editLoadSequence.current) return;
+    setEditing({ cardId, title: card.title, content: card.content ?? '', version: card.version, sessionId: requestSequence });
+  }, [resetEditMutation]);
   const processedMarkdown = useMemo(
     () => (markdown ? closeUnclosedCodeFences(markdown) : undefined),
     [markdown]
@@ -38,7 +76,7 @@ export function CompileView({ nodeId, headerTabs }: CompileViewProps) {
     () => (markdown ? parseCompileSections(markdown) : new Map()),
     [markdown]
   );
-  const headingComponents = useEditableHeadingComponents(nodeId, sectionMap);
+  const headingComponents = useEditableHeadingComponents(nodeId, sectionMap, openCardForEdit);
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -74,6 +112,18 @@ export function CompileView({ nodeId, headerTabs }: CompileViewProps) {
           />
         </div>
       </div>
+
+      {editing && (
+        <CardFormModal
+          mode="edit"
+          initialTitle={editing.title}
+          initialContent={editing.content}
+          onConfirm={(title, content) => saveEditedCard({ ...editing, title, content })}
+          onClose={() => setEditing(null)}
+          isLoading={isEditPending}
+          errorMessage={editError instanceof VersionConflictError ? t('card.unsaved_changes') : undefined}
+        />
+      )}
     </div>
   );
 }
