@@ -3,6 +3,16 @@ import type { SearchResult, SearchFilters } from "../../shared/types.js";
 import { getDb } from "../client.js";
 import { deserializeBoolean } from "../utils.js";
 
+export class SearchQueryInputError extends Error {
+  readonly code = "SEARCH_QUERY_INVALID";
+  readonly statusCode = 400;
+
+  constructor() {
+    super("Search query contains invalid syntax.");
+    this.name = "SearchQueryInputError";
+  }
+}
+
 export async function searchByBm25(
   db: Queryable,
   filters: SearchFilters
@@ -150,7 +160,72 @@ async function searchPostgres(db: Queryable, filters: SearchFilters) {
 // SQLite is used only for unit tests. breadcrumb (node_path) is intentionally
 // not implemented here — all results return node_path: [] via the result mapper.
 
-function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknown[] } {
+function toSqliteFtsQuery(input: string): string | null {
+  const groups: string[][] = [[]];
+  const excludedTerms: string[] = [];
+  let cursor = 0;
+
+  while (cursor < input.length) {
+    while (cursor < input.length && /\s/u.test(input[cursor]!)) cursor++;
+    if (cursor >= input.length) break;
+
+    let excluded = false;
+    if (input[cursor] === "-" && cursor + 1 < input.length && !/\s/u.test(input[cursor + 1]!)) {
+      excluded = true;
+      cursor++;
+    }
+
+    let quoted = false;
+    let term: string;
+    if (input[cursor] === '"') {
+      quoted = true;
+      cursor++;
+      let phrase = "";
+      while (cursor < input.length) {
+        if (input[cursor] === '"') {
+          if (input[cursor + 1] === '"') {
+            phrase += '"';
+            cursor += 2;
+            continue;
+          }
+          cursor++;
+          break;
+        }
+        phrase += input[cursor];
+        cursor++;
+      }
+      term = phrase;
+    } else {
+      const start = cursor;
+      while (cursor < input.length && !/\s/u.test(input[cursor]!)) cursor++;
+      term = input.slice(start, cursor);
+    }
+
+    if (term.length === 0) continue;
+    if (!excluded && !quoted && term === "OR") {
+      const current = groups.at(-1);
+      if (!current || current.length === 0) throw new SearchQueryInputError();
+      groups.push([]);
+      continue;
+    }
+
+    const ftsTerm = `"${term.replace(/"/g, '""')}"`;
+    if (excluded) excludedTerms.push(ftsTerm);
+    else groups.at(-1)!.push(ftsTerm);
+  }
+
+  if (groups.length > 1 && groups.at(-1)!.length === 0) throw new SearchQueryInputError();
+  const expressions = groups
+    .filter(group => group.length > 0)
+    .map(group => group.length === 1 ? group[0]! : `(${group.join(" ")})`);
+  if (expressions.length === 0) return null;
+
+  let expression = expressions.length === 1 ? expressions[0]! : expressions.join(" OR ");
+  for (const excluded of excludedTerms) expression = `(${expression}) NOT ${excluded}`;
+  return expression;
+}
+
+function buildSqliteQuery(filters: SearchFilters, ftsQuery: string): { sql: string; params: unknown[] } {
   const params: unknown[] = [];
   let idx = 1;
 
@@ -169,7 +244,7 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
   }
 
   // FTS query follows the CTE placeholder, when present.
-  params.push(filters.query);
+  params.push(ftsQuery);
   const matchIdx = idx++;
 
   // Additional WHERE conditions beyond FTS MATCH
@@ -196,13 +271,13 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
   }
 
   if (filters.updated_after) {
-    extraConditions.push(`c.updated_at >= $${idx}`);
+    extraConditions.push(`julianday(c.updated_at) >= julianday($${idx})`);
     params.push(filters.updated_after);
     idx++;
   }
 
   if (filters.updated_before) {
-    extraConditions.push(`c.updated_at <= $${idx}`);
+    extraConditions.push(`julianday(c.updated_at) <= julianday($${idx})`);
     params.push(filters.updated_before);
     idx++;
   }
@@ -228,12 +303,21 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
   const limitIdx = idx;
   params.push(filters.limit ?? 20);
 
+  const occurrenceFilter = filters.root_node_id
+    ? "AND tn.id IN (SELECT id FROM subtree)"
+    : "AND tn.is_symlink = 0";
+  const occurrenceOrder = filters.root_node_id ? "ORDER BY tn.is_symlink ASC, tn.id ASC" : "";
+  const nodeIdSelection = `(SELECT tn.id FROM tree_nodes tn WHERE tn.card_id = c.id ${occurrenceFilter} ${occurrenceOrder} LIMIT 1)`;
+  const isSymlinkSelection = filters.root_node_id
+    ? `(SELECT tn.is_symlink FROM tree_nodes tn WHERE tn.card_id = c.id ${occurrenceFilter} ${occurrenceOrder} LIMIT 1)`
+    : "0";
+
   const sql = `${subtreeCte}SELECT
          c.id AS card_id,
-         (SELECT tn.id FROM tree_nodes tn WHERE tn.card_id = c.id AND tn.is_symlink = 0 LIMIT 1) AS node_id,
+         ${nodeIdSelection} AS node_id,
          c.title,
          c.card_type,
-         0 AS is_symlink,
+         ${isSymlinkSelection} AS is_symlink,
          snippet(cards_fts, -1, '<b>', '</b>', '...', 20) AS snippet
        FROM cards_fts
        JOIN cards c ON c.rowid = cards_fts.rowid
@@ -245,6 +329,18 @@ function buildSqliteQuery(filters: SearchFilters): { sql: string; params: unknow
 }
 
 async function searchSqlite(db: Queryable, filters: SearchFilters) {
-  const { sql, params } = buildSqliteQuery(filters);
-  return db.query(sql, params);
+  const ftsQuery = toSqliteFtsQuery(filters.query);
+  if (ftsQuery === null) return { rows: [] };
+
+  const { sql, params } = buildSqliteQuery(filters, ftsQuery);
+  try {
+    return await db.query(sql, params);
+  } catch (error) {
+    if (isSqliteFtsSyntaxError(error)) throw new SearchQueryInputError();
+    throw error;
+  }
+}
+
+function isSqliteFtsSyntaxError(error: unknown): boolean {
+  return error instanceof Error && /fts5: syntax error|unterminated string|no such column:/i.test(error.message);
 }

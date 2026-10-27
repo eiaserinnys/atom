@@ -67,6 +67,7 @@ export class JevSearchCatalog {
       const parent = await this.deps.getNode(parentId);
       if (!parent) break;
       ancestors.unshift(parent);
+      if (parent.id === this.rootId) break;
       parentId = parent.parent_node_id;
     }
     return ancestors;
