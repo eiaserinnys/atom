@@ -369,6 +369,8 @@ pnpm --dir dashboard lint
 ```
 
 `npm run test:unit` and `npm run test:e2e` do not require a database.
+Jest tests refuse to start if `DATABASE_URL` is set and route default SQLite access
+to a disposable file, protecting the checkout's `atom.db` and production databases.
 `npm run test:integration` and `npm test` require an empty PostgreSQL test
 database whose name contains `test`; set its URL as `TEST_DATABASE_URL`.
 Integration tests delete rows from this database, so use a dedicated database with no data you need to keep.
