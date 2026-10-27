@@ -9,7 +9,7 @@ import { parseSnapshot } from "../unfurl/utils.js";
 export interface CompileUnfurlDeps {
   findAdapter(sourceType: string): UnfurlAdapter | undefined;
   findAdapterByRef(ref: string): UnfurlAdapter | undefined;
-  writeSnapshot(cardId: string, snapshot: string): Promise<void>;
+  writeSnapshot(cardId: string, snapshot: string, sourceRef: string): Promise<void>;
   repairSourceType(cardId: string, sourceType: string): Promise<void>;
   logError(message: string, error: unknown): void;
 }
@@ -23,7 +23,7 @@ export function createCompileUnfurlDeps(db: Queryable): CompileUnfurlDeps {
   return {
     findAdapter: (sourceType) => adapterRegistry.find(sourceType),
     findAdapterByRef: (ref) => adapterRegistry.findByRef(ref),
-    writeSnapshot: (cardId, snapshot) => updateCardSnapshot(db, cardId, snapshot),
+    writeSnapshot: (cardId, snapshot, sourceRef) => updateCardSnapshot(db, cardId, snapshot, sourceRef),
     repairSourceType: (cardId, sourceType) => updateCardSourceType(db, cardId, sourceType),
     logError: (message, error) => console.error(message, error),
   };
@@ -40,10 +40,12 @@ export async function resolveCompileRefs(
 
   await Promise.allSettled(
     Array.from(cardCache.entries()).map(async ([cardId, card]) => {
-      if (!card.source_ref || !card.source_type) return;
+      const sourceRef = card.source_ref;
+      const sourceType = card.source_type;
+      if (!sourceRef || !sourceType) return;
 
-      const typedAdapter = deps.findAdapter(card.source_type);
-      const adapter = typedAdapter ?? deps.findAdapterByRef(card.source_ref);
+      const typedAdapter = deps.findAdapter(sourceType);
+      const adapter = typedAdapter ?? deps.findAdapterByRef(sourceRef);
       if (!adapter) return;
 
       if (!typedAdapter && canWriteRefs) {
@@ -57,25 +59,25 @@ export async function resolveCompileRefs(
       if (mode === "cached" && card.source_snapshot) {
         try {
           const result = parseSnapshot(card.source_snapshot);
-          resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
+          resolved.set(cardId, { ok: true, result, sourceType });
         } catch (error) {
-          resolved.set(cardId, { ok: false, error: serializeError(error), sourceType: card.source_type });
+          resolved.set(cardId, { ok: false, error: serializeError(error), sourceType });
         }
         return;
       }
 
       try {
-        const result = await adapter.resolve(card.source_ref, credentials[adapter.sourceType] ?? {});
-        resolved.set(cardId, { ok: true, result, sourceType: card.source_type });
+        const result = await adapter.resolve(sourceRef, credentials[adapter.sourceType] ?? {});
+        resolved.set(cardId, { ok: true, result, sourceType });
         if (canWriteRefs) {
           runFireAndForget(
-            () => deps.writeSnapshot(cardId, result.snapshot),
+            () => deps.writeSnapshot(cardId, result.snapshot, sourceRef),
             "[unfurl] snapshot write failed",
             deps
           );
         }
       } catch (error) {
-        resolved.set(cardId, { ok: false, error: serializeError(error), sourceType: card.source_type });
+        resolved.set(cardId, { ok: false, error: serializeError(error), sourceType });
       }
     })
   );

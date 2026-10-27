@@ -103,9 +103,28 @@ export async function compileSubtree(
   const compileContext = await loadTreeCompileContext(db, nodeId, depth);
 
   let resolvedRefsMap: Map<string, ResolvedRef> | undefined;
-  if (resolveRefsMode !== undefined && resolveRefsMode !== false) {
+  if (resolveRefsMode !== undefined && resolveRefsMode !== false && !options.titlesOnly) {
+    const emittedCardIds = new Set<string>();
+    compileNode(
+      nodeId,
+      compileContext.getNodeCard,
+      compileContext.getChildren,
+      compileContext.getCard,
+      depth,
+      new Set(),
+      1,
+      {
+        ...options,
+        resolvedRefs: undefined,
+        onCardEmitted: (cardId) => emittedCardIds.add(cardId),
+      }
+    );
+    const emittedCards = new Map(
+      Array.from(compileContext.cardCache.entries())
+        .filter(([cardId]) => emittedCardIds.has(cardId))
+    );
     resolvedRefsMap = await resolveCompileRefs(
-      compileContext.cardCache,
+      emittedCards,
       resolveRefsMode,
       credentials ?? {},
       createCompileUnfurlDeps(db),
