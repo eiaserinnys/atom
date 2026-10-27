@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { searchCards } from "../../services/search.service.js";
+import { SearchQueryInputError } from "../../db/queries/search.js";
+import { normalizeSearchRootNodeId, searchCards } from "../../services/search.service.js";
 import { runConfiguredJevSearch } from "../../services/jev-search/service.js";
 import { JevSearchRequestError } from "../../services/jev-search/config.js";
 import type { JevSearchCompactResponse, JevSearchInput, JevSearchResponse } from "../../shared/jev-search.js";
@@ -9,12 +10,14 @@ import type { SearchFilters, SearchResult } from "../../shared/types.js";
 export interface SearchToolDependencies {
   searchCards(filters: SearchFilters): Promise<SearchResult[]>;
   runJev(input: JevSearchInput, signal?: AbortSignal): Promise<JevSearchResponse>;
+  normalizeSearchRootNodeId?(rootNodeId: string | null | undefined): Promise<string | null | undefined>;
 }
 
 export function registerSearchTools(server: McpServer, overrides: Partial<SearchToolDependencies> = {}): void {
   const deps: SearchToolDependencies = {
     searchCards,
     runJev: runConfiguredJevSearch,
+    normalizeSearchRootNodeId,
     ...overrides,
   };
 
@@ -45,8 +48,13 @@ export function registerSearchTools(server: McpServer, overrides: Partial<Search
       if (engine !== "jev") {
         if (context !== undefined) return toolError("JEV_CONTEXT_REQUIRES_JEV", "Context fields require engine=jev.");
         if (exhaustive !== undefined || include_trace !== undefined) return toolError("JEV_OPTIONS_REQUIRE_JEV", "Jev options require engine=jev.");
-        const results = await deps.searchCards(searchFilters);
-        return { content: [{ type: "text", text: JSON.stringify(results) }] };
+        try {
+          const results = await deps.searchCards(searchFilters);
+          return { content: [{ type: "text", text: JSON.stringify(results) }] };
+        } catch (error) {
+          if (error instanceof SearchQueryInputError) return toolError(error.code, error.message);
+          throw error;
+        }
       }
 
       const unsupported = ["tags", "card_type", "updated_after", "updated_before", "source_type", "strategy"];
@@ -55,7 +63,7 @@ export function registerSearchTools(server: McpServer, overrides: Partial<Search
       }
       const input: JevSearchInput = {
         query: filters.query,
-        root_node_id: filters.root_node_id,
+        root_node_id: (await (deps.normalizeSearchRootNodeId ?? normalizeSearchRootNodeId)(filters.root_node_id)) ?? null,
         limit: filters.limit,
         exhaustive,
         context: {

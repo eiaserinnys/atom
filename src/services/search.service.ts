@@ -1,5 +1,7 @@
 import { getDb } from "../db/client.js";
 import { searchByBm25 } from "../db/queries/search.js";
+import { resolveWriteParentNodeId } from "./tree-parent.js";
+import { getNode } from "./tree.service.js";
 import type { SearchResult, SearchFilters } from "../shared/types.js";
 
 const RELAXED_QUERY_MIN_TERMS = 4;
@@ -46,25 +48,48 @@ const DOMAIN_SYNONYMS: Array<[RegExp, string[]]> = [
 export async function searchCards(
   filters: SearchFilters
 ): Promise<SearchResult[]> {
-  const strictResults = await searchByBm25(getDb(), filters);
-  if (strictResults.length > 0 || filters.strategy === "strict") {
-    return strictResults;
+  const db = getDb();
+  const rootNodeId = await normalizeSearchRootNodeId(filters.root_node_id);
+  const normalizedFilters = rootNodeId === filters.root_node_id ? filters : {
+    ...filters,
+    root_node_id: rootNodeId ?? undefined,
+  };
+  const strictResults = await searchByBm25(db, normalizedFilters);
+  const rootNode = rootNodeId ? await getNode(rootNodeId) : null;
+  const scopedStrictResults = trimResultsToScope(strictResults, rootNode?.card.title);
+  if (scopedStrictResults.length > 0 || normalizedFilters.strategy === "strict") {
+    return scopedStrictResults;
   }
 
-  const fallbackQueries = buildSearchFallbackQueries(filters.query);
+  const fallbackQueries = buildSearchFallbackQueries(normalizedFilters.query);
   for (const fallbackQuery of fallbackQueries) {
     const fallbackResults = await searchByBm25(getDb(), {
-      ...filters,
+      ...normalizedFilters,
       query: fallbackQuery,
       strategy: "strict",
     });
 
     if (fallbackResults.length > 0) {
-      return fallbackResults;
+      return trimResultsToScope(fallbackResults, rootNode?.card.title);
     }
   }
 
-  return strictResults;
+  return scopedStrictResults;
+}
+
+export async function normalizeSearchRootNodeId(
+  rootNodeId: string | null | undefined
+): Promise<string | null | undefined> {
+  if (rootNodeId == null) return rootNodeId;
+  return resolveWriteParentNodeId(getDb(), rootNodeId);
+}
+
+function trimResultsToScope(results: SearchResult[], rootTitle: string | undefined): SearchResult[] {
+  if (!rootTitle) return results;
+  return results.map(result => {
+    const rootIndex = result.node_path.lastIndexOf(rootTitle);
+    return { ...result, node_path: rootIndex < 0 ? [] : result.node_path.slice(rootIndex) };
+  });
 }
 
 export function buildSearchFallbackQueries(query: string): string[] {

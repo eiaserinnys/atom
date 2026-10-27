@@ -48,7 +48,10 @@ function captureTool(dependencies: SearchToolDependencies) {
   const server = {
     tool: (_name: string, _description: string, _schema: unknown, callback: (...args: unknown[]) => Promise<unknown>) => { handler = callback; },
   } as unknown as McpServer;
-  registerSearchTools(server, dependencies);
+  registerSearchTools(server, {
+    ...dependencies,
+    normalizeSearchRootNodeId: dependencies.normalizeSearchRootNodeId ?? (async rootNodeId => rootNodeId),
+  });
   if (!handler) throw new Error("search_cards was not registered");
   return handler;
 }
