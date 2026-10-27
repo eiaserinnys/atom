@@ -191,13 +191,12 @@ export function keyBetween(prev: string | null, next: string | null): string {
       throw new Error(`keyBetween: non-normal prev not supported: ${prev}`);
     }
     const p = BigInt(prev!);
-    const MAX = 9_999_999_999n;
-    if (p >= MAX) {
-      // Extend digit count by appending '5'.
-      return prev + "5";
+    const nextPosition = p + 100n;
+    if (nextPosition <= BigInt(INT32_MAX)) {
+      return posToKey(Number(nextPosition));
     }
-    // Midpoint between prev and MAX
-    return String(p + (MAX - p) / 2n).padStart(NORMAL_DIGIT_COUNT, "0");
+    // Signal the existing append callers to rekey before leaving the public range.
+    return prev + "5";
   }
 
   // Both non-null. Both must be normal-territory.
