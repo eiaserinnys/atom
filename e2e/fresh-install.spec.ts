@@ -29,7 +29,7 @@ test.describe('Fresh install — bypass mode API key issuance', () => {
 
     await page.getByRole('button', { name: /API Keys/i }).click();
 
-    const agentInput = modal.locator('input[placeholder*="agent_id"]');
+    const agentInput = modal.getByLabel('Agent ID');
     await agentInput.fill('test-e2e-agent');
 
     await modal.getByRole('button', { name: /Generate/i }).click();
