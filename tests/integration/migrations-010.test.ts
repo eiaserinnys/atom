@@ -167,13 +167,15 @@ describe("migration 010 — idempotency", () => {
       await pool.query(sql);
     }
 
-    // Duplicate rows survived (002's UNIQUE index was skipped, 010 left them alone).
-    const dups = await pool.query(
-      `SELECT COUNT(*)::int AS n FROM tree_nodes
-       WHERE parent_node_id = $1 AND position = $2`,
-      [parentNode.id, "0000000600"]
+    // Migration 016 rekeys duplicate positions on restart while retaining both rows.
+    const children = await pool.query(
+      `SELECT position FROM tree_nodes WHERE parent_node_id = $1`,
+      [parentNode.id]
     );
-    expect(dups.rows[0]["n"]).toBe(2);
+    expect(children.rows).toHaveLength(2);
+    const positions = children.rows.map((row) => String(row["position"]));
+    expect(new Set(positions).size).toBe(2);
+    expect(positions.every((position) => /^\d{10}$/.test(position))).toBe(true);
 
     // And the UNIQUE index was not recreated.
     const idx = await pool.query(

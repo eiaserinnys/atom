@@ -26,7 +26,7 @@ import {
 } from "./compile-unfurl.service.js";
 import { loadTreeCompileContext } from "./tree-compile-context.service.js";
 import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
-import { resolveWriteParentNodeId } from "./tree-parent.js";
+import { resolveParentNodeId, resolveWriteParentNodeId } from "./tree-parent.js";
 import { lockTreeStructure } from "../db/queries/tree-lock.js";
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
@@ -284,8 +284,8 @@ export async function getTreeOutline(
   const db = getDb();
   let canonicalNodeId: string | null = null;
   if (nodeId !== null) {
-    if (!(await selectNodeById(db, nodeId))) return null;
-    canonicalNodeId = await resolveWriteParentNodeId(db, nodeId);
+    canonicalNodeId = await resolveParentNodeId(db, nodeId);
+    if (canonicalNodeId === null) return null;
   }
 
   const rows = await selectTreeOutlineRows(
