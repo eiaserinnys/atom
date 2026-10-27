@@ -38,6 +38,8 @@ test.describe('Auth config and DB connection test', () => {
   });
 
   test('DB connection test with invalid URL shows error', async ({ page }) => {
+    await page.route('**/api/system/status', route => route.fulfill({ json: { pendingRestart: false } }));
+
     await page.goto('/');
     await expect(page.locator('button[aria-label="Settings"]')).toBeVisible({ timeout: 15_000 });
 
@@ -45,11 +47,9 @@ test.describe('Auth config and DB connection test', () => {
     const modal = page.locator('.fixed.inset-0');
     await page.getByRole('button', { name: /Database/i }).click();
 
-    const connInput = modal.locator('input[placeholder*="postgresql"]');
-    if (await connInput.isVisible()) {
-      await connInput.fill('postgresql://invalid:invalid@127.0.0.1:9999/nonexistent');
-      await modal.getByRole('button', { name: /Test Connection/i }).click();
-      await expect(modal.locator('text=Connection failed').or(modal.locator('text=연결 실패'))).toBeVisible({ timeout: 15_000 });
-    }
+    const connInput = modal.getByLabel('PostgreSQL Connection String');
+    await connInput.fill('postgresql://invalid:invalid@127.0.0.1:9999/nonexistent');
+    await modal.getByRole('button', { name: /Test Connection/i }).click();
+    await expect(modal.locator('text=Connection failed').or(modal.locator('text=연결 실패'))).toBeVisible({ timeout: 15_000 });
   });
 });

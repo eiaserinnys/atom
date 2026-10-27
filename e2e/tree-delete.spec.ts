@@ -51,6 +51,7 @@ test.describe('Tree Delete — 시나리오 4: 카드 삭제', () => {
     // 새 노드 생성 후 삭제 → 페이지 새로고침으로 확인
     const y = await createTestCard({ card_type: 'knowledge', title: 'DeleteMe2' });
     const nodeY = y.node_id;
+    const keep = await createTestCard({ card_type: 'knowledge', title: 'KeepAfterReload' });
 
     await page.goto('/');
     await expect(page.locator(`[data-testid="tree-node-${nodeY}"]`)).toBeVisible({ timeout: 15_000 });
@@ -73,7 +74,7 @@ test.describe('Tree Delete — 시나리오 4: 카드 삭제', () => {
 
     // 페이지 새로고침 후에도 없어야 함 (DELETE API 400 회귀 방지)
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator(`[data-testid="tree-node-${keep.node_id}"]`)).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(`[data-testid="tree-node-${nodeY}"]`)).not.toBeVisible({ timeout: 10_000 });
   });
 });
