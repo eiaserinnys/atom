@@ -5,14 +5,15 @@ import { EditableHeading } from './EditableHeading';
 
 export function useEditableHeadingComponents(
   nodeId: string | null,
-  sectionMap: SectionMap
+  sectionMap: SectionMap,
+  onEditCard: (cardId: string) => Promise<void>
 ): Components {
   return useMemo(() => {
     if (!nodeId) return {};
 
     const makeHeading = (level: number) =>
       ({ children }: { children?: ReactNode }) => (
-        <EditableHeading level={level} sectionMap={sectionMap} compiledNodeId={nodeId}>
+        <EditableHeading level={level} sectionMap={sectionMap} onEditCard={onEditCard}>
           {children}
         </EditableHeading>
       );
@@ -25,5 +26,5 @@ export function useEditableHeadingComponents(
       h5: makeHeading(5),
       h6: makeHeading(6),
     };
-  }, [nodeId, sectionMap]);
+  }, [nodeId, onEditCard, sectionMap]);
 }
