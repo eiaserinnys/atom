@@ -1,4 +1,4 @@
-import type { Queryable } from '../queryable.js';
+import type { DatabaseAdapter, Queryable } from '../adapter.js';
 import { deserializeBoolean } from '../utils.js';
 
 export type UserRole = 'admin' | 'editor' | 'viewer';
@@ -109,4 +109,13 @@ export async function countAdmins(db: Queryable): Promise<number> {
     `SELECT COUNT(*) AS cnt FROM users WHERE role = 'admin' AND is_active = TRUE`
   );
   return parseInt(result.rows[0]['cnt'], 10);
+}
+
+export async function lockActiveAdminChanges(
+  db: DatabaseAdapter,
+  tx: Queryable,
+): Promise<void> {
+  if (db.dbType === 'postgres') {
+    await tx.query('SELECT pg_advisory_xact_lock(725002)');
+  }
 }

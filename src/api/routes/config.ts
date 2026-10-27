@@ -7,6 +7,7 @@ import path from 'path';
 import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
 import pg from 'pg';
+import { z } from 'zod';
 import { setPendingRestart } from '../state.js';
 import { agentKeyVerifier } from '../agent-key-auth.js';
 import { mapPostgresConnectionError } from '../config/db-test.js';
@@ -26,6 +27,7 @@ import {
   updateUserRole,
   updateUserActive,
   countAdmins,
+  lockActiveAdminChanges,
 } from '../../db/queries/users.js';
 import {
   listAgents,
@@ -39,6 +41,11 @@ import { closeUserEventConnections } from './events.js';
 export type MigrationRouteDeps = Omit<ConfigMigrationServiceDeps, 'db'> & {
   getDb(): DatabaseAdapter;
 };
+
+const userUpdateSchema = z.object({
+  role: z.enum(['admin', 'editor', 'viewer']).optional(),
+  is_active: z.boolean().optional(),
+});
 
 const defaultMigrationRouteDeps: MigrationRouteDeps = {
   getDb,
@@ -97,30 +104,49 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
     Body: { role?: UserRole; is_active?: boolean };
   }>('/api/config/users/:id', async (req, reply) => {
     if (!requireRole(req, reply, 'admin')) return;
+    const parsedChanges = userUpdateSchema.safeParse(req.body);
+    if (!parsedChanges.success) {
+      return reply.code(400).send({ error: 'Invalid user update' });
+    }
+
     const db = getDb();
     const { id } = req.params;
-    const { role, is_active } = req.body;
+    const { role, is_active } = parsedChanges.data;
 
-    // Last admin protection
-    const targetUser = await findUserById(db, id);
-    if (!targetUser) return reply.code(404).send({ error: 'User not found' });
+    const result = await db.transaction(async (tx) => {
+      await lockActiveAdminChanges(db, tx);
 
-    const userChanges = { role, is_active };
-    if (isAdminRemovalChange(targetUser, userChanges)) {
-      if (wouldRemoveLastAdmin(targetUser, userChanges, await countAdmins(db))) {
-        return reply.code(400).send({ error: 'Cannot remove the last admin' });
+      const targetUser = await findUserById(tx, id);
+      if (!targetUser) return { kind: 'not_found' as const };
+
+      const userChanges = { role, is_active };
+      if (isAdminRemovalChange(targetUser, userChanges)) {
+        if (wouldRemoveLastAdmin(targetUser, userChanges, await countAdmins(tx))) {
+          return { kind: 'last_admin' as const };
+        }
       }
+
+      let updated = targetUser;
+      if (role !== undefined) {
+        const r = await updateUserRole(tx, id, role);
+        if (r) updated = r;
+      }
+      if (is_active !== undefined) {
+        const r = await updateUserActive(tx, id, is_active);
+        if (r) updated = r;
+      }
+      return { kind: 'updated' as const, user: updated, previous: targetUser };
+    });
+
+    if (result.kind === 'not_found') {
+      return reply.code(404).send({ error: 'User not found' });
+    }
+    if (result.kind === 'last_admin') {
+      return reply.code(400).send({ error: 'Cannot remove the last admin' });
     }
 
-    let updated = targetUser;
-    if (role !== undefined) {
-      const r = await updateUserRole(db, id, role);
-      if (r) updated = r;
-    }
-    if (is_active !== undefined) {
-      const r = await updateUserActive(db, id, is_active);
-      if (r) updated = r;
-    }
+    const updated = result.user;
+    const targetUser = result.previous;
     if (updated.role !== targetUser.role || (targetUser.is_active && !updated.is_active)) {
       closeUserEventConnections(id);
     }
