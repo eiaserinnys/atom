@@ -18,6 +18,7 @@
     "^(\\.{1,2}/.*)\\.js$": "$1"
   },
   "testEnvironment": "node",
+  "setupFiles": ["<rootDir>/tests/setup/isolate-db.ts"],
   "testMatch": ["**/?(*.)+(spec|test).[tj]s?(x)"],
   "roots": ["<rootDir>/tests"],
   "testTimeout": 120000
