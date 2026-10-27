@@ -54,7 +54,10 @@ function response(): JevSearchResponse {
 
 function makeApp(dependencies: SearchHandlerDependencies) {
   const app = Fastify({ logger: false });
-  app.get("/search", createSearchHandler(dependencies));
+  app.get("/search", createSearchHandler({
+    ...dependencies,
+    normalizeSearchRootNodeId: dependencies.normalizeSearchRootNodeId ?? (async rootNodeId => rootNodeId),
+  }));
   return app;
 }
 

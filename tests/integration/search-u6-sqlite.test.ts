@@ -11,8 +11,8 @@ import { getNode, getTreeOutline } from "../../src/services/tree.service.js";
 import { searchCards } from "../../src/services/search.service.js";
 import { searchWithJev } from "../../src/services/jev-search/service.js";
 import { JEV_SEARCH_POLICY } from "../../src/services/jev-search/config.js";
-import { registerSearchTools } from "../../src/mcp/tools/search_tools.js";
-import type { JevMeaningPayload } from "../../src/shared/jev-search.js";
+import { registerSearchTools, type SearchToolDependencies } from "../../src/mcp/tools/search_tools.js";
+import type { JevMeaningPayload, JevSearchInput, JevSearchResponse } from "../../src/shared/jev-search.js";
 import type { SearchResult } from "../../src/shared/types.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -20,14 +20,14 @@ const migrations = path.join(root, "src/db/migrations-sqlite");
 
 type ToolHandler = (input: Record<string, unknown>, extra: { signal?: AbortSignal }) => Promise<unknown>;
 
-function captureSearchCardsTool(): ToolHandler {
+function captureSearchCardsTool(overrides: Partial<SearchToolDependencies> = {}): ToolHandler {
   let handler: ToolHandler | undefined;
   const server = {
     tool: (name: string, _description: string, _schema: unknown, callback: ToolHandler) => {
       if (name === "search_cards") handler = callback;
     },
   } as unknown as McpServer;
-  registerSearchTools(server);
+  registerSearchTools(server, overrides);
   if (!handler) throw new Error("search_cards was not registered");
   return handler;
 }
@@ -145,6 +145,81 @@ describe("U6 SQLite search date filters", () => {
 });
 
 describe("U6 Jev search scope with SQLite aliases", () => {
+  it("normalizes an alias root to its canonical subtree for BM25 and Jev", async () => {
+    const db = getDb();
+    const outsideParentCard = await insertCard(db, { card_type: "structure", title: "Outside Q u6rootaliasneedle", content: null });
+    const outsideParentNode = await insertNode(db, outsideParentCard.id, null, 1);
+    const canonicalRootCard = await insertCard(db, { card_type: "structure", title: "Canonical P", content: null });
+    const canonicalRootNode = await insertNode(db, canonicalRootCard.id, outsideParentNode.id, 1);
+    const targetCard = await insertSearchCard("In-scope descendant", "u6rootaliasneedle body");
+    const targetNode = await insertNode(db, targetCard.id, canonicalRootNode.id, 1);
+    const siblingCard = await insertSearchCard("Outside sibling Y", "u6rootaliasneedle outside sibling");
+    const siblingNode = await insertNode(db, siblingCard.id, outsideParentNode.id, 2);
+    const aliasNode = await insertNode(db, canonicalRootCard.id, null, 2, true);
+    const query = "u6rootaliasneedle";
+    const bm25Results = await searchCards({ query, strategy: "strict", root_node_id: aliasNode.id });
+    const rootsPassedToJev: Array<string | null> = [];
+    const payloads: JevMeaningPayload[] = [];
+    const runJev = async (input: JevSearchInput, signal?: AbortSignal): Promise<JevSearchResponse> => {
+      rootsPassedToJev.push(input.root_node_id ?? null);
+      return searchWithJev(input, {
+        getNode,
+        getTreeOutline,
+        searchCards,
+        judge: async payload => {
+          payloads.push(payload);
+          return {
+            model: "jev-latest",
+            usage: { input_tokens: 1, output_tokens: 1 },
+            answers: Object.fromEntries(Object.keys(payload.questions).map(key => [key, {
+              type: "noul",
+              noul: 0.9,
+            }])),
+          };
+        },
+        policy: { ...JEV_SEARCH_POLICY },
+      }, signal);
+    };
+
+    const app = Fastify();
+    app.get("/search", createSearchHandler({ runJev }));
+    const tool = captureSearchCardsTool({ runJev });
+    try {
+      const httpResponse = await app.inject({ method: "GET", url: `/search?${new URLSearchParams({
+        q: query,
+        engine: "jev",
+        root_node_id: aliasNode.id,
+        exhaustive: "1",
+      })}` });
+      const httpJev = httpResponse.json() as JevSearchResponse;
+      const mcpRaw = await tool({ query, engine: "jev", root_node_id: aliasNode.id, exhaustive: true, include_trace: true }, {});
+      const mcpText = (mcpRaw as { content: Array<{ text: string }> }).content[0]!.text;
+      const mcpJev = JSON.parse(mcpText) as JevSearchResponse;
+      const allPayloads = JSON.stringify(payloads);
+
+      expect(bm25Results.map(result => result.card_id)).toEqual([targetCard.id]);
+      expect(bm25Results.map(result => result.node_id)).toEqual([targetNode.id]);
+      expect(JSON.stringify(bm25Results)).not.toContain(outsideParentCard.title);
+      expect(JSON.stringify(bm25Results)).not.toContain(siblingCard.title);
+      expect(httpResponse.statusCode).toBe(200);
+      expect(rootsPassedToJev).toEqual([canonicalRootNode.id, canonicalRootNode.id]);
+      for (const result of [httpJev, mcpJev]) {
+        expect(result.results.map(item => item.card_id)).toContain(targetCard.id);
+        expect(result.results.map(item => item.card_id)).not.toContain(outsideParentCard.id);
+        expect(result.results.map(item => item.card_id)).not.toContain(siblingCard.id);
+        expect(JSON.stringify(result.results)).not.toContain(outsideParentCard.title);
+        expect(JSON.stringify(result.results)).not.toContain(siblingCard.title);
+      }
+      expect(allPayloads).toContain(targetCard.title);
+      expect(allPayloads).not.toContain(outsideParentCard.title);
+      expect(allPayloads).not.toContain(siblingCard.title);
+      expect(outsideParentNode.id).not.toBe(canonicalRootNode.id);
+      expect(siblingNode.id).not.toBe(targetNode.id);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("keeps an in-scope alias seed and every Jev payload inside the requested subtree", async () => {
     const db = getDb();
     const rootCard = await insertCard(db, { card_type: "structure", title: "Requested Scope", content: null });

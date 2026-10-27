@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { searchCards } from "../../services/search.service.js";
+import { normalizeSearchRootNodeId, searchCards } from "../../services/search.service.js";
 import { runConfiguredJevSearch } from "../../services/jev-search/service.js";
 import { JevSearchRequestError } from "../../services/jev-search/config.js";
 import type { JevSearchInput, JevSearchObserver, JevSearchResponse } from "../../shared/jev-search.js";
@@ -8,6 +8,7 @@ import type { SearchFilters, SearchResult, CardType } from "../../shared/types.j
 export interface SearchHandlerDependencies {
   searchCards(filters: SearchFilters): Promise<SearchResult[]>;
   runJev(input: JevSearchInput, signal: AbortSignal, observer?: JevSearchObserver): Promise<JevSearchResponse>;
+  normalizeSearchRootNodeId?(rootNodeId: string | null | undefined): Promise<string | null | undefined>;
 }
 
 export async function searchRoutes(app: FastifyInstance): Promise<void> {
@@ -18,6 +19,7 @@ export function createSearchHandler(overrides: Partial<SearchHandlerDependencies
   const deps: SearchHandlerDependencies = {
     searchCards,
     runJev: runConfiguredJevSearch,
+    normalizeSearchRootNodeId,
     ...overrides,
   };
 
@@ -113,9 +115,10 @@ async function handleJevSearch(req: FastifyRequest, reply: FastifyReply, deps: S
     limit = Number(rawLimit.value);
   }
 
+  const rootNodeId = await (deps.normalizeSearchRootNodeId ?? normalizeSearchRootNodeId)(rootSnake.value ?? rootCamel.value ?? null);
   const input: JevSearchInput = {
     query: query.value,
-    root_node_id: rootSnake.value ?? rootCamel.value ?? null,
+    root_node_id: rootNodeId ?? null,
     limit,
     exhaustive: exhaustive.value === "1",
     context: {

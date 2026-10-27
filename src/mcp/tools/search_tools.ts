@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { searchCards } from "../../services/search.service.js";
+import { normalizeSearchRootNodeId, searchCards } from "../../services/search.service.js";
 import { runConfiguredJevSearch } from "../../services/jev-search/service.js";
 import { JevSearchRequestError } from "../../services/jev-search/config.js";
 import type { JevSearchCompactResponse, JevSearchInput, JevSearchResponse } from "../../shared/jev-search.js";
@@ -9,12 +9,14 @@ import type { SearchFilters, SearchResult } from "../../shared/types.js";
 export interface SearchToolDependencies {
   searchCards(filters: SearchFilters): Promise<SearchResult[]>;
   runJev(input: JevSearchInput, signal?: AbortSignal): Promise<JevSearchResponse>;
+  normalizeSearchRootNodeId?(rootNodeId: string | null | undefined): Promise<string | null | undefined>;
 }
 
 export function registerSearchTools(server: McpServer, overrides: Partial<SearchToolDependencies> = {}): void {
   const deps: SearchToolDependencies = {
     searchCards,
     runJev: runConfiguredJevSearch,
+    normalizeSearchRootNodeId,
     ...overrides,
   };
 
@@ -55,7 +57,7 @@ export function registerSearchTools(server: McpServer, overrides: Partial<Search
       }
       const input: JevSearchInput = {
         query: filters.query,
-        root_node_id: filters.root_node_id,
+        root_node_id: (await (deps.normalizeSearchRootNodeId ?? normalizeSearchRootNodeId)(filters.root_node_id)) ?? null,
         limit: filters.limit,
         exhaustive,
         context: {

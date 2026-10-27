@@ -89,7 +89,7 @@ export class JevSearchCatalog {
         const node = await this.deps.getNode(seed.node_id);
         if (!node || node.id === this.rootId) return null;
         const ancestors = await this.ancestors(node);
-        return { candidate: candidateFromNode(node, ancestors, seed.node_path), rank: index + 1, snippet: seedMatchSnippet(seed.snippet) };
+        return { candidate: candidateFromNode(node, ancestors, this.rootId ? undefined : seed.node_path), rank: index + 1, snippet: seedMatchSnippet(seed.snippet) };
       })), Promise.all(summaries.map(read => read?.result ?? null))]);
       const found = values.map(value => {
         if (this.run.stopped() || this.run.limitCode || value.status === "rejected" || !value.value) return null;
