@@ -111,7 +111,7 @@ describe("query neighbor service", () => {
     const result = await service.expand({ query: "normalized query", exclude_card_ids: [ids.excluded], limit: 1 }, new AbortController().signal);
 
     expect(result.statusCode).toBe(200);
-    expect(JSON.parse(sentBody).input).toEqual([createEmbeddingInputFromText("normalized query").inputTokens]);
+    expect(JSON.parse(sentBody).input).toEqual([(await createEmbeddingInputFromText("normalized query")).inputTokens]);
     expect(neighborRows.cardIds).toEqual([ids.visible]);
     expect(result.body).toMatchObject({
       status: "ready",

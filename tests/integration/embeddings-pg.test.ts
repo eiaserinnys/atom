@@ -71,7 +71,7 @@ describe("PostgreSQL embedding contract", () => {
       `INSERT INTO tree_nodes (id, card_id, position, is_symlink) VALUES ($1, $2, 1, FALSE)`,
       [nodeId, cardId]
     );
-    const input = createEmbeddingInput("PG contract", "body");
+    const input = await createEmbeddingInput("PG contract", "body");
     const embedding = serializeEmbedding(new Float32Array(3072).fill(0.125));
     expect(await saveEmbedding(getDb(), {
       cardId, version: 1, contentHash: input.contentHash, tokenCount: input.tokenCount,
@@ -94,7 +94,7 @@ describe("PostgreSQL embedding contract", () => {
        ('20000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002', 2, TRUE)`,
       [nodeId, cardId]
     );
-    const input = createEmbeddingInput("PG contract", "body");
+    const input = await createEmbeddingInput("PG contract", "body");
     await saveEmbedding(getDb(), {
       cardId, version: 1, contentHash: input.contentHash, tokenCount: input.tokenCount,
       truncated: input.truncated, embedding: serializeEmbedding(new Float32Array(3072).fill(0.2)),
@@ -122,8 +122,8 @@ describe("PostgreSQL embedding contract", () => {
       [sourceNodeId, sourceCardId, nearNodeId, nearCardId]
     );
     await saveOpenAIKey(getDb(), "pg-neighbor-test-key", "2026-10-26T00:00:00.000Z");
-    const sourceInput = createEmbeddingInput("Source", "source body");
-    const nearInput = createEmbeddingInput("Near", "near body");
+    const sourceInput = await createEmbeddingInput("Source", "source body");
+    const nearInput = await createEmbeddingInput("Near", "near body");
     const sourceVector = new Float32Array(3072);
     sourceVector[0] = 1;
     const nearVector = new Float32Array(3072);
@@ -146,7 +146,7 @@ describe("PostgreSQL embedding contract", () => {
       [nearCardId]
     );
     expect(Number(changed.rows[0]["version"])).toBe(2);
-    expect(createEmbeddingInput(String(changed.rows[0]["title"]), String(changed.rows[0]["content"])).contentHash)
+    expect((await createEmbeddingInput(String(changed.rows[0]["title"]), String(changed.rows[0]["content"]))).contentHash)
       .toBe(String(changed.rows[0]["content_hash"]));
     expect((await listEmbeddingCandidates(getDb(), null)).map(row => row.card_id)).toEqual([nearCardId]);
 

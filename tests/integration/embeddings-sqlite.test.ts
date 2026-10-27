@@ -69,7 +69,7 @@ describe("SQLite embedding contract", () => {
 
     await seedCard("buffer-card", "본문", 1);
     const buffer = serializeEmbedding(new Float32Array(3072).fill(0.25));
-    const input = createEmbeddingInput("제목 buffer-card", "본문");
+    const input = await createEmbeddingInput("제목 buffer-card", "본문");
     expect(await saveEmbedding(getDb(), {
       cardId: "buffer-card", version: 1, contentHash: input.contentHash,
       tokenCount: input.tokenCount, truncated: input.truncated, embedding: buffer,
@@ -91,7 +91,7 @@ describe("SQLite embedding contract", () => {
     expect(candidates.map(row => row.card_id)).toEqual(["eligible"]);
     expect(await getEmbeddingProgress(getDb())).toEqual({ target_cards: 1, completed_cards: 0 });
 
-    const input = createEmbeddingInput("제목 eligible", "body");
+    const input = await createEmbeddingInput("제목 eligible", "body");
     const embedding = serializeEmbedding(new Float32Array(3072).fill(0.1));
     await saveEmbedding(getDb(), {
       cardId: "eligible", version: 1, contentHash: input.contentHash,
@@ -107,7 +107,7 @@ describe("SQLite embedding contract", () => {
 
   it("updates only the version when the stored content hash still matches", async () => {
     await seedCard("version-card", "unchanged", 1);
-    const input = createEmbeddingInput("제목 version-card", "unchanged");
+    const input = await createEmbeddingInput("제목 version-card", "unchanged");
     const embedding = serializeEmbedding(new Float32Array(3072).fill(0.3));
     await saveEmbedding(getDb(), {
       cardId: "version-card", version: 1, contentHash: input.contentHash,

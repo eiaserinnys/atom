@@ -31,13 +31,26 @@ export async function searchWithJev(rawInput: JevSearchInput, deps: JevSearchDep
   const controller = new AbortController();
   let cancelled = callerSignal?.aborted ?? false;
   let timedOut = false;
-  const onCallerAbort = () => { cancelled = true; controller.abort(); };
+  let finished = false;
+  let finalizing = false;
+  let settleStopped!: () => void;
+  const stoppedSignal = new Promise<void>(resolve => { settleStopped = resolve; });
+  const markFinished = () => {
+    if (finished) return;
+    finished = true;
+    controller.abort();
+    settleStopped();
+  };
+  const onCallerAbort = () => { cancelled = true; markFinished(); };
   if (callerSignal && !callerSignal.aborted) callerSignal.addEventListener("abort", onCallerAbort, { once: true });
-  if (cancelled) controller.abort();
-  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, policy.runTimeoutMs);
+  if (cancelled) markFinished();
+  const timeout = setTimeout(() => { timedOut = true; markFinished(); }, policy.runTimeoutMs);
   timeout.unref?.();
-  const stopped = () => cancelled || timedOut || callerSignal?.aborted === true;
-  const run = new JevRunTrace(randomUUID(), stopped, observer);
+  const stopped = () => finished || cancelled || timedOut || callerSignal?.aborted === true;
+  const traceObserver: JevSearchObserver | undefined = observer
+    ? event => { if (!finished || finalizing) observer(event); }
+    : undefined;
+  const run = new JevRunTrace(randomUUID(), stopped, traceObserver);
   const catalog = new JevSearchCatalog(deps, run, policy, input.root_node_id);
   const scored: ScoredContent[] = [];
   let status: JevSearchStatus = "complete";
@@ -56,6 +69,7 @@ export async function searchWithJev(rawInput: JevSearchInput, deps: JevSearchDep
     let response: JevMeaningResponse | undefined;
     try {
       response = await deps.judge(payload, controller.signal);
+      if (finished) return null;
       if (stopped()) {
         run.finish(step, call, { completedAt: new Date().toISOString(), response, disposition: "skipped" });
         return null;
@@ -77,6 +91,7 @@ export async function searchWithJev(rawInput: JevSearchInput, deps: JevSearchDep
       run.finish(step, call, { completedAt: new Date().toISOString(), response });
       return { scores, frontier };
     } catch (cause) {
+      if (finished) return null;
       if (stopped()) { run.finish(step, call, { completedAt: null, disposition: "skipped" }); return null; }
       const failure = safeJevFailure(cause);
       run.finish(step, call, { completedAt: new Date().toISOString(), response, error: failure, disposition: "error" });
@@ -108,6 +123,7 @@ export async function searchWithJev(rawInput: JevSearchInput, deps: JevSearchDep
         catch (cause) { failure = cause; }
       }
     }));
+    if (finished) return { frontier: [], hits: [] };
     const frontier: SearchCandidate[] = catalog.rootFrontier.splice(0), hits: SearchCandidate[] = [];
     jobs.forEach((job, index) => {
       const result = scoresByJob[index];
@@ -138,97 +154,142 @@ export async function searchWithJev(rawInput: JevSearchInput, deps: JevSearchDep
     return scores !== null && scores.scores[0] >= policy.sufficiencyThreshold;
   };
 
-  try {
-    if (input.root_node_id) {
-      let root: TreeNodeWithCard | null;
-      try { root = await deps.getNode(input.root_node_id); }
-      catch { throw new JevSearchRequestError("The search scope could not be read.", "JEV_ROOT_READ_FAILED", 502); }
-      if (!stopped()) {
-        if (!root) throw new JevSearchRequestError("The search scope node was not found.", "JEV_ROOT_NOT_FOUND", 404);
-        if (root.card.card_type !== "structure") throw new JevSearchRequestError("The search scope must be a structure node.", "JEV_ROOT_NOT_STRUCTURE", 400);
-        catalog.rootPath = [root.card.title];
-        catalog.rootPathNodeIds = [root.id];
-      }
-    }
-    observer?.({ event: "run", data: { schema_version: 2, engine: "jev", run_id: run.runId, query: input.query,
-      root_node_id: input.root_node_id, exhaustive: input.exhaustive, started_at: startedAt, policy: policyView(policy) } });
-    emittedRun = true;
-    let frontier: SearchCandidate[] = [], hits: SearchCandidate[] = [];
-    if (!stopped()) {
-      await catalog.lexicalSeeds(input.query);
-      if (!run.limitCode && !stopped()) ({ frontier, hits } = await judgeHop());
-      if (await sufficient() && !input.exhaustive) stopReason = "sufficient";
-    }
-    run.hop = 1;
-    while (!stopReason && !stopped() && !run.limitCode) {
-      const [commitParents, commitOutlines] = await Promise.all([
-        catalog.prepareParents(hits), catalog.prepareOutlines(frontier),
-      ]);
-      const parents = commitParents();
-      commitOutlines();
-      if (stopped() || run.limitCode) break;
-      if (frontier.length === 0 && parents.length === 0) {
-        const deferred = catalog.takeDeferred();
-        if (deferred) (await catalog.prepareOutlines([deferred]))();
-        else {
-          if (widened) { stopReason = "exhausted"; break; }
-          widened = true;
-          const step = run.start("widen");
-          step.widen_reason = run.hop === 1 ? "no_entry" : "frontier_empty";
-          run.finish(step);
-          (await catalog.prepareOutlines([null]))();
+  const execute = async (): Promise<void> => {
+    if (finished) return;
+    try {
+      if (input.root_node_id) {
+        let root: TreeNodeWithCard | null;
+        try { root = await deps.getNode(input.root_node_id); }
+        catch {
+          if (finished) return;
+          throw new JevSearchRequestError("The search scope could not be read.", "JEV_ROOT_READ_FAILED", 502);
+        }
+        if (finished) return;
+        if (!stopped()) {
+          if (!root) throw new JevSearchRequestError("The search scope node was not found.", "JEV_ROOT_NOT_FOUND", 404);
+          if (root.card.card_type !== "structure") throw new JevSearchRequestError("The search scope must be a structure node.", "JEV_ROOT_NOT_STRUCTURE", 400);
+          catalog.rootPath = [root.card.title];
+          catalog.rootPathNodeIds = [root.id];
         }
       }
-      if (stopped() || run.limitCode) break;
-      const next = await judgeHop();
-      if (await sufficient() && !input.exhaustive) { stopReason = "sufficient"; break; }
-      frontier = [...next.frontier, ...parents];
-      hits = next.hits;
-      run.hop += 1;
+      if (finished) return;
+      observer?.({ event: "run", data: { schema_version: 2, engine: "jev", run_id: run.runId, query: input.query,
+        root_node_id: input.root_node_id, exhaustive: input.exhaustive, started_at: startedAt, policy: policyView(policy) } });
+      emittedRun = true;
+      let frontier: SearchCandidate[] = [], hits: SearchCandidate[] = [];
+      if (!stopped()) {
+        await catalog.lexicalSeeds(input.query);
+        if (finished) return;
+        if (!run.limitCode && !stopped()) ({ frontier, hits } = await judgeHop());
+        if (finished) return;
+        if (await sufficient() && !input.exhaustive) stopReason = "sufficient";
+        if (finished) return;
+      }
+      run.hop = 1;
+      while (!stopReason && !stopped() && !run.limitCode) {
+        const [commitParents, commitOutlines] = await Promise.all([
+          catalog.prepareParents(hits), catalog.prepareOutlines(frontier),
+        ]);
+        if (finished) return;
+        const parents = commitParents();
+        commitOutlines();
+        if (stopped() || run.limitCode) break;
+        if (frontier.length === 0 && parents.length === 0) {
+          const deferred = catalog.takeDeferred();
+          if (deferred) {
+            const commit = await catalog.prepareOutlines([deferred]);
+            if (finished) return;
+            commit();
+          } else {
+            if (widened) { stopReason = "exhausted"; break; }
+            widened = true;
+            const step = run.start("widen");
+            step.widen_reason = run.hop === 1 ? "no_entry" : "frontier_empty";
+            run.finish(step);
+            const commit = await catalog.prepareOutlines([null]);
+            if (finished) return;
+            commit();
+          }
+        }
+        if (stopped() || run.limitCode) break;
+        const next = await judgeHop();
+        if (finished) return;
+        if (await sufficient() && !input.exhaustive) { stopReason = "sufficient"; break; }
+        if (finished) return;
+        frontier = [...next.frontier, ...parents];
+        hits = next.hits;
+        run.hop += 1;
+      }
+      if (stopped()) {
+        status = timedOut ? "limited" : "cancelled";
+        if (timedOut) run.limitCode = "RUN_TIME_LIMIT";
+      } else if (run.limitCode) status = "limited";
+    } catch (cause) {
+      if (finished) return;
+      if (stopped()) {
+        status = timedOut ? "limited" : "cancelled";
+        if (timedOut) run.limitCode = "RUN_TIME_LIMIT";
+      } else if (cause instanceof JevSearchRequestError && !emittedRun) throw cause;
+      else {
+        status = "error";
+        error = cause instanceof JevRunError ? { code: cause.code, message: cause.message } : { code: "JEV_SEARCH_FAILED", message: "Jev search failed." };
+      }
     }
-    if (stopped()) {
-      status = timedOut ? "limited" : "cancelled";
-      if (timedOut) run.limitCode = "RUN_TIME_LIMIT";
-    } else if (run.limitCode) status = "limited";
-  } catch (cause) {
-    if (stopped()) {
-      status = timedOut ? "limited" : "cancelled";
-      if (timedOut) run.limitCode = "RUN_TIME_LIMIT";
-    } else if (cause instanceof JevSearchRequestError && !emittedRun) throw cause;
-    else {
-      status = "error";
-      error = cause instanceof JevRunError ? { code: cause.code, message: cause.message } : { code: "JEV_SEARCH_FAILED", message: "Jev search failed." };
-    }
+  };
+
+  try {
+    await Promise.race([execute(), stoppedSignal]);
   } finally {
+    finished = true;
     clearTimeout(timeout);
     callerSignal?.removeEventListener("abort", onCallerAbort);
     releaseSlot();
   }
 
-  let results: JevSearchResponse["results"] = [];
-  if (status === "complete" || status === "limited") {
-    const selection = run.start("selection", scored.map(item => item.candidate.ref));
-    results = recordSelection(selection, scored, input.limit, policy);
-    run.finish(selection);
+  if (timedOut) {
+    status = "limited";
+    run.limitCode = "RUN_TIME_LIMIT";
+  } else if (cancelled || callerSignal?.aborted) {
+    status = "cancelled";
   }
-  if (status === "limited") error = { code: run.limitCode ?? "RUN_TIME_LIMIT", message: run.limitCode === "CALL_BUDGET" ? "Jev search reached its call budget." : run.limitCode === "CANDIDATE_LIMIT" ? "Jev search reached its candidate limit." : "Jev search reached its time limit." };
-  if (status === "cancelled") error = { code: "CANCELLED", message: "Jev search was cancelled." };
-  if (status !== "complete") stopReason = null;
-  const completedAt = new Date().toISOString();
-  const terminal = run.start("run_terminal", [], completedAt);
-  terminal.completed_at = completedAt;
-  terminal.terminal_status = status;
-  terminal.terminal_code = error?.code ?? null;
-  terminal.stop_reason = stopReason;
-  run.finish(terminal);
-  const response: JevSearchResponse = {
-    schema_version: 2, engine: "jev", run_id: run.runId, query: input.query, root_node_id: input.root_node_id, exhaustive: input.exhaustive,
-    status, complete: status === "complete", stop_reason: stopReason, started_at: startedAt, completed_at: completedAt,
-    policy: policyView(policy), results,
-    trace: { candidates: run.candidates, steps: run.steps, calls: run.calls.sort((a, b) => a.seq - b.seq) }, error,
-  };
-  observer?.({ event: "done", data: { status, complete: response.complete, stop_reason: stopReason, completed_at: completedAt, results, error } });
-  return response;
+
+  finalizing = true;
+  try {
+    if (!emittedRun) {
+      observer?.({ event: "run", data: { schema_version: 2, engine: "jev", run_id: run.runId, query: input.query,
+        root_node_id: input.root_node_id, exhaustive: input.exhaustive, started_at: startedAt, policy: policyView(policy) } });
+      emittedRun = true;
+    }
+    let results: JevSearchResponse["results"] = [];
+    if (status === "complete" || status === "limited") {
+      const selection = run.start("selection", scored.map(item => item.candidate.ref));
+      results = recordSelection(selection, scored, input.limit, policy);
+      run.finish(selection);
+    }
+    if (status === "limited") error = { code: run.limitCode ?? "RUN_TIME_LIMIT", message: run.limitCode === "CALL_BUDGET" ? "Jev search reached its call budget." : run.limitCode === "CANDIDATE_LIMIT" ? "Jev search reached its candidate limit." : "Jev search reached its time limit." };
+    if (status === "cancelled") error = { code: "CANCELLED", message: "Jev search was cancelled." };
+    if (status !== "complete") stopReason = null;
+    const completedAt = new Date().toISOString();
+    const terminal = run.start("run_terminal", [], completedAt);
+    terminal.completed_at = completedAt;
+    terminal.terminal_status = status;
+    terminal.terminal_code = error?.code ?? null;
+    terminal.stop_reason = stopReason;
+    run.finish(terminal);
+    const stableResults = structuredClone(results);
+    const stableError = error ? { ...error } : null;
+    const response: JevSearchResponse = {
+      schema_version: 2, engine: "jev", run_id: run.runId, query: input.query, root_node_id: input.root_node_id, exhaustive: input.exhaustive,
+      status, complete: status === "complete", stop_reason: stopReason, started_at: startedAt, completed_at: completedAt,
+      policy: policyView(policy), results: stableResults,
+      trace: structuredClone({ candidates: run.candidates, steps: run.steps, calls: [...run.calls].sort((a, b) => a.seq - b.seq) }), error: stableError,
+    };
+    observer?.({ event: "done", data: { status, complete: response.complete, stop_reason: stopReason, completed_at: completedAt,
+      results: structuredClone(stableResults), error: stableError ? { ...stableError } : null } });
+    return response;
+  } finally {
+    finalizing = false;
+  }
 }
 
 export async function runConfiguredJevSearch(input: JevSearchInput, signal?: AbortSignal, observer?: JevSearchObserver): Promise<JevSearchResponse> {

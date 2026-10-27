@@ -79,7 +79,7 @@ export function createQueryNeighborService({ db, index, fetcher = fetch }: Query
       };
     }
 
-    const embeddingInput = createEmbeddingInputFromText(input.query);
+    const embeddingInput = await createEmbeddingInputFromText(input.query);
     const controller = new AbortController();
     let timedOut = false;
     const abortForCaller = () => controller.abort(signal.reason);
