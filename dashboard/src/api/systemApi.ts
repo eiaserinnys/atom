@@ -1,7 +1,7 @@
 import { request } from './request';
 
 export const systemApi = {
-  getHealth(): Promise<{ status: string }> {
+  getHealth(): Promise<{ status: string; bootId: string }> {
     return request('/api/health');
   },
 

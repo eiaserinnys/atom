@@ -2,10 +2,7 @@ import { test, expect } from '@playwright/test';
 import { assertBypassAuthStatus, resetTestDb } from './helpers';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, '../.env');
+const envPath = path.join(process.env.ATOM_E2E_DIR!, '.env');
 
 test.describe('Fresh install — bypass mode API key issuance', () => {
   test.beforeAll(async () => {
@@ -28,7 +25,7 @@ test.describe('Fresh install — bypass mode API key issuance', () => {
 
     // Wait for modal header specifically
     const modal = page.locator('.fixed.inset-0');
-    await expect(modal.locator('.text-base.font-semibold')).toBeVisible();
+    await expect(modal.getByText('Settings', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: /API Keys/i }).click();
 

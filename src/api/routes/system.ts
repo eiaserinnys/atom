@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { getPendingRestart, setPendingRestart } from '../state.js';
 import { getDb } from '../../db/client.js';
+import { randomUUID } from 'node:crypto';
 
 function requireAdmin(req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply): boolean {
   const user = req.jwtUser;
@@ -16,9 +17,10 @@ function requireAdmin(req: import('fastify').FastifyRequest, reply: import('fast
 }
 
 export const systemRoutes: FastifyPluginAsync = async (app) => {
+  const bootId = randomUUID();
   // GET /api/health — no auth required (exempted in authMiddleware)
   app.get('/api/health', async (_req, reply) => {
-    return reply.send({ status: 'ok' });
+    return reply.send({ status: 'ok', bootId });
   });
 
   // DELETE /test/reset — E2E test helper, only available in NODE_ENV=test

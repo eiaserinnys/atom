@@ -2,10 +2,7 @@ import { test, expect } from '@playwright/test';
 import { resetTestDb } from './helpers';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, '../.env');
+const envPath = path.join(process.env.ATOM_E2E_DIR!, '.env');
 
 test.describe('Auth config and DB connection test', () => {
   test.beforeAll(async () => {
@@ -20,7 +17,7 @@ test.describe('Auth config and DB connection test', () => {
     // Open settings
     await page.locator('button[aria-label="Settings"]').click();
     const modal = page.locator('.fixed.inset-0');
-    await expect(modal.locator('.text-base.font-semibold')).toBeVisible();
+    await expect(modal.getByText('Settings', { exact: true })).toBeVisible();
 
     // Click Auth tab
     await page.getByRole('button', { name: 'Auth', exact: true }).click();
