@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
@@ -8,9 +8,7 @@ if (process.env["DATABASE_URL"] !== undefined) {
   );
 }
 
-const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "atom-jest-"));
-process.env["SQLITE_PATH"] = path.join(tempDirectory, "atom.db");
-
-process.once("exit", () => {
-  fs.rmSync(tempDirectory, { recursive: true, force: true });
-});
+process.env["SQLITE_PATH"] = path.join(
+  os.tmpdir(),
+  `atom-jest-${process.pid}-${randomUUID()}.db`,
+);

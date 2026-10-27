@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -28,21 +27,19 @@ function loadSetup(databaseUrl?: string, sqlitePath?: string) {
 test("Jest database setup rejects DATABASE_URL and isolates its default SQLite path", () => {
   const sqlitePath = process.env["SQLITE_PATH"];
   expect(sqlitePath).toBeDefined();
-  const workspace = path.dirname(sqlitePath ?? "");
-  expect(path.relative(os.tmpdir(), workspace).startsWith("..")).toBe(false);
-  expect(path.basename(workspace)).toMatch(/^atom-jest-/);
-  expect(path.basename(sqlitePath ?? "")).toBe("atom.db");
+  expect(path.dirname(sqlitePath ?? "")).toBe(os.tmpdir());
+  expect(path.basename(sqlitePath ?? "")).toMatch(/^atom-jest-\d+-[0-9a-f-]+\.db$/);
 
-  const disposablePath = "/tmp/not-used-by-jest/atom.db";
-  const isolated = loadSetup(undefined, disposablePath);
+  const shellSqlitePath = path.join(os.tmpdir(), "shell-supplied-atom.db");
+  const isolated = loadSetup(undefined, shellSqlitePath);
   expect(isolated.error).toBeUndefined();
   expect(isolated.status).toBe(0);
   const childSqlitePath = JSON.parse(isolated.stdout.trim()) as string;
-  expect(childSqlitePath).not.toBe(disposablePath);
-  expect(path.basename(path.dirname(childSqlitePath))).toMatch(/^atom-jest-/);
-  expect(fs.existsSync(path.dirname(childSqlitePath))).toBe(false);
+  expect(childSqlitePath).not.toBe(shellSqlitePath);
+  expect(path.dirname(childSqlitePath)).toBe(os.tmpdir());
+  expect(path.basename(childSqlitePath)).toMatch(/^atom-jest-\d+-[0-9a-f-]+\.db$/);
 
-  const rejected = loadSetup(invalidDatabaseUrl, disposablePath);
+  const rejected = loadSetup(invalidDatabaseUrl, shellSqlitePath);
   expect(rejected.error).toBeUndefined();
   expect(rejected.status).not.toBe(0);
   expect(rejected.stderr).toContain("Unset DATABASE_URL before running tests");
