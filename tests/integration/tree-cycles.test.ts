@@ -104,10 +104,11 @@ describe.each(["sqlite", "postgres"] as const)("tree cycle protection (%s)", (ki
     await expect(moveNode(a.id, { parent_node_id: null })).resolves.toMatchObject({ node: { parent_node_id: null } });
   });
 
-  it("checks physical parents without expanding symlink card references", async () => {
+  it("normalizes a symlink parent before checking the physical parent chain", async () => {
     const a = await node("A");
     const alias = await createSymlink(a.card_id, null);
-    await expect(moveNode(a.id, { parent_node_id: alias.id })).resolves.toMatchObject({ node: { parent_node_id: alias.id } });
+    await expect(moveNode(a.id, { parent_node_id: alias.id }))
+      .rejects.toMatchObject({ code: "TREE_CYCLE", statusCode: 400 });
   });
 
   it("returns HTTP 400 and a coded MCP tool error", async () => {

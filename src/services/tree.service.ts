@@ -12,7 +12,6 @@ import {
 import { selectCardById } from "../db/queries/cards.js";
 import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
 import type { TreeNode, TreeNodeWithCard, TreeOutline, TreeOutlineNode } from "../shared/types.js";
-import type { Queryable } from "../db/queryable.js";
 import { selectTreeOutlineRows } from "../db/queries/tree-outline.js";
 import { EXCERPT_SOURCE_CHARS, toOutlineExcerpt } from "./outline-excerpt.js";
 import type { UnfurlCredentials } from "../unfurl/interface.js";
@@ -27,22 +26,8 @@ import {
 } from "./compile-unfurl.service.js";
 import { loadTreeCompileContext } from "./tree-compile-context.service.js";
 import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
-
-/**
- * Resolve the node whose children are listed "under" `nodeId`: a symlink
- * lists its canonical node's children (an orphan symlink falls back to
- * itself). Returns null when `nodeId` does not exist.
- */
-async function resolveChildParentNodeId(
-  db: Queryable,
-  nodeId: string
-): Promise<string | null> {
-  const node = await selectNodeById(db, nodeId);
-  if (!node) return null;
-  if (!node.is_symlink) return node.id;
-  const canonical = await selectCanonicalNodeByCardId(db, node.card_id);
-  return canonical?.id ?? node.id;
-}
+import { resolveWriteParentNodeId } from "./tree-parent.js";
+import { lockTreeStructure } from "../db/queries/tree-lock.js";
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
   const db = getDb();
@@ -63,7 +48,7 @@ export async function listChildren(
   const effectiveParentId =
     parentNodeId === null
       ? null
-      : (await resolveChildParentNodeId(db, parentNodeId)) ?? parentNodeId;
+      : await resolveWriteParentNodeId(db, parentNodeId);
 
   const nodes = await selectChildren(db, effectiveParentId);
   const results: TreeNodeWithCard[] = [];
@@ -145,12 +130,13 @@ export async function createSymlink(
   position?: number
 ): Promise<TreeNode> {
   const db = getDb();
-  const node = await insertNode(db, card_id, parent_node_id, position, true);
+  const effectiveParentNodeId = await resolveWriteParentNodeId(db, parent_node_id);
+  const node = await insertNode(db, card_id, effectiveParentNodeId, position, true);
   eventBus.emit("atom:event", {
     type: "node:created",
     nodeId: node.id,
     cardId: card_id,
-    parentNodeId: parent_node_id,
+    parentNodeId: effectiveParentNodeId,
     node: await toTreeNodeWithCard(db, node),
     actor: null,
   });
@@ -189,11 +175,13 @@ export async function moveNode(
 ): Promise<{ node: TreeNode | null; warnings: string[] }> {
   const db = getDb();
   const moved = await db.transaction(async (client) => {
+    await lockTreeStructure(client);
     const oldNode = await selectNodeById(client, nodeId);
     if (!oldNode) return null;
-    const effectiveParent = opts.parent_node_id === undefined
+    const requestedParent = opts.parent_node_id === undefined
       ? oldNode.parent_node_id
       : opts.parent_node_id;
+    const effectiveParent = await resolveWriteParentNodeId(client, requestedParent);
     // Validate before position resolution, which may rekey siblings.
     await assertTreeParent(client, nodeId, effectiveParent);
     const { key, warnings } = await resolvePositionKey(client, effectiveParent, nodeId, {
@@ -277,8 +265,8 @@ export async function getTreeOutline(
   const db = getDb();
   let canonicalNodeId: string | null = null;
   if (nodeId !== null) {
-    canonicalNodeId = await resolveChildParentNodeId(db, nodeId);
-    if (canonicalNodeId === null) return null;
+    if (!(await selectNodeById(db, nodeId))) return null;
+    canonicalNodeId = await resolveWriteParentNodeId(db, nodeId);
   }
 
   const rows = await selectTreeOutlineRows(

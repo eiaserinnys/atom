@@ -14,6 +14,7 @@ import { eventBus } from "../events/eventBus.js";
 import { deserializeArray, deserializeBoolean } from "../db/utils.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
 import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
+import { resolveWriteParentNodeId } from "./tree-parent.js";
 
 export async function createCard(
   agentIdOrInput: string | null | CreateCardInput,
@@ -31,11 +32,15 @@ export async function createCard(
   }
 
   const { card, node } = await getDb().transaction(async (client) => {
+    const parentNodeId = await resolveWriteParentNodeId(
+      client,
+      input.parent_node_id ?? null
+    );
     const card = await insertCard(client, input, agentId ?? undefined);
     const node = await insertNode(
       client,
       card.id,
-      input.parent_node_id ?? null,
+      parentNodeId,
       input.position,
       false
     );
@@ -46,7 +51,7 @@ export async function createCard(
     type: "card:created",
     cardId: card.id,
     nodeId: node.id,
-    parentNodeId: input.parent_node_id ?? null,
+    parentNodeId: node.parent_node_id,
     data: card,
     node: await toTreeNodeWithCard(getDb(), node),
     actor: agentId,

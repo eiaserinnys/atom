@@ -9,6 +9,7 @@ import type {
   BatchSymlinkItem,
 } from "../shared/types.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
+import { resolveWriteParentNodeId } from "./tree-parent.js";
 
 interface ProcessBatchCreatesContext {
   db: Queryable;
@@ -41,6 +42,14 @@ interface BatchParentReference {
 export function topologicalSortCreates(
   creates: BatchCreateItem[]
 ): BatchCreateItem[] {
+  const seenTempIds = new Set<string>();
+  for (const item of creates) {
+    if (seenTempIds.has(item.temp_id)) {
+      throw new DuplicateBatchTempIdError(item.temp_id);
+    }
+    seenTempIds.add(item.temp_id);
+  }
+
   const byTempId = new Map<string, BatchCreateItem>(
     creates.map((c) => [c.temp_id, c])
   );
@@ -98,6 +107,9 @@ export async function processBatchCreates({
       tempIdToNodeId,
       (tempId) => `Internal error: resolved node_id not found for temp_id "${tempId}"`
     );
+    const effectiveParentNodeId = item.parent_temp_id === undefined
+      ? await resolveWriteParentNodeId(db, parentNodeId)
+      : parentNodeId;
 
     const card = await insertCard(db, {
       card_type: item.card_type,
@@ -113,7 +125,7 @@ export async function processBatchCreates({
     const node = await insertNode(
       db,
       card.id,
-      parentNodeId,
+      effectiveParentNodeId,
       item.position,
       false
     );
@@ -128,7 +140,7 @@ export async function processBatchCreates({
       type: "card:created",
       cardId: card.id,
       nodeId: node.id,
-      parentNodeId,
+      parentNodeId: effectiveParentNodeId,
       data: card,
       node: await toTreeNodeWithCard(db, node),
       actor,
@@ -152,11 +164,14 @@ export async function processBatchSymlinks({
       tempIdToNodeId,
       (tempId) => `Symlink: parent_temp_id "${tempId}" not found among batch creates`
     );
+    const effectiveParentNodeId = item.parent_temp_id === undefined
+      ? await resolveWriteParentNodeId(db, parentNodeId)
+      : parentNodeId;
 
     const node = await insertNode(
       db,
       item.card_id,
-      parentNodeId,
+      effectiveParentNodeId,
       item.position,
       true
     );
@@ -165,10 +180,20 @@ export async function processBatchSymlinks({
       type: "node:created",
       nodeId: node.id,
       cardId: item.card_id,
-      parentNodeId,
+      parentNodeId: effectiveParentNodeId,
       node: await toTreeNodeWithCard(db, node),
       actor,
     });
+  }
+}
+
+class DuplicateBatchTempIdError extends Error {
+  readonly code = "DUPLICATE_TEMP_ID";
+  readonly statusCode = 400;
+
+  constructor(tempId: string) {
+    super(`duplicate temp_id "${tempId}" in batch creates`);
+    this.name = "DuplicateBatchTempIdError";
   }
 }
 

@@ -8,6 +8,7 @@ import type {
   TreeNode,
 } from "../shared/types.js";
 import { selectChildrenWithCards, toTreeNodeWithCard } from "./tree-node-payload.js";
+import { resolveWriteParentNodeId } from "./tree-parent.js";
 
 interface ProcessBatchChildOrdersContext {
   db: Queryable;
@@ -37,11 +38,12 @@ async function applyChildOrder(
   actor: string | null
 ): Promise<void> {
   const oldNodes = await selectOrderedNodes(db, childOrder);
+  const parentNodeId = await resolveWriteParentNodeId(db, childOrder.parent_node_id);
   const keys = rekeyEvenly(childOrder.order.length);
 
   for (let i = 0; i < childOrder.order.length; i++) {
     const nodeId = childOrder.order[i];
-    await updateOrderedNode(db, childOrder.parent_node_id, keys[i], nodeId);
+    await updateOrderedNode(db, parentNodeId, keys[i], nodeId);
 
     const movedNode = await selectNodeById(db, nodeId);
     if (!movedNode) {
@@ -52,14 +54,14 @@ async function applyChildOrder(
       type: "node:moved",
       nodeId,
       oldParentNodeId: oldNodes.get(nodeId)?.parent_node_id ?? null,
-      newParentNodeId: childOrder.parent_node_id,
+      newParentNodeId: parentNodeId,
       node: await toTreeNodeWithCard(db, movedNode),
-      affectedNodes: await selectChildrenWithCards(db, childOrder.parent_node_id),
+      affectedNodes: await selectChildrenWithCards(db, parentNodeId),
       actor,
     });
   }
 
-  result.child_ordered.push(childOrder.parent_node_id);
+  result.child_ordered.push(parentNodeId);
 }
 
 async function selectOrderedNodes(

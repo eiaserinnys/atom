@@ -15,6 +15,7 @@ import { processBatchChildOrders } from "./batch-child-order.service.js";
 import { processBatchNodeUpdates } from "./batch-node-update.service.js";
 import { processBatchDeletes } from "./batch-delete.service.js";
 import { processBatchCardUpdates } from "./batch-card-update.service.js";
+import { lockTreeStructure } from "../db/queries/tree-lock.js";
 
 export { topologicalSortCreates } from "./batch-create-symlink.service.js";
 
@@ -39,6 +40,10 @@ export async function executeBatchOp(
 
   const batchWarnings: string[] = [];
   const { result, patches } = await getDb().transaction(async (client) => {
+    if ((input.moves?.length ?? 0) > 0 || (input.child_orders?.length ?? 0) > 0) {
+      await lockTreeStructure(client);
+    }
+
     const result: BatchOpResult = {
       created: [],
       symlinked: [],
