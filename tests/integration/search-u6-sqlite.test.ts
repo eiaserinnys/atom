@@ -106,13 +106,72 @@ describe("U6 SQLite search query compatibility", () => {
     await insertSearchCard("Invalid query fixture", "alpha");
     const app = Fastify();
     app.get("/search", createSearchHandler());
+    const tool = captureSearchCardsTool();
     try {
       const response = await app.inject({ method: "GET", url: "/search?q=alpha%20OR&strategy=strict" });
       expect(response.statusCode).toBe(400);
       expect(response.json()).toMatchObject({ statusCode: 400, message: expect.any(String) });
+
+      const mcp = await tool({ query: "alpha OR", strategy: "strict" }, {});
+      expect(mcp).toMatchObject({ isError: true, content: [{ type: "text" }] });
+      expect(JSON.parse((mcp as { content: Array<{ text: string }> }).content[0]!.text).error.code)
+        .toBe("SEARCH_QUERY_INVALID");
     } finally {
       await app.close();
     }
+  });
+
+  it.each([
+    {
+      query: "alpha OR beta -gamma",
+      documents: [
+        { title: "alpha with excluded word", content: "alpha gamma" },
+        { title: "beta with excluded word", content: "beta gamma" },
+        { title: "beta without excluded word", content: "beta" },
+        { title: "alpha without excluded word", content: "alpha" },
+      ],
+      included: [0, 2, 3],
+    },
+    {
+      query: "a b -c OR d",
+      documents: [
+        { title: "first branch excluded", content: "a b c" },
+        { title: "first branch included", content: "a b" },
+        { title: "second branch includes excluded word", content: "d c" },
+        { title: "second branch included", content: "d" },
+      ],
+      included: [1, 2, 3],
+    },
+    {
+      query: '"x y" -z OR w',
+      documents: [
+        { title: "phrase branch excluded", content: "x y z" },
+        { title: "phrase branch included", content: "x y" },
+        { title: "word branch includes excluded word", content: "w z" },
+        { title: "word branch included", content: "w" },
+        { title: "noncontiguous phrase", content: "x z y" },
+      ],
+      included: [1, 2, 3],
+    },
+  ])("keeps exclusions inside each OR branch: $query", async ({ query, documents, included }) => {
+    const cards = await Promise.all(documents.map(document => insertSearchCard(document.title, document.content)));
+    const results = await searchCards({ query, strategy: "strict" });
+    expect(new Set(results.map(result => result.card_id)))
+      .toEqual(new Set(included.map(index => cards[index]!.id)));
+  });
+
+  it("drops an OR branch that has exclusions but no positive term", async () => {
+    const alpha = await insertSearchCard("Positive branch", "alpha");
+    await insertSearchCard("Negative-only branch", "gamma");
+    const results = await searchCards({ query: "alpha OR -gamma", strategy: "strict" });
+    expect(results.map(result => result.card_id)).toEqual([alpha.id]);
+  });
+
+  it("returns no rows when every OR branch has exclusions but no positive term", async () => {
+    await insertSearchCard("First negative-only fixture", "alpha");
+    await insertSearchCard("Second negative-only fixture", "beta");
+    const results = await searchCards({ query: "-alpha OR -beta", strategy: "strict" });
+    expect(results).toEqual([]);
   });
 
   it("converts generated OR fallback queries before SQLite FTS5", async () => {

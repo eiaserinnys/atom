@@ -99,6 +99,21 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
     )`);
   }
 
+  const occurrenceSelection = filters.root_node_id
+    ? `LEFT JOIN LATERAL (
+      SELECT tn.id AS node_id, tn.is_symlink
+      FROM tree_nodes tn
+      WHERE tn.card_id = c.id AND tn.id IN (SELECT id FROM subtree)
+      ORDER BY tn.is_symlink ASC, tn.id ASC
+      LIMIT 1
+    ) selected_node ON TRUE`
+    : `LEFT JOIN LATERAL (
+      SELECT tn.id AS node_id, tn.is_symlink
+      FROM tree_nodes tn
+      WHERE tn.card_id = c.id AND tn.is_symlink = FALSE
+      LIMIT 1
+    ) selected_node ON TRUE`;
+
   // LIMIT is always the last parameter
   const limitIdx = idx;
   params.push(filters.limit ?? 20);
@@ -108,10 +123,10 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   )
   SELECT
     c.id AS card_id,
-    canonical_node.node_id,
+    selected_node.node_id,
     c.title,
     c.card_type,
-    FALSE AS is_symlink,
+    COALESCE(selected_node.is_symlink, FALSE) AS is_symlink,
     ts_headline('simple',
       coalesce(c.content, c.title),
       tsq.q,
@@ -119,18 +134,13 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
     ) AS snippet,
     COALESCE(breadcrumb.path, '{}') AS node_path
   FROM cards c, tsq
-  LEFT JOIN LATERAL (
-    SELECT tn.id AS node_id
-    FROM tree_nodes tn
-    WHERE tn.card_id = c.id AND tn.is_symlink = FALSE
-    LIMIT 1
-  ) canonical_node ON TRUE
+  ${occurrenceSelection}
   LEFT JOIN LATERAL (
     WITH RECURSIVE anc AS (
       SELECT tn.parent_node_id, ac.title, 1 AS depth, ARRAY[tn.id] AS visited
       FROM tree_nodes tn
       JOIN cards ac ON ac.id = tn.card_id
-      WHERE tn.id = canonical_node.node_id
+      WHERE tn.id = selected_node.node_id
       UNION ALL
       SELECT tn.parent_node_id, ac.title, a.depth + 1, a.visited || tn.id
       FROM tree_nodes tn
@@ -141,7 +151,7 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
     SELECT array_agg(title ORDER BY depth DESC) AS path
     FROM anc
     WHERE depth > 1
-  ) breadcrumb ON canonical_node.node_id IS NOT NULL
+  ) breadcrumb ON selected_node.node_id IS NOT NULL
   WHERE ${conditions.join("\n    AND ")}
   ORDER BY ts_rank(c.fts_vector, tsq.q) DESC
   LIMIT $${limitIdx}`;
@@ -161,8 +171,9 @@ async function searchPostgres(db: Queryable, filters: SearchFilters) {
 // not implemented here — all results return node_path: [] via the result mapper.
 
 function toSqliteFtsQuery(input: string): string | null {
-  const groups: string[][] = [[]];
-  const excludedTerms: string[] = [];
+  const groups: Array<{ positiveTerms: string[]; excludedTerms: string[]; hasTerms: boolean }> = [
+    { positiveTerms: [], excludedTerms: [], hasTerms: false },
+  ];
   let cursor = 0;
 
   while (cursor < input.length) {
@@ -204,25 +215,34 @@ function toSqliteFtsQuery(input: string): string | null {
     if (term.length === 0) continue;
     if (!excluded && !quoted && term === "OR") {
       const current = groups.at(-1);
-      if (!current || current.length === 0) throw new SearchQueryInputError();
-      groups.push([]);
+      if (!current?.hasTerms) throw new SearchQueryInputError();
+      groups.push({ positiveTerms: [], excludedTerms: [], hasTerms: false });
       continue;
     }
 
     const ftsTerm = `"${term.replace(/"/g, '""')}"`;
-    if (excluded) excludedTerms.push(ftsTerm);
-    else groups.at(-1)!.push(ftsTerm);
+    const group = groups.at(-1)!;
+    group.hasTerms = true;
+    if (excluded) group.excludedTerms.push(ftsTerm);
+    else group.positiveTerms.push(ftsTerm);
   }
 
-  if (groups.length > 1 && groups.at(-1)!.length === 0) throw new SearchQueryInputError();
+  if (groups.length > 1 && !groups.at(-1)!.hasTerms) throw new SearchQueryInputError();
+  // Apply exclusions within each OR branch so alternatives retain websearch precedence.
   const expressions = groups
-    .filter(group => group.length > 0)
-    .map(group => group.length === 1 ? group[0]! : `(${group.join(" ")})`);
+    .filter(group => group.positiveTerms.length > 0)
+    .map(group => {
+      let expression = group.positiveTerms.length === 1
+        ? group.positiveTerms[0]!
+        : `(${group.positiveTerms.join(" ")})`;
+      for (const excluded of group.excludedTerms) expression = `${expression} NOT ${excluded}`;
+      return expression;
+    });
   if (expressions.length === 0) return null;
 
-  let expression = expressions.length === 1 ? expressions[0]! : expressions.join(" OR ");
-  for (const excluded of excludedTerms) expression = `(${expression}) NOT ${excluded}`;
-  return expression;
+  return expressions.length === 1
+    ? expressions[0]!
+    : expressions.map(expression => `(${expression})`).join(" OR ");
 }
 
 function buildSqliteQuery(filters: SearchFilters, ftsQuery: string): { sql: string; params: unknown[] } {
