@@ -1775,7 +1775,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
       clearTimeout(player.timer); clearTimeout(player.arrive); clearTimeout(summaryTimer);
       Object.assign(player, { events: [], ts: [], received: 0, applied: 0, frameEnds: [], total: null, playing: true, serverDone: false, fast: false, source: null, liveStart: performance.now(), lastApply: 0 });
       player.clock0 = player.liveStart; resetView(); shownAt.clear(); callbacks.onResults([]);
-      $("tray").replaceChildren(); syncDockActive(0, false); $("more").hidden = true;
+      $("tray").replaceChildren(); delete $("tray").dataset.projection; syncDockActive(0, false); $("more").hidden = true;
       $("query-title").textContent = "“" + query + "”";
       setFollow(true); sync(performance.now(), false, null);
       tickSummary(); chrome();
