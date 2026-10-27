@@ -66,6 +66,7 @@ export function snippetParts(snippet: string): { text: string; match: boolean }[
 
   const parts: { text: string; match: boolean }[] = [];
   let match = false;
+  // eslint-disable-next-line no-control-regex -- Control characters delimit internal search match markers.
   for (const text of cleaned.split(/(\u0001|\u0002)/)) {
     if (text === '\u0001') {
       match = true;
@@ -80,6 +81,7 @@ export function snippetParts(snippet: string): { text: string; match: boolean }[
 
 function formatJsonStringArray(value: string): string | null {
   const markerValues: string[] = [];
+  // eslint-disable-next-line no-control-regex -- Control characters delimit internal search match markers.
   const json = value.replace(/[\u0001\u0002]/g, (marker) => {
     const placeholder = `\uE000${markerValues.length}\uE001`;
     markerValues.push(marker);
