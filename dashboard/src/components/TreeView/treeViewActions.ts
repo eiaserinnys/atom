@@ -77,7 +77,7 @@ export function buildModalConfirmAction(
   if (modal.type === 'edit') {
     return {
       type: 'edit-card',
-      vars: { cardId: modal.node.card.id, title, content },
+      vars: { cardId: modal.node.card.id, title, content, expectedVersion: modal.node.card.version },
     };
   }
 

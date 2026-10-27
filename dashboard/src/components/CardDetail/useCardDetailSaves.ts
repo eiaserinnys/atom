@@ -8,12 +8,12 @@ import { VersionConflictError } from '../../api/request';
 interface UseCardDetailSavesArgs {
   nodeId: string | null;
   editBaseVersion: number | null;
-  onSavingChange: (saving: boolean) => void;
+  onSavingChange: (field: 'title' | 'content' | 'journalLimit', saving: boolean) => void;
   onVersionConflict: (currentVersion: number) => void;
   saveFailedLabel: string;
   onSaveError: (field: 'title' | 'content' | 'journalLimit', message: string) => void;
-  onTitleSaved: (card: CardData) => void;
-  onContentSaved: (card: CardData) => void;
+  onTitleSaved: (card: CardData, savedTitle: string) => void;
+  onContentSaved: (card: CardData, savedContent: string) => void;
   onJournalLimitSaved: () => void;
   onJournalLimitIgnored: () => void;
 }
@@ -50,29 +50,29 @@ export function useCardDetailSaves({
 
   const saveTitle = useCallback(async (cardId: string | undefined, titleDraft: string) => {
     if (!cardId) return;
-    onSavingChange(true);
+    onSavingChange('title', true);
     try {
       const updatedCard = await api.updateCard(cardId, { title: titleDraft, expected_version: editBaseVersion ?? undefined });
-      onTitleSaved(updatedCard);
+      onTitleSaved(updatedCard, titleDraft);
       invalidateNode();
     } catch (error: unknown) {
       showSaveError('title', error);
     } finally {
-      onSavingChange(false);
+      onSavingChange('title', false);
     }
   }, [editBaseVersion, invalidateNode, onSavingChange, onTitleSaved, showSaveError]);
 
   const saveContent = useCallback(async (cardId: string | undefined, contentDraft: string) => {
     if (!cardId) return;
-    onSavingChange(true);
+    onSavingChange('content', true);
     try {
       const updatedCard = await api.updateCard(cardId, { content: contentDraft, expected_version: editBaseVersion ?? undefined });
-      onContentSaved(updatedCard);
+      onContentSaved(updatedCard, contentDraft);
       invalidateNode();
     } catch (error: unknown) {
       showSaveError('content', error);
     } finally {
-      onSavingChange(false);
+      onSavingChange('content', false);
     }
   }, [editBaseVersion, invalidateNode, onSavingChange, onContentSaved, showSaveError]);
 
@@ -85,7 +85,7 @@ export function useCardDetailSaves({
       return;
     }
 
-    onSavingChange(true);
+    onSavingChange('journalLimit', true);
     try {
       await api.updateNode(nodeId, { journal_limit: parsed.value });
       onJournalLimitSaved();
@@ -93,7 +93,7 @@ export function useCardDetailSaves({
     } catch (error: unknown) {
       showSaveError('journalLimit', error);
     } finally {
-      onSavingChange(false);
+      onSavingChange('journalLimit', false);
     }
   }, [invalidateNode, nodeId, onJournalLimitIgnored, onJournalLimitSaved, onSavingChange, showSaveError]);
 

@@ -23,7 +23,6 @@ export function DeleteConfirmModal({
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') onClose();
-    if (e.key === 'Enter') onConfirm();
   }
 
   return (

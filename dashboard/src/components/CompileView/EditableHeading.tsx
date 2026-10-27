@@ -6,6 +6,7 @@ import { api } from '../../api/client';
 import { CardFormModal } from '../CardFormModal/CardFormModal';
 import type { SectionMap } from '../../utils/parseCompileSections';
 import { standardCompileNodeQueryKey } from '../../query/queryKeys';
+import { VersionConflictError } from '../../api/request';
 
 interface EditableHeadingProps {
   level: number;
@@ -46,7 +47,7 @@ function extractNodeId(children: React.ReactNode): string | null {
 export function EditableHeading({ level, children, sectionMap, compiledNodeId }: EditableHeadingProps) {
   const { t } = useTranslation();
   const [showModal, setShowModal] = useState(false);
-  const [cardData, setCardData] = useState<{ title: string; content: string } | null>(null);
+  const [cardData, setCardData] = useState<{ title: string; content: string; version: number } | null>(null);
   const [loadingCard, setLoadingCard] = useState(false);
   const queryClient = useQueryClient();
 
@@ -55,8 +56,8 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
   const sectionInfo = nodeId ? sectionMap.get(nodeId) : null;
 
   const editMutation = useMutation({
-    mutationFn: (vars: { cardId: string; title: string; content: string }) =>
-      api.updateCard(vars.cardId, { title: vars.title, content: vars.content || undefined }),
+    mutationFn: (vars: { cardId: string; title: string; content: string; expectedVersion: number }) =>
+      api.updateCard(vars.cardId, { title: vars.title, content: vars.content, expected_version: vars.expectedVersion }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: standardCompileNodeQueryKey(compiledNodeId) });
       setShowModal(false);
@@ -68,10 +69,11 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
     e.stopPropagation();
     if (!sectionInfo) return;
 
+    editMutation.reset();
     setLoadingCard(true);
     try {
       const card = await api.getCard(sectionInfo.cardId);
-      setCardData({ title: card.title, content: card.content ?? '' });
+      setCardData({ title: card.title, content: card.content ?? '', version: card.version });
       setShowModal(true);
     } finally {
       setLoadingCard(false);
@@ -80,7 +82,7 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
 
   function handleConfirm(title: string, content: string) {
     if (!sectionInfo || !cardData) return;
-    editMutation.mutate({ cardId: sectionInfo.cardId, title, content });
+    editMutation.mutate({ cardId: sectionInfo.cardId, title, content, expectedVersion: cardData.version });
   }
 
   const HeadingTag = `h${level}` as ElementType;
@@ -113,6 +115,7 @@ export function EditableHeading({ level, children, sectionMap, compiledNodeId }:
           onConfirm={handleConfirm}
           onClose={() => { setShowModal(false); setCardData(null); }}
           isLoading={editMutation.isPending}
+          errorMessage={editMutation.error instanceof VersionConflictError ? t('card.unsaved_changes') : undefined}
         />
       )}
     </>

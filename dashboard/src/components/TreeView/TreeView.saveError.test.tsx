@@ -99,7 +99,9 @@ describe('TreeView Rename save errors', () => {
     await enterDraft();
     await settle(() => button(english.common.save).click());
 
-    expect(update).toHaveBeenCalledWith('card-a', { title: 'Draft title', content: 'Retained draft' });
+    expect(update).toHaveBeenCalledWith('card-a', {
+      title: 'Draft title', content: 'Retained draft', expected_version: 1,
+    });
     expect(alert()?.textContent).toBe(`${english.card.save_failed}: Card not found`);
     expect(alert()?.className).toBe('text-sm text-node-error');
     expect(input().value).toBe('Draft title');

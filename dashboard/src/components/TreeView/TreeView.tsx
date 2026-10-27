@@ -24,6 +24,7 @@ import type { MotionNode } from '../SearchMotionView/types';
 import { resolveNodePath } from './useInitialNodePathRestore';
 import { useInitialNodePathRestore } from './useInitialNodePathRestore';
 import { rootTreeQueryKey } from '../../query/queryKeys';
+import { VersionConflictError } from '../../api/request';
 import {
   buildContextMenuActionDescriptors,
   buildModalConfirmAction,
@@ -267,7 +268,9 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
               onClose={closeModal}
               isLoading={isFormMutating}
               errorMessage={modal.type === 'edit' && editMutation.isError
-                ? editMutation.error?.message
+                ? editMutation.error instanceof VersionConflictError
+                  ? t('card.unsaved_changes')
+                  : editMutation.error?.message
                   ? `${t('card.save_failed')}: ${editMutation.error.message}`
                   : t('card.save_failed')
                 : undefined}

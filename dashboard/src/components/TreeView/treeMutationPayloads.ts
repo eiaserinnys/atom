@@ -14,6 +14,7 @@ export interface EditCardVars {
   cardId: string;
   title: string;
   content: string;
+  expectedVersion: number;
 }
 
 export interface CreateCardPayload {
@@ -27,6 +28,7 @@ export interface CreateCardPayload {
 export interface EditCardPayload {
   title?: string;
   content?: string;
+  expected_version: number;
 }
 
 export function buildCreateCardPayload(vars: CreateCardVars): CreateCardPayload {
@@ -41,7 +43,8 @@ export function buildCreateCardPayload(vars: CreateCardVars): CreateCardPayload 
 export function buildEditCardPayload(vars: EditCardVars): EditCardPayload {
   return {
     title: vars.title,
-    content: vars.content || undefined,
+    content: vars.content,
+    expected_version: vars.expectedVersion,
   };
 }
 
