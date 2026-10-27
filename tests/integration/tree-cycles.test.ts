@@ -23,6 +23,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 describe.each(["sqlite", "postgres"] as const)("tree cycle protection (%s)", (kind) => {
   let tempDir: string;
   let dbPath: string;
+  let databaseWasEmpty = false;
 
   beforeAll(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "tree-cycle-test-"));
@@ -38,9 +39,11 @@ describe.each(["sqlite", "postgres"] as const)("tree cycle protection (%s)", (ki
     }
     await getDb().runMigrations(path.join(root, "src/db", kind === "sqlite" ? "migrations-sqlite" : "migrations"));
     expect((await getDb().query("SELECT COUNT(*) AS n FROM cards")).rows[0].n.toString()).toBe("0");
+    databaseWasEmpty = true;
   });
 
   afterEach(async () => {
+    if (!databaseWasEmpty) return;
     await getDb().query("DELETE FROM tree_nodes");
     await getDb().query("DELETE FROM cards");
   });

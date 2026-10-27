@@ -371,6 +371,7 @@ pnpm --dir dashboard lint
 `npm run test:unit` and `npm run test:e2e` do not require a database.
 `npm run test:integration` and `npm test` require an empty PostgreSQL test
 database whose name contains `test`; set its URL as `TEST_DATABASE_URL`.
+Integration tests delete rows from this database, so use a dedicated database with no data you need to keep.
 
 ```bash
 docker run --rm -d -p 127.0.0.1:5433:5432 -e POSTGRES_PASSWORD=test -e POSTGRES_DB=atom_test postgres:16
