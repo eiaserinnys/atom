@@ -81,7 +81,8 @@ export class JevSearchCatalog {
       const seeds = orQuery ? await this.deps.searchCards({ query: orQuery, strategy: "strict", limit: this.policy.seedLimit, root_node_id: this.rootId ?? undefined }) : [];
       // Search results already identify structural seeds, so summaries need not
       // wait for body/path hydration. Registration below still follows rank.
-      const summaries = seeds.map(seed => seed.node_id && seed.node_id !== this.rootId && seed.card_type === "structure" && !this.run.stopped()
+      const summaries = seeds.map(seed => seed.node_id && seed.node_id !== this.rootId && seed.card_type === "structure"
+        && (!this.rootId || !seed.is_symlink) && !this.run.stopped()
         ? this.prepareSummary(seed.node_id) : null);
       const [values, summaryResults] = await Promise.all([Promise.allSettled(seeds.map(async (seed, index) => {
         if (!seed.node_id || this.run.stopped()) return null;
@@ -170,7 +171,8 @@ export class JevSearchCatalog {
     });
     const values = await Promise.allSettled(reads.map(async read => {
       const outline = await read.read;
-      const summaries = (outline?.nodes ?? []).map(node => node.card_type === "structure" && node.is_symlink ? this.prepareSummary(node.id) : null);
+      const summaries = (outline?.nodes ?? []).map(node => node.card_type === "structure" && node.is_symlink && !this.rootId
+        ? this.prepareSummary(node.id) : null);
       const results = await Promise.all(summaries.map(summary => summary?.result ?? null));
       return { outline, summaries, results };
     }));
@@ -210,6 +212,7 @@ export class JevSearchCatalog {
   open(candidate: SearchCandidate, step: JevSearchStep): boolean {
     if (this.opened.has(candidate.cardId)) return false;
     this.opened.add(candidate.cardId);
+    if (this.rootId && candidate.isSymlink) return false;
     if (candidate.childCount !== null && candidate.childCount > this.policy.deferCandidates) {
       this.deferred.push(candidate);
       (step.deferred_refs ??= []).push(candidate.ref);

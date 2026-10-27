@@ -188,4 +188,57 @@ describe("U6 Jev search scope with SQLite aliases", () => {
     expect(response.results.every(result => result.node_id === rootNode.id || result.node_id === aliasNode.id)).toBe(true);
     expect(canonicalNode.id).not.toBe(aliasNode.id);
   });
+
+  it("does not expand a scoped structure alias into canonical children outside the root", async () => {
+    const db = getDb();
+    const rootCard = await insertCard(db, { card_type: "structure", title: "Requested Scope", content: null });
+    const rootNode = await insertNode(db, rootCard.id, null, 1);
+    const outsideParentCard = await insertCard(db, { card_type: "structure", title: "Outside Canonical Parent", content: null });
+    const outsideParentNode = await insertNode(db, outsideParentCard.id, null, 2);
+    const targetCard = await insertCard(db, { card_type: "structure", title: "Alias Structure", content: "u6structurealiasneedle" });
+    const canonicalNode = await insertNode(db, targetCard.id, outsideParentNode.id, 1);
+    const childCard = await insertCard(db, { card_type: "knowledge", title: "Canonical Child", content: "outsidechildneedle" });
+    const childNode = await insertNode(db, childCard.id, canonicalNode.id, 1);
+    const siblingCard = await insertCard(db, { card_type: "knowledge", title: "Outside Sibling", content: "unrelated sibling text" });
+    const siblingNode = await insertNode(db, siblingCard.id, outsideParentNode.id, 2);
+    const aliasNode = await insertNode(db, targetCard.id, rootNode.id, 1, true);
+    const payloads: JevMeaningPayload[] = [];
+
+    const response = await searchWithJev({ query: "u6structurealiasneedle", root_node_id: rootNode.id, exhaustive: true }, {
+      getNode,
+      getTreeOutline,
+      searchCards,
+      judge: async payload => {
+        payloads.push(payload);
+        return {
+          model: "jev-latest",
+          usage: { input_tokens: 1, output_tokens: 1 },
+          answers: Object.fromEntries(Object.keys(payload.questions).map(key => [key, {
+            type: "noul",
+            noul: 0.9,
+          }])),
+        };
+      },
+      policy: { ...JEV_SEARCH_POLICY },
+    });
+
+    const allPayloads = JSON.stringify(payloads);
+    const trace = JSON.stringify(response.trace);
+    expect(payloads.length).toBeGreaterThan(0);
+    expect(response.trace.candidates.map(candidate => candidate.node_id)).toContain(aliasNode.id);
+    expect(allPayloads).not.toContain(outsideParentNode.id);
+    expect(allPayloads).not.toContain(childNode.id);
+    expect(allPayloads).not.toContain(siblingNode.id);
+    expect(allPayloads).not.toContain(outsideParentCard.title);
+    expect(allPayloads).not.toContain(childCard.title);
+    expect(allPayloads).not.toContain(siblingCard.title);
+    expect(trace).not.toContain(outsideParentNode.id);
+    expect(trace).not.toContain(childNode.id);
+    expect(trace).not.toContain(siblingNode.id);
+    const resultNodeIds = response.results.map(result => result.node_id);
+    expect(resultNodeIds).not.toContain(outsideParentNode.id);
+    expect(resultNodeIds).not.toContain(childNode.id);
+    expect(resultNodeIds).not.toContain(siblingNode.id);
+    expect(canonicalNode.id).not.toBe(aliasNode.id);
+  });
 });
