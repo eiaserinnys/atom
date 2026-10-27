@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { UserRole } from '../../hooks/useAuth';
 import { useSystem } from '../../contexts/systemContext';
-import { ConfigCategoryNav, getDefaultConfigTab, type ConfigTab } from './ConfigCategoryNav';
+import { ConfigCategoryNav } from './ConfigCategoryNav';
+import { getDefaultConfigTab, type ConfigTab } from './configCategories';
 import { ConfigFooter } from './ConfigFooter';
 import { ConfigTabPanel } from './ConfigTabPanel';
 import type { AuthFooterState } from './AuthTab';
@@ -30,6 +31,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset the selected tab when the modal closes.
       setActiveTab(getDefaultConfigTab(currentUserRole));
       setAuthFooter(null);
       return;

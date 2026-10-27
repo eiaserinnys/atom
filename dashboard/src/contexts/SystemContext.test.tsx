@@ -11,6 +11,7 @@ let state: SystemState;
 let root: Root;
 let host: HTMLDivElement;
 const reload = vi.fn();
+// eslint-disable-next-line react-hooks/globals -- Expose the hook result to the test assertions.
 function Probe() { state = useSystem(); return null; }
 async function tick(ms: number) { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); }
 

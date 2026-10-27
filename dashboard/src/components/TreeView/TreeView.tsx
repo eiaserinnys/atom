@@ -59,8 +59,10 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
   const [modal, setModal] = useState<TreeModalState>({ type: 'none' });
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const previousRootIds = useRef<Set<string>>(new Set());
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Keep the callback identity stable for mutation hooks.
   const closeModal = useCallback(() => setModal({ type: 'none' }), []);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Keep the tree node toggle handler stable across renders.
   const toggleExpand = useCallback((nodeId: string) => {
     setExpandedNodes(prev => {
       const next = new Set(prev);
@@ -82,7 +84,6 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
     if (newRootIds.length === 0) return;
 
     // Preserve legacy auto-expand for roots when they first appear.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpandedNodes(prev => {
       const idsToExpand = newRootIds.filter(id => !prev.has(id));
       if (idsToExpand.length === 0) return prev;
@@ -134,10 +135,12 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
   const treeDrag = useTreeDragAndDrop({ roots, onMove: moveNode });
 
   // 컨텍스트 메뉴 핸들러
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Keep the tree node context-menu handler stable across renders.
   const handleContextMenu = useCallback((x: number, y: number, node: TreeNodeData) => {
     setContextMenu({ x, y, node });
   }, []);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Keep this action callback memoized with resetEditMutation.
   const handleContextMenuAction = useCallback((action: TreeContextMenuAction) => {
     if (action.type === 'create-child') {
       setModal({ type: 'create-child', cardType: action.cardType, parentNode: action.parentNode });

@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useSystem } from '../../contexts/systemContext';
 import type { UserRole } from '../../hooks/useAuth';
-import { ConfigCategoryNav, type ConfigTab } from './ConfigCategoryNav';
+import { ConfigCategoryNav } from './ConfigCategoryNav';
+import type { ConfigTab } from './configCategories';
 import { ConfigFooter } from './ConfigFooter';
 import { ConfigTabPanel } from './ConfigTabPanel';
 import type { AuthFooterState } from './AuthTab';

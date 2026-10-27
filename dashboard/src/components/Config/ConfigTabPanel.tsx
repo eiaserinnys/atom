@@ -8,7 +8,7 @@ import { DatabaseTab } from './DatabaseTab';
 import { LanguageTab } from './LanguageTab';
 import { OpenAITab } from './OpenAITab';
 import { UserManagementTab } from './UserManagementTab';
-import type { ConfigTab } from './ConfigCategoryNav';
+import type { ConfigTab } from './configCategories';
 
 const LABEL_KEYS: Record<ConfigTab, string> = {
   agents: 'config.tab_agents',

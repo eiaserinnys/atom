@@ -1,7 +1,7 @@
 import { TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ConfigActionButton } from './ConfigFields';
-import type { ConfigTab } from './ConfigCategoryNav';
+import type { ConfigTab } from './configCategories';
 import type { AuthFooterState } from './AuthTab';
 
 interface Props {
