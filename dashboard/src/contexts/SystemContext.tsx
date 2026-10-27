@@ -36,24 +36,32 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     // The deadline also applies while the old process keeps returning HTTP 200.
     const deadline = setTimeout(fail, 30_000);
     async function restart() {
+      let previousBootId: string | undefined;
       try {
-        const previous = await systemApi.getHealth();
-        if (!active) return;
-        await systemApi.restart();
-        if (!active) return;
-        poll = setInterval(() => {
-          systemApi.getHealth().then(health => {
-            if (active && health.bootId && health.bootId !== previous.bootId) {
-              active = false;
-              clearInterval(poll);
-              clearTimeout(deadline);
-              window.location.reload();
-            }
-          }).catch(() => {}); // Expected while the process is down.
-        }, 1000);
+        previousBootId = (await systemApi.getHealth()).bootId;
       } catch {
-        fail();
+        // The server may still be down after an earlier restart attempt.
       }
+      if (!active) return;
+      if (previousBootId !== undefined) {
+        try {
+          await systemApi.restart();
+        } catch {
+          fail();
+          return;
+        }
+      }
+      if (!active) return;
+      poll = setInterval(() => {
+        systemApi.getHealth().then(health => {
+          if (active && (previousBootId === undefined || (health.bootId && health.bootId !== previousBootId))) {
+            active = false;
+            clearInterval(poll);
+            clearTimeout(deadline);
+            window.location.reload();
+          }
+        }).catch(() => {}); // Expected while the process is down.
+      }, 1000);
     }
     void restart();
     return () => {

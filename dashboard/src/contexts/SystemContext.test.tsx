@@ -61,3 +61,27 @@ test('restores the existing restart prompt when the request fails', async () => 
   expect(state.pendingRestart).toBe(true);
   expect(reload).not.toHaveBeenCalled();
 });
+
+test.each(['recovers', 'times out'])('keeps reconnecting when pre-restart health fails and then %s', async outcome => {
+  api.getHealth.mockRejectedValue(new Error('offline'));
+  await act(async () => state.triggerRestart());
+  expect(state.reconnecting).toBe(true);
+  expect(api.restart).not.toHaveBeenCalled();
+  await tick(28_000);
+  expect(state.reconnecting).toBe(true);
+  expect(reload).not.toHaveBeenCalled();
+
+  if (outcome === 'recovers') {
+    api.getHealth.mockResolvedValue({ status: 'ok', bootId: 'returned' });
+    await tick(1000);
+    expect(reload).toHaveBeenCalledTimes(1);
+  } else {
+    await tick(1999);
+    expect(state.reconnecting).toBe(true);
+    await tick(1);
+    expect(state.reconnecting).toBe(false);
+    expect(state.pendingRestart).toBe(true);
+    expect(reload).not.toHaveBeenCalled();
+  }
+  expect(api.restart).not.toHaveBeenCalled();
+});
