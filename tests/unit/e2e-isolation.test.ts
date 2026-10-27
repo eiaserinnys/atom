@@ -12,23 +12,26 @@ function loadConfig(databaseUrl?: string, workspace?: string) {
   // Importing the config does not run Playwright or start either web server.
   return spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e',
     "const {default:c}=await import('./playwright.config.ts'); console.log(JSON.stringify(c.webServer));"],
-  { cwd: process.cwd(), env, encoding: 'utf8', timeout: 20_000 });
+  { cwd: process.cwd(), env, encoding: 'utf8', timeout: 120_000 });
 }
 
 test('E2E fails before startup when DATABASE_URL is inherited', () => {
   const result = loadConfig('postgresql://invalid/forbidden_test_db');
+  expect(result.error).toBeUndefined();
   expect(result.status).not.toBe(0);
   expect(result.stderr).toContain('DATABASE_URL');
-});
+}, 130_000);
 
 test('E2E rejects a checkout supplied as the disposable workspace', () => {
   const result = loadConfig(undefined, process.cwd());
+  expect(result.error).toBeUndefined();
   expect(result.status).not.toBe(0);
   expect(result.stderr).toContain('ATOM_E2E_DIR must be a disposable workspace');
-});
+}, 130_000);
 
 test('E2E server source, SQLite and .env all live in a disposable directory', () => {
   const result = loadConfig();
+  expect(result.error).toBeUndefined();
   expect(result.status).toBe(0);
   const [api] = JSON.parse(result.stdout.trim());
   expect(api.cwd).toEqual(expect.any(String));
@@ -41,7 +44,7 @@ test('E2E server source, SQLite and .env all live in a disposable directory', ()
   } finally {
     fs.rmSync(api.cwd, { recursive: true, force: true });
   }
-});
+}, 130_000);
 
 test('local database, migration leftovers and env variants stay out of git', () => {
   const files = ['atom.db', 'atom.db-wal', 'atom.db-shm', 'atom.db.deprecated', '.env.local', '.env.test'];

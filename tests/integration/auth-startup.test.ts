@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { createConnection } from 'node:net';
 import path from 'node:path';
@@ -10,7 +10,16 @@ import Database from 'better-sqlite3';
 // Other route integration tests use Fastify directly and cannot cover listen/seed.
 let child: ChildProcess | undefined;
 let directory: string;
+let sourceDirectory: string;
 
+beforeAll(() => {
+  sourceDirectory = mkdtempSync(path.join(realpathSync(tmpdir()), 'atom-auth-startup-source-'));
+  cpSync(path.resolve('src'), path.join(sourceDirectory, 'src'), { recursive: true });
+  symlinkSync(path.resolve('node_modules'), path.join(sourceDirectory, 'node_modules'), 'junction');
+  writeFileSync(path.join(sourceDirectory, 'package.json'), '{"type":"module"}');
+  writeFileSync(path.join(sourceDirectory, '.env'), '');
+});
+afterAll(() => { rmSync(sourceDirectory, { recursive: true, force: true }); });
 beforeEach(() => { directory = mkdtempSync(path.join(tmpdir(), 'atom-auth-startup-test-')); });
 afterEach(async () => {
   if (child && child.exitCode === null) {
@@ -23,10 +32,9 @@ afterEach(async () => {
 });
 
 async function startServer(allowedEmail: string, bypass: boolean) {
-  expect(existsSync(path.resolve('.env'))).toBe(false);
   const sqlitePath = path.join(directory, 'startup-test.db');
   child = spawn(process.execPath, ['--import', 'tsx', 'src/api/index.ts'], {
-    cwd: process.cwd(),
+    cwd: sourceDirectory,
     env: {
       PATH: process.env['PATH'], NODE_ENV: 'test', API_PORT: '0',
       SQLITE_PATH: sqlitePath, ALLOWED_EMAIL: allowedEmail,

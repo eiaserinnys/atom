@@ -22,7 +22,7 @@ export function setupRelativePositionIntegrationTest() {
     if (!databaseUrl) {
       throw new Error(
         "TEST_DATABASE_URL is required.\n" +
-          "Set it to: postgresql://atom:atom@localhost:5434/atom_test_db"
+          "Set it to an empty PostgreSQL test database, e.g. postgresql://postgres:test@127.0.0.1:5433/atom_test"
       );
     }
     if (!databaseUrl.includes("test")) {

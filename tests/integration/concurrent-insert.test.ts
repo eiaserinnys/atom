@@ -31,7 +31,7 @@ beforeAll(async () => {
   const databaseUrl = process.env["TEST_DATABASE_URL"];
   if (!databaseUrl) {
     throw new Error(
-      "TEST_DATABASE_URL is required. Set it to the atom-postgres test instance."
+      "TEST_DATABASE_URL is required. Set it to an empty PostgreSQL test database."
     );
   }
   if (!databaseUrl.includes("test")) {

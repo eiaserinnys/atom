@@ -23,6 +23,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 describe.each(["sqlite", "postgres"] as const)("tree cycle protection (%s)", (kind) => {
   let tempDir: string;
   let dbPath: string;
+  let databaseWasEmpty = false;
 
   beforeAll(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "tree-cycle-test-"));
@@ -31,16 +32,18 @@ describe.each(["sqlite", "postgres"] as const)("tree cycle protection (%s)", (ki
       setDb(new SqliteAdapter(dbPath));
     } else {
       const url = process.env["TEST_DATABASE_URL"];
-      if (!url || !new URL(url).pathname.endsWith("/cycle_test_db")) {
-        throw new Error("Tree cycle tests require a dedicated cycle_test_db TEST_DATABASE_URL");
+      if (!url || !url.includes("test")) {
+        throw new Error("Tree cycle tests require TEST_DATABASE_URL pointing to an empty test database (URL must contain 'test')");
       }
       setDb(new PostgresAdapter(url));
     }
     await getDb().runMigrations(path.join(root, "src/db", kind === "sqlite" ? "migrations-sqlite" : "migrations"));
     expect((await getDb().query("SELECT COUNT(*) AS n FROM cards")).rows[0].n.toString()).toBe("0");
+    databaseWasEmpty = true;
   });
 
   afterEach(async () => {
+    if (!databaseWasEmpty) return;
     await getDb().query("DELETE FROM tree_nodes");
     await getDb().query("DELETE FROM cards");
   });

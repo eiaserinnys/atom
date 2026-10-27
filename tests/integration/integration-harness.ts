@@ -23,7 +23,7 @@ export function setupIntegrationTestDb(): void {
     if (!databaseUrl) {
       throw new Error(
         "TEST_DATABASE_URL is required for integration tests.\n" +
-          "Set it to the atom-postgres instance: postgresql://atom:atom@localhost:5434/atom_test_db"
+          "Set it to an empty PostgreSQL test database, e.g. postgresql://postgres:test@127.0.0.1:5433/atom_test"
       );
     }
 
