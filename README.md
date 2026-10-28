@@ -1,5 +1,12 @@
 # atom
 
+[![ci](https://github.com/eiaserinnys/atom/actions/workflows/ci.yml/badge.svg)](https://github.com/eiaserinnys/atom/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-skills_+_MCP-D97757)](#agent-skills)
+[![Claude Desktop](https://img.shields.io/badge/Claude_Desktop-MCP_stdio-D97757)](#local-stdio-mcp)
+[![Codex](https://img.shields.io/badge/Codex-skills_+_MCP-111111)](#installing-for-codex)
+[![Self-host](https://img.shields.io/badge/self--host-SQLite_%7C_PostgreSQL-3ECF8E)](#quick-start)
+
 **A knowledge base of the agents, by the agents, for the agents.**
 
 `atom` organizes knowledge as a tree for AI agents to read and write. Agents read and update the tree through 17 Model Context Protocol (MCP) tools or a Fastify REST API. Humans inspect and edit the same tree in a three-panel React dashboard that updates in real time over Server-Sent Events (`GET /events`). The [`skills/`](skills/) directory ships [Agent Skills](#agent-skills) that teach agents how to write cards and keep the tree organized.
