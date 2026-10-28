@@ -40,7 +40,7 @@ export function CompileToc({ sections, scrollRef, listRef }: Props) {
       className={`absolute top-0 right-0 bottom-0 overflow-y-auto bg-background/95 backdrop-blur-sm border-l border-border transition-all duration-200 ease-out ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2 pointer-events-none'}`}
       style={{ width: TOC_WIDTH }}
     >
-      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+      <nav className="pb-3" style={{ height: virtualizer.getTotalSize(), boxSizing: 'content-box', position: 'relative' }}>
         {virtualizer.getVirtualItems().map(row => {
           const style = { position: 'absolute' as const, top: 0, left: 0, width: '100%', transform: `translateY(${row.start}px)` };
           if (row.index === 0) return <div key="title" className="px-3 py-3 text-[13px] font-semibold text-muted-foreground uppercase tracking-wider" style={style}>{t('compile.toc_title')}</div>;
@@ -54,7 +54,7 @@ export function CompileToc({ sections, scrollRef, listRef }: Props) {
             >{entry.text}</button>
           </div>;
         })}
-      </div>
+      </nav>
     </div>
     {!visible && <div className="absolute top-1/3 right-1 w-1 h-1/3 rounded-none bg-muted-foreground/20" />}
   </div>;

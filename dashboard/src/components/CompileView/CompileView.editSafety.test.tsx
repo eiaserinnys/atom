@@ -13,7 +13,7 @@ import { CompileView } from './CompileView';
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize: (index: number) => number }) => ({
     getVirtualItems: () => Array.from({ length: count }, (_, index) => ({ key: index, index, start: index * estimateSize(index) })),
-    getTotalSize: () => count * estimateSize(0), measureElement: () => {}, scrollToIndex: () => {}, scrollRect: { width: 600 },
+    getTotalSize: () => count * estimateSize(0), measureElement: () => {}, scrollToIndex: () => {}, scrollToOffset: () => {}, cancelScroll: () => {}, scrollRect: { width: 600 },
   }),
 }));
 

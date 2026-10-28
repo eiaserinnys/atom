@@ -166,7 +166,9 @@
   }
 
   .compile-section { display: flow-root; }
-  .markdown-content .compile-section > :last-child { margin-bottom: 0; }
+  /* Only the final block's last-child chain reaches the section boundary. */
+  .markdown-content .compile-section > :last-child,
+  .markdown-content .compile-section > :last-child :last-child:not(.compile-section > :last-child :not(:last-child) *) { margin-bottom: 0; }
 
   .markdown-content h1,
   .markdown-content h2,
@@ -296,8 +298,8 @@
 }
 
 ::highlight(compile-find-current) {
-  background-color: color-mix(in srgb, var(--brand) 65%, transparent);
-  color: var(--foreground);
+  background-color: var(--brand);
+  color: var(--brand-foreground);
 }
 
 @media (max-width: 767px) {
@@ -310,6 +312,7 @@
 /* Index geometry and the minimum UI type gate also cover inherited modal utilities. */
 *, *::before, *::after { border-radius: 0 !important; box-shadow: none !important; }
 :focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--ring) !important; }
+[data-compile-scroll]:focus-visible { box-shadow: none !important; }
 /* Filled buttons: a ring at the edge vanishes into the brand fill or the page, so draw it in the button's text color 2px inside the edge. */
 :is(.bg-brand, .bg-primary, .bg-node-error, .bg-green-600, .bg-foreground):focus-visible { box-shadow: none !important; outline: 2px solid currentColor; outline-offset: -4px; }
 .text-xs { font-size: 13px; line-height: 1.4; }

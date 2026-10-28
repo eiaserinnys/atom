@@ -65,9 +65,6 @@ export function useCompileFind(
       if (occurrence && element?.dataset.loaded === 'true') {
         const range = findTextRanges(element, term)[occurrence.withinSection];
         if (range) {
-          const rect = range.getBoundingClientRect();
-          const scrollRect = scroll.getBoundingClientRect();
-          scroll.scrollTop += rect.top + rect.height / 2 - scrollRect.top - scroll.clientHeight / 2;
           paintedCurrent = target.index;
           pending.current = null;
           setCurrent(target.index);
@@ -78,7 +75,8 @@ export function useCompileFind(
         } else {
           const index = (target.index + target.direction + occurrences.length) % occurrences.length;
           pending.current = { ...target, index, tried: target.tried + 1 };
-          listRef.current?.jumpToMatch(occurrences[index]!.sectionIndex);
+          const next = occurrences[index]!;
+          listRef.current?.jumpToMatch(next.sectionIndex, term, next.withinSection);
           requestAnimationFrame(resolve);
         }
       }
@@ -90,9 +88,16 @@ export function useCompileFind(
     if (occurrences.length === 0) return;
     const index = current < 0 ? (direction === 1 ? 0 : occurrences.length - 1) : (current + direction + occurrences.length) % occurrences.length;
     pending.current = { index, direction, tried: 0 };
-    listRef.current?.jumpToMatch(occurrences[index]!.sectionIndex);
+    const next = occurrences[index]!;
+    listRef.current?.jumpToMatch(next.sectionIndex, term, next.withinSection);
     requestAnimationFrame(resolve);
-  }, [current, listRef, occurrences, resolve]);
+  }, [current, listRef, occurrences, resolve, term]);
+
+  useEffect(() => {
+    pending.current = null;
+    const list = listRef.current;
+    return () => { list?.cancelJump(); };
+  }, [listRef, open, term]);
 
   useEffect(() => {
     const scroll = scrollRef.current;

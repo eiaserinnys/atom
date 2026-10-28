@@ -30,8 +30,10 @@ export function CompileFindBar({ query, current, total, onChange, onNavigate, on
       />
     </div>
     {query.trim() && <span className="text-[13px] text-muted-foreground shrink-0">{current}/{total}</span>}
-    <button type="button" className={button} title={t('compile.find_previous')} aria-label={t('compile.find_previous')} onClick={() => onNavigate(-1)}><ChevronUp className="w-4 h-4" aria-hidden="true" /></button>
-    <button type="button" className={button} title={t('compile.find_next')} aria-label={t('compile.find_next')} onClick={() => onNavigate(1)}><ChevronDown className="w-4 h-4" aria-hidden="true" /></button>
-    <button type="button" className={button} title={t('compile.find_close')} aria-label={t('compile.find_close')} onClick={onClose}><X className="w-4 h-4" aria-hidden="true" /></button>
+    <div className="-mr-2 flex items-center gap-2">
+      <button type="button" className={button} title={t('compile.find_previous')} aria-label={t('compile.find_previous')} onClick={() => onNavigate(-1)}><ChevronUp className="w-4 h-4" aria-hidden="true" /></button>
+      <button type="button" className={button} title={t('compile.find_next')} aria-label={t('compile.find_next')} onClick={() => onNavigate(1)}><ChevronDown className="w-4 h-4" aria-hidden="true" /></button>
+      <button type="button" className={button} title={t('compile.find_close')} aria-label={t('compile.find_close')} onClick={onClose}><X className="w-4 h-4" aria-hidden="true" /></button>
+    </div>
   </div>;
 }
