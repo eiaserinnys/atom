@@ -3,6 +3,9 @@ import {
   getNode,
   listChildren,
   compileSubtree,
+  compileSubtreeSections,
+  findCompileSubtree,
+  getCompileCardContents,
   createSymlink,
   deleteNode,
   moveNode,
@@ -24,6 +27,17 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
   // GET /tree/outline — body-free structural outline (same handler as
   // GET /api/tree/outline). Static segment, so it wins over /tree/:nodeId.
   app.get("/tree/outline", createTreeOutlineHandler({ getTreeOutline }));
+
+  // POST /tree/compile/contents — fetch card bodies for a visible section batch.
+  app.post("/tree/compile/contents", async (req, reply) => {
+    const body = req.body as Record<string, unknown> | null ?? {};
+    const cardIds = body["card_ids"];
+    if (!Array.isArray(cardIds) || cardIds.length < 1 || cardIds.length > 200 ||
+      !cardIds.every((cardId) => typeof cardId === "string")) {
+      return reply.code(400).send({ error: "card_ids must be an array of 1–200 strings" });
+    }
+    return getCompileCardContents(cardIds);
+  });
 
   // GET /tree/:nodeId
   app.get<{ Params: { nodeId: string } }>(
@@ -104,6 +118,76 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // GET /tree/:nodeId/compile/sections — numbered compile sections for the dashboard.
+  app.get<{ Params: { nodeId: string } }>(
+    "/tree/:nodeId/compile/sections",
+    async (req, reply) => {
+      const qs = req.query as Record<string, string | undefined>;
+      const depthStr = qs["depth"];
+      const depth = depthStr === "Infinity"
+        ? Infinity
+        : depthStr !== undefined && !isNaN(parseInt(depthStr, 10))
+          ? parseInt(depthStr, 10)
+          : 3;
+      const headChars = parseHeadChars(qs["head_chars"]);
+      if (headChars === null) {
+        return reply.code(400).send({ error: "head_chars must be an integer between 0 and 200000" });
+      }
+      return compileSubtreeSections(
+        req.params.nodeId,
+        depth,
+        headChars,
+        { numbering: true, includeIds: true }
+      );
+    }
+  );
+
+  // POST /tree/:nodeId/compile/sections — sections with the existing unfurl compile options.
+  app.post<{ Params: { nodeId: string } }>(
+    "/tree/:nodeId/compile/sections",
+    async (req, reply) => {
+      const body = req.body as Record<string, unknown> | null ?? {};
+      const headChars = parseHeadChars(body["head_chars"]);
+      if (headChars === null) {
+        return reply.code(400).send({ error: "head_chars must be an integer between 0 and 200000" });
+      }
+      const depth = body["depth"] === null
+        ? Infinity
+        : typeof body["depth"] === "number" ? body["depth"] : 3;
+      const resolveRefs = (body["resolveRefs"] as "cached" | "fresh" | undefined) ?? undefined;
+      const credentials = (body["credentials"] as Record<string, Record<string, string>> | undefined) ?? undefined;
+      return compileSubtreeSections(
+        req.params.nodeId,
+        depth,
+        headChars,
+        {},
+        resolveRefs,
+        credentials,
+        req.jwtUser?.role === "admin" || req.jwtUser?.role === "editor"
+      );
+    }
+  );
+
+  // GET /tree/:nodeId/compile/find — count non-overlapping, case-insensitive matches by section.
+  app.get<{ Params: { nodeId: string } }>(
+    "/tree/:nodeId/compile/find",
+    async (req, reply) => {
+      const qs = req.query as Record<string, string | undefined>;
+      const rawQuery = qs["q"];
+      const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
+      if (query.length < 1 || query.length > 200) {
+        return reply.code(400).send({ error: "q must contain 1–200 characters" });
+      }
+      const depthStr = qs["depth"];
+      const depth = depthStr === "Infinity"
+        ? Infinity
+        : depthStr !== undefined && !isNaN(parseInt(depthStr, 10))
+          ? parseInt(depthStr, 10)
+          : 3;
+      return findCompileSubtree(req.params.nodeId, depth, query);
+    }
+  );
+
   // POST /tree/symlink
   app.post("/tree/symlink", async (req, reply) => {
     const body = req.body as Record<string, unknown>;
@@ -169,4 +253,12 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(204).send();
     }
   );
+}
+
+function parseHeadChars(value: unknown): number | null {
+  if (value === undefined) return 0;
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 200000 ? parsed : null;
 }

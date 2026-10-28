@@ -45,8 +45,7 @@ export function presentContinuation(scene, segment, frame, active) {
     }
     if (refs.length) scene.inflight.delete(call.id);
   }
-  // The narration names the actual search hop; the display can put newly found
-  // cards in the approved single continuation column.
+  // The narration and newly found cards stay on their actual search hops.
   scene.last = { stage: step.stage, hop: step.hop };
   scene.continuationStep = { stage: step.stage, hop, refs };
 }

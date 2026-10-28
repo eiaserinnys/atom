@@ -9,8 +9,14 @@ import {
   assertTreeParent,
   updateNodeProperties as updateNodePropertiesQuery,
 } from "../db/queries/tree.js";
-import { selectCardById } from "../db/queries/cards.js";
-import { compileNode, type CompileOptions, type ResolvedRef } from "../shared/bfs.js";
+import { selectCardById, selectCardsByIds } from "../db/queries/cards.js";
+import {
+  compileNode,
+  compileSections as compileBfsSections,
+  type CompileOptions,
+  type CompileSection,
+  type ResolvedRef,
+} from "../shared/bfs.js";
 import type { TreeNode, TreeNodeWithCard, TreeOutline, TreeOutlineNode } from "../shared/types.js";
 import { selectTreeOutlineRows } from "../db/queries/tree-outline.js";
 import { EXCERPT_SOURCE_CHARS, toOutlineExcerpt } from "./outline-excerpt.js";
@@ -74,6 +80,17 @@ export async function listChildren(
 export interface CompileResult {
   markdown: string;
   unfurls?: CompileUnfurls;
+}
+
+export interface CompileSectionsResult {
+  sections: CompileSection[];
+  total_chars: number;
+  unfurls?: CompileUnfurls;
+}
+
+export interface CompileFindResult {
+  matches: Array<{ index: number; count: number }>;
+  total: number;
 }
 
 export async function compileSubtree(
@@ -141,6 +158,141 @@ export async function compileSubtree(
   const unfurls = buildCompileUnfurls(resolvedRefsMap);
 
   return { markdown, ...(unfurls ? { unfurls } : {}) };
+}
+
+export async function compileSubtreeSections(
+  nodeId: string,
+  depth: number = 3,
+  headChars: number = 0,
+  options: CompileOptions = {},
+  resolveRefsMode?: false | "cached" | "fresh",
+  credentials?: Record<string, UnfurlCredentials>,
+  canWriteRefs: boolean = false
+): Promise<CompileSectionsResult> {
+  const db = getDb();
+  const compileContext = await loadTreeCompileContext(db, nodeId, depth);
+  const emittedCardIds = new Set<string>();
+  const shouldResolveRefs = resolveRefsMode !== undefined && resolveRefsMode !== false;
+  const baseOptions: CompileOptions = {
+    ...options,
+    resolvedRefs: shouldResolveRefs ? undefined : options.resolvedRefs,
+    onCardEmitted: (cardId) => {
+      emittedCardIds.add(cardId);
+      if (!shouldResolveRefs) options.onCardEmitted?.(cardId);
+    },
+  };
+
+  let sections = compileBfsSections(
+    nodeId,
+    compileContext.getNodeCard,
+    compileContext.getChildren,
+    compileContext.getCard,
+    depth,
+    baseOptions
+  );
+
+  let resolvedRefsMap: Map<string, ResolvedRef> | undefined;
+  if (shouldResolveRefs) {
+    const emittedCards = new Map(
+      Array.from(compileContext.cardCache.entries())
+        .filter(([cardId]) => emittedCardIds.has(cardId))
+    );
+    resolvedRefsMap = await resolveCompileRefs(
+      emittedCards,
+      resolveRefsMode,
+      credentials ?? {},
+      createCompileUnfurlDeps(db),
+      canWriteRefs
+    );
+    sections = sections.map((section) => {
+      if (section.cycle) return section;
+      options.onCardEmitted?.(section.card_id);
+      const resolved = resolvedRefsMap?.get(section.card_id);
+      if (!resolved) return section;
+      return {
+        ...section,
+        unfurl_text: resolved.ok
+          ? resolved.result.text
+          : `<!-- unfurl failed: ${resolved.sourceType} -->`,
+      };
+    });
+  }
+
+  const totalChars = sections.reduce((total, section) => total + section.chars, 0);
+  const unfurls = buildCompileUnfurls(resolvedRefsMap);
+  return {
+    sections: selectSectionHead(sections, headChars),
+    total_chars: totalChars,
+    ...(unfurls ? { unfurls } : {}),
+  };
+}
+
+export async function findCompileSubtree(
+  nodeId: string,
+  depth: number,
+  query: string
+): Promise<CompileFindResult> {
+  const db = getDb();
+  const compileContext = await loadTreeCompileContext(db, nodeId, depth);
+  const sections = compileBfsSections(
+    nodeId,
+    compileContext.getNodeCard,
+    compileContext.getChildren,
+    compileContext.getCard,
+    depth,
+    { numbering: true, includeIds: true }
+  );
+  const normalizedQuery = query.trim().toLowerCase();
+  const matches: Array<{ index: number; count: number }> = [];
+  for (const section of sections) {
+    const text = `${section.title}\n${section.content ?? ""}`.toLowerCase();
+    let count = 0;
+    let offset = 0;
+    while (true) {
+      const foundAt = text.indexOf(normalizedQuery, offset);
+      if (foundAt < 0) break;
+      count += 1;
+      offset = foundAt + normalizedQuery.length;
+    }
+    if (count > 0) matches.push({ index: section.index, count });
+  }
+  return { matches, total: matches.reduce((total, match) => total + match.count, 0) };
+}
+
+export async function getCompileCardContents(cardIds: string[]): Promise<{
+  contents: Record<string, { version: number; content: string | null }>;
+}> {
+  const cards = await selectCardsByIds(getDb(), Array.from(new Set(cardIds)));
+  return {
+    contents: Object.fromEntries(cards.map((card) => [card.id, {
+      version: card.version,
+      content: card.content,
+    }])),
+  };
+}
+
+function selectSectionHead(sections: CompileSection[], headChars: number): CompileSection[] {
+  let includedChars = 0;
+  let includedBody = false;
+  let pastHead = false;
+
+  return sections.map((section) => {
+    if (section.chars === 0) return { ...section, content: null };
+    if (!pastHead && includedChars + section.chars <= headChars) {
+      includedChars += section.chars;
+      includedBody = true;
+      return section;
+    }
+    if (!includedBody && headChars > 0) {
+      includedChars += section.chars;
+      includedBody = true;
+      pastHead = true;
+      return section;
+    }
+    pastHead = true;
+    const { content: _content, ...withoutContent } = section;
+    return withoutContent;
+  });
 }
 
 export async function createSymlink(

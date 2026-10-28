@@ -6,7 +6,13 @@ import { getDb } from '../../db/client.js';
 import { findUserById } from '../../db/queries/users.js';
 
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const READ_ONLY_POST_ROUTES = ['/tree/:nodeId/compile', '/search/evaluate', '/search/expand'];
+const READ_ONLY_POST_ROUTES = [
+  '/tree/:nodeId/compile',
+  '/tree/compile/contents',
+  '/tree/:nodeId/compile/sections',
+  '/search/evaluate',
+  '/search/expand',
+];
 
 // Module-level lazy init to avoid re-creating on every request
 let _jwtSecret: Uint8Array | null = null;
