@@ -1,9 +1,9 @@
 import {
-  selectCanonicalNodeByCardId,
-  selectChildren,
+  selectCanonicalNodesByCardIds,
+  selectChildrenByParentIds,
   selectNodeById,
 } from "../db/queries/tree.js";
-import { selectCardById } from "../db/queries/cards.js";
+import { selectCardsByIds } from "../db/queries/cards.js";
 import type { Queryable } from "../db/queryable.js";
 import type { Card, TreeNode } from "../shared/types.js";
 
@@ -21,32 +21,77 @@ export async function loadTreeCompileContext(
 ): Promise<TreeCompileContext> {
   const nodeCache = new Map<string, TreeNode>();
   const cardCache = new Map<string, Card>();
-  const visitedCardIds = new Set<string>();
+  const canonicalNodeIdByCardId = new Map<string, string>();
+  const canonicalLookupComplete = new Set<string>();
+  const fetchedParentIds = new Set<string>();
 
-  async function preloadSubtree(nid: string, remaining: number): Promise<void> {
-    const node = await selectNodeById(db, nid);
-    if (!node) return;
-    nodeCache.set(nid, node);
-    await cacheCard(db, cardCache, node.card_id);
-
-    if (remaining <= 0) return;
-    if (visitedCardIds.has(node.card_id)) return;
-
-    visitedCardIds.add(node.card_id);
-    try {
-      const childParentId = await resolveChildParentId(db, nodeCache, cardCache, node);
-      const children = await selectChildren(db, childParentId);
-      for (const child of children) {
-        nodeCache.set(child.id, child);
-        await cacheCard(db, cardCache, child.card_id);
-        await preloadSubtree(child.id, remaining - 1);
+  function cacheNodes(nodes: TreeNode[]): void {
+    for (const node of nodes) {
+      nodeCache.set(node.id, node);
+      if (!node.is_symlink && !canonicalNodeIdByCardId.has(node.card_id)) {
+        canonicalNodeIdByCardId.set(node.card_id, node.id);
+        canonicalLookupComplete.add(node.card_id);
       }
-    } finally {
-      visitedCardIds.delete(node.card_id);
     }
   }
 
-  await preloadSubtree(nodeId, depth);
+  async function cacheMissingCards(cardIds: string[]): Promise<void> {
+    const missingCardIds = Array.from(new Set(cardIds)).filter((id) => !cardCache.has(id));
+    if (missingCardIds.length === 0) return;
+    const cards = await selectCardsByIds(db, missingCardIds);
+    for (const card of cards) cardCache.set(card.id, card);
+  }
+
+  const root = await selectNodeById(db, nodeId);
+  if (root) {
+    cacheNodes([root]);
+    await cacheMissingCards([root.card_id]);
+  }
+
+  let levelNodes = root ? [root] : [];
+  let level = 0;
+
+  while (levelNodes.length > 0 && level < depth) {
+    const unresolvedCardIds = Array.from(new Set(
+      levelNodes
+        .filter((node) => node.is_symlink && !canonicalLookupComplete.has(node.card_id))
+        .map((node) => node.card_id)
+    ));
+    const canonicalNodes = unresolvedCardIds.length > 0
+      ? await selectCanonicalNodesByCardIds(db, unresolvedCardIds)
+      : [];
+    cacheNodes(canonicalNodes);
+    for (const cardId of unresolvedCardIds) canonicalLookupComplete.add(cardId);
+
+    const parentIds = Array.from(new Set(levelNodes.map((node) =>
+      node.is_symlink
+        ? canonicalNodeIdByCardId.get(node.card_id) ?? node.id
+        : node.id
+    )));
+    const newParentIds = parentIds.filter((parentId) => !fetchedParentIds.has(parentId));
+    const childNodes = newParentIds.length > 0
+      ? await selectChildrenByParentIds(db, newParentIds)
+      : [];
+    for (const parentId of newParentIds) fetchedParentIds.add(parentId);
+    cacheNodes(childNodes);
+    await cacheMissingCards([
+      ...canonicalNodes.map((node) => node.card_id),
+      ...childNodes.map((node) => node.card_id),
+    ]);
+
+    if (childNodes.length === 0) break;
+    levelNodes = childNodes;
+    level += 1;
+  }
+
+  const childrenByParent = new Map<string, TreeNode[]>();
+  for (const node of nodeCache.values()) {
+    if (node.parent_node_id === null) continue;
+    const children = childrenByParent.get(node.parent_node_id) ?? [];
+    children.push(node);
+    childrenByParent.set(node.parent_node_id, children);
+  }
+  for (const children of childrenByParent.values()) children.sort(compareTreePositionAsc);
 
   return {
     cardCache,
@@ -60,13 +105,9 @@ export async function loadTreeCompileContext(
       if (!node) return [];
 
       const effectiveParentId = node.is_symlink
-        ? findCanonicalNodeId(nodeCache, node.card_id) ?? nid
+        ? canonicalNodeIdByCardId.get(node.card_id) ?? nid
         : nid;
-
-      const children = Array.from(nodeCache.values())
-        .filter((n) => n.parent_node_id === effectiveParentId)
-        .sort(compareTreePositionAsc);
-
+      const children = childrenByParent.get(effectiveParentId) ?? [];
       const journalLimit = node.journal_limit;
       if (journalLimit === null || journalLimit === undefined) return children;
 
@@ -80,39 +121,6 @@ export async function loadTreeCompileContext(
       return card;
     },
   };
-}
-
-async function resolveChildParentId(
-  db: Queryable,
-  nodeCache: Map<string, TreeNode>,
-  cardCache: Map<string, Card>,
-  node: TreeNode
-): Promise<string> {
-  if (!node.is_symlink) return node.id;
-
-  const canonicalNode = await selectCanonicalNodeByCardId(db, node.card_id);
-  if (!canonicalNode) return node.id;
-
-  nodeCache.set(canonicalNode.id, canonicalNode);
-  await cacheCard(db, cardCache, canonicalNode.card_id);
-  return canonicalNode.id;
-}
-
-async function cacheCard(
-  db: Queryable,
-  cardCache: Map<string, Card>,
-  cardId: string
-): Promise<void> {
-  if (cardCache.has(cardId)) return;
-  const card = await selectCardById(db, cardId);
-  if (card) cardCache.set(cardId, card);
-}
-
-function findCanonicalNodeId(nodeCache: ReadonlyMap<string, TreeNode>, cardId: string): string | null {
-  for (const [id, node] of nodeCache) {
-    if (node.card_id === cardId && !node.is_symlink) return id;
-  }
-  return null;
 }
 
 function compareTreePositionAsc(a: TreeNode, b: TreeNode): number {

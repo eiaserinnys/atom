@@ -1,5 +1,6 @@
 import type { Card, TreeNode } from "./types.js";
 import type { UnfurlResult } from "../unfurl/interface.js";
+import { extractMarkdownHeadings, type MarkdownHeading } from "./compile-markdown-headings.js";
 
 export type ResolvedRef =
   | { ok: true; result: UnfurlResult; sourceType: string }
@@ -24,6 +25,22 @@ export interface CompileOptions {
   /** Limit depth-1 children (direct children of the root node) to the latest n items.
    *  Sorted by card_timestamp descending. Does not affect deeper levels. */
   limit?: number;
+}
+
+export interface CompileSection {
+  index: number;
+  node_id: string;
+  card_id: string;
+  card_version: number;
+  depth: number;
+  level: number;
+  heading: string;
+  title: string;
+  cycle: boolean;
+  chars: number;
+  headings: MarkdownHeading[];
+  content?: string | null;
+  unfurl_text?: string | null;
 }
 
 function buildIdLabel(nodeId: string, cardId: string): string {
@@ -137,6 +154,20 @@ export function compileNode(
   options: CompileOptions = {},
   numberPrefix: string = ""
 ): string {
+  if (!options.titlesOnly) {
+    return renderSections(collectCompileSections(
+      nodeId,
+      getNodeCard,
+      getChildren,
+      getCard,
+      depth,
+      options,
+      visited,
+      headingLevel,
+      numberPrefix
+    ));
+  }
+
   // exclude_nodes — skip this node and all descendants
   if (options.excludeNodes?.has(nodeId)) {
     return "";
@@ -149,62 +180,29 @@ export function compileNode(
   // Cycle detection — no metadata comment on cycle nodes
   if (visited.has(card_id)) {
     const card = getCard(card_id);
-    if (options.titlesOnly) {
-      const indent = "  ".repeat(currentDepth);
-      const prefix = currentDepth === 0 ? "" : "├── ";
-      return `${indent}${prefix}${numberLabel}${card.title} *(cycle)*`;
-    }
-    const heading = "#".repeat(Math.min(headingLevel, 6));
-    return `${heading} ${numberLabel}${card.title} *(cycle)*`;
+    const indent = "  ".repeat(currentDepth);
+    const prefix = currentDepth === 0 ? "" : "├── ";
+    return `${indent}${prefix}${numberLabel}${card.title} *(cycle)*`;
   }
 
   const card = getCard(card_id);
   const contentChars = card.content?.length ?? 0;
 
-  // Build this node's output line
-  const lines: string[] = [];
-  if (options.titlesOnly) {
-    const indent = "  ".repeat(currentDepth);
-    const prefix = currentDepth === 0 ? "" : "├── ";
-    const symlinkMark = is_symlink ? "~ " : "";
-    let metaPart: string;
-    if (options.includeIds === true) {
-      // full metadata HTML 주석 (명시적 true 보존)
-      metaPart = " " + buildMetaComment(nodeId, card, currentDepth, contentChars, is_symlink);
-    } else if (options.includeIds === false) {
-      // minimal — UUID 생략 (명시적 false, pre-260508 legacy)
-      metaPart = ` (${contentChars} chars)`;
-    } else {
-      // 디폴트 — 짧은 ID 라벨 + chars (260508)
-      metaPart = ` ${buildIdLabel(nodeId, card.id)} (${contentChars} chars)`;
-    }
-    lines.push(`${indent}${prefix}${numberLabel}${symlinkMark}${card.title}${metaPart}`);
+  const indent = "  ".repeat(currentDepth);
+  const prefix = currentDepth === 0 ? "" : "├── ";
+  const symlinkMark = is_symlink ? "~ " : "";
+  let metaPart: string;
+  if (options.includeIds === true) {
+    // full metadata HTML 주석 (명시적 true 보존)
+    metaPart = " " + buildMetaComment(nodeId, card, currentDepth, contentChars, is_symlink);
+  } else if (options.includeIds === false) {
+    // minimal — UUID 생략 (명시적 false, pre-260508 legacy)
+    metaPart = ` (${contentChars} chars)`;
   } else {
-    options.onCardEmitted?.(card_id);
-    const heading = "#".repeat(Math.min(headingLevel, 6));
-    const symlinkMark = is_symlink ? "~ " : "";
-    if (options.includeIds === false) {
-      // minimal (명시적 false, pre-260508 legacy) — HTML 주석 생략
-      lines.push(`${heading} ${numberLabel}${symlinkMark}${card.title}`);
-    } else {
-      // 디폴트(undefined) 또는 true — full metadata HTML 주석 노출 (260508)
-      lines.push(`${heading} ${numberLabel}${symlinkMark}${card.title} ${buildMetaComment(nodeId, card, currentDepth, undefined, is_symlink)}`);
-    }
-    if (card.content) {
-      lines.push(card.content);
-    }
-    // Append unfurl result if available
-    if (options.resolvedRefs) {
-      const resolved = options.resolvedRefs.get(card_id);
-      if (resolved) {
-        if (resolved.ok) {
-          lines.push(resolved.result.text);
-        } else {
-          lines.push(`<!-- unfurl failed: ${resolved.sourceType} -->`);
-        }
-      }
-    }
+    // 디폴트 — 짧은 ID 라벨 + chars (260508)
+    metaPart = ` ${buildIdLabel(nodeId, card.id)} (${contentChars} chars)`;
   }
+  const lines = [`${indent}${prefix}${numberLabel}${symlinkMark}${card.title}${metaPart}`];
 
   // No children if depth exhausted
   if (depth <= 0) {
@@ -255,4 +253,135 @@ export function compileNode(
   });
 
   return lines.join("\n");
+}
+
+/** Compile one record for each heading and body emitted by full-content mode. */
+export function compileSections(
+  nodeId: string,
+  getNodeCard: (nodeId: string) => { card_id: string; is_symlink: boolean },
+  getChildren: (nodeId: string) => TreeNode[],
+  getCard: (cardId: string) => Card,
+  depth: number,
+  options: CompileOptions = {}
+): CompileSection[] {
+  return collectCompileSections(
+    nodeId, getNodeCard, getChildren, getCard, depth, options, new Set(), 1, ""
+  ).map((section, index) => ({ ...section, index }));
+}
+
+function collectCompileSections(
+  nodeId: string,
+  getNodeCard: (nodeId: string) => { card_id: string; is_symlink: boolean },
+  getChildren: (nodeId: string) => TreeNode[],
+  getCard: (cardId: string) => Card,
+  depth: number,
+  options: CompileOptions,
+  visited: ReadonlySet<string>,
+  headingLevel: number,
+  numberPrefix: string
+): CompileSection[] {
+  if (options.excludeNodes?.has(nodeId)) return [];
+
+  const { card_id, is_symlink } = getNodeCard(nodeId);
+  const currentDepth = headingLevel - 1;
+  const level = Math.min(headingLevel, 6);
+  const numberLabel = options.numbering && numberPrefix ? `${numberPrefix} ` : "";
+  const headingPrefix = "#".repeat(level);
+
+  if (visited.has(card_id)) {
+    const card = getCard(card_id);
+    const cycleTitle = `${numberLabel}${card.title} (cycle)`;
+    return [{
+      index: -1,
+      node_id: nodeId,
+      card_id,
+      card_version: card.version,
+      depth: currentDepth,
+      level,
+      heading: `${headingPrefix} ${numberLabel}${card.title} *(cycle)*`,
+      title: cycleTitle,
+      cycle: true,
+      chars: 0,
+      headings: [],
+      content: null,
+    }];
+  }
+
+  const card = getCard(card_id);
+  options.onCardEmitted?.(card_id);
+  const content = card.content || null;
+  const symlinkMark = is_symlink ? "~ " : "";
+  const title = `${numberLabel}${symlinkMark}${card.title}`;
+  const heading = options.includeIds === false
+    ? `${headingPrefix} ${title}`
+    : `${headingPrefix} ${title} ${buildMetaComment(nodeId, card, currentDepth, undefined, is_symlink)}`;
+  let unfurlText: string | null | undefined;
+  const resolved = options.resolvedRefs?.get(card_id);
+  if (resolved) {
+    unfurlText = resolved.ok
+      ? resolved.result.text
+      : `<!-- unfurl failed: ${resolved.sourceType} -->`;
+  }
+
+  const section: CompileSection = {
+    index: -1,
+    node_id: nodeId,
+    card_id,
+    card_version: card.version,
+    depth: currentDepth,
+    level,
+    heading,
+    title,
+    cycle: false,
+    chars: card.content?.length ?? 0,
+    headings: extractMarkdownHeadings(card.content),
+    content,
+    ...(unfurlText !== undefined ? { unfurl_text: unfurlText } : {}),
+  };
+
+  if (depth <= 0) return [section];
+
+  const nextVisited = new Set(visited);
+  nextVisited.add(card_id);
+
+  let children = getChildren(nodeId);
+  if (headingLevel === 1 && options.limit !== undefined) {
+    children = [...children]
+      .sort((a, b) => compareCardTimestampDescending(
+        getCard(getNodeCard(a.id).card_id),
+        getCard(getNodeCard(b.id).card_id)
+      ))
+      .slice(0, options.limit);
+  }
+
+  const sections = [section];
+  children.forEach((child, index) => {
+    const childNumber = options.numbering
+      ? numberPrefix ? `${numberPrefix}.${index + 1}` : `${index + 1}`
+      : "";
+    sections.push(...collectCompileSections(
+      child.id,
+      getNodeCard,
+      getChildren,
+      getCard,
+      depth - 1,
+      options,
+      nextVisited,
+      headingLevel + 1,
+      childNumber
+    ));
+  });
+
+  return sections;
+}
+
+function renderSections(sections: CompileSection[]): string {
+  return sections.map((section) => {
+    const lines = [section.heading];
+    if (section.content) lines.push(section.content);
+    if (section.unfurl_text !== undefined && section.unfurl_text !== null) {
+      lines.push(section.unfurl_text);
+    }
+    return lines.join("\n");
+  }).join("\n");
 }
