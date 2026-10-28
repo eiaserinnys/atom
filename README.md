@@ -2,7 +2,7 @@
 
 **A knowledge base of the agents, by the agents, for the agents.**
 
-`atom` organizes knowledge as a tree for AI agents to read and write. Agents read and update the tree through 17 Model Context Protocol (MCP) tools or a Fastify REST API. Humans inspect and edit the same tree in a three-panel React dashboard that updates in real time over Server-Sent Events (`GET /events`).
+`atom` organizes knowledge as a tree for AI agents to read and write. Agents read and update the tree through 17 Model Context Protocol (MCP) tools or a Fastify REST API. Humans inspect and edit the same tree in a three-panel React dashboard that updates in real time over Server-Sent Events (`GET /events`). The [`skills/`](skills/) directory ships [Agent Skills](#agent-skills) that teach agents how to write cards and keep the tree organized.
 
 ![atom three-panel dashboard](docs/screenshots/overview.png)
 
@@ -191,6 +191,47 @@ Read a branch outline first, then compile full card content only for the nodes y
 7. `deletes` (card deletions by `card_id`, removing each card and all of its tree nodes)
 
 Each item in `creates` requires a caller-assigned `temp_id` string. Other items in `creates`, `symlinks`, and `moves` within the same request can pass that string in `parent_temp_id` to place nodes under the newly created card. `symlinks.card_id` and `child_orders.parent_node_id` do not accept `temp_id` values and require real UUIDs. The call returns `{ created, symlinked, updated, node_updated, moved, child_ordered, deleted }`, where `created` is an array of `{ temp_id, card_id, node_id }` objects. If any step fails, the whole transaction rolls back.
+
+## Agent Skills
+
+The MCP tools let an agent change the tree; they do not tell it what a good card or a well-organized branch looks like. The [`skills/`](skills/) directory fills that gap with four skills in the open [Agent Skills](https://agentskills.io) format: each is a folder with a `SKILL.md` (YAML frontmatter with `name` and `description`, followed by Markdown instructions) that agents load when a request matches the description.
+
+| Skill | Use it when the agent needs to |
+| :--- | :--- |
+| [`atom-zettelkasten`](skills/atom-zettelkasten/SKILL.md) | Write, update, link, or retire cards: one idea per card with a `source_ref`, structure cards that describe their section, `references` vs. symlinks, and updates guarded by `expected_version`. |
+| [`atom-search`](skills/atom-search/SKILL.md) | Find what the tree already knows: rewrite `search_cards` queries until they hit, then drill down with `compile_subtree` outlines. Works with a `read` key. |
+| [`atom-tree-cleanup`](skills/atom-tree-cleanup/SKILL.md) | Design or groom a branch: section order and naming, integrity checks, relative moves with `before`/`after`, `batch_op` restructuring, and deleting sections without losing cards. Includes `scripts/scan_heavy_cards.py` for finding oversized cards. |
+| [`atom-reference-digest`](skills/atom-reference-digest/SKILL.md) | Turn an external source (web page, Git repository, paper) into atomic reference cards and symlink them into the knowledge tree. |
+
+Register the atom MCP server before installing the skills (see [Connecting Agents via MCP](#connecting-agents-via-mcp)). The skills refer to tools by name; with the server registered as `atom`, Claude Code exposes them as `mcp__atom__<tool>`.
+
+### Installing for Claude Code
+
+Copy the skill folders into a skills directory. Claude Code reads personal skills from `~/.claude/skills/` (every project on the machine) and project skills from `.claude/skills/` in a repository:
+
+```bash
+mkdir -p ~/.claude/skills
+cp -R skills/atom-* ~/.claude/skills/
+```
+
+Claude uses a skill when a request matches its description, and you can invoke one directly with `/atom-search`, `/atom-tree-cleanup`, and so on.
+
+### Installing for Codex
+
+Codex reads user skills from `~/.agents/skills/` and repository skills from `.agents/skills/` between the working directory and the repository root:
+
+```bash
+mkdir -p ~/.agents/skills
+cp -R skills/atom-* ~/.agents/skills/
+```
+
+Codex picks a skill when a task matches its description; mention one explicitly with `$atom-search` or choose it from `/skills`.
+
+### Other Agents
+
+To keep installed skills in step with this repository, symlink the folders instead of copying them (for example, `ln -s "$PWD/skills/atom-search" ~/.claude/skills/atom-search`). For an agent without skill support, add the relevant `SKILL.md` body to its system prompt or project instructions (such as `AGENTS.md`); the files are plain Markdown.
+
+`atom-tree-cleanup/scripts/scan_heavy_cards.py` calls the REST API (`GET /api/tree/:nodeId/children`) with an agent key. It reads `ATOM_BASE_URL` and `ATOM_API_KEY` from the environment, or the `atom` entry of a `.mcp.json` found above the script or the current directory.
 
 ## Web Dashboard
 
