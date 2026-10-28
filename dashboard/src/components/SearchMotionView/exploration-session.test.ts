@@ -78,3 +78,105 @@ test('content relevance never changes an existing structure traversal verdict', 
   expect(node.asked).toEqual(target.asked);
   expect(node.verdict).toBe('open');
 });
+
+test('continues search on hop columns with mapped links, gauges, and a continuation root', () => {
+  const session = createExplorationSession();
+  session.begin('query');
+  samples.atom.forEach(event => session.receive(event));
+  const initial = session.project(session.timeline().frames.length);
+  expect(initial.scene.nodes.has('__root__')).toBe(false);
+
+  const existingTarget = [...initial.scene.nodes.values()].find(node => node.origin === 'hit_parent' && node.cardId)!;
+  const originalTarget = { ref: existingTarget.ref, hop: existingTarget.hop };
+  const events: any[] = structuredClone(samples.atom);
+  const sourceRef = 'step-000001:0003';
+  let freshTargetRef = '';
+  let continuationSource: any;
+  for (const event of events) {
+    for (const candidate of event.data.candidates ?? []) {
+      candidate.card_id = `continued-${candidate.card_id}`;
+      candidate.node_id = `continued-${candidate.node_id}`;
+    }
+    if (event.event !== 'step_completed') continue;
+    if (event.data.step.stage === 'lexical_seed') {
+      continuationSource = event.data.candidates.find((candidate: any) => candidate.ref === sourceRef);
+      continuationSource.hop = 4;
+    }
+    if (event.data.step.stage === 'sufficiency_noul') {
+      event.data.step.sufficiency_score = 0.2 + event.data.step.hop / 10;
+    }
+    if (event.data.step.stage === 'hit_parent') {
+      const freshTarget = event.data.candidates.find((candidate: any) => candidate.origin === 'hit_parent');
+      freshTargetRef = freshTarget.ref;
+      continuationSource.physical_parent_node_id = freshTarget.node_id;
+      const repeatedTarget = structuredClone(freshTarget);
+      repeatedTarget.ref = 'continued-existing-hit-parent';
+      repeatedTarget.card_id = existingTarget.cardId;
+      repeatedTarget.node_id = existingTarget.nodeId;
+      repeatedTarget.hit_ref = sourceRef;
+      event.data.candidates.push(repeatedTarget);
+      event.data.step.candidate_refs = [sourceRef, freshTarget.ref, repeatedTarget.ref];
+    }
+  }
+  events.splice(1, 0, {
+    event: 'step_completed',
+    data: { step: { id: 'continued-widen', seq: 0, hop: 4, stage: 'widen', started_at: '2026-10-25T11:00:00.001Z', completed_at: '2026-10-25T11:00:00.002Z', decisions: [], candidate_refs: [], widen_reason: 'test' }, candidates: [], call: null },
+  });
+
+  session.begin('query', { resume: true });
+  events.forEach(event => session.receive(event));
+  const continued = session.project(session.timeline().frames.length);
+  const continuedHit = continued.scene.nodes.get(`search-2:${freshTargetRef}`)!;
+  expect(continuedHit.hop).toBe(1);
+  expect(continuedHit.parent).not.toBeNull();
+  expect(continued.scene.nodes.has(continuedHit.parent)).toBe(true);
+  expect(continuedHit.climbFrom.length).toBeGreaterThan(0);
+  expect(continuedHit.climbFrom.every((ref: string) => continued.scene.nodes.has(ref))).toBe(true);
+  expect(continued.scene.nodes.has('__root__')).toBe(true);
+
+  const target = continued.scene.nodes.get(originalTarget.ref)!;
+  expect(target.hop).toBe(originalTarget.hop);
+  expect(target.climbFrom).toContain(`search-2:${sourceRef}`);
+  expect(continued.scene.nodes.has(`search-2:${sourceRef}`)).toBe(true);
+  expect([...continued.scene.columnLabels.values()]).not.toContain('추가 검색');
+
+  const gauge = continued.scene.suff.get(1);
+  expect(gauge.score).toBeCloseTo(0.3);
+  expect(gauge.step).toBe('search-2:step-000008');
+  expect(gauge.refs.length).toBeGreaterThan(0);
+  expect(gauge.refs.every((ref: string) => continued.scene.nodes.has(ref))).toBe(true);
+});
+
+test('places expansion after the highest search hop, including continuation hops', () => {
+  const session = createExplorationSession();
+  session.begin('query');
+  samples.atom.forEach(event => session.receive(event));
+  const first = session.project(session.timeline().frames.length);
+  const events: any[] = structuredClone(samples.atom);
+  for (const event of events) {
+    for (const candidate of event.data.candidates ?? []) {
+      candidate.card_id = `continued-${candidate.card_id}`;
+      candidate.node_id = `continued-${candidate.node_id}`;
+    }
+    if (event.event === 'step_completed' && event.data.step.stage === 'lexical_seed') {
+      event.data.candidates.find((candidate: any) => candidate.ref === 'step-000001:0003').hop = 4;
+    }
+  }
+  events.splice(1, 0, {
+    event: 'step_completed',
+    data: { step: { id: 'continued-widen', seq: 0, hop: 4, stage: 'widen', started_at: '2026-10-25T11:00:00.001Z', completed_at: '2026-10-25T11:00:00.002Z', decisions: [], candidate_refs: [], widen_reason: 'test' }, candidates: [], call: null },
+  });
+  session.begin('query', { resume: true });
+  events.forEach(event => session.receive(event));
+  const source = [...first.scene.nodes.values()].find(node => node.cardId)!;
+  session.apply({ type: 'started', id: 'expand-after-continuation', kind: 'expand', fromCardId: source.cardId });
+  session.apply({ type: 'expansion_succeeded', operationId: 'expand-after-continuation', response: { neighbors: [
+    { card_id: 'expanded-after-search', node_id: 'expanded-node', card_type: 'knowledge', title: 'expanded', path: [], similarity: 0.8, tree_relation: null },
+  ] } });
+  session.apply({ type: 'completed', operationId: 'expand-after-continuation' });
+
+  const result = session.project(session.timeline().frames.length);
+  const expanded = [...result.scene.nodes.values()].find(node => node.cardId === 'expanded-after-search')!;
+  expect(expanded.hop).toBe(5);
+  expect([...result.scene.columnLabels.values()]).not.toContain('추가 검색');
+});
