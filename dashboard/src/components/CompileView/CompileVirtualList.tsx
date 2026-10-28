@@ -18,7 +18,7 @@ interface Props {
 }
 
 function estimateBodyHeight(chars: number, width: number) {
-  return Math.max(24, Math.ceil(chars * 192 / Math.max(width - 32, 1)));
+  return Math.max(24, Math.ceil(chars * 520 / Math.max(width - 32, 1)));
 }
 
 export const CompileVirtualList = forwardRef<CompileListHandle, Props>(function CompileVirtualList(
