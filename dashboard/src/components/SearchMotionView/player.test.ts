@@ -193,14 +193,26 @@ test('draws a backward parent edge from the source left side to the target right
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1440, 900));
   const host = document.createElement('div'); host.innerHTML = markup; document.body.append(host);
-  const player = createMotionPlayer(host, { onSelect: vi.fn(), onResults: vi.fn(), onMore: vi.fn(), onCancel: vi.fn() });
+  const player = createMotionPlayer(host, {
+    onSelect: vi.fn(), onResults: vi.fn(), onMore: vi.fn(), onCancel: vi.fn(),
+    translate: (key: string, values?: { count?: number; title?: string; hop?: string }) => key === 'visual_search.hop'
+      ? `Hop ${values?.count}` : key === 'visual_search.node_live' ? `${values?.title}, ${values?.hop}` : key,
+  });
   try {
     const initialEvents: any[] = structuredClone(samples.atom);
     const sourceRef = 'step-000001:0003';
+    const futureHopRef = 'step-000001:0002';
     for (const event of initialEvents) {
       if (event.event !== 'step_completed') continue;
-      const source = event.data.candidates?.find((candidate: any) => candidate.ref === sourceRef);
-      if (source) source.hop = 4;
+      for (const candidate of event.data.candidates ?? []) {
+        if (candidate.ref === sourceRef) {
+          candidate.hop = 4;
+          candidate.title = 'backward source';
+          candidate.origin = 'outline';
+          candidate.traversal_parent_ref = 'step-000009:0002';
+        }
+        if (candidate.ref === futureHopRef) candidate.hop = 5;
+      }
       if (event.data.step.stage === 'selection') event.data.step.selected_refs.push('step-000005:0001');
     }
     player.begin('query');
@@ -217,6 +229,7 @@ test('draws a backward parent edge from the source left side to the target right
           candidate.physical_parent_node_id = targetNodeId;
           continue;
         }
+        if (candidate.ref === futureHopRef) continue;
         if (candidate.origin === 'hit_parent') {
           if (candidate.origin === 'hit_parent') targetType = candidate.card_type;
           continue;
@@ -241,5 +254,26 @@ test('draws a backward parent edge from the source left side to the target right
     const expectedSourceLeft = 4 * (nodeWidth + gap);
     const expectedTargetRight = 1 * (nodeWidth + gap) + nodeWidth + (targetType === 'structure' ? 6 : 0);
     expect(paths.some(path => path.start[0] === expectedSourceLeft && path.end[0] === expectedTargetRight)).toBe(true);
+
+    const plot = host.querySelector<HTMLElement>('[data-motion-id=plot]')!;
+    const live = host.querySelector<HTMLElement>('[data-motion-id=graph-live]')!;
+    const focusedHop = () => Number(live.textContent?.match(/Hop (\d+)/)?.[1]);
+    plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    settleFrames(frames);
+    for (let i = 0; i < 24 && !live.textContent?.includes('backward source'); i += 1) {
+      plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      settleFrames(frames);
+    }
+    const sourceHop = focusedHop();
+    expect(live.textContent).toContain('backward source');
+    expect(sourceHop).toBe(4);
+    plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    settleFrames(frames);
+    const rightHop = focusedHop();
+    expect(rightHop).toBeGreaterThan(sourceHop);
+    plot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    settleFrames(frames);
+    expect(focusedHop()).toBeLessThan(rightHop);
   } finally { player.dispose(); }
 });

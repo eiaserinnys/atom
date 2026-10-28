@@ -1735,8 +1735,11 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     if (k === "ArrowDown") return focusKey((items[i + 1] || items[i]).key);
     if (k === "ArrowUp") return focusKey((items[i - 1] || items[i]).key);
     const y = items[i] ? items[i].y : 0; let target = null;
-    if (k === "ArrowLeft") { const up = cur.origin === "hit_parent" ? cur.climbFrom && cur.climbFrom[0] : cur.parent; if (up && !view.L.hidden.has(up) && model.nodes.has(up)) target = up; }
-    else if (view.focus[0] !== "@" && view.focus[0] !== "#") { const kids = [...model.nodes.values()].filter((n) => (n.parent === cur.ref || n.climbFrom.includes(cur.ref)) && view.L.pos.has(n.ref)).sort((a, b) => view.L.pos.get(a.ref).y - view.L.pos.get(b.ref).y); if (kids.length) target = kids[0].ref; }
+    if (k === "ArrowLeft") {
+      const parents = cur.origin === "hit_parent" ? cur.climbFrom : [cur.parent];
+      target = parents.find((ref) => ref && !view.L.hidden.has(ref) && model.nodes.has(ref) && model.nodes.get(ref).hop < cur.hop);
+    }
+    else if (view.focus[0] !== "@" && view.focus[0] !== "#") { const kids = [...model.nodes.values()].filter((n) => (n.parent === cur.ref || n.climbFrom.includes(cur.ref)) && n.hop > cur.hop && view.L.pos.has(n.ref)).sort((a, b) => view.L.pos.get(a.ref).y - view.L.pos.get(b.ref).y); if (kids.length) target = kids[0].ref; }
     if (!target) { const near = columnItems(hop + (k === "ArrowLeft" ? -1 : 1)).sort((a, b) => Math.abs(a.y - y) - Math.abs(b.y - y))[0]; target = near && near.key; }
     focusKey(target);
   });
