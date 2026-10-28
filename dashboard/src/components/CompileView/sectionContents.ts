@@ -51,7 +51,7 @@ export function createSectionContentsStore(fetchContents: (ids: string[]) => Pro
     get,
     setSections(value: CompileSection[]) {
       sections = value;
-      for (const section of value) if (section.content !== undefined) cache.set(key(section), section.content);
+      for (const section of value) if (!section.cycle && section.content !== undefined) cache.set(key(section), section.content);
     },
     request(value: number[]) {
       indices = value;

@@ -13,8 +13,8 @@ test('scroll-driven parent renders do not parse an unchanged section again', asy
   const section: Section = { index: 0, node_id: 'n', card_id: 'c', card_version: 1, depth: 0, level: 1, heading: '# Title', title: 'Title', cycle: false, chars: 4, headings: [] };
   const components = {};
   function Parent() {
-    const [, update] = useState(0);
-    return <div onScroll={() => update(n => n + 1)}><CompileSection section={section} content="body" headingComponents={components} estimateBodyHeight={20} /></div>;
+    const [count, update] = useState(0);
+    return <div data-renders={count} onScroll={() => update(n => n + 1)}><CompileSection section={{ ...section }} content="body" headingComponents={components} estimateBodyHeight={20} /></div>;
   }
   const host = document.createElement('div');
   document.body.append(host);
@@ -22,6 +22,7 @@ test('scroll-driven parent renders do not parse an unchanged section again', asy
   await act(async () => root.render(<Parent />));
   const before = renders.markdown;
   await act(async () => host.firstElementChild!.dispatchEvent(new Event('scroll')));
+  expect(host.firstElementChild!.getAttribute('data-renders')).toBe('1');
   expect(renders.markdown).toBe(before);
   act(() => root.unmount());
   host.remove();

@@ -12,11 +12,15 @@ interface Props {
   estimateBodyHeight: number;
 }
 
+const SectionMarkdown = memo(function SectionMarkdown({ markdown, headingComponents }: { markdown: string; headingComponents: Components }) {
+  return <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={headingComponents}>{closeUnclosedCodeFences(markdown)}</Markdown>;
+});
+
 export const CompileSection = memo(function CompileSection({ section, content, headingComponents, estimateBodyHeight }: Props) {
   const loaded = content !== undefined || section.chars === 0 || section.cycle;
   const markdown = [section.heading, loaded ? content || null : null, loaded ? section.unfurl_text || null : null].filter(Boolean).join('\n');
   return <>
-    <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={headingComponents}>{closeUnclosedCodeFences(markdown)}</Markdown>
+    <SectionMarkdown markdown={markdown} headingComponents={headingComponents} />
     {!loaded && <div className="bg-muted" aria-hidden="true" style={{ height: estimateBodyHeight }} />}
   </>;
 });

@@ -53,4 +53,15 @@ describe('section content requests', () => {
     store.request([0]);
     await vi.waitFor(() => expect(store.get(changed)).toBe('updated'));
   });
+
+  test('does not treat a cycle marker as the shared card body', async () => {
+    const body = section(0);
+    const cycle = { ...section(1, 0), card_id: body.card_id, cycle: true, content: null };
+    const fetch = vi.fn(async () => ({ [body.card_id]: { version: 1, content: 'actual body' } }));
+    const store = createSectionContentsStore(fetch, () => {});
+    store.setSections([body, cycle]);
+    expect(store.get(body)).toBeUndefined();
+    store.request([0, 1]);
+    await vi.waitFor(() => expect(store.get(body)).toBe('actual body'));
+  });
 });
