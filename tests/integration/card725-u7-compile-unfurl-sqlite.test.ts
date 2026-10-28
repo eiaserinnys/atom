@@ -3,7 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { jest } from "@jest/globals";
+import Fastify from "fastify";
 
+import { createAgentCompileHandler } from "../../src/api/routes/card_api.js";
 import { closeDb, getDb, runMigrations, setDb } from "../../src/db/client.js";
 import { SqliteAdapter } from "../../src/db/adapters/sqlite.js";
 import { updateCardById, selectCardById } from "../../src/db/queries/cards.js";
@@ -136,6 +138,25 @@ async function expectUnresolved(
 }
 
 describe("U7 compile reference scope on SQLite", () => {
+  it("compiles descendants through the agent REST handler with depth=Infinity", async () => {
+    const root = await seedCard({ title: "Agent root" });
+    const child = await seedCard({ title: "Agent child", parentNodeId: root.nodeId });
+    await seedCard({ title: "Agent grandchild", parentNodeId: child.nodeId });
+    const app = Fastify({ logger: false });
+    app.get("/api/tree/:nodeId/compile", createAgentCompileHandler({ compileSubtree: treeService.compileSubtree }));
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/tree/${root.nodeId}/compile?depth=Infinity`,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<{ markdown: string }>().markdown).toContain("### Agent grandchild");
+    } finally {
+      await app.close();
+    }
+  });
+
   it("does not resolve an external reference on an excluded root", async () => {
     const external = await seedCard({ title: "Excluded root", sourceRef: "u7://excluded-root" });
 
