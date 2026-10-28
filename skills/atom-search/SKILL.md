@@ -16,7 +16,7 @@ Tool names below are the bare MCP tool names; your client may prefix them (Claud
 
 ## Search: rewrite the query before giving up
 
-`search_cards` is lexical full-text search ranked by relevance (BM25-style `ts_rank` on PostgreSQL, FTS on SQLite). A card matches only if it contains your words. There is no synonym expansion, so a card about "atomic transactions" is invisible to the query "do several things at once". **A miss usually means the wrong words, not a missing card.**
+`search_cards` is lexical full-text search ranked by relevance (BM25-style `ts_rank` on PostgreSQL, FTS on SQLite). A card matches only if it contains your words. Apart from a small built-in set of term expansions in the fallback below, there are no synonyms, so a card about "atomic transactions" is invisible to the query "do several things at once". **A miss usually means the wrong words, not a missing card.**
 
 ### Step 1: Try the request as written
 
@@ -24,7 +24,7 @@ Tool names below are the bare MCP tool names; your client may prefix them (Claud
 search_cards(query="apply several changes at once", limit=10)
 ```
 
-With the default `strategy="auto"`, a plain query of four or more terms that returns nothing is retried once as an OR query. Stop here if the results answer the question.
+With the default `strategy="auto"`, a plain query (no `OR`, quotes, or `-`) that returns nothing is retried: first as an OR of its terms when it has four or more, then with the small built-in set of term expansions. `strategy="strict"` turns the retries off. Stop here if the results answer the question.
 
 ### Step 2: Extract terms and OR them together
 
@@ -49,7 +49,7 @@ Too many hits, or hits from the wrong context:
 
 - `root_node_id` limits the search to one branch.
 - `card_type` (`structure` or `knowledge`), `tags` (cards carrying all listed tags), `source_type`, `updated_after` / `updated_before` filter further.
-- Every result carries `node_path`, the titles from the root down to the card's parent. Read it to tell "incident notes" apart from "design notes" without opening each card.
+- Every result carries `node_path`, the titles from the root down to the card's parent (starting at the `root_node_id` branch when you set one). Read it to tell "incident notes" apart from "design notes" without opening each card.
 
 Only after steps 1 to 3 fail should you conclude the knowledge is not in atom. Say which queries you tried.
 
