@@ -17,7 +17,7 @@ description: |
 Read an external resource, break it into a knowledge structure, place it in the atom reference tree,
 and link it into the knowledge tree via symlinks.
 
-Card writing principles follow the `atom-zettelkasten` skill.
+Card writing principles follow the `atom-zettelkasten` skill. Tool calls are written with Claude Code's `mcp__atom__` prefix (server registered as `atom`); other clients use the bare tool names.
 
 ## Source Type Classification
 
@@ -100,7 +100,8 @@ If similar cards already exist, consider updating instead of creating.
 mcp__atom__get_tree()                                      # find root nodes
 mcp__atom__list_children(parent_node_id="{root ID}")       # look for Reference node
 # create if missing
-mcp__atom__create_card(title="Reference", card_type="structure", parent_node_id="{root ID}")
+mcp__atom__create_card(title="Reference", card_type="structure", parent_node_id="{root ID}",
+                       content="External sources digested into atomic cards, grouped by source type.")
 # find or create type node (Web document / Git repo / Paper)
 mcp__atom__list_children(parent_node_id="{reference node ID}")
 ```
@@ -116,9 +117,10 @@ mcp__atom__create_card(
     parent_node_id="{type node ID}"
 )
 
-# Section structure card
+# Section structure card (content: one sentence on what this section covers)
 mcp__atom__create_card(
     title="{section title}",
+    content="{what this section of the source covers}",
     card_type="structure",
     parent_node_id="{source root node ID}"
 )
@@ -149,7 +151,8 @@ This is the moment when reference material becomes a living knowledge network.
 ```python
 mcp__atom__list_children(parent_node_id="{root ID}")  # look for knowledge node
 # create if missing
-mcp__atom__create_card(title="Knowledge", card_type="structure", parent_node_id="{root ID}")
+mcp__atom__create_card(title="Knowledge", card_type="structure", parent_node_id="{root ID}",
+                       content="Knowledge organized by topic. Cards from references are placed here through symlinks.")
 ```
 
 For each knowledge card, ask yourself:
@@ -159,7 +162,7 @@ For each knowledge card, ask yourself:
 - Place in a category where related cards already exist
 - Choose a location that connects conceptually with neighboring cards
 - Avoid orphan placements; prefer categories with 2+ related cards
-- If no suitable category exists, create a new structure card
+- If no suitable category exists, create a new structure card with a one-sentence description of what it collects
 
 **⚠️ Never place knowledge cards directly under a structure card without an intermediate structure:**
 

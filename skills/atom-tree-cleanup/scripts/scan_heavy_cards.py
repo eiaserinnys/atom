@@ -2,7 +2,7 @@
 Scan an atom tree for cards with long content.
 
 Usage:
-    python .claude/skills/atom-tree-cleanup/scripts/scan_heavy_cards.py <node_id> [--threshold 300] [--depth 10]
+    python <skill-dir>/scripts/scan_heavy_cards.py <node_id> [--threshold 300] [--depth 10]
 
 Output:
     Cards whose content length exceeds the threshold, sorted by length descending.
