@@ -78,7 +78,6 @@ test('D: continuation skip lands at the same last-hop camera as natural completi
     try {
       skipped.motion(true); skipped.player.begin('q', { resume: true }); extra.forEach(e => skipped.player.receive(e));
       skipped.button('t-skip').checked = true; skipped.button('t-skip').dispatchEvent(new Event('change'));
-      expect(skipped.player.getCamera().x).toBeGreaterThan(0);
       expect(skipped.player.getCamera()).toEqual(end);
     } finally { skipped.player.dispose(); }
   } finally { r.player.dispose(); }

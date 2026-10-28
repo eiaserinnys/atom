@@ -174,3 +174,72 @@ test.each(['long', 'shortmore', 'atommore'] as const)('widened %s root is transl
     }
   } finally { player.dispose(); }
 });
+
+test('draws a backward parent edge from the source left side to the target right side', () => {
+  const paths: Array<{ start: number[]; end: number[] }> = [];
+  let currentStart: number[] | null = null;
+  let currentEnd: number[] | null = null;
+  const context = new Proxy({}, { get: (_target, key) => key === 'measureText' ? (text: string) => ({ width: text.length * 7 })
+    : key === 'beginPath' ? () => { currentStart = null; currentEnd = null; }
+    : key === 'moveTo' ? (x: number, y: number) => { currentStart ??= [x, y]; currentEnd = [x, y]; }
+    : key === 'lineTo' ? (x: number, y: number) => { currentEnd = [x, y]; }
+    : key === 'bezierCurveTo' ? (_x1: number, _y1: number, _x2: number, _y2: number, x: number, y: number) => { currentEnd = [x, y]; }
+    : key === 'stroke' ? () => { if (currentStart && currentEnd) paths.push({ start: currentStart, end: currentEnd }); }
+    : key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {} });
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D);
+  vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1440, 900));
+  const host = document.createElement('div'); host.innerHTML = markup; document.body.append(host);
+  const player = createMotionPlayer(host, { onSelect: vi.fn(), onResults: vi.fn(), onMore: vi.fn(), onCancel: vi.fn() });
+  try {
+    const initialEvents: any[] = structuredClone(samples.atom);
+    const sourceRef = 'step-000001:0003';
+    for (const event of initialEvents) {
+      if (event.event !== 'step_completed') continue;
+      const source = event.data.candidates?.find((candidate: any) => candidate.ref === sourceRef);
+      if (source) source.hop = 4;
+      if (event.data.step.stage === 'selection') event.data.step.selected_refs.push('step-000005:0001');
+    }
+    player.begin('query');
+    initialEvents.forEach(event => player.receive(event));
+    settleFrames(frames);
+    paths.length = 0;
+
+    const events: any[] = structuredClone(initialEvents);
+    let targetType = '';
+    const targetNodeId = events.flatMap(event => event.data.candidates ?? []).find((candidate: any) => candidate.origin === 'hit_parent')?.node_id;
+    for (const event of events) {
+      for (const candidate of event.data.candidates ?? []) {
+        if (candidate.ref === sourceRef) {
+          candidate.physical_parent_node_id = targetNodeId;
+          continue;
+        }
+        if (candidate.origin === 'hit_parent') {
+          if (candidate.origin === 'hit_parent') targetType = candidate.card_type;
+          continue;
+        }
+        candidate.card_id = `continued-${candidate.card_id}`;
+        candidate.node_id = `continued-${candidate.node_id}`;
+      }
+      if (event.event !== 'step_completed' || event.data.step.stage !== 'hit_parent') continue;
+      const target = event.data.candidates.find((candidate: any) => candidate.origin === 'hit_parent');
+      const oldRef = target.ref;
+      target.ref = 'continued-hit-parent';
+      target.hit_ref = sourceRef;
+      event.data.step.candidate_refs = [sourceRef, target.ref];
+      for (const decision of event.data.step.decisions) if (decision.ref === oldRef) decision.ref = target.ref;
+    }
+    player.begin('query', { resume: true });
+    events.forEach(event => player.receive(event));
+    settleFrames(frames);
+
+    const nodeWidth = Number.parseFloat(getComputedStyle(host).getPropertyValue('--motion-node-width')) || 268;
+    const gap = Number.parseFloat(getComputedStyle(host).getPropertyValue('--motion-column-gap')) || 64;
+    const expectedSourceLeft = 4 * (nodeWidth + gap);
+    const expectedTargetRight = 1 * (nodeWidth + gap) + nodeWidth + (targetType === 'structure' ? 6 : 0);
+    expect(paths.some(path => path.start[0] === expectedSourceLeft && path.end[0] === expectedTargetRight)).toBe(true);
+  } finally { player.dispose(); }
+});

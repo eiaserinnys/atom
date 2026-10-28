@@ -4,6 +4,7 @@ import { createModel, applyEvent } from "./model.js";
 import { createExplorationSession } from './exploration-session.js';
 import { fitZoom, operationGroups, nodeTextLayout, createDisplayPathResolver } from './node-presentation.js';
 import { motionIcon } from './motion-icons.js';
+import { curvePoint, edgeShape, lanePoint } from './edge-route.js';
 
 export function createMotionPlayer(root, callbacks, samples = null) {
   let disposed = false;
@@ -78,6 +79,7 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   const geometry = getComputedStyle(root);
   const metric = (name, value) => Number.parseFloat(geometry.getPropertyValue(name)) || value;
   const M = { colW: metric('--motion-node-width', 268), gap: metric('--motion-column-gap', 64), rowH: metric('--motion-node-height', 48), pitch: 56, lowPitch: 56, actionH: metric('--motion-action-height', 28), actionGap: metric('--motion-action-gap', 4), chipH: 22, bandGap: 14, groupGap: 6, padX: 24, padTop: 14, headerH: 42, pileH: 26, pendCap: 14, cell: 5, laneY: -9 };
+  M.backLaneY = M.laneY - 4;
   const ui = { showLow: true, expanded: new Set(), follow: true };
   const colX = (hop) => hop * (M.colW + M.gap);
   // 열은 홉. 한 열 안에서 위 띠는 살아 있는 것(열린 구조, 맞은 카드, 선정)과 아직 판정 전인 것,
@@ -279,11 +281,23 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     const hopOf = (ref) => { const n = model.nodes.get(ref); return n ? n.hop : 0; };
     for (const n of model.nodes.values()) {
       if (n.dormant) continue;
-      if (n.origin === "hit_parent") n.climbFrom.forEach((h, i) => edge(h + ">" + n.ref, h, n.ref, "climb", i === 0));
-      else if (n.parent) edge(n.parent + ">" + n.ref, n.parent, n.ref, "child", false).lane = n.hop - hopOf(n.parent) > 1;
+      if (n.origin === "hit_parent") n.climbFrom.forEach((h, i) => {
+        const e = edge(h + ">" + n.ref, h, n.ref, "climb", i === 0);
+        e.dir = Math.sign(n.hop - hopOf(h));
+        e.lane = Math.abs(n.hop - hopOf(h)) > 1;
+      });
+      else if (n.parent) {
+        const e = edge(n.parent + ">" + n.ref, n.parent, n.ref, "child", false);
+        e.dir = Math.sign(n.hop - hopOf(n.parent));
+        e.lane = Math.abs(n.hop - hopOf(n.parent)) > 1;
+      }
       if (n.fromRef) edge(`${n.displayColumn || n.columnLabel}:${n.ref}`, n.fromRef, n.ref, 'expansion', false);
     }
-    for (const [key, p] of L.piles) if (p.count > 0) for (const par of p.parents) edge(par + ">@" + key, par, "@" + key, "bundle", false).lane = p.hop - hopOf(par) > 1;
+    for (const [key, p] of L.piles) if (p.count > 0) for (const par of p.parents) {
+      const e = edge(par + ">@" + key, par, "@" + key, "bundle", false);
+      e.dir = Math.sign(p.hop - hopOf(par));
+      e.lane = Math.abs(p.hop - hopOf(par)) > 1;
+    }
     for (const key of [...view.edges.keys()]) if (!want.has(key)) view.edges.delete(key);
     // 선정한 카드까지의 길
     const path = new Map(); let longest = new Map();
@@ -494,13 +508,22 @@ export function createMotionPlayer(root, callbacks, samples = null) {
   function rr(x, y, w, h, _r) { ctx.beginPath(); ctx.rect(x, y, w, h); }
   const typeOf = (n) => (n.type === "structure" ? [T.struct, T.structFill] : n.type === "root" ? [T.path, T.path] : [T.know, T.knowFill]);
 
-  function anchorOut(ref) { const v = view.nodes.get(ref); return v ? { x: v.x + M.colW, y: v.y + M.rowH / 2, a: v.a, born: v.born } : null; }
-  function anchorIn(to) {
-    if (to[0] === "@") { const p = view.piles.get(to.slice(1)); return p ? { x: p.x, y: p.y + Math.min(p.info.h / 2, 13), a: Math.max(p.a, performance.now() < p.born + 120 ? 1 : p.a), born: p.born, alive: 0, dim: 1 } : null; }
-    const v = view.nodes.get(to); return v ? { x: v.x, y: v.y + M.rowH / 2, a: (v.next || v.t).a > 0 ? Math.max(v.a, performance.now() < v.born + 120 ? 1 : v.a) : v.a, born: v.born, alive: v.alive * ((v.next || v.t).soft ? 0.56 : 1), dim: v.dim } : null;
+  function anchorOut(ref, side = 'right') {
+    const v = view.nodes.get(ref);
+    return v ? { x: side === 'left' ? v.x : v.x + M.colW, y: v.y + M.rowH / 2, a: v.a, born: v.born } : null;
   }
-  function curve(a, b, t0, t1) {
-    const dx = Math.max(34, (b.x - a.x) * 0.5); const x1 = a.x + dx; const x2 = b.x - dx;
+  function anchorIn(to, side = 'left') {
+    if (to[0] === "@") {
+      const p = view.piles.get(to.slice(1));
+      return p ? { x: side === 'right' ? p.x + M.colW : p.x, y: p.y + Math.min(p.info.h / 2, 13), a: Math.max(p.a, performance.now() < p.born + 120 ? 1 : p.a), born: p.born, alive: 0, dim: 1 } : null;
+    }
+    const v = view.nodes.get(to); const n = model.nodes.get(to);
+    return v ? { x: side === 'right' ? v.x + M.colW + (n?.type === 'structure' ? 6 : 0) : v.x,
+      y: v.y + M.rowH / 2, a: (v.next || v.t).a > 0 ? Math.max(v.a, performance.now() < v.born + 120 ? 1 : v.a) : v.a,
+      born: v.born, alive: v.alive * ((v.next || v.t).soft ? 0.56 : 1), dim: v.dim } : null;
+  }
+  function curve(shape, a, b, t0, t1) {
+    const { x1, x2 } = shape;
     if (t0 <= 0 && t1 >= 1) { ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(x1, a.y, x2, b.y, b.x, b.y); return b; }
     const bl = (p0, p1, p2, p3, u, v, w) => (1 - u) * (1 - v) * (1 - w) * p0 + (u * (1 - v) * (1 - w) + (1 - u) * v * (1 - w) + (1 - u) * (1 - v) * w) * p1 + (u * v * (1 - w) + u * (1 - v) * w + (1 - u) * v * w) * p2 + u * v * w * p3;
     const X = (u, v, w) => bl(a.x, x1, x2, b.x, u, v, w); const Y = (u, v, w) => bl(a.y, a.y, b.y, b.y, u, v, w);
@@ -519,24 +542,19 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     return t1 > t0 ? [t0, t1] : null;
   }
   const FULL = [0, 1];
-  function lanePath(a, b) {
-    const ly = M.laneY; const r = 24;
-    ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + r, a.y, a.x + r, ly, a.x + 2 * r, ly); ctx.lineTo(b.x - 2 * r, ly); ctx.bezierCurveTo(b.x - r, ly, b.x - r, b.y, b.x, b.y);
+  function lanePath(shape, a, b) {
+    const { s, ly } = shape; const r = 24;
+    ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + s * r, a.y, a.x + s * r, ly, a.x + 2 * s * r, ly);
+    ctx.lineTo(b.x - 2 * s * r, ly); ctx.bezierCurveTo(b.x - s * r, ly, b.x - s * r, b.y, b.x, b.y);
   }
-  function lanePoint(a, b, t) {
-    const ly = M.laneY; const r = 24; const cub = (p0, p1, p2, p3, u) => { const w = 1 - u; return w * w * w * p0 + 3 * w * w * u * p1 + 3 * w * u * u * p2 + u * u * u * p3; };
-    if (t < 0.12) { const u = t / 0.12; return { x: cub(a.x, a.x + r, a.x + r, a.x + 2 * r, u), y: cub(a.y, a.y, ly, ly, u) }; }
-    if (t > 0.88) { const u = (t - 0.88) / 0.12; return { x: cub(b.x - 2 * r, b.x - r, b.x - r, b.x, u), y: cub(ly, ly, b.y, b.y, u) }; }
-    return { x: lerp(a.x + 2 * r, b.x - 2 * r, (t - 0.12) / 0.76), y: ly };
-  }
-  function strokeLane(a, b, t) {
-    if (t < 1) { ctx.save(); ctx.beginPath(); ctx.rect(a.x - 6, -1e5, (b.x - a.x + 12) * t, 2e5); ctx.clip(); }
-    ctx.beginPath(); lanePath(a, b); ctx.stroke();
+  function strokeLane(shape, a, b, t) {
+    if (t < 1) {
+      const w = (Math.abs(b.x - a.x) + 12) * t;
+      const x = shape.s > 0 ? a.x - 6 : a.x + 6 - w;
+      ctx.save(); ctx.beginPath(); ctx.rect(x, -1e5, w, 2e5); ctx.clip();
+    }
+    ctx.beginPath(); lanePath(shape, a, b); ctx.stroke();
     if (t < 1) ctx.restore();
-  }
-  function pointOn(a, b, t) {
-    const dx = Math.max(34, (b.x - a.x) * 0.5); const u = 1 - t;
-    return { x: u * u * u * a.x + 3 * u * u * t * (a.x + dx) + 3 * u * t * t * (b.x - dx) + t * t * t * b.x, y: u * u * u * a.y + 3 * u * u * t * a.y + 3 * u * t * t * b.y + t * t * t * b.y };
   }
 
   function draw(now) {
@@ -551,7 +569,9 @@ export function createMotionPlayer(root, callbacks, samples = null) {
     const strong = []; const lanes = [];
     for (const e of view.edges.values()) {
       if (e.grow <= 0 || now < e.born) continue;
-      const a = anchorOut(e.from); const b = anchorIn(e.to); if (!a || !b) continue;
+      const a = e.kind === 'expansion' ? anchorOut(e.from) : anchorOut(e.from, e.dir < 0 ? 'left' : 'right');
+      const b = e.kind === 'expansion' ? anchorIn(e.to) : anchorIn(e.to, e.dir > 0 ? 'left' : 'right');
+      if (!a || !b) continue;
       const alpha = Math.min(a.a, b.a); if (alpha < 0.03) continue;
       if (e.kind === 'expansion') {
         const slot = view.L.groupSlots.get(model.nodes.get(e.to).displayColumn) ?? 0;
@@ -568,58 +588,70 @@ export function createMotionPlayer(root, callbacks, samples = null) {
         if (n?.similarity != null && z >= 0.8) { ctx.font = font(500, 13); ctx.fillStyle = css(T.lowText); ctx.textAlign = 'right'; ctx.fillText(n.similarity.toFixed(2), b.x - 8, b.y - 6); ctx.textAlign = 'left'; }
         continue;
       }
+      const shape = edgeShape(e.dir, e.lane, a, b, M);
       if ((a.x > x1 && b.x > x1) || (a.x < x0 && b.x < x0)) continue;
-      if (e.lane) { if (e.kind === "bundle" || e.sel > 0 || b.alive > 0.5 || view.hoverKeys.has(e.key) || (b.y > y0 && b.y < y1)) lanes.push([e, a, b, alpha, e.kind === "bundle" ? 0 : b.alive]); continue; }
+      if (e.lane) {
+        const strength = e.kind === 'climb' ? 1 : e.kind === 'bundle' ? 0 : b.alive;
+        if (e.kind === "bundle" || e.sel > 0 || b.alive > 0.5 || view.hoverKeys.has(e.key) || (b.y > y0 && b.y < y1)) lanes.push([e, a, b, alpha, strength, shape]);
+        continue;
+      }
       const sp = span(a, b, y0, y1); if (!sp) continue;
-      const s = e.kind === "climb" ? 1 : e.kind === "bundle" ? 0 : b.alive;
-      if (s > 0.5 || e.sel > 0 || view.hoverKeys.has(e.key)) { strong.push([e, a, b, alpha, s, sp]); if (s > 0.5) continue; }
+      const strength = e.kind === 'climb' ? 1 : e.kind === 'bundle' ? 0 : b.alive;
+      if (strength > 0.5 || e.sel > 0 || view.hoverKeys.has(e.key)) { strong.push([e, a, b, alpha, strength, sp, shape]); if (strength > 0.5) continue; }
       // 흐린 선은 끝이 화면에서 한참 벗어나 있으면 그리지 않는다(펼친 큰 모음에서 수백 줄이 겹칠 뿐이다)
       if (b.y < y0 - 900 || b.y > y1 + 900) continue;
       const dashed = e.kind === "bundle" || b.dim > 0.5;
       ctx.globalAlpha = alpha * (dashed ? 0.85 : 0.6);
-      ctx.strokeStyle = css(mix(T.thin, T.path, s)); ctx.lineWidth = e.kind === "bundle" ? 2.4 : 1.1;
+      ctx.strokeStyle = css(mix(T.thin, T.path, strength)); ctx.lineWidth = e.kind === "bundle" ? 2.4 : 1.1;
       ctx.setLineDash(dashed ? (e.kind === "bundle" ? [2, 5] : [4, 4]) : []);
-      ctx.beginPath(); curve(a, b, sp[0], Math.min(sp[1], e.grow)); ctx.stroke();
-      if (text && e.grow >= 1 && sp[1] >= 1 && e.kind !== "bundle") { ctx.setLineDash([]); ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - 6, b.y - 3.2); ctx.lineTo(b.x - 6, b.y + 3.2); ctx.fill(); }
+      ctx.beginPath(); curve(shape, a, b, sp[0], Math.min(sp[1], e.grow)); ctx.stroke();
+      if (text && e.grow >= 1 && sp[1] >= 1 && e.kind !== "bundle") { ctx.setLineDash([]); ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - shape.s * 6, b.y - 3.2); ctx.lineTo(b.x - shape.s * 6, b.y + 3.2); ctx.fill(); }
     }
     ctx.setLineDash([]);
-    for (const [e, a, b, alpha, s, sp] of strong) {
-      if (s > 0.5) {
-        ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.path); ctx.lineWidth = lerp(1.2, 2.5, s);
-        ctx.beginPath(); const tip = curve(a, b, sp[0], Math.min(sp[1], e.grow)); ctx.stroke();
-        if (e.grow >= 1 && sp[1] >= 1) { ctx.fillStyle = css(T.path); ctx.beginPath(); ctx.moveTo(tip.x + 1, tip.y); ctx.lineTo(tip.x - 7, tip.y - 4.4); ctx.lineTo(tip.x - 7, tip.y + 4.4); ctx.fill(); }
+    for (const [e, a, b, alpha, strength, sp, shape] of strong) {
+      if (strength > 0.5) {
+        ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.path); ctx.lineWidth = lerp(1.2, 2.5, strength);
+        ctx.beginPath(); const tip = curve(shape, a, b, sp[0], Math.min(sp[1], e.grow)); ctx.stroke();
+        if (e.grow >= 1 && sp[1] >= 1) { ctx.fillStyle = css(T.path); ctx.beginPath(); ctx.moveTo(tip.x + shape.s * 1, tip.y); ctx.lineTo(tip.x - shape.s * 7, tip.y - 4.4); ctx.lineTo(tip.x - shape.s * 7, tip.y + 4.4); ctx.fill(); }
       }
       if (e.sel > 0) {
-        ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.selBase); ctx.lineWidth = 5.4; ctx.beginPath(); curve(a, b, sp[0], Math.min(sp[1], e.sel)); ctx.stroke();
+        ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.selBase); ctx.lineWidth = 5.4; ctx.beginPath(); curve(shape, a, b, sp[0], Math.min(sp[1], e.sel)); ctx.stroke();
         ctx.strokeStyle = css(T.evidence); ctx.lineWidth = 3.2; ctx.setLineDash([9, 8]); ctx.lineDashOffset = now < view.march ? -(now / 28) % 17 : 0;
-        ctx.beginPath(); curve(a, b, sp[0], Math.min(sp[1], e.sel)); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+        ctx.beginPath(); curve(shape, a, b, sp[0], Math.min(sp[1], e.sel)); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
       }
-      if (view.hoverKeys.has(e.key)) { ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.jev); ctx.lineWidth = 2.2; ctx.setLineDash([5, 4]); ctx.beginPath(); curve(a, b, sp[0], Math.min(sp[1], e.grow)); ctx.stroke(); ctx.setLineDash([]); }
+      if (view.hoverKeys.has(e.key)) { ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.jev); ctx.lineWidth = 2.2; ctx.setLineDash([5, 4]); ctx.beginPath(); curve(shape, a, b, sp[0], Math.min(sp[1], e.grow)); ctx.stroke(); ctx.setLineDash([]); }
     }
-    for (const [e, a, b, alpha, st] of lanes) {
+    for (const [e, a, b, alpha, st, shape] of lanes) {
       const dashed = e.kind === "bundle" || (b.dim > 0.5 && st < 0.5);
       ctx.globalAlpha = alpha * (st > 0.5 ? 1 : dashed ? 0.85 : 0.6); ctx.strokeStyle = css(mix(T.thin, T.path, st)); ctx.lineWidth = e.kind === "bundle" ? 2.4 : lerp(1.1, 2.5, st);
-      ctx.setLineDash(dashed ? (e.kind === "bundle" ? [2, 5] : [4, 4]) : []); strokeLane(a, b, e.grow); ctx.setLineDash([]);
-      if (e.grow >= 1 && e.kind !== "bundle" && text) { ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.moveTo(b.x + (st > 0.5 ? 1 : 0), b.y); ctx.lineTo(b.x - 7, b.y - (st > 0.5 ? 4.4 : 3.2)); ctx.lineTo(b.x - 7, b.y + (st > 0.5 ? 4.4 : 3.2)); ctx.fill(); }
+      ctx.setLineDash(dashed ? (e.kind === "bundle" ? [2, 5] : [4, 4]) : []); strokeLane(shape, a, b, e.grow); ctx.setLineDash([]);
+      if (e.grow >= 1 && e.kind !== "bundle" && text) { ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.moveTo(b.x + shape.s * (st > 0.5 ? 1 : 0), b.y); ctx.lineTo(b.x - shape.s * 7, b.y - (st > 0.5 ? 4.4 : 3.2)); ctx.lineTo(b.x - shape.s * 7, b.y + (st > 0.5 ? 4.4 : 3.2)); ctx.fill(); }
       if (e.sel > 0) {
-        ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.selBase); ctx.lineWidth = 5.4; strokeLane(a, b, e.sel);
-        ctx.strokeStyle = css(T.evidence); ctx.lineWidth = 3.2; ctx.setLineDash([9, 8]); ctx.lineDashOffset = now < view.march ? -(now / 28) % 17 : 0; strokeLane(a, b, e.sel); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+        ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.selBase); ctx.lineWidth = 5.4; strokeLane(shape, a, b, e.sel);
+        ctx.strokeStyle = css(T.evidence); ctx.lineWidth = 3.2; ctx.setLineDash([9, 8]); ctx.lineDashOffset = now < view.march ? -(now / 28) % 17 : 0; strokeLane(shape, a, b, e.sel); ctx.setLineDash([]); ctx.lineDashOffset = 0;
       }
-      if (view.hoverKeys.has(e.key)) { ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.jev); ctx.lineWidth = 2.2; ctx.setLineDash([5, 4]); strokeLane(a, b, e.grow); ctx.setLineDash([]); }
+      if (view.hoverKeys.has(e.key)) { ctx.globalAlpha = alpha; ctx.strokeStyle = css(T.jev); ctx.lineWidth = 2.2; ctx.setLineDash([5, 4]); strokeLane(shape, a, b, e.grow); ctx.setLineDash([]); }
     }
     // 윗구조 선의 이름표
     if (text && M.gap >= 52) for (const e of view.edges.values()) {
       if (e.kind !== "climb" || !e.primary || e.grow < 1) continue;
-      const a = anchorOut(e.from); const b = anchorIn(e.to); if (!a || !b) continue;
-      const p = pointOn(a, b, 0.5); ctx.font = font(600, 13); const tw = ctx.measureText(tr('visual_search.parent')).width + 14;
+      const a = anchorOut(e.from, e.dir < 0 ? 'left' : 'right');
+      const b = anchorIn(e.to, e.dir > 0 ? 'left' : 'right'); if (!a || !b) continue;
+      const shape = edgeShape(e.dir, e.lane, a, b, M);
+      const p = e.lane ? lanePoint(shape, a, b, 0.5) : curvePoint(shape, a, b, 0.5);
+      ctx.font = font(600, 13); const tw = ctx.measureText(tr('visual_search.parent')).width + 14;
       ctx.globalAlpha = Math.min(a.a, b.a); rr(p.x - tw / 2, p.y - 11, tw, 22, 6); ctx.fillStyle = css(T.node); ctx.fill(); ctx.strokeStyle = css(T.path); ctx.lineWidth = 1.2; ctx.stroke();
       ctx.fillStyle = css(T.path); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tr('visual_search.parent'), p.x, p.y + 0.5); ctx.textAlign = "left";
     }
     // 선을 타고 가는 빛
     for (const f of view.fx) {
       if (f.type !== "spark" || now < f.at) continue;
-      const e = view.edges.get(f.key); if (!e) continue; const a = anchorOut(e.from); const b = anchorIn(e.to); if (!a || !b || b.a < 0.05) continue;
-      const t = easeOut((now - f.at) / f.dur); const p = e.lane ? lanePoint(a, b, t) : pointOn(a, b, t); const fade = 1 - Math.pow((now - f.at) / f.dur, 3);
+      const e = view.edges.get(f.key); if (!e) continue;
+      const a = e.kind === 'expansion' ? anchorOut(e.from) : anchorOut(e.from, e.dir < 0 ? 'left' : 'right');
+      const b = e.kind === 'expansion' ? anchorIn(e.to) : anchorIn(e.to, e.dir > 0 ? 'left' : 'right');
+      if (!a || !b || b.a < 0.05) continue;
+      const shape = edgeShape(e.kind === 'expansion' ? 1 : e.dir, e.kind === 'expansion' ? false : e.lane, a, b, M);
+      const t = easeOut((now - f.at) / f.dur); const p = e.kind !== 'expansion' && e.lane ? lanePoint(shape, a, b, t) : curvePoint(shape, a, b, t); const fade = 1 - Math.pow((now - f.at) / f.dur, 3);
       ctx.globalAlpha = 0.9 * fade * Math.max(b.a, 0.3); ctx.fillStyle = css(e.kind === "climb" || b.alive > 0.5 ? T.path : T.jev);
       ctx.beginPath(); ctx.arc(p.x, p.y, 3.2, 0, 6.2832); ctx.fill();
       ctx.globalAlpha *= 0.28; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 6.2832); ctx.fill();

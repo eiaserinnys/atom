@@ -3,44 +3,79 @@ import { createExplorationModel, applyExplorationEvent, projectExploration } fro
 import { buildExplorationTimeline, groupExplorationChapters } from './exploration-timeline.js';
 import { presentContinuation } from './continuation-scene.js';
 
+const ROOT = '__root__';
 const hopLabel = hop => hop === 0 ? '입구' : `홉 ${hop}`;
 const blankNode = () => ({ parent: null, climbFrom: [], reading: 0, climbing: false, byHit: false, again: [], dormant: false });
 
-function initialCards(scene, label) {
+function initialCards(scene) {
   return [...scene.nodes.values()].filter(n => n.cardId).map(n => {
     const call = n.asked && scene.calls.get(n.asked.step);
     const content = call?.stage === 'content_noul';
     return {
       card_id: n.cardId, node_id: n.nodeId, card_type: n.type,
       title: n.title, path: n.path, score: n.score, selected: n.selected, rank: n.rank,
-      display_column_id: `initial:${n.hop}`, column_label: label ?? hopLabel(n.hop),
+      display_column_id: `initial:${n.hop}`, column_label: hopLabel(n.hop),
       renderNode: { ...n, climbFrom: [...n.climbFrom] },
       ...(content && n.score != null ? { initial_evaluation: { score: n.score, call_id: call.call_id, question_key: n.asked.key } } : {}),
     };
   });
 }
 
-function mergeSearch(exploration, segment, id, label, scene) {
-  let column = exploration.columns.find(c => c.id === id);
-  if (!column) { column = { id, label, cardIds: [], referenceIds: [] }; exploration.columns.push(column); }
-  for (const input of initialCards(segment, label)) {
+function displayRef(card) { return card.renderNode?.ref ?? `card:${card.cardId}`; }
+
+function mergeSearch(exploration, segment, id, scene) {
+  const refMap = new Map([[ROOT, ROOT]]);
+  const firstRefByCard = new Map();
+  for (const ref of segment.order) {
+    const node = segment.nodes.get(ref);
+    if (!node?.cardId) continue;
+    const existing = exploration.cards.get(node.cardId);
+    if (existing && existing.searchId !== id) {
+      refMap.set(ref, displayRef(existing));
+      continue;
+    }
+    const firstRef = firstRefByCard.get(node.cardId);
+    if (firstRef) {
+      refMap.set(ref, `${id}:${firstRef}`);
+      continue;
+    }
+    firstRefByCard.set(node.cardId, ref);
+    refMap.set(ref, `${id}:${ref}`);
+  }
+
+  for (const input of initialCards(segment)) {
     const existing = exploration.cards.get(input.card_id);
-    if (existing && existing.displayColumnId !== id) continue;
+    if (existing && existing.searchId !== id) {
+      if (existing.renderNode?.origin === 'hit_parent' && input.renderNode.origin === 'hit_parent') {
+        const climbFrom = [...new Set([
+          ...existing.renderNode.climbFrom,
+          ...input.renderNode.climbFrom.map(ref => refMap.get(ref)).filter(Boolean),
+        ])];
+        exploration.cards.set(input.card_id, { ...existing,
+          renderNode: { ...existing.renderNode, climbFrom } });
+      }
+      continue;
+    }
+    const sourceRef = input.renderNode.ref;
+    if (refMap.get(sourceRef) !== `${id}:${sourceRef}`) continue;
     const card = { ...input, cardId: input.card_id, nodeId: input.node_id, cardType: input.card_type,
-      displayColumnId: id, columnLabel: label, discoveryOrder: existing?.discoveryOrder ?? exploration.nextDiscoveryOrder++, initialScore: input.score };
-    // Continuations have their own namespace. Their original topology stays in the segment trace.
-    card.renderNode = { ...input.renderNode, ref: `${id}:${input.renderNode.ref}`, parent: null, climbFrom: [], hop: scene.maxHop + 1,
+      displayColumnId: input.display_column_id, columnLabel: input.column_label, searchId: id,
+      discoveryOrder: existing?.discoveryOrder ?? exploration.nextDiscoveryOrder++, initialScore: input.score };
+    card.renderNode = { ...input.renderNode, ref: refMap.get(sourceRef),
+      parent: input.renderNode.parent == null ? null : (refMap.get(input.renderNode.parent) ?? null),
+      climbFrom: [...new Set(input.renderNode.climbFrom.map(ref => refMap.get(ref)).filter(Boolean))],
       asked: input.renderNode.asked ? { ...input.renderNode.asked, step: `${id}:${input.renderNode.asked.step}` } : null };
     exploration.cards.set(card.cardId, card);
-    if (!existing) { exploration.cardOrder.push(card.cardId); column.cardIds.push(card.cardId); }
+    if (!existing) { exploration.cardOrder.push(card.cardId); exploration.columns[0].cardIds.push(card.cardId); }
     if (input.initial_evaluation) exploration.evaluationCache.set(card.cardId, {
       score: input.initial_evaluation.score, callId: input.initial_evaluation.call_id,
       questionKey: input.initial_evaluation.question_key, origin: 'initial_content', operationId: null,
     });
   }
   const results = [...segment.nodes.values()].filter(n => n.selected).sort((a, b) => a.rank - b.rank);
-  for (const n of results) if (exploration.cards.get(n.cardId)?.displayColumnId === id && n.score >= exploration.selectionThreshold && !exploration.resultOrder.includes(n.cardId)) exploration.resultOrder.push(n.cardId);
+  for (const n of results) if (exploration.cards.get(n.cardId)?.searchId === id && n.score >= exploration.selectionThreshold && !exploration.resultOrder.includes(n.cardId)) exploration.resultOrder.push(n.cardId);
   for (const [step, call] of segment.calls) scene.calls.set(`${id}:${step}`, call);
+  return refMap;
 }
 
 function materialize(scene, exploration) {
@@ -138,9 +173,9 @@ export function createExplorationSession() {
     const previous = folded && frames[folded.cursor - 1];
     if (!folded || evaluating || folded.evaluating || frames.length < folded.cursor
       || (folded.cursor && (previous?.id !== folded.frameId || previous.events.length !== folded.eventCount))) {
-      folded = { scene: createModel(), exploration: null, searchModels: new Map(), cursor: 0 };
+      folded = { scene: createModel(), exploration: null, searchModels: new Map(), refMaps: new Map(), cursor: 0 };
     }
-    let { scene, exploration, searchModels } = folded;
+    let { scene, exploration, searchModels, refMaps } = folded;
     for (const frame of frames.slice(folded.cursor)) {
       if (frame.entry.type === 'search') {
         const segment = searchModels.get(frame.segmentId) ?? createModel();
@@ -153,7 +188,7 @@ export function createExplorationSession() {
           scene = segment;
           exploration = createExplorationModel({ query, selectionThreshold: scene.selThreshold ?? scene.done?.summary?.selection_threshold, initialCards: initialCards(scene) });
         } else {
-          mergeSearch(exploration, segment, frame.segmentId, '추가 검색', scene);
+          refMaps.set(frame.segmentId, mergeSearch(exploration, segment, frame.segmentId, scene));
         }
       } else {
         const enteringQueryEvaluation = evaluating && frame === frames.at(-1) && frame.id.endsWith(':evaluate');
@@ -164,11 +199,26 @@ export function createExplorationSession() {
       }
     }
     if (!exploration) exploration = createExplorationModel({ query, selectionThreshold: null, initialCards: [] });
-    folded = { scene, exploration, searchModels, cursor: frames.length, frameId: frames.at(-1)?.id,
+    folded = { scene, exploration, searchModels, refMaps, cursor: frames.length, frameId: frames.at(-1)?.id,
       eventCount: frames.at(-1)?.events.length, evaluating };
     // Materialization adds display columns and resolves display paths. Never put those
     // mutations back into the search reducer's scene.
-    const result = materialize({ ...scene, nodes: new Map(scene.nodes), order: [...scene.order], calls: new Map(scene.calls) }, exploration);
+    const firstSearchId = searchModels.keys().next().value;
+    const maxSearchHop = Math.max(0, ...[...searchModels.values()].map(segment => segment.maxHop));
+    const suff = new Map(scene.suff);
+    let continuationRoot = null;
+    for (const [segmentId, segment] of searchModels) {
+      if (segmentId === firstSearchId) continue;
+      if (!continuationRoot && segment.nodes.has(ROOT)) continuationRoot = segment.nodes.get(ROOT);
+      const refs = refMaps.get(segmentId) ?? new Map();
+      for (const [hop, value] of segment.suff) {
+        suff.set(hop, { ...value, refs: value.refs.map(ref => refs.get(ref)).filter(Boolean), step: `${segmentId}:${value.step}` });
+      }
+    }
+    const materializeScene = { ...scene, nodes: new Map(scene.nodes), order: [...scene.order], calls: new Map(scene.calls),
+      maxHop: maxSearchHop, suff };
+    if (!materializeScene.nodes.has(ROOT) && continuationRoot) materializeScene.nodes.set(ROOT, continuationRoot);
+    const result = materialize(materializeScene, exploration);
     result.scene.searchDurationMs = [...searchModels.values()].reduce((sum, segment) => sum + (segment.elapsedMs ?? 0), 0);
     const current = frames.at(-1);
     if (current?.entry.type === 'search' && current.entry !== entries[0]) {
