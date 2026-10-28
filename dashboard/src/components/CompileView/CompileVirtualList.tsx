@@ -82,7 +82,7 @@ export const CompileVirtualList = forwardRef<CompileListHandle, Props>(function 
         if (!element || element.dataset.loaded !== 'true') return null;
         const target = headingIndex === null
           ? query ? findTextRanges(element, query)[withinSection] : element
-          : headingIndex < 0 ? element : findTocHeading(element, section, headingIndex) ?? element;
+          : headingIndex < 0 ? element.querySelector('h1,h2,h3,h4,h5,h6') : findTocHeading(element, section, headingIndex) ?? element;
         if (!target) return null;
         // A loaded target can look stable while bodies above it are still in flight.
         const ready = !Array.from(listRef.current!.querySelectorAll<HTMLElement>('[data-loaded="false"]'))
