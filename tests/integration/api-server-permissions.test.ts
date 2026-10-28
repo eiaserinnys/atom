@@ -84,6 +84,7 @@ describe("server-side user permissions", () => {
     });
     const cookieHeader = await issueCookie(user, "admin");
     const headers = { cookie: cookieHeader };
+    const viewerHeaders = { cookie: await issueCookie(user, "viewer") };
 
     expect((await app.inject({ method: "GET", url: "/tree", headers })).statusCode).toBe(200);
     expect((await app.inject({
@@ -91,6 +92,18 @@ describe("server-side user permissions", () => {
       url: `/tree/${nodeId}/compile`,
       headers,
       payload: {},
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST",
+      url: "/tree/compile/contents",
+      headers: viewerHeaders,
+      payload: { card_ids: [card.id] },
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST",
+      url: `/tree/${nodeId}/compile/sections`,
+      headers: viewerHeaders,
+      payload: { depth: 1, head_chars: 200000 },
     })).statusCode).toBe(200);
     expect((await app.inject({
       method: "POST",

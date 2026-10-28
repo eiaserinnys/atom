@@ -58,6 +58,23 @@ export async function selectCardById(
   return rowToCard(result.rows[0]);
 }
 
+export async function selectCardsByIds(
+  db: Queryable,
+  ids: string[]
+): Promise<Card[]> {
+  const cards: Card[] = [];
+  for (let offset = 0; offset < ids.length; offset += 500) {
+    const batch = ids.slice(offset, offset + 500);
+    const placeholders = batch.map((_, index) => `$${index + 1}`).join(", ");
+    const result = await db.query(
+      `SELECT * FROM cards WHERE id IN (${placeholders})`,
+      batch
+    );
+    cards.push(...result.rows.map(rowToCard));
+  }
+  return cards;
+}
+
 export type UpdateCardResult =
   | { card: Card; conflict: false }
   | { conflict: true; actualVersion: number }

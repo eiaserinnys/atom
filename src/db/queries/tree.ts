@@ -134,6 +134,25 @@ export async function selectChildren(
   return result.rows.map(rowToNode);
 }
 
+export async function selectChildrenByParentIds(
+  db: Queryable,
+  parentNodeIds: string[]
+): Promise<TreeNode[]> {
+  const nodes: TreeNode[] = [];
+  for (let offset = 0; offset < parentNodeIds.length; offset += 500) {
+    const batch = parentNodeIds.slice(offset, offset + 500);
+    const placeholders = batch.map((_, index) => `$${index + 1}`).join(", ");
+    const result = await db.query(
+      `SELECT * FROM tree_nodes
+       WHERE parent_node_id IN (${placeholders})
+       ORDER BY parent_node_id ASC, position ASC, id ASC`,
+      batch
+    );
+    nodes.push(...result.rows.map(rowToNode));
+  }
+  return nodes;
+}
+
 export async function selectCanonicalNodeByCardId(
   db: Queryable,
   card_id: string
@@ -144,6 +163,24 @@ export async function selectCanonicalNodeByCardId(
   );
   if (result.rows.length === 0) return null;
   return rowToNode(result.rows[0]);
+}
+
+export async function selectCanonicalNodesByCardIds(
+  db: Queryable,
+  cardIds: string[]
+): Promise<TreeNode[]> {
+  const nodes: TreeNode[] = [];
+  for (let offset = 0; offset < cardIds.length; offset += 500) {
+    const batch = cardIds.slice(offset, offset + 500);
+    const placeholders = batch.map((_, index) => `$${index + 1}`).join(", ");
+    const result = await db.query(
+      `SELECT * FROM tree_nodes
+       WHERE is_symlink = FALSE AND card_id IN (${placeholders})`,
+      batch
+    );
+    nodes.push(...result.rows.map(rowToNode));
+  }
+  return nodes;
 }
 
 export async function getNodeBreadcrumb(

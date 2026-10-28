@@ -150,6 +150,42 @@ describe.each(callers)("compile persistence for %s", caller => {
   });
 });
 
+it("does not persist a fresh snapshot from the viewer section compile POST", async () => {
+  const db = getIntegrationTestPool();
+  const user = await insertUser(db, {
+    email: "compile-sections-viewer@example.test", role: "viewer",
+  });
+  const { card, node_id: nodeId } = await createCard({
+    card_type: "knowledge", title: "External section reference",
+    source_type: "p4-ref", source_ref: "p4://item",
+  });
+  const cachedSnapshot = snapshot("old response");
+  await db.query("UPDATE cards SET source_snapshot = $1 WHERE id = $2", [cachedSnapshot, card.id]);
+  const before = (await db.query("SELECT * FROM cards WHERE id = $1", [card.id])).rows[0];
+  const token = await new SignJWT({ id: user.id, role: "viewer" })
+    .setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h")
+    .sign(new TextEncoder().encode(JWT_SECRET));
+  const queries = jest.spyOn(db, "query");
+  try {
+    const response = await app.inject({
+      method: "POST", url: `/tree/${nodeId}/compile/sections`,
+      headers: { cookie: `atom_auth=${token}` },
+      payload: { resolveRefs: "fresh", head_chars: 200000, canWriteRefs: true },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().sections[0].unfurl_text).toBe("live response");
+    await Promise.all(queries.mock.results
+      .filter(result => result.type === "return")
+      .map(result => result.value));
+    const mutations = queries.mock.calls.filter(([sql]) => /^\s*UPDATE cards\b/i.test(sql));
+    const after = (await db.query("SELECT * FROM cards WHERE id = $1", [card.id])).rows[0];
+    expect(after).toEqual(before);
+    expect(mutations).toHaveLength(0);
+  } finally {
+    queries.mockRestore();
+  }
+});
+
 it("keeps stdio registration writable when no HTTP key scope is supplied", async () => {
   const { card, node_id: nodeId } = await createCard({
     card_type: "knowledge", title: "Stdio reference", source_type: "p4-ref", source_ref: "p4://item",
