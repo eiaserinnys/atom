@@ -1,7 +1,31 @@
 import { request } from './request';
-import type { CompileOptions, UnfurlEntry } from './types';
+import type { CompileContentsResponse, CompileFindResponse, CompileOptions, CompileSectionsResponse, UnfurlEntry } from './types';
 
 export const compileApi = {
+  sections(nodeId: string, depth: number, headChars: number): Promise<CompileSectionsResponse> {
+    const params = new URLSearchParams({ depth: String(depth), head_chars: String(headChars) });
+    return request(`/tree/${nodeId}/compile/sections?${params}`);
+  },
+
+  sectionsWithRefs(
+    nodeId: string, depth: number, resolveRefs: 'cached' | 'fresh',
+    credentials: Record<string, Record<string, string>>, headChars: number,
+  ): Promise<CompileSectionsResponse> {
+    return request(`/tree/${nodeId}/compile/sections`, {
+      method: 'POST',
+      body: JSON.stringify({ depth: depth === Infinity ? null : depth, resolveRefs, credentials, head_chars: headChars }),
+    });
+  },
+
+  contents(cardIds: string[]): Promise<CompileContentsResponse> {
+    return request('/tree/compile/contents', { method: 'POST', body: JSON.stringify({ card_ids: cardIds }) });
+  },
+
+  find(nodeId: string, depth: number, q: string): Promise<CompileFindResponse> {
+    const params = new URLSearchParams({ depth: String(depth), q });
+    return request(`/tree/${nodeId}/compile/find?${params}`);
+  },
+
   compile(nodeId: string, options?: CompileOptions): Promise<{ markdown: string }> {
     const params = new URLSearchParams();
     if (options?.depth === Infinity) {

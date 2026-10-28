@@ -1,89 +1,50 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  buildTocEntriesFromHeadings,
-  getTocMinLevel,
-  type TocEntry,
-} from './compileToc';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
+import type { CompileSection } from '../../api/types';
+import { buildTocEntriesFromSections, findTocHeading, getTocMinLevel } from './compileToc';
 
-export function useCompileToc(markdown: string | undefined) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [tocEntries, setTocEntries] = useState<TocEntry[]>([]);
-  const [tocVisible, setTocVisible] = useState(false);
+export function useCompileToc(sections: CompileSection[], scrollRef: RefObject<HTMLDivElement | null>) {
+  const entries = useMemo(() => buildTocEntriesFromSections(sections), [sections]);
+  const minLevel = useMemo(() => getTocMinLevel(entries), [entries]);
+  const [visible, setVisible] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const rafRef = useRef(0);
 
   useEffect(() => {
-    if (!contentRef.current || !markdown) return;
-
-    const timer = setTimeout(() => {
-      const el = contentRef.current;
-      if (!el) return;
-
-      const headings = Array.from(el.querySelectorAll<HTMLHeadingElement>('h1, h2, h3, h4, h5, h6'));
-      const entries = buildTocEntriesFromHeadings(headings);
-      headings.forEach((heading, index) => {
-        heading.id = entries[index]!.id;
-      });
-
-      setTocEntries(entries);
-    }, 50);
-
-    return () => clearTimeout(timer);
-  }, [markdown]);
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || tocEntries.length === 0) return;
-
-    const handleScroll = () => {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => {
-        const scrollTop = container.scrollTop;
-        let current: string | null = null;
-
-        for (const entry of tocEntries) {
-          const el = document.getElementById(entry.id);
-          if (el && el.offsetTop <= scrollTop + 60) {
-            current = entry.id;
-          }
-        }
-
-        setActiveId(current);
-      });
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    let frame = 0;
+    const update = () => {
+      const edge = scroll.getBoundingClientRect().top + 60;
+      const elements = Array.from(scroll.querySelectorAll<HTMLElement>('[data-section-index]'));
+      let current = elements[0];
+      for (const element of elements) {
+        if (element.getBoundingClientRect().top <= edge) current = element;
+        else break;
+      }
+      const sectionIndex = Number(current?.dataset.sectionIndex);
+      const section = sections[sectionIndex];
+      if (!current || !section) return;
+      let active = entries.find(entry => entry.sectionIndex === sectionIndex && entry.headingIndex === -1)?.id ?? null;
+      for (const entry of entries) {
+        if (entry.sectionIndex !== sectionIndex || entry.headingIndex < 0) continue;
+        const heading = findTocHeading(current, section, entry.headingIndex);
+        if (heading && heading.getBoundingClientRect().top <= edge) active = entry.id;
+      }
+      setActiveId(active);
     };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+    const observer = new MutationObserver(schedule);
+    observer.observe(scroll, { childList: true, subtree: true });
+    scroll.addEventListener('scroll', schedule, { passive: true });
+    schedule();
     return () => {
-      container.removeEventListener('scroll', handleScroll);
-      cancelAnimationFrame(rafRef.current);
+      observer.disconnect();
+      scroll.removeEventListener('scroll', schedule);
+      cancelAnimationFrame(frame);
     };
-  }, [tocEntries]);
+  }, [entries, scrollRef, sections]);
 
-  const scrollTo = useCallback((id: string) => {
-    const el = document.getElementById(id);
-    const container = scrollContainerRef.current;
-    if (!el || !container) return;
-    const containerRect = container.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    container.scrollTo({
-      top: container.scrollTop + (elRect.top - containerRect.top) - 16,
-      behavior: 'smooth',
-    });
-  }, []);
-
-  const minLevel = useMemo(() => getTocMinLevel(tocEntries), [tocEntries]);
-
-  return {
-    contentRef,
-    scrollContainerRef,
-    tocEntries,
-    tocVisible,
-    setTocVisible,
-    activeId,
-    scrollTo,
-    minLevel,
-  };
+  return { entries, minLevel, visible, setVisible, activeId };
 }

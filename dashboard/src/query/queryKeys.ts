@@ -30,6 +30,18 @@ export function standardCompileNodeQueryKey(nodeId: string | null) {
   return ['compile', nodeId] as const;
 }
 
+export function compileSectionsQueryKey(nodeId: string | null, depth: number) {
+  return ['compile', nodeId, depth, 'sections'] as const;
+}
+
+export function unfurlSectionsQueryKey(nodeId: string | null, depth: number) {
+  return ['compile-unfurl', nodeId, depth, 'sections'] as const;
+}
+
+export function compileFindQueryKey(nodeId: string | null, depth: number, query: string) {
+  return ['compile', nodeId, depth, 'find', query] as const;
+}
+
 export function unfurlCompileQueryKey(nodeId: string | null, depth: number) {
   return ['compile-unfurl', nodeId, depth] as const;
 }

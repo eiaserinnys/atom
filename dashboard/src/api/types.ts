@@ -107,6 +107,37 @@ export interface CompileOptions {
   exclude_nodes?: string[];
 }
 
+export interface CompileSection {
+  index: number;
+  node_id: string;
+  card_id: string;
+  card_version: number;
+  depth: number;
+  level: number;
+  heading: string;
+  title: string;
+  cycle: boolean;
+  chars: number;
+  headings: { level: number; text: string }[];
+  content?: string | null;
+  unfurl_text?: string | null;
+}
+
+export interface CompileSectionsResponse {
+  sections: CompileSection[];
+  total_chars: number;
+  unfurls?: Record<string, UnfurlEntry>;
+}
+
+export interface CompileContentsResponse {
+  contents: Record<string, { version: number; content: string | null }>;
+}
+
+export interface CompileFindResponse {
+  matches: { index: number; count: number }[];
+  total: number;
+}
+
 export interface AuthStatus {
   authenticated: boolean;
   id?: string;

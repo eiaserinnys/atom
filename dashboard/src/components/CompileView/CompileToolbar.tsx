@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link2, ListTree } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Link2, ListTree, Search } from 'lucide-react';
+import { api } from '../../api/client';
+import { readStoredCredentials } from '../../hooks/useLocalStorageCredentials';
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu';
 import { INFINITY_SLIDER_VALUE } from './compileDepth';
 
@@ -8,25 +10,53 @@ interface CompileToolbarProps {
   nodeId: string | null;
   headerTabs?: React.ReactNode;
   sliderValue: number;
+  depth: number;
   depthLabel: string;
   unfurlEnabled: boolean;
   selectDepth: (value: number) => void;
   onToggleUnfurl: () => void;
+  onOpenFind: () => void;
 }
 
 export function CompileToolbar({
   nodeId,
   headerTabs,
   sliderValue,
+  depth,
   depthLabel,
   unfurlEnabled,
   selectDepth,
   onToggleUnfurl,
+  onOpenFind,
 }: CompileToolbarProps) {
   const { t } = useTranslation();
   const depthButton = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [copyState, setCopyState] = useState<'idle' | 'busy' | 'copied' | 'error'>('idle');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
+
+  const copyDocument = async () => {
+    if (!nodeId) return;
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    setCopyState('busy');
+    const markdown = unfurlEnabled
+      ? api.compileWithRefs(nodeId, depth, 'cached', readStoredCredentials()).then(result => result.markdown)
+      : api.compile(nodeId, { depth, numbering: true, include_ids: true }).then(result => result.markdown);
+    try {
+      if (window.ClipboardItem && navigator.clipboard.write) {
+        await navigator.clipboard.write([new ClipboardItem({ 'text/plain': markdown.then(text => new Blob([text], { type: 'text/plain' })) })]);
+      } else {
+        await navigator.clipboard.writeText(await markdown);
+      }
+      setCopyState('copied');
+    } catch {
+      setCopyState('error');
+    }
+    copyTimer.current = setTimeout(() => setCopyState('idle'), 1500);
+  };
+  const copyLabel = copyState === 'error' ? t('compile.copy_failed') : copyState === 'copied' ? t('common.copied') : t('compile.copy_document');
 
   const openDepthMenu = () => {
     const rect = depthButton.current?.getBoundingClientRect();
@@ -77,6 +107,17 @@ export function CompileToolbar({
           >
             <Link2 className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
           </button>
+          <button
+            type="button" onClick={() => void copyDocument()} disabled={copyState === 'busy'} aria-busy={copyState === 'busy'}
+            aria-label={copyLabel} title={copyLabel}
+            className="w-8 h-8 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+          >
+            {copyState === 'copied' ? <Check className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" /> : copyState === 'error' ? <AlertTriangle className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" /> : <Copy className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />}
+          </button>
+          <button
+            type="button" onClick={onOpenFind} aria-label={t('compile.find_open')} title={t('compile.find_open')}
+            className="w-8 h-8 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          ><Search className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" /></button>
         </div>
       )}
       {menuOpen && menuPosition && (

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { api } from './client';
+import { compileApi } from './compileApi';
 
 type FetchMock = ReturnType<
   typeof vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>
@@ -152,6 +153,25 @@ describe('dashboard API client transport contracts', () => {
     expect(url.searchParams.get('numbering')).toBe('true');
     expect(url.searchParams.get('max_chars')).toBe('120');
     expect(url.searchParams.get('exclude_nodes')).toBe('skip-1,skip-2');
+  });
+
+  test('serializes the section, contents and find API contracts', async () => {
+    fetchMock.mockResolvedValue(responseWithJson({}));
+    await compileApi.sections('node-1', Infinity, 60000);
+    await compileApi.sectionsWithRefs('node-1', Infinity, 'cached', {}, 60000);
+    await compileApi.contents(['card-1', 'card-2']);
+    await compileApi.find('node-1', 5, '찾는 글');
+
+    const sections = new URL(String(fetchMock.mock.calls[0]?.[0]), 'https://atom.local');
+    expect(sections.pathname).toBe('/tree/node-1/compile/sections');
+    expect(sections.searchParams.get('depth')).toBe('Infinity');
+    expect(sections.searchParams.get('head_chars')).toBe('60000');
+    expect(JSON.parse(getFetchInit(fetchMock, 1).body as string)).toEqual({ depth: null, resolveRefs: 'cached', credentials: {}, head_chars: 60000 });
+    expect(String(fetchMock.mock.calls[2]?.[0])).toBe('/tree/compile/contents');
+    expect(JSON.parse(getFetchInit(fetchMock, 2).body as string)).toEqual({ card_ids: ['card-1', 'card-2'] });
+    const find = new URL(String(fetchMock.mock.calls[3]?.[0]), 'https://atom.local');
+    expect(find.pathname).toBe('/tree/node-1/compile/find');
+    expect(find.searchParams.get('q')).toBe('찾는 글');
   });
 
   test('keeps text-only search URL compatible', async () => {

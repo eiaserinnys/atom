@@ -1,34 +1,29 @@
+// @vitest-environment jsdom
 import { describe, expect, test } from 'vitest';
-import {
-  buildTocEntriesFromHeadings,
-  getTocEntryPaddingLeft,
-  getTocMinLevel,
-} from './compileToc';
+import type { CompileSection } from '../../api/types';
+import { buildTocEntriesFromSections, findTocHeading, getTocEntryPaddingLeft, getTocMinLevel } from './compileToc';
 
-describe('compile TOC logic', () => {
-  test('builds entries with the existing generated id, text, and heading level rules', () => {
-    const entries = buildTocEntriesFromHeadings([
-      { tagName: 'H2', textContent: 'Intro' },
-      { tagName: 'H4', textContent: null },
-      { tagName: 'H3', textContent: 'Details' },
-    ]);
+const section: CompileSection = {
+  index: 0, node_id: 'node', card_id: 'card', card_version: 1, depth: 0, level: 1,
+  heading: '# Root', title: 'Root', cycle: false, chars: 10,
+  headings: [{ level: 2, text: '[Link](https://example.test)' }, { level: 2, text: 'Same' }, { level: 3, text: 'Same' }],
+};
 
-    expect(entries).toEqual([
-      { id: 'compile-heading-0', text: 'Intro', level: 2 },
-      { id: 'compile-heading-1', text: '', level: 4 },
-      { id: 'compile-heading-2', text: 'Details', level: 3 },
+describe('compile TOC', () => {
+  test('builds entries from the server headings and retains the existing indentation', () => {
+    const entries = buildTocEntriesFromSections([section]);
+    expect(entries.map(({ sectionIndex, headingIndex, text, level }) => [sectionIndex, headingIndex, text, level])).toEqual([
+      [0, -1, 'Root', 1], [0, 0, '[Link](https://example.test)', 2], [0, 1, 'Same', 2], [0, 2, 'Same', 3],
     ]);
+    expect(getTocMinLevel(entries)).toBe(1);
+    expect(getTocEntryPaddingLeft(entries[3]!, 1)).toBe(32);
   });
 
-  test('preserves the current min-level formula that is anchored at level 1', () => {
-    const entries = buildTocEntriesFromHeadings([
-      { tagName: 'H2', textContent: 'Intro' },
-      { tagName: 'H4', textContent: 'Deep' },
-    ]);
-
-    expect(getTocMinLevel(entries)).toBe(1);
-    expect(getTocMinLevel([])).toBe(1);
-    expect(getTocEntryPaddingLeft(entries[0]!, 1)).toBe(20);
-    expect(getTocEntryPaddingLeft(entries[1]!, 1)).toBe(44);
+  test('finds matching rendered headings by text and duplicate order, ignoring extra headings', () => {
+    const element = document.createElement('div');
+    element.innerHTML = '<h1>Root</h1><h2>Unlisted</h2><h2> Link </h2><h2>Same</h2><h3>Same</h3>';
+    expect(findTocHeading(element, section, 0)?.textContent).toBe(' Link ');
+    expect(findTocHeading(element, section, 2)?.tagName).toBe('H3');
+    expect(findTocHeading(element, { ...section, headings: [{ level: 2, text: 'Missing' }] }, 0)).toBeNull();
   });
 });

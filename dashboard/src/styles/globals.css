@@ -165,6 +165,9 @@
     letter-spacing: 0;
   }
 
+  .compile-section { display: flow-root; }
+  .markdown-content .compile-section > :last-child { margin-bottom: 0; }
+
   .markdown-content h1,
   .markdown-content h2,
   .markdown-content h3,
@@ -285,6 +288,16 @@
   .markdown-content input[type="checkbox"] {
     margin-right: 0.4em;
   }
+}
+
+::highlight(compile-find) {
+  background-color: color-mix(in srgb, var(--brand) 30%, transparent);
+  color: var(--foreground);
+}
+
+::highlight(compile-find-current) {
+  background-color: color-mix(in srgb, var(--brand) 65%, transparent);
+  color: var(--foreground);
 }
 
 @media (max-width: 767px) {

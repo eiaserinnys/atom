@@ -7,8 +7,15 @@ import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { CardData } from '../../api/client';
 import english from '../../locales/en/translation.json';
-import { standardCompileNodeQueryKey, standardCompileQueryKey } from '../../query/queryKeys';
+import { compileSectionsQueryKey, standardCompileNodeQueryKey } from '../../query/queryKeys';
 import { CompileView } from './CompileView';
+
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize: (index: number) => number }) => ({
+    getVirtualItems: () => Array.from({ length: count }, (_, index) => ({ key: index, index, start: index * estimateSize(index) })),
+    getTotalSize: () => count * estimateSize(0), measureElement: () => {}, scrollToIndex: () => {}, scrollRect: { width: 600 },
+  }),
+}));
 
 function makeCard(overrides: Partial<CardData> = {}): CardData {
   return {
@@ -24,6 +31,17 @@ function compileMarkdown(title: string) {
   return `# ${title} <!-- node:node-a card:card-a -->
 
 Compiled body for ${title}.`;
+}
+
+function compileSections(markdown: string) {
+  const headings = [...markdown.matchAll(/^# (.*?) <!-- node:(\S+) card:(\S+) -->/gm)];
+  return {
+    sections: headings.map((match, index) => ({
+      index, node_id: match[2]!, card_id: match[3]!, card_version: 1, depth: 0, level: 1,
+      heading: match[0], title: match[1]!, cycle: false, chars: 0, headings: [], content: null,
+    })),
+    total_chars: 0,
+  };
 }
 
 function jsonResponse(body: unknown): Response {
@@ -89,8 +107,8 @@ describe('CompileView edit safety', () => {
     conflictOnPut = false;
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/tree/node-root/compile') {
-        return jsonResponse({ markdown: latestMarkdown });
+      if (url.pathname === '/tree/node-root/compile/sections') {
+        return jsonResponse(compileSections(latestMarkdown));
       }
       if (url.pathname.startsWith('/cards/')) {
         const cardId = url.pathname.slice('/cards/'.length);
@@ -124,7 +142,7 @@ describe('CompileView edit safety', () => {
     client = new QueryClient({
       defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false }, mutations: { gcTime: Infinity, retry: false } },
     });
-    client.setQueryData(standardCompileQueryKey('node-root', 5), { markdown: latestMarkdown });
+    client.setQueryData(compileSectionsQueryKey('node-root', 5), compileSections(latestMarkdown));
     i18n = i18next.createInstance();
     await i18n.init({ lng: 'en', resources: { en: { translation: english } }, initAsync: false });
     container = document.createElement('div');
@@ -196,7 +214,7 @@ describe('CompileView edit safety', () => {
     latestMarkdown = `# A title <!-- node:node-a card:card-a -->
 
 # B title <!-- node:node-b card:card-b -->`;
-    await settle(() => client.setQueryData(standardCompileQueryKey('node-root', 5), { markdown: latestMarkdown }));
+    await settle(() => client.setQueryData(compileSectionsQueryKey('node-root', 5), compileSections(latestMarkdown)));
     holdCardGets = true;
 
     const editButtons = () => [...container.querySelectorAll<HTMLButtonElement>(
@@ -227,7 +245,7 @@ describe('CompileView edit safety', () => {
     latestMarkdown = `# A title <!-- node:node-a card:card-a -->
 
 # B title <!-- node:node-b card:card-b -->`;
-    await settle(() => client.setQueryData(standardCompileQueryKey('node-root', 5), { markdown: latestMarkdown }));
+    await settle(() => client.setQueryData(compileSectionsQueryKey('node-root', 5), compileSections(latestMarkdown)));
 
     const editButtons = () => [...container.querySelectorAll<HTMLButtonElement>(
       `h1 button[title="${english.card.edit_title}"]`

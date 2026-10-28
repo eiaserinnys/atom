@@ -294,6 +294,13 @@
     "compile_view": "컴파일 문서"
   },
   "compile": {
+    "copy_document": "문서 복사",
+    "copy_failed": "복사 실패",
+    "find_open": "문서에서 찾기",
+    "find_input": "문서에서 찾기",
+    "find_previous": "이전 결과",
+    "find_next": "다음 결과",
+    "find_close": "찾기 닫기",
     "header": "컴파일 문서",
     "copy_id": "ID 복사",
     "unfurl_enable": "외부 참조 조회 켜기",

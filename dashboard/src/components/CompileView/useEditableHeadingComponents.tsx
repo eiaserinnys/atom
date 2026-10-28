@@ -1,7 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import type { Components } from 'react-markdown';
-import type { SectionMap } from '../../utils/parseCompileSections';
-import { EditableHeading } from './EditableHeading';
+import { EditableHeading, type SectionMap } from './EditableHeading';
 
 export function useEditableHeadingComponents(
   nodeId: string | null,
