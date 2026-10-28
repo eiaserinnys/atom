@@ -51,7 +51,8 @@ export async function loadTreeCompileContext(
   let levelNodes = root ? [root] : [];
   let level = 0;
 
-  while (levelNodes.length > 0 && level < depth) {
+  // Match the compiler's remaining-depth check, including NaN from agent REST.
+  while (levelNodes.length > 0 && !(depth - level <= 0)) {
     const unresolvedCardIds = Array.from(new Set(
       levelNodes
         .filter((node) => node.is_symlink && !canonicalLookupComplete.has(node.card_id))
