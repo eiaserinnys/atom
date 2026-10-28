@@ -1,25 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
-import { api, type UnfurlEntry } from '../../api/client';
+import { compileApi } from '../../api/compileApi';
+import type { UnfurlEntry } from '../../api/client';
 import { readStoredCredentials } from '../../hooks/useLocalStorageCredentials';
-import { standardCompileQueryKey, unfurlCompileQueryKey } from '../../query/queryKeys';
+import { compileSectionsQueryKey, unfurlSectionsQueryKey } from '../../query/queryKeys';
 
 export { standardCompileQueryKey, unfurlCompileQueryKey } from '../../query/queryKeys';
 
 export function useCompileQueries(nodeId: string | null, depth: number, unfurlEnabled: boolean) {
   const standardQuery = useQuery({
-    queryKey: standardCompileQueryKey(nodeId, depth),
-    queryFn: async () => {
-      const result = await api.compile(nodeId!, { depth, numbering: true, include_ids: true });
-      return { markdown: result.markdown };
-    },
+    queryKey: compileSectionsQueryKey(nodeId, depth),
+    queryFn: () => compileApi.sections(nodeId!, depth, 60000),
     enabled: !!nodeId && !unfurlEnabled,
   });
 
   const unfurlQuery = useQuery({
-    queryKey: unfurlCompileQueryKey(nodeId, depth),
-    queryFn: async () => {
-      return api.compileWithRefs(nodeId!, depth, 'cached', readStoredCredentials());
-    },
+    queryKey: unfurlSectionsQueryKey(nodeId, depth),
+    queryFn: () => compileApi.sectionsWithRefs(nodeId!, depth, 'cached', readStoredCredentials(), 60000),
     enabled: !!nodeId && unfurlEnabled,
   });
 
@@ -29,7 +25,7 @@ export function useCompileQueries(nodeId: string | null, depth: number, unfurlEn
     : null;
 
   return {
-    markdown: activeQuery.data?.markdown,
+    sections: activeQuery.data?.sections,
     isLoading: activeQuery.isLoading,
     error: activeQuery.error,
     unfurls,

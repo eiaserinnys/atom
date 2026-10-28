@@ -128,6 +128,13 @@
     "compile_view": "Document compilé"
   },
   "compile": {
+    "copy_document": "Copier le document",
+    "copy_failed": "Échec de la copie",
+    "find_open": "Rechercher dans le document",
+    "find_input": "Rechercher dans le document",
+    "find_previous": "Résultat précédent",
+    "find_next": "Résultat suivant",
+    "find_close": "Fermer la recherche",
     "header": "Document compilé",
     "copy_id": "Copier l'ID",
     "unfurl_enable": "Activer la consultation de référence externe",

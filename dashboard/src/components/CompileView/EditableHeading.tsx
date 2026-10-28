@@ -1,7 +1,7 @@
 import { useState, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pencil } from 'lucide-react';
-import type { SectionMap } from '../../utils/parseCompileSections';
+export type SectionMap = Map<string, { nodeId: string; cardId: string }>;
 
 interface EditableHeadingProps {
   level: number;

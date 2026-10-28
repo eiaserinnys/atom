@@ -294,6 +294,13 @@
     "compile_view": "Compiled Document"
   },
   "compile": {
+    "copy_document": "Copy document",
+    "copy_failed": "Copy failed",
+    "find_open": "Find in document",
+    "find_input": "Find in document",
+    "find_previous": "Previous match",
+    "find_next": "Next match",
+    "find_close": "Close find",
     "header": "Compiled Document",
     "copy_id": "Copy ID",
     "unfurl_enable": "Enable external reference lookup",

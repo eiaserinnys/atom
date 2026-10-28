@@ -128,6 +128,13 @@
     "compile_view": "コンパイル文書"
   },
   "compile": {
+    "copy_document": "文書をコピー",
+    "copy_failed": "コピーに失敗しました",
+    "find_open": "文書内を検索",
+    "find_input": "文書内を検索",
+    "find_previous": "前の結果",
+    "find_next": "次の結果",
+    "find_close": "検索を閉じる",
     "header": "コンパイル文書",
     "copy_id": "ID をコピー",
     "unfurl_enable": "外部参照照会を有効化",

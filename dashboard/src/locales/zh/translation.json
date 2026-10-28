@@ -128,6 +128,13 @@
     "compile_view": "编译文档"
   },
   "compile": {
+    "copy_document": "复制文档",
+    "copy_failed": "复制失败",
+    "find_open": "在文档中查找",
+    "find_input": "在文档中查找",
+    "find_previous": "上一个结果",
+    "find_next": "下一个结果",
+    "find_close": "关闭查找",
     "header": "编译文档",
     "copy_id": "复制 ID",
     "unfurl_enable": "启用外部引用查询",
