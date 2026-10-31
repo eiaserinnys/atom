@@ -1,3 +1,6 @@
+import { randomBytes } from 'node:crypto';
+import { SignJWT, type JWTPayload } from 'jose';
+
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const SLACK_AUTH_URL = 'https://slack.com/oauth/v2/authorize';
 
@@ -8,8 +11,77 @@ export const SLACK_IDENTITY_URL = 'https://slack.com/api/users.identity';
 
 export const JWT_COOKIE_NAME = 'atom_auth';
 export const STATE_COOKIE_NAME = 'atom_oauth_state';
+export const OAUTH_PENDING_COOKIE_NAME = 'atom_oauth_pending';
 export const JWT_EXPIRY_SECONDS = 7 * 24 * 60 * 60;
 export const ATOM_SEARCH_MOTION_RETURN_TO = 'atom-search-motion';
+
+const authorizationCodeExpirations = new Map<string, number>();
+
+export function extractAuthToken(req: {
+  cookies?: Record<string, string | undefined>;
+  headers: { authorization?: string | string[] };
+}): string | undefined {
+  const cookieToken = req.cookies?.[JWT_COOKIE_NAME];
+  if (cookieToken) return cookieToken;
+
+  const authorization = req.headers.authorization;
+  if (typeof authorization !== 'string') return undefined;
+  return authorization.match(/^Bearer\s+(\S+)$/i)?.[1];
+}
+
+export function isAllowedAccessJwtPayload(payload: JWTPayload): boolean {
+  return payload['typ'] === undefined || payload['typ'] === 'access';
+}
+
+export function isLoopbackRedirectUri(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'http:' &&
+      url.username === '' &&
+      url.password === '' &&
+      url.hash === '' &&
+      ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export async function issueAuthorizationCode(input: {
+  userId: string;
+  clientId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  scope?: string;
+  jwtSecret: Uint8Array;
+}): Promise<string> {
+  const now = Date.now();
+  for (const [jti, expiresAt] of authorizationCodeExpirations) {
+    if (expiresAt <= now) authorizationCodeExpirations.delete(jti);
+  }
+
+  const jti = randomBytes(16).toString('hex');
+  authorizationCodeExpirations.set(jti, now + 300_000);
+  const payload: JWTPayload = {
+    typ: 'atom_oauth_code',
+    sub: input.userId,
+    client_id: input.clientId,
+    redirect_uri: input.redirectUri,
+    code_challenge: input.codeChallenge,
+    ...(input.scope === undefined ? {} : { scope: input.scope }),
+    jti,
+  };
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('5m')
+    .sign(input.jwtSecret);
+}
+
+export function consumeAuthorizationCode(jti: string): boolean {
+  const expiresAt = authorizationCodeExpirations.get(jti);
+  authorizationCodeExpirations.delete(jti);
+  return expiresAt !== undefined && expiresAt > Date.now();
+}
 
 export function getSearchMotionPageUrl(): string | undefined {
   const configuredUrl = process.env['SEARCH_MOTION_PAGE_URL']?.trim();

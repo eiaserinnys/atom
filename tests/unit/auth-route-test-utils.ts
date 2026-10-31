@@ -98,6 +98,7 @@ export function makeFakeAuthDeps(input: {
   const fetchResponses = [...input.fetchResponses];
   const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
   const findCalls: string[] = [];
+  const findByIdCalls: string[] = [];
   const inserts: Array<{ email: string; display_name?: string; role: User["role"] }> = [];
 
   const deps: AuthRoutesDeps = {
@@ -113,6 +114,11 @@ export function makeFakeAuthDeps(input: {
       findCalls.push(email);
       return users[email] ?? null;
     },
+    findUserById: async (actualDb, id) => {
+      expect(actualDb).toBe(db);
+      findByIdCalls.push(id);
+      return Object.values(users).find((user) => user?.id === id) ?? null;
+    },
     insertUser: async (actualDb, insert) => {
       expect(actualDb).toBe(db);
       inserts.push(insert);
@@ -127,7 +133,7 @@ export function makeFakeAuthDeps(input: {
     },
   };
 
-  return { deps, fetchCalls, findCalls, inserts, users };
+  return { deps, fetchCalls, findCalls, findByIdCalls, inserts, users };
 }
 
 export function configureGoogleCallbackEnv() {

@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger, FastifyReply } from 'fastify';
-import { SignJWT } from 'jose';
+import { SignJWT, jwtVerify } from 'jose';
 import type { DatabaseAdapter } from '../../db/adapter.js';
 import { isEmailAllowed, type User } from '../../db/queries/users.js';
 import {
@@ -7,9 +7,12 @@ import {
   GOOGLE_USERINFO_URL,
   JWT_COOKIE_NAME,
   JWT_EXPIRY_SECONDS,
+  OAUTH_PENDING_COOKIE_NAME,
   SLACK_IDENTITY_URL,
   SLACK_TOKEN_URL,
   getJwtCookieOptions,
+  isLoopbackRedirectUri,
+  issueAuthorizationCode,
   isSlackWorkspaceAllowed,
 } from './auth_helpers.js';
 
@@ -27,6 +30,7 @@ async function issueJwtAndRedirect(input: {
   reply: FastifyReply;
   frontendUrl: string;
   successRedirectUrl?: string;
+  pendingOAuthToken?: string;
   jwtSecret: Uint8Array;
   dbUser: Pick<User, 'id' | 'role'>;
   email: string;
@@ -45,6 +49,35 @@ async function issueJwtAndRedirect(input: {
 
   input.reply.setCookie(JWT_COOKIE_NAME, token, getJwtCookieOptions(process.env['NODE_ENV']));
 
+  if (input.pendingOAuthToken) {
+    input.reply.clearCookie(OAUTH_PENDING_COOKIE_NAME, { path: '/' });
+    try {
+      const { payload } = await jwtVerify(input.pendingOAuthToken, input.jwtSecret);
+      const redirectUri = payload['redirect_uri'];
+      const clientId = payload['client_id'];
+      const codeChallenge = payload['code_challenge'];
+      const state = payload['state'];
+      if (
+        payload['typ'] === 'atom_oauth_pending' &&
+        typeof redirectUri === 'string' && isLoopbackRedirectUri(redirectUri) &&
+        typeof clientId === 'string' && typeof codeChallenge === 'string' &&
+        payload['code_challenge_method'] === 'S256' && typeof state === 'string' && state.length > 0
+      ) {
+        const code = await issueAuthorizationCode({
+          userId: input.dbUser.id,
+          clientId,
+          redirectUri,
+          codeChallenge,
+          scope: typeof payload['scope'] === 'string' ? payload['scope'] : undefined,
+          jwtSecret: input.jwtSecret,
+        });
+        return input.reply.redirect(`${redirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
+      }
+    } catch {
+      // Invalid or expired pending authorization falls back to the regular login destination.
+    }
+  }
+
   return input.reply.redirect(input.successRedirectUrl ?? (input.frontendUrl || '/'));
 }
 
@@ -53,6 +86,7 @@ export async function handleGoogleCallback(input: {
   reply: FastifyReply;
   frontendUrl: string;
   successRedirectUrl?: string;
+  pendingOAuthToken?: string;
   jwtSecret: Uint8Array;
   code: string;
   googleClientId: string;
@@ -98,6 +132,7 @@ export async function handleGoogleCallback(input: {
     reply: input.reply,
     frontendUrl: input.frontendUrl,
     successRedirectUrl: input.successRedirectUrl,
+    pendingOAuthToken: input.pendingOAuthToken,
     jwtSecret: input.jwtSecret,
     dbUser,
     email: user.email,
@@ -112,6 +147,7 @@ export async function handleSlackCallback(input: {
   frontendUrl: string;
   jwtSecret: Uint8Array;
   code: string;
+  pendingOAuthToken?: string;
   slackClientId: string;
   slackClientSecret: string;
   slackCallbackUrl: string;
@@ -189,6 +225,7 @@ export async function handleSlackCallback(input: {
   return issueJwtAndRedirect({
     reply: input.reply,
     frontendUrl: input.frontendUrl,
+    pendingOAuthToken: input.pendingOAuthToken,
     jwtSecret: input.jwtSecret,
     dbUser,
     email,
