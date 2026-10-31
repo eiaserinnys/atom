@@ -4,6 +4,10 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { getDb } from "../db/client.js";
 import { findActiveAgents, type Agent } from "../db/queries/agents.js";
+import { findUserById } from "../db/queries/users.js";
+import { jwtVerify } from "jose";
+import { isAuthBypassEnabled } from "./auth-mode.js";
+import { isAllowedAccessJwtPayload } from "./routes/auth_helpers.js";
 
 /**
  * Agent key (x-api-key) verification with a per-process cache of keys that
@@ -89,7 +93,41 @@ export const agentKeyVerifier: AgentKeyVerifier = createAgentKeyVerifier({
 export async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   const secret = req.headers["x-api-key"] as string | undefined;
   if (!secret) {
-    return reply.code(401).send({ error: "x-api-key header required" });
+    const authorization = req.headers.authorization;
+    const token = typeof authorization === "string"
+      ? authorization.match(/^Bearer\s+(\S+)$/i)?.[1]
+      : undefined;
+    if (!token) return reply.code(401).send({ error: "x-api-key header required" });
+
+    let payload;
+    try {
+      ({ payload } = await jwtVerify(token, new TextEncoder().encode(process.env["JWT_SECRET"]!)));
+    } catch {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+    if (!isAllowedAccessJwtPayload(payload) || typeof payload["id"] !== "string") {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+
+    const user = payload["id"] === "bypass" && isAuthBypassEnabled()
+      ? {
+          id: "bypass",
+          email: "bypass@local",
+          display_name: "Bypass Admin",
+          role: "admin" as const,
+          is_active: true,
+        }
+      : await findUserById(getDb(), payload["id"]);
+    if (!user?.is_active) return reply.code(401).send({ error: "Unauthorized" });
+
+    req.jwtUser = {
+      id: user.id,
+      email: user.email,
+      name: user.display_name ?? (typeof payload["name"] === "string" ? payload["name"] : ""),
+      role: user.role,
+    };
+    req.agentScope = user.role === "admin" || user.role === "editor" ? "write" : "read";
+    return;
   }
   const agent = await agentKeyVerifier.verify(secret);
   if (!agent) {

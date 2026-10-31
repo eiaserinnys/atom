@@ -4,6 +4,7 @@ import type { UserRole } from '../../shared/types.js';
 import { isAuthBypassEnabled } from '../auth-mode.js';
 import { getDb } from '../../db/client.js';
 import { findUserById } from '../../db/queries/users.js';
+import { extractAuthToken, isAllowedAccessJwtPayload } from '../routes/auth_helpers.js';
 
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const READ_ONLY_POST_ROUTES = [
@@ -56,7 +57,7 @@ export async function authMiddleware(
     return;
   }
 
-  const token = req.cookies['atom_auth'];
+  const token = extractAuthToken(req);
   if (!token) {
     reply.code(401).send({ error: 'Unauthorized' });
     return;
@@ -66,6 +67,11 @@ export async function authMiddleware(
   try {
     ({ payload } = await jwtVerify(token, getJwtSecret()));
   } catch {
+    reply.code(401).send({ error: 'Invalid token' });
+    return;
+  }
+
+  if (!isAllowedAccessJwtPayload(payload)) {
     reply.code(401).send({ error: 'Invalid token' });
     return;
   }
