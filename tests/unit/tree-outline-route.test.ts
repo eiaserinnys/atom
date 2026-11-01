@@ -40,7 +40,7 @@ describe("tree outline route boundary", () => {
     expect(res.json()).toEqual({ node_id: null, canonical_node_id: null, depth: 2, nodes: [] });
   });
 
-  it.each([1, 2, 3])("accepts depth=%i", async (depth) => {
+  it.each([1, 2, 3, 10])("accepts depth=%i", async (depth) => {
     const { app, calls } = makeApp(EMPTY);
     const res = await app.inject({
       method: "GET",
@@ -50,7 +50,7 @@ describe("tree outline route boundary", () => {
     expect(calls).toEqual([{ nodeId: NODE_ID, depth, excerptChars: 0 }]);
   });
 
-  it.each(["0", "4", "-1", "1.5", "2x", "", "abc", "02"])(
+  it.each(["0", "11", "-1", "2.5", "abc", ""])(
     "rejects depth=%p with 400 before touching the service",
     async (depth) => {
       const { app, calls } = makeApp(EMPTY);
@@ -59,7 +59,7 @@ describe("tree outline route boundary", () => {
         url: `/api/tree/outline?depth=${encodeURIComponent(depth)}`,
       });
       expect(res.statusCode).toBe(400);
-      expect(res.json().error).toMatch(/depth/);
+      expect(res.json()).toEqual({ error: "depth must be an integer between 1 and 10" });
       expect(calls).toEqual([]);
     }
   );

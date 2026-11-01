@@ -48,7 +48,7 @@ afterEach(async () => {
 });
 
 describe("tree outline on SQLite", () => {
-  it.each([1, 2, 3] as const)("depth=%i matches the Postgres contract", async (depth) => {
+  it.each([1, 2, 3, 4] as const)("depth=%i matches the Postgres contract", async (depth) => {
     const outline = await treeService.getTreeOutline(fx.R, depth, 0);
     expect(outline).not.toBeNull();
     expect(outline!.canonical_node_id).toBe(fx.R);
