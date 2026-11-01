@@ -68,7 +68,7 @@ describe("GET /api/tree/outline", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it.each([1, 2, 3] as const)(
+  it.each([1, 2, 3, 4] as const)(
     "depth=%i expands children only to the limit and counts the rest",
     async (depth) => {
       const body = await outline(`?node_id=${fx.R}&depth=${depth}`);
@@ -143,13 +143,14 @@ describe("GET /api/tree/outline", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it.each(["0", "4"])("rejects depth=%s with 400", async (depth) => {
+  it.each(["0", "11"])("rejects depth=%s with 400", async (depth) => {
     const res = await app.inject({
       method: "GET",
       url: `/api/tree/outline?node_id=${fx.R}&depth=${depth}`,
       headers: { "x-api-key": API_KEY },
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "depth must be an integer between 1 and 10" });
   });
 
   it("issues a constant number of queries regardless of subtree size (no N+1)", async () => {
@@ -271,8 +272,17 @@ describe("GET /tree/outline (dashboard route)", () => {
     expect(res.json().id).toBe(fx.R);
   });
 
+  it("accepts depth=4 and serves the same outline as the agent route", async () => {
+    const agent = await outline(`?node_id=${fx.R}&depth=4`);
+    const res = await app.inject({ method: "GET", url: `/tree/outline?node_id=${fx.R}&depth=4` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(agent);
+    expect(shapeOf(res.json<TreeOutline>().nodes)).toEqual(expectedUnderR(4));
+  });
+
   it("validates the query the same way", async () => {
-    const res = await app.inject({ method: "GET", url: "/tree/outline?depth=4" });
+    const res = await app.inject({ method: "GET", url: "/tree/outline?depth=11" });
     expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "depth must be an integer between 1 and 10" });
   });
 });

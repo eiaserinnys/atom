@@ -7,12 +7,12 @@ import type { TreeOutline } from "../../shared/types.js";
  *
  * Query:
  *   node_id        UUID, omitted = virtual root (parent_node_id IS NULL)
- *   depth          1..3, default 2 — how many levels `children` is filled
+ *   depth          1..10, default 2 — how many levels `children` is filled
  *   excerpt_chars  0..400, default 0 — plain-text body excerpt on each
  *                  level-1 node (0 = no `excerpt` field, bodies not read)
  */
 const OUTLINE_DEFAULT_DEPTH = 2;
-const DEPTH_PATTERN = /^[1-3]$/;
+const DEPTH_PATTERN = /^([1-9]|10)$/;
 const EXCERPT_CHARS_PATTERN = /^(0|[1-9][0-9]{0,2})$/;
 const EXCERPT_CHARS_MAX = 400;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,7 +37,7 @@ export function parseTreeOutlineQuery(query: unknown): TreeOutlineQueryParseResu
   let depth = OUTLINE_DEFAULT_DEPTH;
   if (rawDepth !== undefined) {
     if (typeof rawDepth !== "string" || !DEPTH_PATTERN.test(rawDepth)) {
-      return { ok: false, error: "depth must be an integer between 1 and 3" };
+      return { ok: false, error: "depth must be an integer between 1 and 10" };
     }
     depth = Number(rawDepth);
   }

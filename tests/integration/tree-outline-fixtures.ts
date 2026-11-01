@@ -114,10 +114,14 @@ function leaf(title: string, child_count: number, descendant_count: number, is_s
 }
 
 /** Expected shape of R's outline at each allowed depth. */
-export function expectedUnderR(depth: 1 | 2 | 3): OutlineShape[] {
+export function expectedUnderR(depth: number): OutlineShape[] {
+  const a1a =
+    depth >= 4
+      ? { ...leaf("A1a", 1, 1), children: [leaf("A1ai", 0, 0)] }
+      : leaf("A1a", 1, 1);
   const a1 =
     depth >= 3
-      ? { ...leaf("A1", 1, 2), children: [leaf("A1a", 1, 1)] }
+      ? { ...leaf("A1", 1, 2), children: [a1a] }
       : leaf("A1", 1, 2);
   const a =
     depth >= 2
