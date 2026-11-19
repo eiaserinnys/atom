@@ -7,6 +7,9 @@ import { getDb } from "../../db/client.js";
 import { findUserById } from "../../db/queries/users.js";
 import { JWT_COOKIE_NAME } from "./auth_helpers.js";
 
+// SSE comment lines keep idle connections alive through proxies and client read timeouts.
+const KEEPALIVE_INTERVAL_MS = 30_000;
+
 const userConnections = new Map<string, Set<() => void>>();
 
 export function closeUserEventConnections(userId: string): void {
@@ -38,9 +41,14 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
     await new Promise<void>((resolve) => {
       let closed = false;
       let pending = Promise.resolve();
+      const keepalive = setInterval(() => {
+        if (closed) return;
+        reply.raw.write(": keepalive\n\n");
+      }, KEEPALIVE_INTERVAL_MS);
       const close = () => {
         if (closed) return;
         closed = true;
+        clearInterval(keepalive);
         eventBus.off("atom:event", listener);
         req.raw.off("close", close);
         if (authenticatedUserId) {
