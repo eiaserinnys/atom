@@ -5,7 +5,7 @@ import { resolveAllowedCorsOrigin } from "../page_access.js";
 import { decodeJwt } from "jose";
 import { getDb } from "../../db/client.js";
 import { findUserById } from "../../db/queries/users.js";
-import { JWT_COOKIE_NAME } from "./auth_helpers.js";
+import { extractAuthToken } from "./auth_helpers.js";
 
 // SSE comment lines keep idle connections alive through proxies and client read timeouts.
 const KEEPALIVE_INTERVAL_MS = 30_000;
@@ -19,12 +19,11 @@ export function closeUserEventConnections(userId: string): void {
 export async function eventsRoutes(app: FastifyInstance): Promise<void> {
   // GET /events — SSE endpoint for real-time atom events
   app.get("/events", async (req, reply) => {
-    // The global auth middleware has already verified this cookie and user.
+    // The global auth middleware has already verified this token and user.
     const userId = req.jwtUser?.id;
     const authenticatedUserId = userId && userId !== "bypass" ? userId : undefined;
-    const expiresAt = authenticatedUserId
-      ? decodeJwt(req.cookies[JWT_COOKIE_NAME]!).exp
-      : undefined;
+    const token = authenticatedUserId ? extractAuthToken(req) : undefined;
+    const expiresAt = token ? decodeJwt(token).exp : undefined;
     const frontendUrl = process.env["FRONTEND_URL"];
     const searchMotionPageUrl = process.env["SEARCH_MOTION_PAGE_URL"];
     const allowedOrigin = resolveAllowedCorsOrigin(req, frontendUrl, searchMotionPageUrl);
