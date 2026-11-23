@@ -23,7 +23,7 @@ import {
   consumeAuthorizationCode,
   extractAuthToken,
 } from './auth_helpers.js';
-import { isAuthBypassEnabled } from '../auth-mode.js';
+import { isAuthBypassEnabled, resolveAuthMode } from '../auth-mode.js';
 import type { AuthCallbackDeps } from './auth_callback_handlers.js';
 import { handleGoogleCallback, handleSlackCallback } from './auth_callback_handlers.js';
 
@@ -475,7 +475,9 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
 
     // GET /api/auth/providers — return available OAuth providers
     app.get('/api/auth/providers', async (_req, reply) => {
-      return reply.send(getProviderAvailability({ googleClientId, slackClientId }));
+      return reply.send(resolveAuthMode() === 'password'
+        ? { google: false, slack: false, password: true }
+        : getProviderAvailability({ googleClientId, slackClientId }));
     });
 
     // GET /api/auth/status — return current auth state
@@ -484,7 +486,7 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
         return reply.send(buildBypassAuthStatus());
       }
 
-      if (!googleClientId && !slackClientId) {
+      if (resolveAuthMode() === 'unconfigured') {
         return reply.send({ authenticated: false });
       }
 

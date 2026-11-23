@@ -1,7 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { jwtVerify, type JWTPayload } from 'jose';
 import type { UserRole } from '../../shared/types.js';
-import { isAuthBypassEnabled } from '../auth-mode.js';
+import { resolveAuthMode } from '../auth-mode.js';
+import { isReservedBackendPath } from '../static-dashboard.js';
 import { getDb } from '../../db/client.js';
 import { findUserById } from '../../db/queries/users.js';
 import { extractAuthToken, isAllowedAccessJwtPayload } from '../routes/auth_helpers.js';
@@ -38,21 +39,26 @@ export async function authMiddleware(
   req: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
+  if ((req.routeOptions.config as { publicStatic?: boolean } | undefined)?.publicStatic === true) {
+    let decodedPath: string;
+    try { decodedPath = decodeURIComponent((req.raw.url ?? req.url).split('?')[0]); }
+    catch { reply.code(400).send({ error: 'Bad Request' }); return; }
+    if (isReservedBackendPath(decodedPath)) reply.code(404).send({ error: 'Not Found' });
+    return;
+  }
+
   // Auth routes, MCP endpoint, and well-known discovery are always accessible
   // (MCP handles its own auth via Bearer token; well-known must be publicly reachable
   //  so MCP clients don't fall back to OAuth discovery)
   // /api/cards and /api/tree use agent key auth (handled in the route's own preHandler)
   if (req.url.startsWith('/api/auth/') || req.url === '/api/version' || req.url.startsWith('/mcp') || req.url.startsWith('/.well-known/') || req.url === '/register' || req.url.startsWith('/api/cards') || req.url.startsWith('/api/tree') || req.url === '/api/health') return;
 
-  // Without a login provider, only explicit local bypass can authenticate browser APIs.
-  const googleClientId = process.env['GOOGLE_CLIENT_ID'];
-  const slackClientId = process.env['SLACK_CLIENT_ID'];
-  if (!googleClientId && !slackClientId) {
-    if (!isAuthBypassEnabled()) {
-      reply.code(401).send({ error: 'Unauthorized' });
-      return;
-    }
-
+  const mode = resolveAuthMode();
+  if (mode === 'unconfigured') {
+    reply.code(401).send({ error: 'Unauthorized' });
+    return;
+  }
+  if (mode === 'bypass') {
     req.jwtUser = { id: 'bypass', email: 'bypass@local', name: 'Bypass Admin', role: 'admin' };
     return;
   }

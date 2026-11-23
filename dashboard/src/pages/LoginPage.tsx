@@ -1,17 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '../components/Spinner';
+import { submitPasswordLogin } from '../api/passwordLogin';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 interface AuthProviders {
   google: boolean;
   slack: boolean;
+  password?: boolean;
 }
 
 export function LoginPage() {
   const { t } = useTranslation();
   const [providers, setProviders] = useState<AuthProviders | null>(null);
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<'invalid' | 'rate_limited' | 'error' | null>(null);
+
+  async function handlePasswordLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    const result = await submitPasswordLogin(password);
+    if (result === 'ok') window.location.reload();
+    else { setError(result); setSubmitting(false); }
+  }
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/auth/providers`, { credentials: 'same-origin' })
@@ -53,7 +67,25 @@ export function LoginPage() {
             </a>
           )}
 
-          {providers !== null && !providers.google && !providers.slack && (
+          {providers?.password === true && (
+            <form onSubmit={handlePasswordLogin} className="flex flex-col gap-2 w-full">
+              <label htmlFor="password-login" className="text-sm text-foreground">{t('login.password_label')}</label>
+              <input
+                id="password-login" name="password" type="password" data-testid="password-login-input"
+                autoComplete="current-password" required value={password}
+                onChange={(event) => { setPassword(event.target.value); setError(null); }}
+                aria-invalid={error === 'invalid'} aria-describedby={error ? 'password-login-error' : undefined}
+                className="w-full px-5 py-2.5 bg-input border border-border text-foreground font-sans"
+              />
+              <button type="submit" data-testid="password-login-button" disabled={submitting}
+                className="px-5 py-2.5 bg-input border border-border text-foreground text-sm font-sans cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-default">
+                {t('login.password_submit')}
+              </button>
+              {error && <p id="password-login-error" role="alert" className="text-sm text-foreground">{t(`login.password_${error}`)}</p>}
+            </form>
+          )}
+
+          {providers !== null && !providers.google && !providers.slack && !providers.password && (
             <p className="text-sm text-muted-foreground text-center">
               {t('login.sign_in_error')}
             </p>

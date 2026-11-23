@@ -1,5 +1,7 @@
 const PLAINTEXT_CONFIG_KEYS = new Set([
   "API_PORT",
+  "API_HOST",
+  "DASHBOARD_DIR",
   "NODE_ENV",
   "FRONTEND_URL",
   "AUTH_BYPASS",

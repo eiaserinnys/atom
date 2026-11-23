@@ -344,6 +344,11 @@
     "deleting": "Deleting…"
   },
   "login": {
+    "password_label": "Password",
+    "password_submit": "Sign in",
+    "password_invalid": "Incorrect password.",
+    "password_rate_limited": "Too many attempts. Try again later.",
+    "password_error": "Unable to sign in. Try again.",
     "title": "atom",
     "desc": "Knowledge Management System",
     "sign_in_google": "Sign in with Google",
