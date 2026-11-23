@@ -70,6 +70,11 @@ export async function insertUser(
   return rowToUser(result.rows[0]);
 }
 
+export async function ensurePasswordAdminUser(db: Queryable): Promise<User> {
+  const existing = await findUserByEmail(db, 'owner@local');
+  return existing ?? insertUser(db, { email: 'owner@local', display_name: 'Owner', role: 'admin' });
+}
+
 export async function listUsers(db: Queryable): Promise<User[]> {
   const result = await db.query(
     `SELECT * FROM users ORDER BY created_at ASC`

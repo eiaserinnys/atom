@@ -9,6 +9,8 @@ import { createSearchExpandRoutes } from "./routes/search-expand.js";
 import { createQueryNeighborService } from "../services/embeddings/query-neighbors.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { authRoutes } from "./routes/auth.js";
+import { passwordLoginRoutes } from "./routes/password_login.js";
+import { createDashboardStaticRoutes } from "./static-dashboard.js";
 import { eventsRoutes } from "./routes/events.js";
 import { batchRoutes } from "./routes/batch.js";
 import { configRoutes } from "./routes/config.js";
@@ -23,14 +25,14 @@ import { runMigrations, getDb, closeDb } from "../db/client.js";
 import { config } from "dotenv";
 import { loadAdapters } from "../unfurl/loader.js";
 import { adapterRegistry } from "../unfurl/registry.js";
-import { userExists, insertUser } from "../db/queries/users.js";
+import { userExists, insertUser, ensurePasswordAdminUser } from "../db/queries/users.js";
 import { FlatEmbeddingIndex } from "../services/embeddings/flat-index.js";
 import { createEmbeddingSync } from "../services/embeddings/sync.js";
 import { createNeighborService } from "../services/embeddings/neighbors.js";
 import { createOpenAIConfigRoutes } from "./routes/openai-config.js";
 import { createNeighborsRoutes } from "./routes/neighbors.js";
 import { inspectStartupConfig } from "./startup-config.js";
-import { isAuthBypassEnabled } from "./auth-mode.js";
+import { isAuthBypassEnabled, resolveAuthMode } from "./auth-mode.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,6 +59,7 @@ app.get('/api/version', async (_req, reply) => {
 });
 
 app.register(authRoutes);
+app.register(passwordLoginRoutes);
 app.addHook('preHandler', authMiddleware);
 app.register(cardRoutes);
 app.register(treeRoutes);
@@ -72,6 +75,8 @@ app.register(cardApiRoutes);
 app.register(systemRoutes);
 app.register(createOpenAIConfigRoutes({ db, sync: embeddingSync }));
 app.register(createNeighborsRoutes(neighborService));
+const dashboardDir = process.env["DASHBOARD_DIR"]?.trim();
+if (dashboardDir) app.register(createDashboardStaticRoutes(dashboardDir));
 app.addHook("onClose", async () => {
   await embeddingSync.stop();
   await neighborService.waitForLoad();
@@ -85,6 +90,7 @@ if (isNaN(port)) {
 
 async function seedMigration(): Promise<void> {
   const db = getDb();
+  if (resolveAuthMode() === "password") await ensurePasswordAdminUser(db);
 
   // ALLOWED_EMAIL → users 테이블 admin 마이그레이션
   const allowedEmail = process.env["ALLOWED_EMAIL"];
@@ -115,7 +121,7 @@ const start = async (): Promise<void> => {
   await runMigrations(migrationsDir);
   await seedMigration();
   await loadAdapters(adapterRegistry);
-  await app.listen({ port, host: isAuthBypassEnabled() ? "127.0.0.1" : "0.0.0.0" });
+  await app.listen({ port, host: process.env["API_HOST"]?.trim() || (isAuthBypassEnabled() ? "127.0.0.1" : "0.0.0.0") });
   embeddingSync.start();
 };
 

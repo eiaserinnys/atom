@@ -1,3 +1,5 @@
+import { getDashboardAdminPassword, resolveAuthMode } from "./auth-mode.js";
+
 export type StartupEnvironment = Record<string, string | undefined>;
 
 export type StartupConfigInspection = {
@@ -25,6 +27,15 @@ export function inspectStartupConfig(env: StartupEnvironment): StartupConfigInsp
     errors.push("AUTH_BYPASS=1 cannot be combined with an OAuth provider.");
   }
 
+  const passwordConfigured = Boolean(getDashboardAdminPassword(env));
+  if (passwordConfigured && bypassConfigured) {
+    errors.push("AUTH_BYPASS=1 cannot be combined with DASHBOARD_ADMIN_PASSWORD.");
+  }
+  const mode = resolveAuthMode(env);
+  if (mode === "password" && !env["JWT_SECRET"]?.trim()) {
+    errors.push("Missing required environment variables: JWT_SECRET");
+  }
+
   if (hasOAuthProvider) {
     const required = [
       "JWT_SECRET",
@@ -39,8 +50,10 @@ export function inspectStartupConfig(env: StartupEnvironment): StartupConfigInsp
 
   return {
     errors,
-    warning: !hasOAuthProvider && !bypassConfigured
+    warning: mode === "unconfigured"
       ? "No login method is configured; browser APIs will return 401. Set AUTH_BYPASS=1 for local development."
-      : undefined,
+      : mode === "oauth" && passwordConfigured
+        ? "DASHBOARD_ADMIN_PASSWORD is ignored because an OAuth provider is configured."
+        : undefined,
   };
 }

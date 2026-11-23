@@ -258,9 +258,20 @@ To keep installed skills in step with this repository, symlink the folders inste
 
 ### Browser Authentication
 
+Authentication modes are resolved in this order:
+
+| Priority | Mode | Configuration |
+| --- | --- | --- |
+| 1 | OAuth | `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID` is set; the installation password is ignored. |
+| 2 | Password | `DASHBOARD_ADMIN_PASSWORD` is nonblank after trimming; requires `JWT_SECRET`. |
+| 3 | Bypass | `AUTH_BYPASS=1` for local development only. |
+| 4 | Unconfigured | No login method; protected browser APIs return 401. |
+
+Password and bypass cannot be enabled together. Password mode creates the first administrator as `owner@local` and preserves an existing account's role and active state. Login is limited to ten failed attempts per IP in a 60-second window. Session cookies are marked `Secure` when the first `X-Forwarded-Proto` value is `https`, or the request itself uses HTTPS when that header is absent. Set `DASHBOARD_DIR` to a built dashboard directory to have the API serve its static files and client routes; `API_HOST` optionally overrides the listen host.
+
 Browser API access is denied by default:
 
-- **Default 401 when unconfigured**: If neither `GOOGLE_CLIENT_ID` nor `SLACK_CLIENT_ID` is configured and `AUTH_BYPASS` is not `1`, browser API routes that need a session cookie return `401`. This rule does not cover public routes such as `/api/health` and `/api/auth/*`. Agent routes (`/mcp`, `/api/cards`, `/api/tree`) authenticate with an API key instead.
+- **Default 401 when unconfigured**: If neither OAuth nor a dashboard password is configured and `AUTH_BYPASS` is not `1`, browser API routes that need a session cookie return `401`. This rule does not cover public routes such as `/api/health` and `/api/auth/*`. Agent routes (`/mcp`, `/api/cards`, `/api/tree`) authenticate with an API key instead.
 - **Startup configuration validation**: At startup, `src/api/startup-config.ts` checks these settings:
   - `AUTH_BYPASS=1` is never set at the same time as `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
   - When `GOOGLE_CLIENT_ID` is set, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `JWT_SECRET`, and `FRONTEND_URL` are also present.
