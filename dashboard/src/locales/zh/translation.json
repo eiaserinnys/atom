@@ -169,11 +169,13 @@
     "title_node": "删除此节点",
     "title_link": "删除此链接",
     "body_node": "\"{{name}}\" 及其下方的所有内容都将被删除。",
-    "body_link": "只会删除链接 \"{{name}}\"，原卡片会保留。",
+    "body_link": "链接 \"{{name}}\" 将被删除。",
     "checking": "正在确认将删除的内容…",
     "cards_permanent": "其他位置没有的卡片也将被永久删除，共 {{total}} 张，且无法撤销。",
     "cards_none": "不会永久删除任何卡片。",
+    "link_card_stays": "原卡片会保留。",
     "cards_unknown": "其他位置没有的下级卡片也将被永久删除，且无法撤销。",
+    "cards_unknown_link": "如果此链接是卡片的最后位置，卡片也将被永久删除，且无法撤销。",
     "confirm_btn": "删除"
   },
   "login": {

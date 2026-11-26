@@ -59,9 +59,18 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
     ]);
   }
 
+  async function clickWhenReady(label: string) {
+    await eventually(() => {
+      const target = button(label);
+      expect(target, `button ${label}`).toBeDefined();
+      expect((target as HTMLButtonElement).disabled, `button ${label} disabled`).toBe(false);
+    });
+    await settle(() => button(label).click());
+  }
+
   async function openFromMenu(nodeId: string, label: string) {
     await settle(() => row(nodeId).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })));
-    await settle(() => button(label).click());
+    await clickWhenReady(label);
   }
 
   function press(key: string) {
@@ -119,7 +128,7 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
   test('closing the delete dialog after a failed delete returns focus to the row', async () => {
     vi.spyOn(api, 'deleteNode').mockRejectedValue(new Error('API 500'));
     await openFromMenu('leaf', english.tree.context_delete);
-    await settle(() => button(english.delete_modal.confirm_btn).click());
+    await clickWhenReady(english.delete_modal.confirm_btn);
     await eventually(() => expect(container.textContent).toContain('API 500'));
 
     await press('Escape');
@@ -131,7 +140,7 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
     vi.spyOn(api, 'deleteNode').mockResolvedValue(undefined);
     await openFromMenu('leaf', english.tree.context_delete);
 
-    await settle(() => button(english.delete_modal.confirm_btn).click());
+    await clickWhenReady(english.delete_modal.confirm_btn);
 
     await eventually(() => {
       expect(container.textContent).not.toContain(english.delete_modal.title_node);
@@ -143,7 +152,7 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
     vi.spyOn(api, 'deleteNode').mockResolvedValue(undefined);
     await openFromMenu('solo', english.tree.context_delete);
 
-    await settle(() => button(english.delete_modal.confirm_btn).click());
+    await clickWhenReady(english.delete_modal.confirm_btn);
 
     await eventually(() => expect(document.activeElement).toBe(list()));
   });

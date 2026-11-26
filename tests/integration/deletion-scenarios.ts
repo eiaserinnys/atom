@@ -67,6 +67,74 @@ export function defineDeletionScenarios(): void {
       expect(await cardExists(original.cardId)).toBe(true);
     });
 
+    it("the last symlink of a card whose canonical node is gone plans the card and deletes it", async () => {
+      const original = await make("Original", undefined, "knowledge");
+      const other = await make("Other root");
+      const alias = await treeService.createSymlink(original.cardId, other.nodeId);
+      await treeService.deleteNode(original.nodeId);
+      expect(await cardExists(original.cardId)).toBe(true);
+
+      const planned = await plan({ nodeId: alias.id });
+      expect(planned.isCanonicalTarget).toBe(false);
+      expect(planned.nodeIds).toEqual([alias.id]);
+      expect(planned.deletedCards.map((card) => card.cardId)).toEqual([original.cardId]);
+      const preview = await treeService.previewNodeDeletion(alias.id);
+      expect(preview).toEqual({ target: "symlink", deletedCardIds: [original.cardId], deletedNodeCount: 1 });
+      expect(await cardExists(original.cardId)).toBe(true);
+
+      expect(await treeService.deleteNode(alias.id)).toEqual({
+        deletedCardIds: preview!.deletedCardIds,
+        deletedNodeCount: preview!.deletedNodeCount,
+      });
+      expect(await nodeExists(alias.id)).toBe(false);
+      expect(await cardExists(original.cardId)).toBe(false);
+      expect(await nodeExists(other.nodeId)).toBe(true);
+    });
+
+    it("one of two remaining symlinks of a card without a canonical node plans no card and keeps it", async () => {
+      const original = await make("Original", undefined, "knowledge");
+      const firstRoot = await make("First root");
+      const secondRoot = await make("Second root");
+      const first = await treeService.createSymlink(original.cardId, firstRoot.nodeId);
+      const second = await treeService.createSymlink(original.cardId, secondRoot.nodeId);
+      await treeService.deleteNode(original.nodeId);
+
+      const planned = await plan({ nodeId: first.id });
+      expect(planned.deletedCards).toEqual([]);
+      const preview = await treeService.previewNodeDeletion(first.id);
+      expect(preview).toEqual({ target: "symlink", deletedCardIds: [], deletedNodeCount: 1 });
+
+      expect(await treeService.deleteNode(first.id)).toEqual({ deletedCardIds: [], deletedNodeCount: 1 });
+      expect(await nodeExists(first.id)).toBe(false);
+      expect(await nodeExists(second.id)).toBe(true);
+      expect(await cardExists(original.cardId)).toBe(true);
+    });
+
+    it("a symlink with a child card, whose own card keeps another symlink, plans only the child card", async () => {
+      const original = await make("Original");
+      const firstRoot = await make("First root");
+      const secondRoot = await make("Second root");
+      const first = await treeService.createSymlink(original.cardId, firstRoot.nodeId);
+      const second = await treeService.createSymlink(original.cardId, secondRoot.nodeId);
+      await treeService.deleteNode(original.nodeId);
+      const child = await make("Child", first.id, "knowledge");
+
+      const planned = await plan({ nodeId: first.id });
+      expect(sorted(planned.nodeIds)).toEqual(sorted([first.id, child.nodeId]));
+      expect(planned.deletedCards.map((card) => card.cardId)).toEqual([child.cardId]);
+      const preview = await treeService.previewNodeDeletion(first.id);
+      expect(preview).toEqual({ target: "symlink", deletedCardIds: [child.cardId], deletedNodeCount: 2 });
+
+      expect(await treeService.deleteNode(first.id)).toEqual({
+        deletedCardIds: preview!.deletedCardIds,
+        deletedNodeCount: preview!.deletedNodeCount,
+      });
+      expect(await cardExists(child.cardId)).toBe(false);
+      expect(await nodeExists(child.nodeId)).toBe(false);
+      expect(await cardExists(original.cardId)).toBe(true);
+      expect(await nodeExists(second.id)).toBe(true);
+    });
+
     it("a node with nested descendants plans every node and orphan card, parents first", async () => {
       const top = await make("Top");
       const middle = await make("Middle", top.nodeId);

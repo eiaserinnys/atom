@@ -36,6 +36,20 @@ describe('TreeView delete confirmation safety', () => {
     });
   }
 
+  async function eventually(assertion: () => void) {
+    for (let attempt = 0; ; attempt += 1) {
+      try { return assertion(); } catch (error) {
+        if (attempt >= 100) throw error;
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+      }
+    }
+  }
+
+  async function clickWhenReady(label: string) {
+    await eventually(() => expect(button(label).disabled, `button ${label} disabled`).toBe(false));
+    await settle(() => button(label).click());
+  }
+
   function button(label: string) {
     const result = [...document.querySelectorAll('button')].find(element => element.textContent?.includes(label));
     expect(result, `button ${label}`).toBeDefined();
@@ -99,7 +113,7 @@ describe('TreeView delete confirmation safety', () => {
     await openDeleteConfirmation();
     const confirm = button(english.delete_modal.confirm_btn);
 
-    await settle(() => confirm.click());
+    await clickWhenReady(english.delete_modal.confirm_btn);
     expect(confirm.disabled).toBe(true);
     await settle(() => confirm.click());
 
@@ -122,11 +136,9 @@ describe('TreeView delete confirmation safety', () => {
     await settle(() => finishPreview({
       target: 'node', deleted_node_count: 3, deleted_card_count: 2, deleted_card_ids: ['card-a', 'card-b'],
     }));
-    await settle();
-
-    expect(container.textContent).toContain(
+    await eventually(() => expect(container.textContent).toContain(
       english.delete_modal.cards_permanent.replace('{{total}}', '2')
-    );
+    ));
     expect(button(english.delete_modal.confirm_btn).disabled).toBe(false);
   });
 
@@ -135,21 +147,76 @@ describe('TreeView delete confirmation safety', () => {
     const deleteNode = vi.spyOn(api, 'deleteNode').mockResolvedValue(undefined);
     await openDeleteConfirmation();
 
-    expect(container.textContent).toContain(english.delete_modal.cards_unknown);
-    await settle(() => button(english.delete_modal.confirm_btn).click());
+    await eventually(() => expect(container.textContent).toContain(english.delete_modal.cards_unknown));
+    await clickWhenReady(english.delete_modal.confirm_btn);
 
     expect(deleteNode).toHaveBeenCalledWith('node-a');
   });
 
-  test('a symlink node skips the preview request and says only the link is deleted', async () => {
-    const symlink = { ...makeNode(), is_symlink: true };
-    await settle(() => client.setQueryData(rootTreeQueryKey(), [symlink]));
-    const getDeletePreview = vi.spyOn(api, 'getDeletePreview');
-    getDeletePreview.mockClear();
+  async function openSymlinkDeleteConfirmation() {
+    await settle(() => client.setQueryData(rootTreeQueryKey(), [{ ...makeNode(), is_symlink: true }]));
     await openDeleteConfirmation();
+  }
 
-    expect(getDeletePreview).not.toHaveBeenCalled();
+  const linkSentence = english.delete_modal.body_link.replace('{{name}}', 'Card to delete');
+
+  test('a symlink node asks for the preview too, locks confirm while it loads and keeps focus on cancel', async () => {
+    let finishPreview!: (preview: Awaited<ReturnType<typeof api.getDeletePreview>>) => void;
+    const getDeletePreview = vi.spyOn(api, 'getDeletePreview').mockImplementation(
+      () => new Promise(resolve => { finishPreview = resolve; })
+    );
+    await openSymlinkDeleteConfirmation();
+
+    expect(getDeletePreview).toHaveBeenCalledWith('node-a');
+    expect(container.textContent).toContain(english.delete_modal.checking);
+    expect(container.textContent).toContain(linkSentence);
+    expect(button(english.delete_modal.confirm_btn).disabled).toBe(true);
+    expect(document.activeElement).toBe(button(english.common.cancel));
+
+    await settle(() => finishPreview({
+      target: 'symlink', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-a'],
+    }));
+
+    await eventually(() => expect(button(english.delete_modal.confirm_btn).disabled).toBe(false));
     expect(container.textContent).toContain(english.delete_modal.title_link);
+    expect(container.textContent).toContain(linkSentence);
+    expect(container.textContent).toContain(english.delete_modal.cards_permanent.replace('{{total}}', '1'));
+  });
+
+  test('a symlink whose card has another place says the original card stays and shows no permanent deletion', async () => {
+    vi.spyOn(api, 'getDeletePreview').mockResolvedValue({
+      target: 'symlink', deleted_node_count: 1, deleted_card_count: 0, deleted_card_ids: [],
+    });
+    await openSymlinkDeleteConfirmation();
+
+    await eventually(() => expect(container.textContent).toContain(english.delete_modal.link_card_stays));
+    expect(container.textContent).toContain(linkSentence);
     expect(container.textContent).not.toContain('permanently');
+    expect(button(english.delete_modal.confirm_btn).disabled).toBe(false);
+  });
+
+  test('a symlink that only deletes cards below it shows the permanent notice and no card-stays line', async () => {
+    vi.spyOn(api, 'getDeletePreview').mockResolvedValue({
+      target: 'symlink', deleted_node_count: 2, deleted_card_count: 1, deleted_card_ids: ['card-child'],
+    });
+    await openSymlinkDeleteConfirmation();
+
+    await eventually(() => expect(container.textContent).toContain(
+      english.delete_modal.cards_permanent.replace('{{total}}', '1')
+    ));
+    expect(container.textContent).toContain(linkSentence);
+    expect(container.textContent).not.toContain(english.delete_modal.link_card_stays);
+  });
+
+  test('a failed symlink preview shows the general warning and still lets the user delete', async () => {
+    vi.spyOn(api, 'getDeletePreview').mockRejectedValue(new Error('API 500'));
+    const deleteNode = vi.spyOn(api, 'deleteNode').mockResolvedValue(undefined);
+    await openSymlinkDeleteConfirmation();
+
+    await eventually(() => expect(container.textContent).toContain(english.delete_modal.cards_unknown_link));
+    expect(container.textContent).toContain(linkSentence);
+    await clickWhenReady(english.delete_modal.confirm_btn);
+
+    expect(deleteNode).toHaveBeenCalledWith('node-a');
   });
 });

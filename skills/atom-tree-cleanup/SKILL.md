@@ -152,7 +152,7 @@ Deletion removes whole subtrees:
 - `delete_node(node_id)` deletes the node and everything under it. Cards in that subtree that are not placed anywhere else are deleted permanently.
 - `delete_card(card_id)` and `batch_op` `deletes` remove the card from every placement and delete the subtrees under those placements the same way.
 
-So to remove a section, first move its children to their new homes, confirm the section is empty with `list_children`, and only then delete it. To remove a symlink placement, call `delete_node` on the symlink node; the card and its canonical placement stay. Check `get_backlinks(card_id)` before deleting any card that others may reference.
+So to remove a section, first move its children to their new homes, confirm the section is empty with `list_children`, and only then delete it. To remove a symlink placement, call `delete_node` on the symlink node; that node and any nodes below it are removed, and the card is permanently deleted only if no other node of it is left (for example the canonical node was already deleted), so check with `dry_run` first. Check `get_backlinks(card_id)` before deleting any card that others may reference.
 
 #### Log sections: `journal_limit`
 

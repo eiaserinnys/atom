@@ -6,6 +6,13 @@ import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import english from '../../locales/en/translation.json';
 import korean from '../../locales/ko/translation.json';
+import chinese from '../../locales/zh/translation.json';
+import french from '../../locales/fr/translation.json';
+import german from '../../locales/de/translation.json';
+import japanese from '../../locales/ja/translation.json';
+import portuguese from '../../locales/pt/translation.json';
+import russian from '../../locales/ru/translation.json';
+import spanish from '../../locales/es/translation.json';
 import { DeleteConfirmModal, type DeletePreviewState } from './DeleteConfirmModal';
 
 describe('DeleteConfirmModal wording follows the preview', () => {
@@ -48,13 +55,57 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     vi.unstubAllGlobals();
   });
 
-  test('a symlink says only the link goes and never mentions a permanent deletion', async () => {
-    await renderModal(modal({ isSymlink: true }));
+  test('a symlink says the link is deleted in one sentence in every state', async () => {
+    const states: DeletePreviewState[] = [
+      { status: 'loading' }, { status: 'ready', deletedCardCount: 0 },
+      { status: 'ready', deletedCardCount: 1 }, { status: 'error' },
+    ];
+    for (const preview of states) {
+      await renderModal(modal({ isSymlink: true, preview }));
+      const dialog = container.querySelector('h2')!.parentElement!;
+      const texts = [...dialog.children].map(child => child.textContent);
+      expect(texts[0], preview.status).toBe(english.delete_modal.title_link);
+      expect(texts[1], preview.status).toBe(sentence('body_link'));
+      expect(texts, preview.status).toHaveLength(4);
+      expect(container.textContent!.match(/"Card"/g), preview.status).toHaveLength(1);
+    }
+  });
 
-    expect(container.textContent).toContain(english.delete_modal.title_link);
-    expect(container.textContent).toContain(sentence('body_link'));
-    expect(container.textContent).not.toContain(sentence('body_node'));
+  test('a symlink whose card sits elsewhere says the original card stays and nothing is deleted permanently', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 0 } }));
+
+    expect(container.textContent).toContain(english.delete_modal.link_card_stays);
     expect(container.textContent).not.toContain('permanently');
+    expect(container.querySelector('svg')).toBeNull();
+    expect(confirmButton().disabled).toBe(false);
+  });
+
+  test('a symlink that deletes cards shows the node notice with their number and no card-stays line', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 1 } }));
+
+    expect(container.textContent).toContain(permanent(1));
+    expect(container.textContent).not.toContain(english.delete_modal.link_card_stays);
+    expect(container.textContent!.match(/permanently/g)).toHaveLength(1);
+    expect(confirmButton().disabled).toBe(false);
+
+    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 3 } }));
+    expect(container.textContent).toContain(permanent(3));
+  });
+
+  test('while a symlink preview loads it shows the node checking line and locks confirm', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'loading' } }));
+
+    expect(container.textContent).toContain(english.delete_modal.checking);
+    expect(container.textContent).not.toContain('permanently');
+    expect(container.textContent).not.toContain(english.delete_modal.link_card_stays);
+    expect(confirmButton().disabled).toBe(true);
+  });
+
+  test('when a symlink preview failed it warns the card may go with the last link and opens confirm', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'error' } }));
+
+    expect(container.textContent).toContain(english.delete_modal.cards_unknown_link);
+    expect(container.textContent).not.toContain(english.delete_modal.link_card_stays);
     expect(confirmButton().disabled).toBe(false);
   });
 
@@ -109,6 +160,18 @@ describe('DeleteConfirmModal wording follows the preview', () => {
       expect(text).not.toMatch(/[―·]/);
     }
     expect(korean.delete_modal.body_node).toBe('"{{name}}" 항목과 그 아래가 모두 삭제됩니다.');
-    expect(korean.delete_modal.body_link).toBe('"{{name}}" 링크만 삭제되고 원본 카드는 남습니다.');
+    expect(korean.delete_modal.body_link).toBe('"{{name}}" 링크가 삭제됩니다.');
+    expect(korean.delete_modal.link_card_stays).toBe('원본 카드는 남습니다.');
+  });
+
+  test('every language has the card-stays line and no longer carries the retired link sentences', () => {
+    const all = [english, korean, chinese, french, german, japanese, portuguese, russian, spanish];
+    for (const language of all) {
+      const modalText = language.delete_modal as Record<string, string>;
+      expect(typeof modalText.link_card_stays).toBe('string');
+      expect(modalText).not.toHaveProperty('body_link_last');
+      expect(modalText).not.toHaveProperty('body_link_unchecked');
+      expect(modalText.body_link).not.toBe(modalText.link_card_stays);
+    }
   });
 });
