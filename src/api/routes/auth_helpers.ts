@@ -103,6 +103,7 @@ export type BypassAuthStatus = {
   email: 'bypass@local';
   name: 'Bypass Admin';
   role: 'admin';
+  jevConfigured: boolean;
 };
 
 export function buildGoogleAuthRedirectUrl(input: {
@@ -144,13 +145,14 @@ export function getProviderAvailability(input: {
   };
 }
 
-export function buildBypassAuthStatus(): BypassAuthStatus {
+export function buildBypassAuthStatus(jevConfigured: boolean): BypassAuthStatus {
   return {
     authenticated: true,
     id: 'bypass',
     email: 'bypass@local',
     name: 'Bypass Admin',
     role: 'admin',
+    jevConfigured,
   };
 }
 

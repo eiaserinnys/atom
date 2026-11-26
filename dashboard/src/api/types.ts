@@ -144,4 +144,5 @@ export interface AuthStatus {
   email?: string;
   name?: string;
   role?: UserRole;
+  jevConfigured?: boolean;
 }

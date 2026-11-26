@@ -107,6 +107,16 @@ export function readJevServerConfig(env: NodeJS.ProcessEnv = process.env): JevSe
   return { apiKey, baseUrl: rawBaseUrl.replace(/\/+$/, "") };
 }
 
+export function isJevConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  try {
+    readJevServerConfig(env);
+    return true;
+  } catch (error) {
+    if (error instanceof JevSearchConfigError) return false;
+    throw error;
+  }
+}
+
 export function policyView(policy: JevSearchPolicy = JEV_SEARCH_POLICY): JevSearchPolicyView {
   return {
     prompt_version: policy.promptVersion,

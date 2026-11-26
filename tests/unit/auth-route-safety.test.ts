@@ -76,13 +76,15 @@ describe("auth route safety boundaries", () => {
       google: false,
       slack: true,
     });
-    expect(buildBypassAuthStatus()).toEqual({
+    expect(buildBypassAuthStatus(false)).toEqual({
       authenticated: true,
       id: "bypass",
       email: "bypass@local",
       name: "Bypass Admin",
       role: "admin",
+      jevConfigured: false,
     });
+    expect(buildBypassAuthStatus(true).jevConfigured).toBe(true);
   });
 
   it("keeps Slack workspace policy explicit", () => {
@@ -130,7 +132,7 @@ describe("auth route safety boundaries", () => {
     const response = await app.inject({ method: "GET", url: "/api/auth/status" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual(buildBypassAuthStatus());
+    expect(response.json()).toEqual(buildBypassAuthStatus(false));
     await app.close();
   });
 

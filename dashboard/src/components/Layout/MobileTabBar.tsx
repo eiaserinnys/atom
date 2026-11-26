@@ -7,6 +7,7 @@ interface Props {
   activeTab: MobileTab;
   onTabChange: (tab: MobileTab) => void;
   showSettings: boolean;
+  visualSearch?: boolean;
 }
 
 const TABS: { id: MobileTab; icon: LucideIcon; labelKey: string }[] = [
@@ -17,7 +18,7 @@ const TABS: { id: MobileTab; icon: LucideIcon; labelKey: string }[] = [
   { id: 'settings', icon: Settings, labelKey: 'mobile.tab_settings' },
 ];
 
-export function MobileTabBar({ activeTab, onTabChange, showSettings }: Props) {
+export function MobileTabBar({ activeTab, onTabChange, showSettings, visualSearch = true }: Props) {
   const { t } = useTranslation();
 
   const visibleTabs = showSettings ? TABS : TABS.filter((tab) => tab.id !== 'settings');
@@ -31,7 +32,7 @@ export function MobileTabBar({ activeTab, onTabChange, showSettings }: Props) {
         <button
           key={tab.id}
           role="tab" aria-selected={activeTab === tab.id}
-          aria-label={tab.id === 'search' ? t(tab.labelKey) : undefined}
+          aria-label={tab.id === 'search' && visualSearch ? t(tab.labelKey) : undefined}
           className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 pt-2 text-[13px] font-medium transition-colors ${
             activeTab === tab.id
               ? 'text-brand'

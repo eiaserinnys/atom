@@ -26,6 +26,7 @@ import { isAuthBypassEnabled, resolveAuthMode } from '../auth-mode.js';
 import { verifyAccessToken } from '../access-token.js';
 import type { AuthCallbackDeps } from './auth_callback_handlers.js';
 import { handleGoogleCallback, handleSlackCallback } from './auth_callback_handlers.js';
+import { isJevConfigured } from '../../services/jev-search/config.js';
 
 export type AuthRoutesDeps = AuthCallbackDeps & {
   findUserById: (db: DatabaseAdapter, id: string) => Promise<User | null>;
@@ -483,7 +484,7 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
     // GET /api/auth/status — return current auth state
     app.get('/api/auth/status', async (req, reply) => {
       if (isAuthBypassEnabled()) {
-        return reply.send(buildBypassAuthStatus());
+        return reply.send(buildBypassAuthStatus(isJevConfigured()));
       }
 
       if (resolveAuthMode() === 'unconfigured') {
@@ -507,6 +508,7 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
           email: user.email,
           name: user.display_name ?? payload['name'],
           role: user.role,
+          jevConfigured: isJevConfigured(),
         });
       } catch {
         return reply.send({ authenticated: false });

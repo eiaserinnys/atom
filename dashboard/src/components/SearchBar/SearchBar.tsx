@@ -15,6 +15,7 @@ interface SearchBarProps {
   onSelectNode: (nodeId: string) => void;
   currentNodeId?: string | null;
   onSubmitJevSearch?: (query: string, options: { rootNodeId?: string }) => void;
+  initialQuery?: string;
 }
 
 type SearchFilterState = Omit<SearchFilterDraft, 'currentNodeId'>;
@@ -28,9 +29,9 @@ const EMPTY_FILTERS: SearchFilterState = {
   updatedBefore: '',
 };
 
-export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: SearchBarProps) {
+export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch, initialQuery }: SearchBarProps) {
   const { t } = useTranslation();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery ?? '');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -97,6 +98,11 @@ export function SearchBar({ onSelectNode, currentNodeId, onSubmitJevSearch }: Se
       void runSearch(nextQuery, draft);
     }, 250);
   };
+
+  useEffect(() => {
+    if (initialQuery?.trim()) void runSearch(initialQuery.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- opens the results for the address query once, on mount
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
