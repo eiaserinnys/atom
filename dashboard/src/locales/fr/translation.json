@@ -166,12 +166,16 @@
     "empty": "Aucune carte structure disponible"
   },
   "delete_modal": {
-    "title": "Supprimer la carte",
+    "title_node": "Supprimer ce nœud",
+    "title_link": "Supprimer ce lien",
     "desc": "Supprimer \"{{name}}\" ?",
-    "confirm_text": "Supprimer \"{{name}}\" ?",
-    "sub_items_warning": "Les éléments enfants seront également supprimés.",
-    "confirm_btn": "Supprimer",
-    "deleting": "Suppression…"
+    "body_node": "Ce nœud et tout ce qui se trouve en dessous seront supprimés.",
+    "body_link": "Seul ce lien est supprimé. La carte d'origine est conservée.",
+    "checking": "Vérification de ce qui sera supprimé…",
+    "cards_permanent": "Les cartes qui n'existent nulle part ailleurs seront aussi supprimées définitivement : {{total}}. Cette action est irréversible.",
+    "cards_none": "Aucune carte ne sera supprimée définitivement.",
+    "cards_unknown": "Les cartes enfants qui n'existent nulle part ailleurs seront aussi supprimées définitivement. Cette action est irréversible.",
+    "confirm_btn": "Supprimer"
   },
   "login": {
     "title": "atom",

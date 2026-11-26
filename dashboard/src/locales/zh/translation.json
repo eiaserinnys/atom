@@ -166,12 +166,16 @@
     "empty": "没有可用的结构卡片"
   },
   "delete_modal": {
-    "title": "删除卡片",
+    "title_node": "删除此节点",
+    "title_link": "删除此链接",
     "desc": "确认删除 \"{{name}}\"？",
-    "confirm_text": "删除 \"{{name}}\"？",
-    "sub_items_warning": "子项目也将一并删除。",
-    "confirm_btn": "删除",
-    "deleting": "删除中…"
+    "body_node": "此节点及其下方的所有内容都将被删除。",
+    "body_link": "只会删除此链接，原卡片会保留。",
+    "checking": "正在确认将删除的内容…",
+    "cards_permanent": "其他位置没有的卡片也将被永久删除，共 {{total}} 张，且无法撤销。",
+    "cards_none": "不会永久删除任何卡片。",
+    "cards_unknown": "其他位置没有的下级卡片也将被永久删除，且无法撤销。",
+    "confirm_btn": "删除"
   },
   "login": {
     "title": "atom",

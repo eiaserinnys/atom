@@ -2,6 +2,10 @@ export function rootTreeQueryKey() {
   return ['tree', null] as const;
 }
 
+export function deletePreviewQueryKey(nodeId: string) {
+  return ['delete-preview', nodeId] as const;
+}
+
 export function allTreeQueryKey() {
   return ['tree'] as const;
 }

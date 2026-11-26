@@ -280,7 +280,10 @@ export interface BatchOpResult {
   moved: string[];
   /** Parent node IDs (or null for root) whose children were reordered by child_orders. */
   child_ordered: (string | null)[];
+  /** Requested card_ids this batch actually deleted. */
   deleted: string[];
+  /** Cards the batch deleted that were not requested: they had no node left outside the deleted subtrees. */
+  cascade_deleted_card_ids: string[];
   /** Deprecation warnings (cycle B). Present only when deprecated position input was used. */
   _warnings?: string[];
 }

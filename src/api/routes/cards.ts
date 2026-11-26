@@ -52,8 +52,7 @@ export async function cardRoutes(app: FastifyInstance): Promise<void> {
 
   // DELETE /cards/:id
   app.delete<{ Params: { id: string } }>("/cards/:id", async (req, reply) => {
-    const deleted = await deleteCard(req.params.id);
-    if (!deleted) throw await cardNotFound(req.params.id);
+    if (!(await deleteCard(req.params.id))) throw await cardNotFound(req.params.id);
     return reply.code(204).send();
   });
 

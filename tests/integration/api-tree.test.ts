@@ -45,7 +45,7 @@ describe("Tree operations", () => {
     });
 
     const deleted = await treeService.deleteNode(node_id);
-    expect(deleted).toBe(true);
+    expect(deleted).toEqual({ deletedCardIds: [card.id], deletedNodeCount: 1 });
 
     // A card without another tree node is removed with its node.
     const fetched = await cardService.getCard(card.id);

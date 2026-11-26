@@ -96,7 +96,7 @@ describe("Card CRUD", () => {
     });
 
     const deleted = await cardService.deleteCard(card.id);
-    expect(deleted).toBe(true);
+    expect(deleted).toEqual({ deletedCardIds: [card.id, childCard.id], deletedNodeCount: 2 });
 
     const fetched = await cardService.getCard(card.id);
     expect(fetched).toBeNull();

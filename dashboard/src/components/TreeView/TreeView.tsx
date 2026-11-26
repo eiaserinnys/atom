@@ -16,6 +16,7 @@ import { TreeDndContext } from './TreeDndContext';
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu';
 import { CardFormModal } from '../CardFormModal/CardFormModal';
 import { DeleteConfirmModal } from '../DeleteConfirmModal/DeleteConfirmModal';
+import { useDeletePreview } from './useDeletePreview';
 import { MoveCardModal } from '../MoveCardModal/MoveCardModal';
 import { buildAppendMovePayload } from '../../utils/treeMoveIntent';
 import { useTreeDragAndDrop } from './useTreeDragAndDrop';
@@ -59,6 +60,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [modal, setModal] = useState<TreeModalState>({ type: 'none' });
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deletePreview = useDeletePreview(modal.type === 'delete' ? modal.node : null);
   const previousRootIds = useRef<Set<string>>(new Set());
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Keep the callback identity stable for mutation hooks.
   const closeModal = useCallback(() => setModal({ type: 'none' }), []);
@@ -296,7 +298,8 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
           {modal.type === 'delete' && (
             <DeleteConfirmModal
               title={modal.node.card.title}
-              isStructure={modal.node.card.card_type === 'structure'}
+              isSymlink={modal.node.is_symlink}
+              preview={deletePreview}
               onConfirm={() => deleteNode(modal.node.id)}
               onClose={() => { closeModal(); setDeleteError(null); }}
               isLoading={deleteMutation.isPending}

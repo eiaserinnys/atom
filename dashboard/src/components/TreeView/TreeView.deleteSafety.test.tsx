@@ -46,6 +46,7 @@ describe('TreeView delete confirmation safety', () => {
     const row = container.querySelector('[data-testid="tree-node-node-a"] > div')!;
     await settle(() => row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })));
     await settle(() => button(english.tree.context_delete).click());
+    await settle();
   }
 
   beforeEach(async () => {
@@ -54,6 +55,9 @@ describe('TreeView delete confirmation safety', () => {
       defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false }, mutations: { gcTime: Infinity, retry: false } },
     });
     client.setQueryData(rootTreeQueryKey(), [makeNode()]);
+    vi.spyOn(api, 'getDeletePreview').mockResolvedValue({
+      target: 'node', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-a'],
+    });
     const i18n = i18next.createInstance();
     await i18n.init({ lng: 'en', resources: { en: { translation: english } }, initAsync: false });
     container = document.createElement('div');
@@ -83,7 +87,7 @@ describe('TreeView delete confirmation safety', () => {
     await settle(() => cancel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
 
     expect(deleteNode).toHaveBeenCalledTimes(0);
-    expect(container.textContent).toContain(english.delete_modal.title);
+    expect(container.textContent).toContain(english.delete_modal.title_node);
   });
 
   test('confirm click starts one delete and disables a second click while pending', async () => {
@@ -101,5 +105,50 @@ describe('TreeView delete confirmation safety', () => {
     expect(deleteNode).toHaveBeenCalledTimes(1);
     expect(deleteNode).toHaveBeenCalledWith('node-a');
     await settle(() => finishDelete());
+  });
+
+  test('the preview of the opened node decides the wording and locks confirm until it arrives', async () => {
+    let finishPreview!: (preview: Awaited<ReturnType<typeof api.getDeletePreview>>) => void;
+    const getDeletePreview = vi.spyOn(api, 'getDeletePreview').mockImplementation(
+      () => new Promise(resolve => { finishPreview = resolve; })
+    );
+    await openDeleteConfirmation();
+
+    expect(getDeletePreview).toHaveBeenCalledWith('node-a');
+    expect(container.textContent).toContain(english.delete_modal.checking);
+    expect(button(english.delete_modal.confirm_btn).disabled).toBe(true);
+
+    await settle(() => finishPreview({
+      target: 'node', deleted_node_count: 3, deleted_card_count: 2, deleted_card_ids: ['card-a', 'card-b'],
+    }));
+    await settle();
+
+    expect(container.textContent).toContain(
+      english.delete_modal.cards_permanent.replace('{{total}}', '2')
+    );
+    expect(button(english.delete_modal.confirm_btn).disabled).toBe(false);
+  });
+
+  test('a failed preview shows the general warning and still lets the user delete', async () => {
+    vi.spyOn(api, 'getDeletePreview').mockRejectedValue(new Error('API 500'));
+    const deleteNode = vi.spyOn(api, 'deleteNode').mockResolvedValue(undefined);
+    await openDeleteConfirmation();
+
+    expect(container.textContent).toContain(english.delete_modal.cards_unknown);
+    await settle(() => button(english.delete_modal.confirm_btn).click());
+
+    expect(deleteNode).toHaveBeenCalledWith('node-a');
+  });
+
+  test('a symlink node skips the preview request and says only the link is deleted', async () => {
+    const symlink = { ...makeNode(), is_symlink: true };
+    await settle(() => client.setQueryData(rootTreeQueryKey(), [symlink]));
+    const getDeletePreview = vi.spyOn(api, 'getDeletePreview');
+    getDeletePreview.mockClear();
+    await openDeleteConfirmation();
+
+    expect(getDeletePreview).not.toHaveBeenCalled();
+    expect(container.textContent).toContain(english.delete_modal.title_link);
+    expect(container.textContent).not.toContain('permanently');
   });
 });

@@ -166,12 +166,16 @@
     "empty": "移動先の構造カードがありません"
   },
   "delete_modal": {
-    "title": "カードを削除",
+    "title_node": "このノードを削除",
+    "title_link": "このリンクを削除",
     "desc": "\"{{name}}\" を削除しますか？",
-    "confirm_text": "\"{{name}}\" を削除しますか？",
-    "sub_items_warning": "子項目も一緒に削除されます。",
-    "confirm_btn": "削除",
-    "deleting": "削除中…"
+    "body_node": "このノードとその配下がすべて削除されます。",
+    "body_link": "このリンクだけが削除され、元のカードは残ります。",
+    "checking": "削除される内容を確認しています…",
+    "cards_permanent": "他の場所にないカード{{total}}枚も完全に削除されます。元に戻せません。",
+    "cards_none": "完全に削除されるカードはありません。",
+    "cards_unknown": "他の場所にない下位カードも完全に削除されます。元に戻せません。",
+    "confirm_btn": "削除"
   },
   "login": {
     "title": "atom",

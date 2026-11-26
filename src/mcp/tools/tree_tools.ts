@@ -9,10 +9,12 @@ import {
   compileSubtree,
   createSymlink,
   deleteNode,
+  previewNodeDeletion,
   moveNode,
   updateNodeProperties,
 } from "../../services/tree.service.js";
 import { uuidSchema } from "../uuid-schema.js";
+import { DRY_RUN_DESCRIPTION, deletionResultContent } from "./deletion-result.js";
 
 export function registerTreeTools(server: McpServer, scope: AgentScope = "write"): void {
   // get_node
@@ -192,11 +194,16 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   // delete_node
   server.tool(
     "delete_node",
-    "Delete a tree node and all its descendant nodes. Cards in that subtree (including the node's own card) that have no tree node left elsewhere are permanently deleted with them; cards that still have a node outside the deleted subtree are kept. This cannot be undone. To keep such a card, move it out first (move_node) or give it another node elsewhere (create_symlink).",
-    { node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) to delete, with all its descendants. Not a card_id; to delete a card and all its nodes use delete_card.") },
-    async ({ node_id }) => {
-      if (!(await deleteNode(node_id))) throw await nodeNotFound(node_id);
-      return { content: [{ type: "text", text: "Deleted" }] };
+    "Delete a tree node and all its descendant nodes. Cards in that subtree (including the node's own card) that have no tree node left elsewhere are permanently deleted with them; cards that still have a node outside the deleted subtree are kept. This cannot be undone. To keep such a card, move it out first (move_node) or give it another node elsewhere (create_symlink). Deleting a symlink node removes only that node; the card stays. Returns JSON { deleted: true, deleted_card_ids, deleted_node_count }: deleted_card_ids lists every card this call deleted permanently (empty when none was), deleted_node_count the nodes removed. Pass dry_run: true to see the same lists without deleting anything. A kept subtree card whose own node is deleted stays only through its symlink outside the subtree, without the children it had below the deleted node.",
+    {
+      node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) to delete, with all its descendants. Not a card_id; to delete a card and all its nodes use delete_card."),
+      dry_run: z.boolean().optional().describe(DRY_RUN_DESCRIPTION),
+    },
+    async ({ node_id, dry_run }) => {
+      const dryRun = dry_run === true;
+      const summary = dryRun ? await previewNodeDeletion(node_id) : await deleteNode(node_id);
+      if (!summary) throw await nodeNotFound(node_id);
+      return deletionResultContent(summary, dryRun);
     }
   );
 }

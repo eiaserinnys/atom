@@ -28,7 +28,12 @@ import {
   type CompileUnfurls,
 } from "./compile-unfurl.service.js";
 import { loadTreeCompileContext } from "./tree-compile-context.service.js";
-import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
+import {
+  deleteTreeAndOrphanCards,
+  planTreeDeletion,
+  summarizeDeletion,
+  type DeletionSummary,
+} from "./node-deletion.service.js";
 import { resolveParentNodeId, resolveWriteParentNodeId } from "./tree-parent.js";
 import { lockTreeStructure } from "../db/queries/tree-lock.js";
 import { assertCardExists, assertUuidArray } from "./service-errors.js";
@@ -300,30 +305,45 @@ export async function createSymlink(
   return node;
 }
 
-export async function deleteNode(nodeId: string): Promise<boolean> {
+export async function deleteNode(nodeId: string): Promise<DeletionSummary | null> {
   const db = getDb();
   const result = await db.transaction((client) =>
     deleteTreeAndOrphanCards(client, { nodeId })
   );
-  if (result.deleted) {
+  if (!result.deleted) return null;
+  eventBus.emit("atom:event", {
+    type: "node:deleted",
+    nodeId,
+    cardId: result.rootNode?.card_id ?? "",
+    parentNodeId: result.rootNode?.parent_node_id ?? null,
+    actor: null,
+  });
+  for (const card of result.deletedCards) {
     eventBus.emit("atom:event", {
-      type: "node:deleted",
-      nodeId,
-      cardId: result.rootNode?.card_id ?? "",
-      parentNodeId: result.rootNode?.parent_node_id ?? null,
+      type: "card:deleted",
+      cardId: card.cardId,
+      nodeIds: card.nodeIds,
+      parentNodeIds: card.parentNodeIds,
       actor: null,
     });
-    for (const card of result.deletedCards) {
-      eventBus.emit("atom:event", {
-        type: "card:deleted",
-        cardId: card.cardId,
-        nodeIds: card.nodeIds,
-        parentNodeIds: card.parentNodeIds,
-        actor: null,
-      });
-    }
   }
-  return result.deleted;
+  return {
+    deletedCardIds: result.deletedCards.map((card) => card.cardId),
+    deletedNodeCount: result.deletedNodeCount,
+  };
+}
+
+export interface NodeDeletionPreview extends DeletionSummary {
+  target: "node" | "symlink";
+}
+
+export async function previewNodeDeletion(nodeId: string): Promise<NodeDeletionPreview | null> {
+  const plan = await planTreeDeletion(getDb(), { nodeId });
+  if (!plan) return null;
+  return {
+    target: plan.isCanonicalTarget ? "node" : "symlink",
+    ...summarizeDeletion(plan),
+  };
 }
 
 export async function moveNode(
