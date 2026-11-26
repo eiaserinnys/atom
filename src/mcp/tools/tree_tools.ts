@@ -98,10 +98,10 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   // create_symlink
   server.tool(
     "create_symlink",
-    "Create a symlink node that references an existing card at a different tree location. The card itself is not duplicated — the new node points to the same card_id, enabling a single card to appear under multiple parents. If parent_node_id is itself a symlink node, the new node is placed under that symlink's canonical node; check parent_node_id in the response.",
+    "Create a symlink node that references an existing card at a different tree location. The card itself is not duplicated — the new node points to the same card_id, enabling a single card to appear under multiple parents. If parent_node_id is itself a symlink node, the new node is placed under its card's canonical node (one of them if there are several, the symlink node itself if there is none); check parent_node_id in the response.",
     {
       card_id: uuidSchema.describe("card_id (card content, shown as card: in compile_subtree output) of the existing card to symlink to. Not a node_id."),
-      parent_node_id: uuidSchema.nullable().optional().describe("node_id (tree position) of the parent for the new symlink. If it is a symlink node, the new node goes under its canonical node. Null = root level."),
+      parent_node_id: uuidSchema.nullable().optional().describe("node_id (tree position) of the parent for the new symlink. If it is a symlink node, the new node goes under its card's canonical node (one of them if there are several, the symlink node itself if there is none). Null = root level."),
       position: z.number().int().nonnegative().optional().describe("Sort key among siblings (usually in steps of 100), not a 0-based index. Omit to append at the end. To choose a spot, use move_node with before/after."),
     },
     async ({ card_id, parent_node_id, position }) => {
@@ -124,13 +124,13 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       "  • Omit all four: append at end (same as to='end').",
       "",
       "Parent (destination):",
-      "  • parent_node_id = UUID: move under that node. If it is a symlink node, the node lands under its canonical node; check parent_node_id in the response.",
+      "  • parent_node_id = UUID: move under that node. If it is a symlink node, the node lands under its card's canonical node (one of them if there are several, the symlink node itself if there is none); check parent_node_id in the response.",
       "  • parent_node_id = null: move to root level.",
       "  • Omit parent_node_id: KEEP CURRENT PARENT (default). Useful for reordering within the same parent.",
     ].join("\n"),
     {
       node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) of the node to move. Not a card_id."),
-      parent_node_id: uuidSchema.nullable().optional().describe("node_id of the destination parent (a symlink node resolves to its canonical node). Null = root. Omit = keep current parent."),
+      parent_node_id: uuidSchema.nullable().optional().describe("node_id of the destination parent (a symlink node resolves to its card's canonical node (one of them if there are several, the symlink node itself if there is none)). Null = root. Omit = keep current parent."),
       before: uuidSchema.optional().describe("Place before this sibling node_id."),
       after: uuidSchema.optional().describe("Place after this sibling node_id."),
       to: z.enum(["start", "end"]).optional().describe("Place at start or end of parent's children."),
@@ -194,7 +194,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   // delete_node
   server.tool(
     "delete_node",
-    "Delete a tree node and everything below it. A card whose canonical node is in the deleted range, whether it is the picked node itself or sits deeper, is permanently deleted together with every symlink node of it elsewhere (and the nodes below those symlinks). A symlink node deleted by itself removes only that link and what is below it; its card is permanently deleted only when that link was the card's last node. This cannot be undone. To keep a card, move its canonical node out of the deleted range first (move_node). Returns JSON { deleted: true, deleted_card_ids, deleted_node_count, deleted_link_count }: deleted_card_ids lists every card this call deleted permanently (empty when none was), deleted_node_count the nodes removed, deleted_link_count the symlink nodes removed in other places, outside the picked node's own subtree (the nodes below such a link are not counted). Pass dry_run: true to see deleted_card_ids and deleted_link_count without deleting anything.",
+    "Delete a tree node and everything below it. A card whose only canonical node is in the deleted range, whether it is the picked node itself or sits deeper, is permanently deleted together with every symlink node of it elsewhere (and the nodes below those symlinks). A card with two or more canonical nodes does not follow its symlinks elsewhere, and a card with only symlink nodes has no canonical node to follow; either one stays as long as one of its nodes remains outside the range. A symlink node deleted by itself removes only that link and what is below it; its card is permanently deleted only when that link was the card's last node. This cannot be undone. To keep a card, move its canonical node out of the deleted range first (move_node). Returns JSON { deleted: true, deleted_card_ids, deleted_node_count, deleted_link_count }: deleted_card_ids lists every card this call deleted permanently (empty when none was), deleted_node_count the nodes removed, deleted_link_count the symlink nodes removed in other places, outside the picked node's own subtree (the nodes below such a link are not counted). Pass dry_run: true to see deleted_card_ids and deleted_link_count without deleting anything.",
     {
       node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) to delete, with all its descendants. Not a card_id; to delete a card and all its nodes use delete_card."),
       dry_run: z.boolean().optional().describe(DRY_RUN_DESCRIPTION),
