@@ -82,7 +82,10 @@ export function summarizeDeletedTree(result: TreeDeletionResult): DeletionSummar
 /**
  * One recursive reference per CTE keeps PostgreSQL happy: the closure joins
  * children and canonical-to-symlink hops in a single ON condition. UNION drops
- * repeated nodes, so loops between cards end.
+ * repeated nodes, so loops between cards end. A card's canonical node hops to
+ * its symlinks only when no other canonical node of the card exists, which
+ * NOT EXISTS checks through the card_id index. `scope` follows parent links
+ * only and gives the depth that orders the rows and tells scope nodes apart.
  */
 const DELETION_CTES = (rootCount: number): string => {
   const roots = Array.from({ length: rootCount }, (_, index) => `($${index + 1})`).join(", ");
@@ -95,9 +98,6 @@ const DELETION_CTES = (rootCount: number): string => {
        SELECT child.id, parent.depth + 1
        FROM tree_nodes child
        JOIN scope parent ON child.parent_node_id = parent.id
-     ),
-     single_canonical(card_id) AS (
-       SELECT card_id FROM tree_nodes WHERE NOT is_symlink GROUP BY card_id HAVING COUNT(*) = 1
      ),
      closure(id, card_id, parent_node_id, is_symlink, created_at) AS (
        SELECT node.id, node.card_id, node.parent_node_id, node.is_symlink, node.created_at
@@ -112,7 +112,12 @@ const DELETION_CTES = (rootCount: number): string => {
            next.card_id = current.card_id
            AND NOT current.is_symlink
            AND next.is_symlink
-           AND current.card_id IN (SELECT card_id FROM single_canonical)
+           AND NOT EXISTS (
+             SELECT 1 FROM tree_nodes other
+             WHERE other.card_id = current.card_id
+               AND NOT other.is_symlink
+               AND other.id <> current.id
+           )
          )
      )`;
 };
@@ -131,8 +136,10 @@ async function selectDeletionNodes(
          WHERE outside.card_id = c.card_id
            AND outside.id NOT IN (SELECT id FROM closure)
        ) THEN 1 ELSE 0 END AS has_outside_node,
-       (SELECT MIN(scope.depth) FROM scope WHERE scope.id = c.id) AS scope_depth
+       scope_depths.depth AS scope_depth
      FROM closure c
+     LEFT JOIN (SELECT id, MIN(depth) AS depth FROM scope GROUP BY id) scope_depths
+       ON scope_depths.id = c.id
      ORDER BY c.created_at, c.id`,
     rootNodeIds
   );
@@ -175,12 +182,38 @@ async function deleteNodesById(db: Queryable, nodeIds: string[]): Promise<number
   return deleted;
 }
 
+function groupNodesByCard(nodes: DeletionNodeRow[]): Map<string, DeletionNodeRow[]> {
+  const byCard = new Map<string, DeletionNodeRow[]>();
+  for (const node of nodes) {
+    const cardNodes = byCard.get(node.card_id);
+    if (cardNodes) cardNodes.push(node);
+    else byCard.set(node.card_id, [node]);
+  }
+  return byCard;
+}
+
+async function deleteCardsWithoutNodes(db: Queryable, cardIds: string[]): Promise<Set<string>> {
+  const deleted = new Set<string>();
+  for (let start = 0; start < cardIds.length; start += 500) {
+    const chunk = cardIds.slice(start, start + 500);
+    const placeholders = chunk.map((_, index) => `$${index + 1}`).join(", ");
+    const result = await db.query(
+      `DELETE FROM cards
+       WHERE id IN (${placeholders})
+         AND NOT EXISTS (SELECT 1 FROM tree_nodes WHERE tree_nodes.card_id = cards.id)
+       RETURNING id`,
+      chunk
+    );
+    for (const row of result.rows) deleted.add(row["id"] as string);
+  }
+  return deleted;
+}
+
 async function toDeletedCardNodes(
   db: Queryable,
   cardId: string,
-  nodes: DeletionNodeRow[]
+  cardNodes: DeletionNodeRow[]
 ): Promise<DeletedCardNodes> {
-  const cardNodes = nodes.filter((node) => node.card_id === cardId);
   // A deleted card has every node inside the collection. Several nodes can share
   // a created_at (SQLite keeps whole seconds), so their order comes from the
   // query that getCardNodes uses.
@@ -235,9 +268,10 @@ export async function planTreeDeletion(
         ...orphanCardIds.filter((cardId) => cardId !== firstCardId),
       ];
 
+  const nodesByCard = groupNodesByCard(subtreeNodes);
   const deletedCards: DeletedCardNodes[] = [];
   for (const cardId of deletedCardIds) {
-    deletedCards.push(await toDeletedCardNodes(db, cardId, subtreeNodes));
+    deletedCards.push(await toDeletedCardNodes(db, cardId, nodesByCard.get(cardId) ?? []));
   }
 
   return {
@@ -278,21 +312,13 @@ export async function deleteTreeAndOrphanCards(
     return notDeleted(plan.rootNode);
   }
 
-  const deletedCards: DeletedCardNodes[] = [];
-  for (const planned of plan.deletedCards) {
-    if (planned.cardId === requestedCardId) {
-      deletedCards.push(planned);
-      continue;
-    }
-    const result = await db.query(
-      `DELETE FROM cards
-       WHERE id = $1
-         AND NOT EXISTS (SELECT 1 FROM tree_nodes WHERE card_id = $2)
-       RETURNING id`,
-      [planned.cardId, planned.cardId]
-    );
-    if ((result.rowCount ?? result.rows.length) > 0) deletedCards.push(planned);
-  }
+  const otherCardIds = plan.deletedCards
+    .filter((planned) => planned.cardId !== requestedCardId)
+    .map((planned) => planned.cardId);
+  const removedCardIds = await deleteCardsWithoutNodes(db, otherCardIds);
+  const deletedCards = plan.deletedCards.filter((planned) =>
+    planned.cardId === requestedCardId || removedCardIds.has(planned.cardId)
+  );
 
   return {
     deleted: true,

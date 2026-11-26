@@ -335,7 +335,7 @@
   },
   "delete_modal": {
     "failed": "삭제하지 못했습니다.",
-    "title_node": "이 자리의 노드 삭제",
+    "title_node": "노드 삭제",
     "title_link": "링크 삭제",
     "body_node": "\"{{name}}\" 항목과 그 아래가 모두 삭제됩니다.",
     "body_link": "\"{{name}}\" 링크가 삭제됩니다.",

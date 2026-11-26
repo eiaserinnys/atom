@@ -292,6 +292,33 @@ export function defineDeletionScenarios(): void {
       expect(await nodeExists(elsewhere.nodeId)).toBe(true);
     });
 
+    it("a symlink below another deleted other-place symlink goes with it but is not counted", async () => {
+      const section = await make("Section");
+      const shared = await make("Shared", section.nodeId, "knowledge");
+      const elsewhere = await make("Elsewhere");
+      const link = await treeService.createSymlink(shared.cardId, elsewhere.nodeId);
+      const keeper = await make("Keeper", undefined, "knowledge");
+      const nestedLink = await treeService.createSymlink(keeper.cardId, elsewhere.nodeId);
+      await getDb().query("UPDATE tree_nodes SET parent_node_id = $1 WHERE id = $2", [link.id, nestedLink.id]);
+
+      const preview = await treeService.previewNodeDeletion(section.nodeId);
+      expect(preview).toEqual({
+        target: "node",
+        deletedCardIds: [section.cardId, shared.cardId],
+        deletedNodeCount: 4,
+        deletedLinkCount: 1,
+      });
+      expect(await treeService.deleteNode(section.nodeId)).toEqual({
+        deletedCardIds: preview!.deletedCardIds,
+        deletedNodeCount: 4,
+        deletedLinkCount: 1,
+      });
+      for (const nodeId of [link.id, nestedLink.id]) expect(await nodeExists(nodeId)).toBe(false);
+      expect(await cardExists(keeper.cardId)).toBe(true);
+      expect(await nodeExists(keeper.nodeId)).toBe(true);
+      expect(await nodeExists(elsewhere.nodeId)).toBe(true);
+    });
+
     it("a card with two canonical nodes is not widened", async () => {
       const section = await make("Section");
       const odd = await make("Two originals", section.nodeId, "knowledge");

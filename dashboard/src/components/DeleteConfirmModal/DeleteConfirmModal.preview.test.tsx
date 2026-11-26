@@ -183,6 +183,8 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     for (const text of Object.values(korean.delete_modal)) {
       expect(text).not.toMatch(/[―·]/);
     }
+    expect(korean.delete_modal.title_node).toBe('노드 삭제');
+    expect(korean.delete_modal.title_link).toBe('링크 삭제');
     expect(korean.delete_modal.body_node).toBe('"{{name}}" 항목과 그 아래가 모두 삭제됩니다.');
     expect(korean.delete_modal.body_link).toBe('"{{name}}" 링크가 삭제됩니다.');
     expect(korean.delete_modal.link_card_stays).toBe('원본 카드는 남습니다.');

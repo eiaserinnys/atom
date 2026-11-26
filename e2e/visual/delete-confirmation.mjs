@@ -207,9 +207,16 @@ async function seedTree(apiUrl, dbPath) {
   const itemTwoLink = await link(itemTwo, elsewhere.node_id);
   const keptLink = await link(kept, elsewhere.node_id);
 
+  // An other-place parent whose only child is the link of the deleted section: it ends up with no children.
+  const emptiedSection = await card('Emptied section', null, 'structure');
+  const emptiedItem = await card('Emptied item', emptiedSection.node_id);
+  const emptiedPlace = await card('Emptied place', null, 'structure');
+  const emptiedLink = await link(emptiedItem, emptiedPlace.node_id);
+
   return {
-    cardIds: [library, referenceOriginal, orphan, sprint, taskOne, taskTwo, taskThree, lonely, shared, archive, archiveGroup, itemOne, itemTwo, kept, elsewhere].map((created) => created.id),
+    cardIds: [library, referenceOriginal, orphan, sprint, taskOne, taskTwo, taskThree, lonely, shared, archive, archiveGroup, itemOne, itemTwo, kept, elsewhere, emptiedSection, emptiedItem, emptiedPlace].map((created) => created.id),
     elsewhere: { nodeId: elsewhere.node_id, linkNodeIds: [itemOneLink.id, itemTwoLink.id], keptLinkNodeId: keptLink.id, keptCardId: kept.id },
+    emptied: { sectionNodeId: emptiedSection.node_id, sectionCardId: emptiedSection.id, itemCardId: emptiedItem.id, placeNodeId: emptiedPlace.node_id, placeCardId: emptiedPlace.id, linkNodeId: emptiedLink.id },
     cases: [
       { key: 'symlink', name: 'Reference card', nodeId: referenceLink.id, expected: { target: 'symlink', cards: 0, links: 0 } },
       { key: 'symlinkLast', name: 'Orphan reference', nodeId: orphanLink.id, cardId: orphan.id, expected: { target: 'symlink', cards: 1, links: 0, ids: [orphan.id] } },
@@ -457,6 +464,7 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
   await measureDeepKeyboard({ browser, webUrl, data });
   await confirmDeleteRemovesPreviewedCards({ browser, apiUrl, webUrl, data, previews });
   await confirmRemovesOtherPlaceRows({ browser, apiUrl, webUrl, data, previews });
+  await confirmEmptiesOtherPlaceParent({ browser, apiUrl, webUrl, data });
 }
 
 // The preview held back (loading) and the preview failing, for one node or symlink.
@@ -575,6 +583,48 @@ async function confirmRemovesOtherPlaceRows({ browser, apiUrl, webUrl, data, pre
   await page.waitForTimeout(500);
   await shot(page, 'deep-ko-1440-other-place-after');
   await page.unroute('**/tree/*');
+  await page.context().close();
+}
+
+// The other-place parent loses its only child: with the parent expanded, its link row leaves and the parent
+// stops offering to expand, without a reload. The parent itself and its card stay.
+async function confirmEmptiesOtherPlaceParent({ browser, apiUrl, webUrl, data }) {
+  const emptied = data.emptied;
+  const row = (nodeId) => `[data-testid="tree-node-${nodeId}"]`;
+  const lang = 'ko';
+  const chevrons = 'svg.lucide-chevron-right, svg.lucide-chevron-down';
+  const childCount = async () => (await (await fetch(`${apiUrl}/tree/${emptied.placeNodeId}/children`)).json()).length;
+  const page = await newPage(browser, WIDE, webUrl, lang);
+  let navigations = 0;
+  page.on('framenavigated', () => { navigations += 1; });
+  const parentRow = page.locator(`${row(emptied.placeNodeId)} > div`).first();
+  await page.locator(row(emptied.placeNodeId)).waitFor({ timeout: 15_000 });
+  await parentRow.locator(chevrons).first().waitFor({ timeout: 10_000 });
+  if ((await parentRow.locator('svg.lucide-chevron-right').count()) > 0) await parentRow.locator('svg.lucide-chevron-right').click();
+  await page.locator(row(emptied.linkNodeId)).waitFor({ timeout: 10_000 });
+  await parentRow.locator('svg.lucide-chevron-down').waitFor({ timeout: 5_000 });
+  const navigationsBefore = navigations;
+  const childrenBefore = await childCount();
+
+  await openDelete(page, lang, emptied.sectionNodeId);
+  await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
+  await shot(page, 'emptied-ko-1440-before');
+  await confirmButton(page, lang).click();
+  await page.locator(MODAL).waitFor({ state: 'detached' });
+  await page.locator(row(emptied.linkNodeId)).waitFor({ state: 'detached', timeout: 10_000 });
+  await page.locator(row(emptied.sectionNodeId)).waitFor({ state: 'detached', timeout: 10_000 });
+  await page.waitForTimeout(500);
+
+  const parentStays = (await page.locator(row(emptied.placeNodeId)).count()) === 1;
+  const expandMarks = await parentRow.locator(chevrons).count();
+  const childrenAfter = await childCount();
+  const rowsUnderParent = await page.locator(`${row(emptied.placeNodeId)} [data-testid^="tree-node-"]`).count();
+  check('the other-place parent loses its only child: its expand mark is gone, no row sits under it, the server lists 0 children, no reload',
+    parentStays && expandMarks === 0 && rowsUnderParent === 0 && childrenBefore === 1 && childrenAfter === 0 && navigations === navigationsBefore,
+    JSON.stringify({ parentStays, expandMarks, rowsUnderParent, childrenBefore, childrenAfter, navigations: navigations - navigationsBefore }));
+  const cardStates = await Promise.all([emptied.sectionCardId, emptied.itemCardId, emptied.placeCardId].map(async (id) => (await fetch(`${apiUrl}/cards/${id}`)).ok));
+  check('the section and its card are deleted, the other-place parent card stays', !cardStates[0] && !cardStates[1] && cardStates[2], JSON.stringify(cardStates));
+  await shot(page, 'emptied-ko-1440-after');
   await page.context().close();
 }
 
