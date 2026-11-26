@@ -8,9 +8,12 @@ interface ConfigFieldProps {
   placeholder?: string;
   value: string;
   disabled?: boolean;
+  name?: string;
+  autoComplete?: string;
+  maxLength?: number;
   onChange: (value: string) => void;
 }
-export function ConfigField({ label, type = "text", placeholder = "", value, disabled, onChange }: ConfigFieldProps) {
+export function ConfigField({ label, type = "text", placeholder = "", value, disabled, name, autoComplete, maxLength, onChange }: ConfigFieldProps) {
   const id = useId();
   return (
     <div className="mb-3">
@@ -20,6 +23,9 @@ export function ConfigField({ label, type = "text", placeholder = "", value, dis
         type={type}
         className={`w-full ${CONFIG_CONTROL_CLASS}`}
         placeholder={placeholder}
+        name={name}
+        autoComplete={autoComplete}
+        maxLength={maxLength}
         value={value}
         onChange={event => onChange(event.target.value)}
         disabled={disabled}
@@ -33,10 +39,11 @@ interface ConfigActionButtonProps {
   disabled?: boolean;
   tone?: "brand" | "danger" | "secondary";
   title?: string;
-  onClick: () => void;
+  submit?: boolean;
+  onClick?: () => void;
 }
 
-export function ConfigActionButton({ children, disabled, tone = "brand", title, onClick }: ConfigActionButtonProps) {
+export function ConfigActionButton({ children, disabled, tone = "brand", title, submit, onClick }: ConfigActionButtonProps) {
   const color = tone === "brand"
     ? "bg-brand text-primary-foreground"
     : tone === "danger"
@@ -45,6 +52,7 @@ export function ConfigActionButton({ children, disabled, tone = "brand", title, 
   return (
     <button
       className={`px-4 py-2 text-sm font-medium rounded-none ${color} ${tone === "secondary" ? "" : "hover:opacity-90"} disabled:opacity-50`}
+      type={submit ? "submit" : undefined}
       onClick={onClick}
       disabled={disabled}
       title={title}

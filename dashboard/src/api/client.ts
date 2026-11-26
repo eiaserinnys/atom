@@ -25,6 +25,7 @@ export const api = {
   moveNode: treeApi.moveNode,
   listChildren: treeApi.listChildren,
   getAuthStatus: authApi.getAuthStatus,
+  getAuthProviders: authApi.getProviders,
   logout: authApi.logout,
 };
 

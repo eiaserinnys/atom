@@ -24,6 +24,7 @@ import {
 } from './auth_helpers.js';
 import { isAuthBypassEnabled, resolveAuthMode } from '../auth-mode.js';
 import { verifyAccessToken } from '../access-token.js';
+import { currentSessionBinding, sessionBindingMatches } from '../admin-password.js';
 import type { AuthCallbackDeps } from './auth_callback_handlers.js';
 import { handleGoogleCallback, handleSlackCallback } from './auth_callback_handlers.js';
 import { isJevConfigured } from '../../services/jev-search/config.js';
@@ -68,6 +69,11 @@ function oauthErrorRedirect(redirectUri: string, error: string, state: string): 
   return `${redirectUri}?error=${encodeURIComponent(error)}&state=${encodeURIComponent(state)}`;
 }
 
+function sessionBindingClaim(): { pwf?: string } {
+  const pwf = currentSessionBinding();
+  return pwf === undefined ? {} : { pwf };
+}
+
 function buildOAuthAccessToken(user: Pick<User, 'id' | 'email' | 'display_name' | 'role'>, jwtSecret: Uint8Array) {
   return new SignJWT({
     id: user.id,
@@ -75,6 +81,7 @@ function buildOAuthAccessToken(user: Pick<User, 'id' | 'email' | 'display_name' 
     name: user.display_name,
     role: user.role,
     typ: 'access',
+    ...sessionBindingClaim(),
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -83,7 +90,7 @@ function buildOAuthAccessToken(user: Pick<User, 'id' | 'email' | 'display_name' 
 }
 
 function buildOAuthRefreshToken(userId: string, clientId: string, jwtSecret: Uint8Array) {
-  return new SignJWT({ sub: userId, client_id: clientId, typ: 'atom_oauth_refresh' })
+  return new SignJWT({ sub: userId, client_id: clientId, typ: 'atom_oauth_refresh', ...sessionBindingClaim() })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('30d')
@@ -230,6 +237,7 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
             codeChallenge,
             scope,
             jwtSecret,
+            sessionBinding: currentSessionBinding(),
           });
           return reply.redirect(`${redirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
         }
@@ -292,7 +300,7 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
         }
         if (!consumeAuthorizationCode(codePayload['jti'])) return reply.code(400).send({ error: 'invalid_grant' });
         if (codePayload['client_id'] !== clientId || codePayload['redirect_uri'] !== redirectUri ||
-          typeof codePayload['code_challenge'] !== 'string' ||
+          typeof codePayload['code_challenge'] !== 'string' || !sessionBindingMatches(codePayload['pwf']) ||
           createHash('sha256').update(codeVerifier).digest('base64url') !== codePayload['code_challenge']) {
           return reply.code(400).send({ error: 'invalid_grant' });
         }
@@ -318,7 +326,8 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
         let refreshPayload;
         try {
           ({ payload: refreshPayload } = await jwtVerify(refreshToken, jwtSecret));
-          if (refreshPayload['typ'] !== 'atom_oauth_refresh' || refreshPayload['client_id'] !== clientId) {
+          if (refreshPayload['typ'] !== 'atom_oauth_refresh' || refreshPayload['client_id'] !== clientId ||
+            !sessionBindingMatches(refreshPayload['pwf'])) {
             throw new Error('invalid refresh token');
           }
         } catch {

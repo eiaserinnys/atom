@@ -17,7 +17,7 @@ const configApi = vi.hoisted(() => ({
   getDbInfo: vi.fn(),
   testDbConnection: vi.fn(),
 }));
-const api = vi.hoisted(() => ({ logout: vi.fn() }));
+const api = vi.hoisted(() => ({ logout: vi.fn(), getAuthProviders: vi.fn() }));
 const systemState = vi.hoisted(() => ({ pendingRestart: false, refreshStatus: vi.fn(), triggerRestart: vi.fn() }));
 
 vi.mock('react-i18next', () => ({
@@ -94,6 +94,7 @@ beforeEach(() => {
     dbType: 'postgres', sqliteFile: '/tmp/atom.db', sqliteFileExists: true, deprecatedFileExists: false,
   });
   api.logout.mockResolvedValue({ ok: true });
+  api.getAuthProviders.mockResolvedValue({ google: true, slack: false });
   root = createRoot(host);
 });
 

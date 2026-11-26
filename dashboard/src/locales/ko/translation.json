@@ -414,7 +414,19 @@
     "secret_set": "설정됨",
     "secret_not_set": "미설정",
     "save": "저장",
-    "save_success": "설정이 저장되었습니다"
+    "save_success": "설정이 저장되었습니다",
+    "password_section": "관리자 비밀번호",
+    "password_current": "현재 비밀번호",
+    "password_new": "새 비밀번호",
+    "password_confirm": "새 비밀번호 확인",
+    "password_submit": "비밀번호 바꾸기",
+    "password_changed": "비밀번호를 바꿨습니다. 다른 기기의 로그인은 끊겼습니다.",
+    "password_mismatch": "새 비밀번호가 서로 다릅니다.",
+    "password_too_short": "새 비밀번호는 8자 이상이어야 합니다.",
+    "password_invalid": "쓸 수 없는 비밀번호입니다. 앞뒤 공백을 빼고 다른 값을 입력해 주세요.",
+    "password_wrong_current": "현재 비밀번호가 올바르지 않습니다.",
+    "password_rate_limited": "시도 횟수가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+    "password_save_failed": "비밀번호를 저장하지 못했습니다. 다시 시도해 주세요."
   },
   "system": {
     "restart_required": "설정이 변경되었습니다. 서버를 재시작해야 적용됩니다.",

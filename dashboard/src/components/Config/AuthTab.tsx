@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { configApi } from '../../api/client';
+import { api, configApi } from '../../api/client';
 import { useSystem } from '../../contexts/systemContext';
+import { AdminPasswordSection } from './AdminPasswordSection';
 import { ConfigField } from './ConfigFields';
 
 const ENV_KEYS = {
@@ -28,6 +29,7 @@ export function AuthTab({ onFooterChange }: Props) {
   const { pendingRestart, refreshStatus } = useSystem();
   const [values, setValues] = useState<Record<string, string>>({});
   const [initialValues, setInitialValues] = useState<Record<string, string>>({});
+  const [passwordMode, setPasswordMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -37,10 +39,14 @@ export function AuthTab({ onFooterChange }: Props) {
   translateRef.current = t;
 
   useEffect(() => {
-    configApi.getEnv()
-      .then((loadedValues) => {
+    Promise.all([
+      configApi.getEnv(),
+      api.getAuthProviders().then((providers) => providers.password === true, () => false),
+    ])
+      .then(([loadedValues, isPasswordMode]) => {
         setValues(loadedValues);
         setInitialValues(loadedValues);
+        setPasswordMode(isPasswordMode);
       })
       .catch((err) => setMessage({ ok: false, text: err.message }))
       .finally(() => setLoading(false));
@@ -104,6 +110,8 @@ export function AuthTab({ onFooterChange }: Props) {
 
   return (
     <div className="space-y-6">
+      {passwordMode && <AdminPasswordSection />}
+
       <section>
         <h3 className="mb-3 text-sm font-semibold text-foreground">{t('auth.google_section')}</h3>
         {renderField('GOOGLE_CLIENT_ID', t('auth.client_id'))}

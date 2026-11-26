@@ -228,5 +228,19 @@
     "shutdown_now": "サーバーを停止",
     "shutdown_done": "サーバーが停止しました。自分で起動し直すと続きから使えます。",
     "reconnecting": "サーバーに接続しています..."
+  },
+  "auth": {
+    "password_section": "管理者パスワード",
+    "password_current": "現在のパスワード",
+    "password_new": "新しいパスワード",
+    "password_confirm": "新しいパスワード（確認）",
+    "password_submit": "パスワードを変更",
+    "password_changed": "パスワードを変更しました。他の端末のログインは解除されました。",
+    "password_mismatch": "新しいパスワードが一致しません。",
+    "password_too_short": "新しいパスワードは8文字以上にしてください。",
+    "password_invalid": "このパスワードは使えません。前後の空白を除いて、別の値を入力してください。",
+    "password_wrong_current": "現在のパスワードが正しくありません。",
+    "password_rate_limited": "試行回数が多すぎます。しばらくしてからもう一度お試しください。",
+    "password_save_failed": "パスワードを保存できませんでした。もう一度お試しください。"
   }
 }
