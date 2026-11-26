@@ -12,8 +12,7 @@ import {
   updateNodeProperties,
 } from "../../services/tree.service.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function registerTreeTools(server: McpServer, _agentId: string, scope: AgentScope = "write"): void {
+export function registerTreeTools(server: McpServer, scope: AgentScope = "write"): void {
   // get_node
   server.tool(
     "get_node",

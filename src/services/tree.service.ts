@@ -1,11 +1,8 @@
 import { getDb } from "../db/client.js";
 import {
   selectNodeById,
-  selectChildren,
-  selectCanonicalNodeByCardId,
   insertNode,
   moveNode as moveNodeQuery,
-  getNodeBreadcrumb,
   assertTreeParent,
   updateNodeProperties as updateNodePropertiesQuery,
 } from "../db/queries/tree.js";
@@ -56,25 +53,7 @@ export async function listChildren(
       ? null
       : await resolveWriteParentNodeId(db, parentNodeId);
 
-  const nodes = await selectChildren(db, effectiveParentId);
-  const results: TreeNodeWithCard[] = [];
-  for (const node of nodes) {
-    const card = await selectCardById(db, node.card_id);
-    if (!card) continue;
-    if (!node.is_symlink) {
-      results.push({ ...node, card });
-      continue;
-    }
-    // symlink: canonical 노드의 breadcrumb을 canonical_path로 첨부
-    const canonical = await selectCanonicalNodeByCardId(db, node.card_id);
-    if (!canonical) {
-      results.push({ ...node, card }); // orphan symlink
-      continue;
-    }
-    const parts = await getNodeBreadcrumb(db, canonical.id);
-    results.push({ ...node, card, canonical_path: parts.join(' / ') });
-  }
-  return results;
+  return selectChildrenWithCards(db, effectiveParentId);
 }
 
 export interface CompileResult {

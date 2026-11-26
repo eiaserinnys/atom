@@ -125,7 +125,7 @@ describe.each(["sqlite", "postgres"] as const)("tree cycle protection (%s)", (ki
       expect(batch.statusCode).toBe(400);
       expect(batch.json().code).toBe("TREE_CYCLE");
       const handlers = new Map<string, (args: unknown) => Promise<any>>();
-      registerTreeTools({ tool(name: string, _description: string, _schema: unknown, handler: (args: unknown) => Promise<any>) { handlers.set(name, handler); } } as unknown as McpServer, "test");
+      registerTreeTools({ tool(name: string, _description: string, _schema: unknown, handler: (args: unknown) => Promise<any>) { handlers.set(name, handler); } } as unknown as McpServer);
       const result = await handlers.get("move_node")!({ node_id: a.id, parent_node_id: b.id });
       expect(result.isError).toBe(true);
       expect(JSON.parse(result.content[0].text).error.code).toBe("TREE_CYCLE");

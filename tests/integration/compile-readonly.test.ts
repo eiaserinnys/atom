@@ -194,7 +194,7 @@ it("keeps stdio registration writable when no HTTP key scope is supplied", async
   const server = { tool: (name: string, _description: string, _schema: unknown, callback: typeof handler) => {
     if (name === "compile_subtree") handler = callback;
   } } as unknown as McpServer;
-  registerTreeTools(server, "stdio-agent");
+  registerTreeTools(server);
   expect(handler).toBeDefined();
   const db = getIntegrationTestPool();
   const queries = jest.spyOn(db, "query");

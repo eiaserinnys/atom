@@ -102,36 +102,6 @@ function compareCardTimestampDescending(cardA: Card, cardB: Card): number {
 }
 
 /**
- * BFS+N subtree compiler.
- *
- * Pure function — no DB access. Children and card data are fetched via callbacks.
- *
- * @param nodeId     Starting tree node ID
- * @param getChildren Returns direct children of a node ID
- * @param getCard    Returns the card for a given card_id
- * @param depth      How many levels to expand.
- *                   0 = current node only (no children expanded)
- *                   1 = current + direct children
- *                   N = N levels
- *                   Infinity / Number.MAX_SAFE_INTEGER = full tree
- * @param visited    Set of card_ids already visited in this traversal (cycle detection)
- * @param headingLevel Markdown heading level for the current node (starts at 1)
- */
-export function compile(
-  nodeId: string,
-  getChildren: (id: string) => TreeNode[],
-  getCard: (cardId: string) => Card,
-  depth: number,
-  visited: Set<string> = new Set(),
-  headingLevel: number = 1
-): string {
-  const node = getChildren(nodeId).find(() => true); // locate this node by looking it up via parent
-  // getCard is called by the caller before invoking compile — we receive the card directly
-  // We redesign: accept the current node's card_id directly
-  throw new Error("Use compileNode instead");
-}
-
-/**
  * Compile a subtree rooted at the given tree node.
  *
  * @param nodeId       The tree node to start from

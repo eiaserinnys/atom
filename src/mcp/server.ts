@@ -2,12 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { fileURLToPath } from "url";
 import path from "path";
-import { registerCardTools } from "./tools/card_tools.js";
-import { registerTreeTools } from "./tools/tree_tools.js";
-import { registerSearchTools } from "./tools/search_tools.js";
-import { registerBatchTools } from "./tools/batch_tools.js";
-import { registerExpansionTools } from "./tools/expansion_tools.js";
-import { runConfiguredJevEvaluation } from "../services/jev-search/evaluate.js";
+import { registerAllTools } from "./register-tools.js";
 import { runMigrations, getDb } from "../db/client.js";
 import { config } from "dotenv";
 import { loadAdapters } from "../unfurl/loader.js";
@@ -31,11 +26,7 @@ async function main(): Promise<void> {
   });
 
   const agentId = process.env['MCP_AGENT_ID'] ?? 'stdio-agent';
-  registerCardTools(server, agentId);
-  registerTreeTools(server, agentId);
-  registerSearchTools(server);
-  registerBatchTools(server, agentId);
-  registerExpansionTools(server, { neighbors: null, evaluate: runConfiguredJevEvaluation });
+  registerAllTools(server, { agentId, neighbors: null });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

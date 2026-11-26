@@ -12,5 +12,3 @@ export interface TrelloCardUnfurlData {
     items: { name: string; state: string }[];
   }[];
 }
-
-export type UnfurlData = TrelloCardUnfurlData; // 향후 확장 대비
