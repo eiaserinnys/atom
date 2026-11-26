@@ -183,7 +183,7 @@
     "desc": "知识管理系统",
     "sign_in_google": "使用 Google 登录",
     "sign_in_slack": "使用 Slack 登录",
-    "sign_in_error": "未配置身份验证"
+    "sign_in_error": "无法加载登录方式。请稍后刷新页面。"
   },
   "app": {
     "logout": "退出登录",

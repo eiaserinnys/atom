@@ -183,7 +183,7 @@
     "desc": "Sistema de gestión del conocimiento",
     "sign_in_google": "Iniciar sesión con Google",
     "sign_in_slack": "Iniciar sesión con Slack",
-    "sign_in_error": "La autenticación no está configurada"
+    "sign_in_error": "No se pudieron cargar los métodos de inicio de sesión. Vuelva a cargar la página en unos instantes."
   },
   "app": {
     "logout": "Cerrar sesión",

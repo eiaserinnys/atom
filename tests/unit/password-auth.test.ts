@@ -5,6 +5,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { jwtVerify } from 'jose';
 import { getDashboardAdminPassword, resolveAuthMode } from '../../src/api/auth-mode.js';
 import { inspectStartupConfig } from '../../src/api/startup-config.js';
+
+const source = { envFile: '/tmp/atom-test.env', envFileFound: true };
 import { authMiddleware } from '../../src/api/middleware/auth.js';
 import { authRoutes } from '../../src/api/routes/auth.js';
 import { createPasswordLoginRoutes } from '../../src/api/routes/password_login.js';
@@ -49,12 +51,12 @@ afterEach(async () => {
 });
 
 describe('authentication mode and startup configuration', () => {
-  it('resolves four modes, whitespace and OAuth precedence', () => {
-    expect(resolveAuthMode({})).toBe('unconfigured');
+  it('resolves three modes, whitespace and OAuth precedence, and none for an empty setup', () => {
+    expect(resolveAuthMode({})).toBeUndefined();
     expect(resolveAuthMode({ AUTH_BYPASS: '1' })).toBe('bypass');
     expect(resolveAuthMode({ DASHBOARD_ADMIN_PASSWORD: ' pass ' })).toBe('password');
     expect(getDashboardAdminPassword({ DASHBOARD_ADMIN_PASSWORD: ' pass ' })).toBe('pass');
-    expect(resolveAuthMode({ DASHBOARD_ADMIN_PASSWORD: '   ' })).toBe('unconfigured');
+    expect(resolveAuthMode({ DASHBOARD_ADMIN_PASSWORD: '   ' })).toBeUndefined();
     expect(resolveAuthMode({ GOOGLE_CLIENT_ID: ' ', DASHBOARD_ADMIN_PASSWORD: 'pass' })).toBe('oauth');
   });
   it('preserves an existing owner without changing its role, name or active state', async () => {
@@ -64,14 +66,14 @@ describe('authentication mode and startup configuration', () => {
     expect(owner).toMatchObject({ id: existing.id, display_name: 'Existing', role: 'viewer', is_active: false });
   });
   it('validates password configuration and warns when OAuth wins', () => {
-    expect(inspectStartupConfig({ DASHBOARD_ADMIN_PASSWORD: 'x', AUTH_BYPASS: '1', JWT_SECRET: secret }).errors)
+    expect(inspectStartupConfig({ DASHBOARD_ADMIN_PASSWORD: 'x', AUTH_BYPASS: '1', JWT_SECRET: secret }, source).errors)
       .toContain('AUTH_BYPASS=1 cannot be combined with DASHBOARD_ADMIN_PASSWORD.');
-    expect(inspectStartupConfig({ DASHBOARD_ADMIN_PASSWORD: 'x', JWT_SECRET: ' ' }).errors)
+    expect(inspectStartupConfig({ DASHBOARD_ADMIN_PASSWORD: 'x', JWT_SECRET: ' ' }, source).errors)
       .toContain('Missing required environment variables: JWT_SECRET');
-    expect(inspectStartupConfig({ DASHBOARD_ADMIN_PASSWORD: 'x', JWT_SECRET: secret }))
+    expect(inspectStartupConfig({ DASHBOARD_ADMIN_PASSWORD: 'x', JWT_SECRET: secret }, source))
       .toEqual({ errors: [], warning: undefined });
     const env = { GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', GOOGLE_CALLBACK_URL: 'http://localhost/cb', FRONTEND_URL: 'http://localhost', JWT_SECRET: secret, DASHBOARD_ADMIN_PASSWORD: 'x' };
-    expect(inspectStartupConfig(env).warning).toBe('DASHBOARD_ADMIN_PASSWORD is ignored because an OAuth provider is configured.');
+    expect(inspectStartupConfig(env, source).warning).toBe('DASHBOARD_ADMIN_PASSWORD is ignored because an OAuth provider is configured.');
   });
 });
 

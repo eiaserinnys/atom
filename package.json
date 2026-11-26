@@ -12,6 +12,7 @@
     "build": "tsc && node scripts/copy-migrations.cjs",
     "start": "node dist/api/index.js",
     "dev": "tsx watch src/api/index.ts",
+    "setup": "node scripts/setup.mjs",
     "mcp": "node dist/mcp/server.js",
     "mcp:dev": "tsx src/mcp/server.ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",

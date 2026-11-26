@@ -86,7 +86,7 @@ export function LoginPage() {
           )}
 
           {providers !== null && !providers.google && !providers.slack && !providers.password && (
-            <p className="text-sm text-muted-foreground text-center">
+            <p className="text-sm text-muted-foreground text-center [&:lang(ko)]:break-keep [overflow-wrap:anywhere]">
               {t('login.sign_in_error')}
             </p>
           )}

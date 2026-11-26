@@ -34,6 +34,10 @@ RUN npm ci --omit=dev
 # Copy built output (includes dist/db/migrations from build script)
 COPY --from=builder /app/dist/ ./dist/
 
+# `npm run setup` runs here from dist/ (no tsx in a production install); it creates a missing env file from .env.example
+COPY --from=builder /app/scripts/setup.mjs ./scripts/setup.mjs
+COPY .env.example ./
+
 # Bake build info into env for /api/version endpoint
 ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
 ENV BUILD_DATE=${BUILD_DATE}

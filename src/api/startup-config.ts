@@ -7,7 +7,18 @@ export type StartupConfigInspection = {
   warning: string | undefined;
 };
 
-export function inspectStartupConfig(env: StartupEnvironment): StartupConfigInspection {
+export type StartupConfigSource = { envFile: string; envFileFound: boolean };
+
+export function noLoginMethodMessage({ envFile, envFileFound }: StartupConfigSource): string {
+  return [
+    "No login method is configured, so the server will not start.",
+    "Run `npm run setup` to choose the administrator password, or provide DASHBOARD_ADMIN_PASSWORD (or an OAuth provider) in the env file or as an environment variable.",
+    "AUTH_BYPASS=1 is for development on this computer only.",
+    `Env file read: ${envFile}${envFileFound ? "" : " (not found)"}`,
+  ].join("\n");
+}
+
+export function inspectStartupConfig(env: StartupEnvironment, source: StartupConfigSource): StartupConfigInspection {
   const providerRequirements = [
     {
       clientId: "GOOGLE_CLIENT_ID",
@@ -32,6 +43,9 @@ export function inspectStartupConfig(env: StartupEnvironment): StartupConfigInsp
     errors.push("AUTH_BYPASS=1 cannot be combined with DASHBOARD_ADMIN_PASSWORD.");
   }
   const mode = resolveAuthMode(env);
+  if (mode === undefined) {
+    errors.push(noLoginMethodMessage(source));
+  }
   if (mode === "password" && !env["JWT_SECRET"]?.trim()) {
     errors.push("Missing required environment variables: JWT_SECRET");
   }
@@ -50,10 +64,8 @@ export function inspectStartupConfig(env: StartupEnvironment): StartupConfigInsp
 
   return {
     errors,
-    warning: mode === "unconfigured"
-      ? "No login method is configured; browser APIs will return 401. Set AUTH_BYPASS=1 for local development."
-      : mode === "oauth" && passwordConfigured
-        ? "DASHBOARD_ADMIN_PASSWORD is ignored because an OAuth provider is configured."
-        : undefined,
+    warning: mode === "oauth" && passwordConfigured
+      ? "DASHBOARD_ADMIN_PASSWORD is ignored because an OAuth provider is configured."
+      : undefined,
   };
 }

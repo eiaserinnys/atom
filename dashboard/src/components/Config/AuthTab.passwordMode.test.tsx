@@ -44,7 +44,7 @@ describe('AuthTab admin password group', () => {
 
   test.each([
     ['oauth', { google: true, slack: false }],
-    ['bypass or unconfigured', { google: false, slack: false }],
+    ['bypass', { google: false, slack: false }],
     ['password false', { google: false, slack: false, password: false }],
   ])('is absent in %s mode', async (_name, providers) => {
     api.getAuthProviders.mockResolvedValue(providers);

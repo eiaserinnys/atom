@@ -34,6 +34,9 @@ if (!testDir.startsWith(path.join(tempRoot, 'atom-e2e-')) ||
 const TEST_API_PORT = '14200';
 const TEST_API_HOST = '127.0.0.1';
 const TEST_FRONTEND_PORT = 15173;
+// A second, password-mode server for the fresh-install spec; e2e/fresh-install-server.mjs prepares and starts it.
+const FRESH_PORT = '14201';
+process.env.ATOM_E2E_FRESH_PASSWORD = 'e2e-fresh-install-password';
 
 export default defineConfig({
   testDir: './e2e',
@@ -67,6 +70,15 @@ export default defineConfig({
         GOOGLE_CLIENT_ID: '',
         SLACK_CLIENT_ID: '',
       },
+    },
+    {
+      command: `node --import tsx ${path.join(repoDir, 'e2e/fresh-install-server.mjs')}`,
+      cwd: testDir,
+      url: `http://${TEST_API_HOST}:${FRESH_PORT}/api/health`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
     {
       command: `node node_modules/vite/bin/vite.js --port ${TEST_FRONTEND_PORT} --host ${TEST_API_HOST}`,
