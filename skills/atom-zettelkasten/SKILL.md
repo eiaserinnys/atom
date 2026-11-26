@@ -110,7 +110,7 @@ create_card(
 
 - **Omit `position`.** The card is appended as the last child. `position` is an internal sort key, not "insert as the Nth child", and a guessed value can collide with existing siblings. To put the card somewhere specific, create it first, then `move_node(node_id=..., before=<sibling node_id>)` or `after=`/`to="start"`.
 - `create_card` returns the new card together with its `node_id`. Keep both: card tools take `card_id`, tree tools take `node_id`.
-- Creating under a symlink node writes the card under that card's canonical node (one of them if there are several, the symlink node itself if there is none).
+- Creating under a symlink node writes the card under the canonical node of that symlink's card (one of them if there are several, the symlink node itself if there is none).
 - To create a section and its cards in one step, use `batch_op` with `temp_id`/`parent_temp_id`; if any item fails, nothing is written:
 
 ```text

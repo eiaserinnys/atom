@@ -98,10 +98,10 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   // create_symlink
   server.tool(
     "create_symlink",
-    "Create a symlink node that references an existing card at a different tree location. The card itself is not duplicated — the new node points to the same card_id, enabling a single card to appear under multiple parents. If parent_node_id is itself a symlink node, the new node is placed under its card's canonical node (one of them if there are several, the symlink node itself if there is none); check parent_node_id in the response.",
+    "Create a symlink node that references an existing card at a different tree location. The card itself is not duplicated — the new node points to the same card_id, enabling a single card to appear under multiple parents. If parent_node_id is itself a symlink node, the new node is placed under the canonical node of that symlink's card (one of them if there are several, the symlink node itself if there is none); check parent_node_id in the response.",
     {
       card_id: uuidSchema.describe("card_id (card content, shown as card: in compile_subtree output) of the existing card to symlink to. Not a node_id."),
-      parent_node_id: uuidSchema.nullable().optional().describe("node_id (tree position) of the parent for the new symlink. If it is a symlink node, the new node goes under its card's canonical node (one of them if there are several, the symlink node itself if there is none). Null = root level."),
+      parent_node_id: uuidSchema.nullable().optional().describe("node_id (tree position) of the parent for the new symlink. If it is a symlink node, the new node goes under the canonical node of that symlink's card (one of them if there are several, the symlink node itself if there is none). Null = root level."),
       position: z.number().int().nonnegative().optional().describe("Sort key among siblings (usually in steps of 100), not a 0-based index. Omit to append at the end. To choose a spot, use move_node with before/after."),
     },
     async ({ card_id, parent_node_id, position }) => {
@@ -124,13 +124,13 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       "  • Omit all four: append at end (same as to='end').",
       "",
       "Parent (destination):",
-      "  • parent_node_id = UUID: move under that node. If it is a symlink node, the node lands under its card's canonical node (one of them if there are several, the symlink node itself if there is none); check parent_node_id in the response.",
+      "  • parent_node_id = UUID: move under that node. If it is a symlink node, the node lands under the canonical node of that symlink's card (one of them if there are several, the symlink node itself if there is none); check parent_node_id in the response.",
       "  • parent_node_id = null: move to root level.",
       "  • Omit parent_node_id: KEEP CURRENT PARENT (default). Useful for reordering within the same parent.",
     ].join("\n"),
     {
       node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) of the node to move. Not a card_id."),
-      parent_node_id: uuidSchema.nullable().optional().describe("node_id of the destination parent (a symlink node resolves to its card's canonical node (one of them if there are several, the symlink node itself if there is none)). Null = root. Omit = keep current parent."),
+      parent_node_id: uuidSchema.nullable().optional().describe("node_id of the destination parent (a symlink node resolves to the canonical node of its card, to one of them if the card has several, or to the symlink node itself if it has none). Null = root. Omit = keep current parent."),
       before: uuidSchema.optional().describe("Place before this sibling node_id."),
       after: uuidSchema.optional().describe("Place after this sibling node_id."),
       to: z.enum(["start", "end"]).optional().describe("Place at start or end of parent's children."),
