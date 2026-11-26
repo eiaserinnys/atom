@@ -119,7 +119,8 @@ afterEach(async () => {
 
 const get = (url: string) => app.inject({ method: "GET", url });
 const agentGet = (url: string) => app.inject({ method: "GET", url, headers: KEY_HEADERS });
-const body = (res: { json(): unknown }) => res.json() as { error: string };
+// The message only; the `code` of each error is asserted in tests/unit/error-codes.test.ts.
+const body = (res: { json(): unknown }) => ({ error: (res.json() as { error: string }).error });
 
 describe("a missing target is an error, not an empty result", () => {
   it("list_children and GET children say Node not found; root listing still works", async () => {
@@ -281,7 +282,7 @@ describe("writes check that the parent node and card exist", () => {
     expect(first.statusCode).toBe(201);
     const second = await configApp.inject({ method: "POST", url: "/api/config/agents", payload: { agent_id: "dup-agent" } });
     expect(second.statusCode).toBe(409);
-    expect(second.json()).toEqual({ error: "agent_id already exists: dup-agent" });
+    expect(second.json()).toEqual({ error: "agent_id already exists: dup-agent", code: "ALREADY_EXISTS" });
   });
 });
 
@@ -384,7 +385,7 @@ describe("a version conflict says what to do next", () => {
     const put = await app.inject({ method: "PUT", url: `/cards/${cardId}`, payload: { content: "stale", expected_version: 1 } });
     const patch = await app.inject({ method: "PATCH", url: `/api/cards/${cardId}`, headers: KEY_HEADERS, payload: { content: "stale", expected_version: 1 } });
     for (const res of [put, patch]) {
-      expect([res.statusCode, res.json()]).toEqual([409, { error: "VERSION_CONFLICT", current_version: 2, message }]);
+      expect([res.statusCode, res.json()]).toEqual([409, { error: "VERSION_CONFLICT", code: "VERSION_CONFLICT", current_version: 2, message }]);
     }
   });
 });

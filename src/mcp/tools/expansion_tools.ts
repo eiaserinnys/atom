@@ -5,6 +5,7 @@ import { EMBEDDING_POLICY } from "../../services/embeddings/policy.js";
 import { runConfiguredJevEvaluation, JevEvaluationRequestError } from "../../services/jev-search/evaluate.js";
 import { JEV_SEARCH_POLICY } from "../../services/jev-search/config.js";
 import type { JevEvaluationInput, JevEvaluationResponse } from "../../shared/visual-search.js";
+import { uuidSchema } from "../uuid-schema.js";
 
 export interface ExpansionToolDependencies {
   neighbors: NeighborService | null;
@@ -21,7 +22,7 @@ export function registerExpansionTools(server: McpServer, overrides: Partial<Exp
     "get_card_neighbors",
     "Get embedding neighbors for one card. The result includes canonical paths and card types. The API index may return loading or not-ready status; call again when ready.",
     {
-      card_id: z.string().uuid().describe("Card UUID whose embedding neighbors should be returned."),
+      card_id: uuidSchema.describe("Card UUID whose embedding neighbors should be returned."),
       limit: z.number().int().min(1).max(EMBEDDING_POLICY.neighborsMaxLimit).optional().describe("Max neighbors to return (default 20, range 1-50)."),
     },
     async ({ card_id, limit }) => {
@@ -41,7 +42,7 @@ export function registerExpansionTools(server: McpServer, overrides: Partial<Exp
     "Score how directly each card's content helps with the original query and context. Send the original query/context and card IDs. Compare scores with summary.selection_threshold from the first search_cards(engine='jev') response; use 0.5 when it is null. Use include_trace=true to include the sanitized audit.",
     {
       query: z.string().min(1).describe("Original Jev search query (normalized length 1-400)."),
-      card_ids: z.array(z.string().uuid()).min(1).max(JEV_SEARCH_POLICY.batchCandidates).describe("Cards to evaluate (1-48 unique UUIDs)."),
+      card_ids: z.array(uuidSchema).min(1).max(JEV_SEARCH_POLICY.batchCandidates).describe("Cards to evaluate (1-48 unique UUIDs)."),
       context: z.object({
         agent: z.string().nullable().optional(),
         project: z.string().nullable().optional(),

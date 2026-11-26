@@ -1,6 +1,6 @@
 import type { Queryable } from "../db/queryable.js";
 import { selectCanonicalNodeByCardId, selectNodeById } from "../db/queries/tree.js";
-import { assertNodeExists } from "./service-errors.js";
+import { assertNodeExists, PARENT_NODE_SUBJECT } from "./service-errors.js";
 
 /** Resolve a node to its canonical parent, preserving missing-node information. */
 export async function resolveParentNodeId(
@@ -19,7 +19,7 @@ export async function resolveParentNodeId(
 export async function resolveWriteParentNodeId(
   db: Queryable,
   parentNodeId: string | null,
-  subject = "Parent node"
+  subject = PARENT_NODE_SUBJECT
 ): Promise<string | null> {
   if (parentNodeId === null) return null;
   await assertNodeExists(db, parentNodeId, subject);

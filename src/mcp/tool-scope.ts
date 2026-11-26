@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { AgentScope } from "../shared/types.js";
 
 export const READ_ONLY_MCP_TOOLS = [
@@ -41,4 +42,27 @@ export function createScopedMcpServer(server: McpServer, scope: AgentScope): Mcp
       };
     },
   });
+}
+
+type ToolCallHandler = (request: { params: { name: string } }, extra: unknown) => Promise<unknown>;
+
+export function writeToolDisabledMessage(toolName: string): string {
+  return `This API key has read scope, so write tools are disabled (${toolName}). Use an API key with write scope.`;
+}
+
+/**
+ * A read key's tools/list leaves out the write tools. Calling one by name would then read
+ * as "Tool x not found", so answer it with the real reason. Other names are left to the SDK.
+ * Call after the tools are registered.
+ */
+export function explainDisabledWriteTools(server: McpServer, scope: AgentScope): void {
+  if (scope !== "read") return;
+  const handlers = (server.server as unknown as { _requestHandlers: Map<string, ToolCallHandler> })._requestHandlers;
+  const sdkHandler = handlers.get(CallToolRequestSchema.shape.method.value);
+  if (!sdkHandler) throw new Error("MCP tools/call handler is not registered; register the tools first");
+  server.server.setRequestHandler(CallToolRequestSchema, (request, extra) =>
+    WRITE_TOOL_NAMES.has(request.params.name)
+      ? { isError: true, content: [{ type: "text" as const, text: writeToolDisabledMessage(request.params.name) }] }
+      : (sdkHandler(request, extra) as never)
+  );
 }

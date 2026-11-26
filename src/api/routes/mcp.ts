@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { registerAllTools } from "../../mcp/register-tools.js";
 import type { NeighborService } from "../../services/embeddings/neighbors.js";
-import { createScopedMcpServer } from "../../mcp/tool-scope.js";
+import { createScopedMcpServer, explainDisabledWriteTools } from "../../mcp/tool-scope.js";
 import { agentKeyVerifier } from "../agent-key-auth.js";
 import type { FastifyPluginAsync } from "fastify";
 
@@ -26,6 +26,7 @@ export const mcpRoutes: FastifyPluginAsync<McpRoutesOptions> = async (app, { nei
     const server = new McpServer({ name: "atom", version: "0.1.0" });
     const scopedServer = createScopedMcpServer(server, agent.scope);
     registerAllTools(scopedServer, { agentId: agent.agent_id, scope: agent.scope, neighbors: neighborService });
+    explainDisabledWriteTools(server, agent.scope);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless — 세션 없이 매 요청 독립 처리

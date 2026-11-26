@@ -119,7 +119,7 @@ describe("read pairs that answer identically", () => {
   });
 
   it("answers an unknown parent with the same 404 on both", async () => {
-    const notFound = { status: 404, body: { error: `Node not found: ${UNKNOWN_ID}` } };
+    const notFound = { status: 404, body: { error: `Node not found: ${UNKNOWN_ID}`, code: "NODE_NOT_FOUND" } };
     expect(outcome(await browserGet(`/tree/${UNKNOWN_ID}/children`))).toEqual(notFound);
     expect(outcome(await agentGet(`/tree/${UNKNOWN_ID}/children`))).toEqual(notFound);
   });
@@ -146,11 +146,19 @@ describe("compile pair: same result", () => {
     ["?depth=3", 3],
     ["?depth=Infinity", 4],
     ["?depth=2abc", 2],
-    ["?depth=-1", 0],
   ])("depth query %s", async (_label, expectedDepth) => {
     const query = _label.replace("?", "&");
     const { browser, agent } = await compile(query);
     expect(browser).toEqual(md(expectedMarkdown(expectedDepth)));
+    expect(agent).toEqual(browser);
+  });
+
+  it("rejects a negative depth on both with the same 400", async () => {
+    const { browser, agent } = await compile("&depth=-1");
+    expect(browser).toEqual({
+      status: 400,
+      body: { error: "Invalid depth: -1 (0 or more; omit or null for unlimited)", code: "INVALID_INPUT" },
+    });
     expect(agent).toEqual(browser);
   });
 
@@ -180,7 +188,7 @@ describe("compile pair: same result", () => {
     ]);
     expect(missingBrowser.statusCode).toBe(404);
     expect(missingAgent.statusCode).toBe(404);
-    expect(missingBrowser.json()).toEqual({ error: `Node not found: ${UNKNOWN_ID}` });
+    expect(missingBrowser.json()).toEqual({ error: `Node not found: ${UNKNOWN_ID}`, code: "NODE_NOT_FOUND" });
     expect(missingAgent.json()).toEqual(missingBrowser.json());
   });
 });
@@ -232,7 +240,7 @@ describe("card create pair (POST /cards, POST /api/cards)", () => {
   });
 
   it("validates the title and defaults card_type to knowledge on the agent route", async () => {
-    const required = { status: 400, body: { error: "title is required (a string of 1-50 characters)" } };
+    const required = { status: 400, body: { error: "title is required (a string of 1-50 characters)", code: "INVALID_INPUT" } };
     const missing = await app.inject({ method: "POST", url: "/api/cards", headers: KEY_HEADERS, payload: { card_type: "knowledge" } });
     expect(outcome(missing)).toEqual(required);
     const numeric = await app.inject({ method: "POST", url: "/api/cards", headers: KEY_HEADERS, payload: { title: 5 } });
@@ -268,26 +276,31 @@ describe("card update pair (PUT /cards/:id, PATCH /api/cards/:id)", () => {
     const patch = await app.inject({ method: "PATCH", url: `/api/cards/${card.id}`, headers: KEY_HEADERS, payload: stale });
     expect(outcome(put)).toEqual({ status: 409, body: {
       error: "VERSION_CONFLICT",
+      code: "VERSION_CONFLICT",
       current_version: 2,
       message: `VersionConflict: card ${card.id} expected version 1, actual 2. Re-read the card with get_card, merge your change into the latest content, and retry with its version as expected_version.`,
     } });
     expect(outcome(patch)).toEqual(outcome(put));
     const missingPut = await app.inject({ method: "PUT", url: `/cards/${UNKNOWN_ID}`, payload: { title: "x" } });
     const missingPatch = await app.inject({ method: "PATCH", url: `/api/cards/${UNKNOWN_ID}`, headers: KEY_HEADERS, payload: { title: "x" } });
-    expect(outcome(missingPut)).toEqual({ status: 404, body: { error: `Card not found: ${UNKNOWN_ID}` } });
+    expect(outcome(missingPut)).toEqual({ status: 404, body: { error: `Card not found: ${UNKNOWN_ID}`, code: "CARD_NOT_FOUND" } });
     expect(outcome(missingPatch)).toEqual(outcome(missingPut));
   });
 
-  it("lets PUT write references and source_type while PATCH rejects them with 400", async () => {
-    const card = await createOne("pair fields");
-    const fields = { source_type: "manual", references: [] as string[] };
-    const put = await app.inject({ method: "PUT", url: `/cards/${card.id}`, payload: fields });
-    expect(put.statusCode).toBe(200);
-    expect(put.json().card).toMatchObject({ source_type: "manual", version: 2 });
-    for (const [field, value] of Object.entries(fields)) {
-      const patch = await app.inject({ method: "PATCH", url: `/api/cards/${card.id}`, headers: KEY_HEADERS, payload: { [field]: value } });
-      expect([field, outcome(patch)]).toEqual([field, { status: 400, body: { error: "Unknown card update field" } }]);
-    }
+  it("lets PATCH write references and source_type like PUT, and rejects an unknown field with 400", async () => {
+    const forPut = await createOne("pair fields put");
+    const forPatch = await createOne("pair fields patch");
+    const fields = { source_type: "manual", references: [forPut.id] };
+    const put = await app.inject({ method: "PUT", url: `/cards/${forPut.id}`, payload: fields });
+    const patch = await app.inject({ method: "PATCH", url: `/api/cards/${forPatch.id}`, headers: KEY_HEADERS, payload: fields });
+    expect([put.statusCode, patch.statusCode]).toEqual([200, 200]);
+    expect(patch.json()).toMatchObject({ source_type: "manual", references: [forPut.id], version: 2 });
+    expect(patch.json()).toMatchObject({ source_type: put.json().card.source_type, references: put.json().card.references });
+
+    const unknown = await app.inject({ method: "PATCH", url: `/api/cards/${forPatch.id}`, headers: KEY_HEADERS, payload: { notAField: 1 } });
+    expect(unknown.statusCode).toBe(400);
+    expect(unknown.json()).toMatchObject({ code: "INVALID_INPUT" });
+    expect(unknown.json().error).toContain("Unknown card update field: notAField");
   });
 
   it("counts an empty update as a version bump on both routes", async () => {

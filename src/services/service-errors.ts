@@ -5,29 +5,37 @@ import type { Queryable } from "../db/queryable.js";
 import { cardTitleProblem } from "../shared/card-title.js";
 import { invalidIdMessage, isUuid } from "../shared/uuid.js";
 
-/** A failure the caller caused and can fix; REST maps statusCode, MCP shows message. */
+export type ServiceErrorCode =
+  | "NODE_NOT_FOUND"
+  | "CARD_NOT_FOUND"
+  | "PARENT_NOT_FOUND"
+  | "INVALID_ID"
+  | "INVALID_INPUT"
+  | "VERSION_CONFLICT";
+
+/** A failure the caller caused and can fix; REST maps statusCode and code, MCP shows message. */
 export class ServiceError extends Error {
-  constructor(readonly statusCode: 400 | 404 | 409, message: string) {
+  constructor(readonly statusCode: 400 | 404 | 409, readonly code: ServiceErrorCode, message: string) {
     super(message);
     this.name = new.target.name;
   }
 }
 
 export class NotFoundError extends ServiceError {
-  constructor(message: string) {
-    super(404, message);
+  constructor(code: "NODE_NOT_FOUND" | "CARD_NOT_FOUND" | "PARENT_NOT_FOUND", message: string) {
+    super(404, code, message);
   }
 }
 
 export class InvalidInputError extends ServiceError {
-  constructor(message: string) {
-    super(400, message);
+  constructor(message: string, code: "INVALID_INPUT" | "INVALID_ID" = "INVALID_INPUT") {
+    super(400, code, message);
   }
 }
 
 export class ConflictError extends ServiceError {
   constructor(message: string) {
-    super(409, message);
+    super(409, "VERSION_CONFLICT", message);
   }
 }
 
@@ -49,17 +57,22 @@ async function otherKindHint(db: Queryable, id: string, expected: "node_id" | "c
   return `. This ID is a node_id (tree position), but this tool takes a card_id (card content). Its card_id: ${node.card_id}`;
 }
 
+export const PARENT_NODE_SUBJECT = "Parent node";
+
 /** `subject` is "Node", "Parent node", or any prefix that reads "<subject> not found". */
 export async function nodeNotFound(
   nodeId: string,
   subject = "Node",
   db: Queryable = getDb()
 ): Promise<NotFoundError> {
-  return new NotFoundError(`${subject} not found: ${nodeId}${await otherKindHint(db, nodeId, "node_id")}`);
+  return new NotFoundError(
+    subject === PARENT_NODE_SUBJECT ? "PARENT_NOT_FOUND" : "NODE_NOT_FOUND",
+    `${subject} not found: ${nodeId}${await otherKindHint(db, nodeId, "node_id")}`
+  );
 }
 
 export async function cardNotFound(cardId: string, db: Queryable = getDb()): Promise<NotFoundError> {
-  return new NotFoundError(`Card not found: ${cardId}${await otherKindHint(db, cardId, "card_id")}`);
+  return new NotFoundError("CARD_NOT_FOUND", `Card not found: ${cardId}${await otherKindHint(db, cardId, "card_id")}`);
 }
 
 export async function assertNodeExists(
@@ -68,17 +81,17 @@ export async function assertNodeExists(
   subject = "Node",
   label = "node_id"
 ): Promise<void> {
-  if (!isUuid(nodeId)) throw new InvalidInputError(invalidIdMessage(label, nodeId));
+  if (!isUuid(nodeId)) throw new InvalidInputError(invalidIdMessage(label, nodeId), "INVALID_ID");
   if (!(await selectNodeById(db, nodeId))) throw await nodeNotFound(nodeId, subject, db);
 }
 
 export async function assertCardExists(db: Queryable, cardId: string): Promise<void> {
-  if (!isUuid(cardId)) throw new InvalidInputError(invalidIdMessage("card_id", cardId));
+  if (!isUuid(cardId)) throw new InvalidInputError(invalidIdMessage("card_id", cardId), "INVALID_ID");
   if (!(await selectCardById(db, cardId))) throw await cardNotFound(cardId, db);
 }
 
 export function assertUuid(label: string, value: unknown): void {
-  if (!isUuid(value)) throw new InvalidInputError(invalidIdMessage(label, value));
+  if (!isUuid(value)) throw new InvalidInputError(invalidIdMessage(label, value), "INVALID_ID");
 }
 
 /** `values` may be absent; when present it must be an array of UUID strings. */

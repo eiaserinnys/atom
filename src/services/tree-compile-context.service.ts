@@ -5,13 +5,15 @@ import {
 } from "../db/queries/tree.js";
 import { selectCardsByIds } from "../db/queries/cards.js";
 import type { Queryable } from "../db/queryable.js";
+import type { JournalOmission } from "../shared/bfs.js";
 import type { Card, TreeNode } from "../shared/types.js";
-import { nodeNotFound } from "./service-errors.js";
+import { InvalidInputError, nodeNotFound } from "./service-errors.js";
 
 export interface TreeCompileContext {
   readonly cardCache: ReadonlyMap<string, Card>;
   getNodeCard(nodeId: string): { card_id: string; is_symlink: boolean };
   getChildren(nodeId: string): TreeNode[];
+  getJournalOmission(nodeId: string): JournalOmission | null;
   getCard(cardId: string): Card;
 }
 
@@ -20,6 +22,9 @@ export async function loadTreeCompileContext(
   nodeId: string,
   depth: number
 ): Promise<TreeCompileContext> {
+  if (depth < 0) {
+    throw new InvalidInputError(`Invalid depth: ${depth} (0 or more; omit or null for unlimited)`);
+  }
   const nodeCache = new Map<string, TreeNode>();
   const cardCache = new Map<string, Card>();
   const canonicalNodeIdByCardId = new Map<string, string>();
@@ -94,6 +99,22 @@ export async function loadTreeCompileContext(
   }
   for (const children of childrenByParent.values()) children.sort(compareTreePositionAsc);
 
+  /** The children a node shows: all of them, or only the newest `journal_limit` ones (0 = all). */
+  function journalChildren(nid: string): { shown: TreeNode[]; omitted: number; journalLimit: number | null } {
+    const node = nodeCache.get(nid);
+    if (!node) return { shown: [], omitted: 0, journalLimit: null };
+
+    const effectiveParentId = node.is_symlink
+      ? canonicalNodeIdByCardId.get(node.card_id) ?? nid
+      : nid;
+    const children = childrenByParent.get(effectiveParentId) ?? [];
+    const journalLimit = node.journal_limit ?? null;
+    if (!journalLimit) return { shown: children, omitted: 0, journalLimit };
+
+    const shown = [...children].sort(compareTreePositionDesc).slice(0, journalLimit).sort(compareTreePositionAsc);
+    return { shown, omitted: children.length - shown.length, journalLimit };
+  }
+
   return {
     cardCache,
     getNodeCard(nid) {
@@ -102,19 +123,11 @@ export async function loadTreeCompileContext(
       return { card_id: node.card_id, is_symlink: node.is_symlink };
     },
     getChildren(nid) {
-      const node = nodeCache.get(nid);
-      if (!node) return [];
-
-      const effectiveParentId = node.is_symlink
-        ? canonicalNodeIdByCardId.get(node.card_id) ?? nid
-        : nid;
-      const children = childrenByParent.get(effectiveParentId) ?? [];
-      const journalLimit = node.journal_limit;
-      if (journalLimit === null || journalLimit === undefined) return children;
-
-      const newestChildren = [...children].sort(compareTreePositionDesc);
-      const limited = journalLimit === 0 ? newestChildren : newestChildren.slice(0, journalLimit);
-      return limited.sort(compareTreePositionAsc);
+      return journalChildren(nid).shown;
+    },
+    getJournalOmission(nid) {
+      const { omitted, journalLimit } = journalChildren(nid);
+      return omitted > 0 && journalLimit ? { count: omitted, journalLimit } : null;
     },
     getCard(cardId) {
       const card = cardCache.get(cardId);

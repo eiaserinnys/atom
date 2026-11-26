@@ -12,13 +12,14 @@ import {
   moveNode,
   updateNodeProperties,
 } from "../../services/tree.service.js";
+import { uuidSchema } from "../uuid-schema.js";
 
 export function registerTreeTools(server: McpServer, scope: AgentScope = "write"): void {
   // get_node
   server.tool(
     "get_node",
     "Get a single tree node by its node_id, including the associated card data (title, content, tags, references, timestamps). Returns the node's position, parent, and is_symlink flag.",
-    { node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output). Not a card_id.") },
+    { node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output). Not a card_id.") },
     async ({ node_id }) => {
       const node = await getNode(node_id);
       if (!node) throw await nodeNotFound(node_id);
@@ -30,7 +31,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   server.tool(
     "list_children",
     "List direct child nodes of a parent, ordered by position. Pass null or omit parent_node_id to get root-level nodes. Each child includes its card data.",
-    { parent_node_id: z.string().uuid().nullable().optional().describe("node_id (tree position) of the parent. Null or omitted = root nodes.") },
+    { parent_node_id: uuidSchema.nullable().optional().describe("node_id (tree position) of the parent. Null or omitted = root nodes.") },
     async ({ parent_node_id }) => {
       const children = await listChildren(parent_node_id ?? null);
       return { content: [{ type: "text", text: JSON.stringify(children) }] };
@@ -57,23 +58,24 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       "  • Default: full markdown with # headings per depth level and card content. Each heading carries an HTML metadata comment <!-- node:<uuid> card:<uuid> depth:<N> ... --> by default (260508).",
       "  • titles_only=true: indented tree of card titles with `[node:<uuid> card:<uuid>] (N chars)` per line by default.",
       "Options:",
-      "  • depth (default 3): how many levels deep to expand. Pass null to drill the full tree without limit (use with caution on large trees).",
+      "  • depth (default 3): how many levels deep to expand, 0 or more (a negative value is rejected). Pass null to drill the full tree without limit (use with caution on large trees).",
       "  • include_ids: tri-state. Omit (default) for the standard ID-annotated output — short `[node:X card:Y]` label in titles_only mode, full HTML metadata comment in heading mode. Pass true to force full HTML metadata in titles_only mode as well (no effect in heading mode — equals default). Pass false for minimal output with no IDs (pre-260508 legacy behavior).",
       "  • numbering=true: prepends hierarchical numbering (1, 1.1, 1.1.1, …) to each heading. Root node is unnumbered; children start at 1.",
-      "  • max_chars: truncates output to at most N characters (on a line boundary) and appends <!-- truncated: M chars omitted -->. 0 or negative = no limit.",
+      "  • max_chars: truncates output to at most N characters (on a line boundary) and appends <!-- truncated: M chars omitted -->. The first line is always kept whole, so an N smaller than it still returns that line. 0 or negative = no limit.",
       "  • exclude_nodes: array of node_id UUIDs whose subtrees are entirely skipped. Unknown IDs are silently ignored. If the root node itself is excluded, returns an empty string.",
       "  • limit: restrict direct children (depth=1) to the latest n items by card_timestamp. Does not affect deeper levels.",
+      "  • Left-out children: when a node's journal_limit or the limit option shows only some of its children, one line such as <!-- omitted: 12 older children (journal_limit 5) --> or <!-- omitted: 30 children (limit 20) --> appears under that node (in titles_only mode at the indentation of its children). Nothing is added when no child was left out.",
       "  • Symlink nodes are prefixed with ~ in the title to distinguish them from canonical nodes.",
       "Common combinations: titles_only + max_chars caps large tree overviews while keeping IDs.",
     ].join("\n"),
     {
-      node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) of the subtree root. Not a card_id."),
-      depth: z.number().int().nullable().optional().describe("Max depth to expand (default 3). Pass null to drill the entire tree without limit."),
+      node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) of the subtree root. Not a card_id."),
+      depth: z.number().int().nullable().optional().describe("Max depth to expand, 0 or more (default 3). Pass null to drill the entire tree without limit. Negative values are rejected."),
       include_ids: z.boolean().optional().describe("Tri-state. Omit (default) for ID-annotated output: short [node:X card:Y] label in titles_only, full HTML metadata in heading mode. true = full HTML metadata in titles_only mode as well (no effect in heading mode). false = minimal (no IDs, legacy)."),
       titles_only: z.boolean().optional().describe("Output indented title tree instead of full markdown."),
       numbering: z.boolean().optional().describe("Prepend hierarchical numbering (1, 1.1, 1.1.1, …) to headings."),
       max_chars: z.number().int().optional().describe("Max output chars. 0 or negative = unlimited."),
-      exclude_nodes: z.array(z.string().uuid()).optional().describe("Node IDs whose subtrees to skip entirely."),
+      exclude_nodes: z.array(uuidSchema).optional().describe("Node IDs whose subtrees to skip entirely."),
       limit: z.number().int().positive().optional().describe("Limit direct children (depth=1) to latest n items by card_timestamp. Independent of journal_limit: journal_limit is a per-node DB property that filters children by position order; limit is a compile-time option that filters depth=1 children by card_timestamp across the whole request."),
       resolve_refs: z.enum(["cached", "fresh"]).optional().describe("Resolve external references (unfurl). 'cached': use snapshot if available; 'fresh': always fetch."),
       credentials: z.record(z.string(), z.record(z.string(), z.string())).optional().describe("Credentials per source_type, e.g. { trello: { apiKey: '...', token: '...' } }."),
@@ -96,8 +98,8 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
     "create_symlink",
     "Create a symlink node that references an existing card at a different tree location. The card itself is not duplicated — the new node points to the same card_id, enabling a single card to appear under multiple parents. If parent_node_id is itself a symlink node, the new node is placed under that symlink's canonical node; check parent_node_id in the response.",
     {
-      card_id: z.string().uuid().describe("card_id (card content, shown as card: in compile_subtree output) of the existing card to symlink to. Not a node_id."),
-      parent_node_id: z.string().uuid().nullable().optional().describe("node_id (tree position) of the parent for the new symlink. If it is a symlink node, the new node goes under its canonical node. Null = root level."),
+      card_id: uuidSchema.describe("card_id (card content, shown as card: in compile_subtree output) of the existing card to symlink to. Not a node_id."),
+      parent_node_id: uuidSchema.nullable().optional().describe("node_id (tree position) of the parent for the new symlink. If it is a symlink node, the new node goes under its canonical node. Null = root level."),
       position: z.number().int().nonnegative().optional().describe("Sort key among siblings (usually in steps of 100), not a 0-based index. Omit to append at the end. To choose a spot, use move_node with before/after."),
     },
     async ({ card_id, parent_node_id, position }) => {
@@ -125,10 +127,10 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       "  • Omit parent_node_id: KEEP CURRENT PARENT (default). Useful for reordering within the same parent.",
     ].join("\n"),
     {
-      node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) of the node to move. Not a card_id."),
-      parent_node_id: z.string().uuid().nullable().optional().describe("node_id of the destination parent (a symlink node resolves to its canonical node). Null = root. Omit = keep current parent."),
-      before: z.string().uuid().optional().describe("Place before this sibling node_id."),
-      after: z.string().uuid().optional().describe("Place after this sibling node_id."),
+      node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) of the node to move. Not a card_id."),
+      parent_node_id: uuidSchema.nullable().optional().describe("node_id of the destination parent (a symlink node resolves to its canonical node). Null = root. Omit = keep current parent."),
+      before: uuidSchema.optional().describe("Place before this sibling node_id."),
+      after: uuidSchema.optional().describe("Place after this sibling node_id."),
       to: z.enum(["start", "end"]).optional().describe("Place at start or end of parent's children."),
       position: z.number().int().nonnegative().optional().describe("DEPRECATED — use before/after/to instead. Absolute sort key (not a sibling index)."),
     },
@@ -169,7 +171,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       "Targets a pre-existing node_id only; temp_id references are not supported.",
     ].join("\n"),
     {
-      node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) to update. Not a card_id."),
+      node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) to update. Not a card_id."),
       journal_limit: z
         .number()
         .int()
@@ -191,7 +193,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   server.tool(
     "delete_node",
     "Delete a tree node and all its descendant nodes. Cards in that subtree (including the node's own card) that have no tree node left elsewhere are permanently deleted with them; cards that still have a node outside the deleted subtree are kept. This cannot be undone. To keep such a card, move it out first (move_node) or give it another node elsewhere (create_symlink).",
-    { node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) to delete, with all its descendants. Not a card_id; to delete a card and all its nodes use delete_card.") },
+    { node_id: uuidSchema.describe("node_id (tree position, shown as node: in compile_subtree output) to delete, with all its descendants. Not a card_id; to delete a card and all its nodes use delete_card.") },
     async ({ node_id }) => {
       if (!(await deleteNode(node_id))) throw await nodeNotFound(node_id);
       return { content: [{ type: "text", text: "Deleted" }] };

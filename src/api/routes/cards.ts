@@ -42,6 +42,7 @@ export async function cardRoutes(app: FastifyInstance): Promise<void> {
     if (updated.conflict) {
       return reply.code(409).send({
         error: "VERSION_CONFLICT",
+        code: "VERSION_CONFLICT",
         current_version: updated.actualVersion,
         message: versionConflictMessage(req.params.id, body["expected_version"] as number | undefined, updated.actualVersion),
       });

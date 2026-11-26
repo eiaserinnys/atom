@@ -65,7 +65,7 @@ describe.each(["browser PUT", "agent PATCH", "MCP update_card"])("%s edit versio
     const stale = await update("stale", 1);
     if (stale.kind === "http") {
       expect(stale.result.statusCode).toBe(409);
-      expect(stale.result.json()).toEqual({ error: "VERSION_CONFLICT", current_version: 2, message: conflictMessage(card.id) });
+      expect(stale.result.json()).toEqual({ error: "VERSION_CONFLICT", code: "VERSION_CONFLICT", current_version: 2, message: conflictMessage(card.id) });
     } else {
       expect(stale.result.isError).toBe(true);
       expect(stale.result.content).toEqual([{ type: "text", text: conflictMessage(card.id) }]);

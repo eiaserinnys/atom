@@ -171,7 +171,9 @@ Keys with the `write` scope can call all 17 tools. For `read` keys, the server r
 
 Tools that take a `parent_node_id` (`create_card`, `create_symlink`, `move_node`, `batch_op`) place the node under the canonical node when that parent is a symlink node, so check the `parent_node_id` in the response (`create_card` and the `batch_op` results for `creates`, `symlinks`, and `moves` do not return the parent, so call `get_node` to confirm it; the `child_ordered` result of `batch_op` lists the resolved parent `node_id` of each `child_orders` item). `position` in the creating tools is a sort key (usually in steps of 100), not a 0-based index: omit it to append at the end, and use `move_node` with `before` or `after` to choose a spot. `node_id` is a tree position (`node:` in `compile_subtree` output) and `card_id` is card content (`card:`); each argument description says which of the two it takes. They are easy to swap: `create_symlink` takes a `card_id` (the card to link) together with a `parent_node_id` (the tree position to put it under).
 
-`update_card`, browser `PUT /cards/:id`, and agent `PATCH /api/cards/:cardId` accept optional `expected_version`. A mismatch leaves the card unchanged. HTTP returns `409` with `{ "error": "VERSION_CONFLICT", "current_version": N }`; MCP reports `VersionConflict`, as `batch_op` does. Omitting the version keeps last-write-wins behavior.
+`update_card`, browser `PUT /cards/:id`, and agent `PATCH /api/cards/:cardId` accept optional `expected_version`. A mismatch leaves the card unchanged. HTTP returns `409` with `{ "error": "VERSION_CONFLICT", "code": "VERSION_CONFLICT", "current_version": N, "message": "..." }`; MCP reports `VersionConflict`, as `batch_op` does. Omitting the version keeps last-write-wins behavior.
+
+Agent `PATCH /api/cards/:cardId` takes the same fields as `update_card`: `title`, `content`, `tags`, `references`, `content_timestamp`, `source_type`, `source_ref`, and `expected_version`. It applies the same checks (title rules, `references` as UUIDs, version conflict), and an unknown field is a `400`.
 
 The card detail editor sends the version from the start of editing. On a conflict it keeps the draft and shows the existing change warning; pressing Save again overwrites against the version returned by the server. Unsaved title, content, and journal-limit drafts stay with their card while switching cards and are cleared by a page reload.
 
@@ -182,15 +184,17 @@ Read a branch outline first, then compile full card content only for the nodes y
 | Parameter | Default | Description |
 | :--- | :--- | :--- |
 | `node_id` | (required) | Root tree node UUID of the subtree to compile. |
-| `depth` | `3` | Maximum traversal depth (`null` compiles the full tree without a depth limit). In the REST API, `GET /tree/:nodeId/compile` also defaults to `3`, while `GET /api/tree/:nodeId/compile` defaults to `2`. |
+| `depth` | `3` | Maximum traversal depth, `0` or more (`null` compiles the full tree without a depth limit; a negative value is rejected). In the REST API, `GET /tree/:nodeId/compile` also defaults to `3`, while `GET /api/tree/:nodeId/compile` defaults to `2`. |
 | `include_ids` | (omitted) | Controls ID annotations. Leave it unset for the defaults (`[node:X card:Y]` in `titles_only` mode, HTML metadata comments in heading mode), set `true` to force full HTML metadata in `titles_only` mode, or set `false` to drop IDs entirely. |
 | `titles_only` | `false` | When `true`, outputs an indented outline of card titles and character counts without card `content`. |
 | `numbering` | `false` | When `true`, prepends hierarchical numbers (`1`, `1.1`, `1.1.1`) to compiled headings below the root node. |
-| `max_chars` | (omitted) | Truncates output to at most `N` characters on a line boundary (`0` or negative means unlimited). |
+| `max_chars` | (omitted) | Truncates output to at most `N` characters on a line boundary and appends `<!-- truncated: M chars omitted -->` (`0` or negative means unlimited). The first line is always kept whole, so an `N` smaller than the first line still returns that line. |
 | `exclude_nodes` | (omitted) | Array of `node_id` UUIDs whose subtrees are skipped. |
 | `limit` | (omitted) | Restricts direct children (`depth = 1`) to the latest `N` items by `card_timestamp`. |
 | `resolve_refs` | (omitted) | External reference unfurl mode: `"cached"` (use `cards.source_snapshot` if present, otherwise fetch) or `"fresh"` (always fetch). Omit to skip unfurling. |
 | `credentials` | (omitted) | Per-source credentials map for external reference unfurling (for example, `{ trello: { apiKey: "...", token: "..." } }`). |
+
+When `journal_limit` shows only the latest children of a node, or `limit` cuts the root's direct children, the compiled text says so with one HTML comment line under that node, for example `<!-- omitted: 12 older children (journal_limit 5) -->` or `<!-- omitted: 30 children (limit 20) -->`. In `titles_only` mode the line sits at the indentation of the children. The count is the number of children actually left out; nothing is added when nothing was left out.
 
 ### Atomic Multi-Step Updates with `batch_op`
 
@@ -304,7 +308,7 @@ Browser API access is denied by default:
 - **Immediate enforcement**: Changing a user's role or deactivating a user (`is_active = false`) in **Settings > Users** takes effect on the very next HTTP request.
 - **Agent key scopes (`agents.scope`)**:
   - `write`: Can invoke all 17 MCP tools and call mutating agent REST endpoints (`POST /api/cards`, `PATCH /api/cards/:cardId`). Keys created before scopes existed have `write`, and so does a key issued through the API without a `scope` field.
-  - `read`: Can see and call only the read-only query MCP tools, and gets `403` from mutating agent REST endpoints. The dashboard issues `read` keys by default.
+  - `read`: Can see and call only the read-only query MCP tools, and gets `403` from mutating agent REST endpoints. The dashboard issues `read` keys by default. Calling a write tool by name answers with an error that names the cause ("This API key has read scope, so write tools are disabled (create_card)..."), and the `403` body says the key has read scope and that a write-scope key is needed.
   - Only `admin` users can issue or deactivate agent keys.
 
 ## Running with PostgreSQL
@@ -378,6 +382,19 @@ To link a card to an external resource, set `source_ref` to the URL and `source_
 - **Streamable HTTP MCP**: Stateless MCP endpoint at `POST /mcp`, authenticated with the `x-api-key` header.
 
 See `src/api/routes/` for route definitions and request schemas.
+
+Errors caused by the caller come back as `{ "error": "<what is wrong and what to do>", "code": "<CODE>" }`. `error` is always a string; branch on `code`. Some responses keep their own shape and are not covered here: Jev search errors and neighbors answer with `{ "error": { "code", "message" } }`, and a move that would make a cycle answers in Fastify's standard shape with a top-level `code` of `TREE_CYCLE`. MCP errors are plain text.
+
+| `code` | Status | Meaning |
+| :--- | :--- | :--- |
+| `NODE_NOT_FOUND` | `404` | No node with that `node_id`. The message says when the value is really a `card_id`. |
+| `CARD_NOT_FOUND` | `404` | No card with that `card_id`. The message says when the value is really a `node_id`. |
+| `PARENT_NOT_FOUND` | `404` | The `parent_node_id` of a write does not exist. |
+| `INVALID_ID` | `400` | A path or body ID is not a UUID (8-4-4-4-12 hex). |
+| `INVALID_INPUT` | `400` | Another input problem, such as an empty title, an unknown field, or a negative `depth`. |
+| `VERSION_CONFLICT` | `409` | `expected_version` differs from the card's version. |
+| `ALREADY_EXISTS` | `409` | The `agent_id` is already registered (`POST /api/config/agents`). |
+| `INSUFFICIENT_SCOPE` | `403` | A read-scope key (or a viewer) called a write route. |
 
 ## Operational Notes
 

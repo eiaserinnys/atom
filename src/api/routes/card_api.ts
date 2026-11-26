@@ -2,10 +2,9 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createCard, updateCard } from "../../services/card.service.js";
 import { listChildren, compileSubtree, getTreeOutline } from "../../services/tree.service.js";
 import { agentKeyPreHandler, requireAgentWriteScope } from "../agent-key-auth.js";
-import type { UpdateCardInput } from "../../shared/types.js";
 import { parseCompileLimit } from "./compile-limit.js";
 import { createTreeOutlineHandler } from "./tree-outline.js";
-import { parseCreateCardBody } from "./card-body.js";
+import { parseCreateCardBody, parseUpdateCardBody } from "./card-body.js";
 import { cardNotFound, versionConflictMessage } from "../../services/service-errors.js";
 import { registerServiceErrors, validateRequestIds } from "../service-errors-http.js";
 
@@ -58,24 +57,13 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
     "/api/cards/:cardId",
     { preHandler: [agentKeyPreHandler, requireAgentWriteScope, validateRequestIds] },
     async (req, reply) => {
-      const body = req.body as Record<string, unknown>;
-      const allowedFields = new Set(["content", "title", "tags", "source_ref", "expected_version"]);
-      if (Object.keys(body).some((key) => !allowedFields.has(key))) {
-        return reply.code(400).send({ error: "Unknown card update field" });
-      }
-      const input: UpdateCardInput = {};
-
-      if ("content" in body) input.content = body["content"] as string | null;
-      if ("title" in body) input.title = body["title"] as string;
-      if ("tags" in body) input.tags = body["tags"] as string[];
-      if ("source_ref" in body) input.source_ref = body["source_ref"] as string | null;
-
-      const expectedVersion = body["expected_version"] as number | undefined;
+      const { input, expectedVersion } = parseUpdateCardBody(req.body);
       const result = await updateCard(req.agentId ?? null, req.params.cardId, input, expectedVersion);
       if (!result) throw await cardNotFound(req.params.cardId);
       if ("conflict" in result && result.conflict) {
         return reply.code(409).send({
           error: "VERSION_CONFLICT",
+          code: "VERSION_CONFLICT",
           current_version: result.actualVersion,
           message: versionConflictMessage(req.params.cardId, expectedVersion, result.actualVersion),
         });
