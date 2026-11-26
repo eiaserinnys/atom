@@ -2,16 +2,15 @@ import type { Queryable } from "../queryable.js";
 import type { SearchResult, SearchFilters } from "../../shared/types.js";
 import { getDb } from "../client.js";
 import { deserializeBoolean } from "../utils.js";
+import { getNodeBreadcrumbs } from "./tree.js";
+import {
+  SearchQueryInputError,
+  buildPostgresTsqueryTexts,
+  buildSqliteFtsQueries,
+  type SearchMatchQueries,
+} from "./search-query.js";
 
-export class SearchQueryInputError extends Error {
-  readonly code = "SEARCH_QUERY_INVALID";
-  readonly statusCode = 400;
-
-  constructor() {
-    super("Search query contains invalid syntax.");
-    this.name = "SearchQueryInputError";
-  }
-}
+export { SearchQueryInputError };
 
 export async function searchByBm25(
   db: Queryable,
@@ -45,9 +44,11 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   const params: unknown[] = [];
   let idx = 1;
 
-  // $1: FTS query (always present)
-  params.push(filters.query);
+  // $1: tsquery text with prefix words, $2: same query with whole words (ranking)
+  const tsqueryTexts = buildPostgresTsqueryTexts(filters.query);
+  params.push(tsqueryTexts.prefix, tsqueryTexts.whole);
   const queryIdx = idx++;
+  const wholeQueryIdx = idx++;
 
   // Dynamic WHERE conditions — fts_vector match is always included
   const conditions: string[] = ["c.fts_vector @@ tsq.q"];
@@ -133,12 +134,14 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   // occurrence, breadcrumb and headline work runs for `limit` cards only.
   if (filters.root_node_id) {
     const sql = `WITH RECURSIVE ${subtreeCte}tsq AS (
-    SELECT websearch_to_tsquery('simple', $${queryIdx}) AS q
+    SELECT to_tsquery('simple', $${queryIdx}) AS q, to_tsquery('simple', $${wholeQueryIdx}) AS whole_q
   ), top AS (
-    SELECT c.id, c.title, c.card_type, c.content, ts_rank(c.fts_vector, tsq.q) AS rank
+    SELECT c.id, c.title, c.card_type, c.content,
+      (c.fts_vector @@ tsq.whole_q) AS whole_match,
+      ts_rank(c.fts_vector, tsq.q) AS rank
     FROM cards c, tsq
     WHERE ${conditions.join("\n      AND ")}
-    ORDER BY rank DESC, c.id ASC
+    ORDER BY whole_match DESC, rank DESC, c.id ASC
     LIMIT $${limitIdx}
   )
   SELECT
@@ -156,12 +159,12 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   FROM top, tsq
   ${subtreeOccurrence("top.id")}
   ${breadcrumbSelection}
-  ORDER BY top.rank DESC, top.id ASC`;
+  ORDER BY top.whole_match DESC, top.rank DESC, top.id ASC`;
     return { sql, params };
   }
 
   const sql = `WITH RECURSIVE tsq AS (
-    SELECT websearch_to_tsquery('simple', $${queryIdx}) AS q
+    SELECT to_tsquery('simple', $${queryIdx}) AS q, to_tsquery('simple', $${wholeQueryIdx}) AS whole_q
   )
   SELECT
     c.id AS card_id,
@@ -184,7 +187,7 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   ) selected_node ON TRUE
   ${breadcrumbSelection}
   WHERE ${conditions.join("\n    AND ")}
-  ORDER BY ts_rank(c.fts_vector, tsq.q) DESC
+  ORDER BY (c.fts_vector @@ tsq.whole_q) DESC, ts_rank(c.fts_vector, tsq.q) DESC
   LIMIT $${limitIdx}`;
 
   return { sql, params };
@@ -198,85 +201,8 @@ async function searchPostgres(db: Queryable, filters: SearchFilters) {
 // ---------------------------------------------------------------------------
 // SQLite dynamic query builder
 // ---------------------------------------------------------------------------
-// SQLite is used only for unit tests. breadcrumb (node_path) is intentionally
-// not implemented here — all results return node_path: [] via the result mapper.
 
-function toSqliteFtsQuery(input: string): string | null {
-  const groups: Array<{ positiveTerms: string[]; excludedTerms: string[]; hasTerms: boolean }> = [
-    { positiveTerms: [], excludedTerms: [], hasTerms: false },
-  ];
-  let cursor = 0;
-
-  while (cursor < input.length) {
-    while (cursor < input.length && /\s/u.test(input[cursor]!)) cursor++;
-    if (cursor >= input.length) break;
-
-    let excluded = false;
-    if (input[cursor] === "-" && cursor + 1 < input.length && !/\s/u.test(input[cursor + 1]!)) {
-      excluded = true;
-      cursor++;
-    }
-
-    let quoted = false;
-    let term: string;
-    if (input[cursor] === '"') {
-      quoted = true;
-      cursor++;
-      let phrase = "";
-      while (cursor < input.length) {
-        if (input[cursor] === '"') {
-          if (input[cursor + 1] === '"') {
-            phrase += '"';
-            cursor += 2;
-            continue;
-          }
-          cursor++;
-          break;
-        }
-        phrase += input[cursor];
-        cursor++;
-      }
-      term = phrase;
-    } else {
-      const start = cursor;
-      while (cursor < input.length && !/\s/u.test(input[cursor]!)) cursor++;
-      term = input.slice(start, cursor);
-    }
-
-    if (term.length === 0) continue;
-    if (!excluded && !quoted && term === "OR") {
-      const current = groups.at(-1);
-      if (!current?.hasTerms) throw new SearchQueryInputError();
-      groups.push({ positiveTerms: [], excludedTerms: [], hasTerms: false });
-      continue;
-    }
-
-    const ftsTerm = `"${term.replace(/"/g, '""')}"`;
-    const group = groups.at(-1)!;
-    group.hasTerms = true;
-    if (excluded) group.excludedTerms.push(ftsTerm);
-    else group.positiveTerms.push(ftsTerm);
-  }
-
-  if (groups.length > 1 && !groups.at(-1)!.hasTerms) throw new SearchQueryInputError();
-  // Apply exclusions within each OR branch so alternatives retain websearch precedence.
-  const expressions = groups
-    .filter(group => group.positiveTerms.length > 0)
-    .map(group => {
-      let expression = group.positiveTerms.length === 1
-        ? group.positiveTerms[0]!
-        : `(${group.positiveTerms.join(" ")})`;
-      for (const excluded of group.excludedTerms) expression = `${expression} NOT ${excluded}`;
-      return expression;
-    });
-  if (expressions.length === 0) return null;
-
-  return expressions.length === 1
-    ? expressions[0]!
-    : expressions.map(expression => `(${expression})`).join(" OR ");
-}
-
-function buildSqliteQuery(filters: SearchFilters, ftsQuery: string): { sql: string; params: unknown[] } {
+function buildSqliteQuery(filters: SearchFilters, ftsQueries: SearchMatchQueries): { sql: string; params: unknown[] } {
   const params: unknown[] = [];
   let idx = 1;
 
@@ -295,7 +221,7 @@ function buildSqliteQuery(filters: SearchFilters, ftsQuery: string): { sql: stri
   }
 
   // FTS query follows the CTE placeholder, when present.
-  params.push(ftsQuery);
+  params.push(ftsQueries.prefix);
   const matchIdx = idx++;
 
   // Additional WHERE conditions beyond FTS MATCH
@@ -350,6 +276,13 @@ function buildSqliteQuery(filters: SearchFilters, ftsQuery: string): { sql: stri
     ? "\n         AND " + extraConditions.join("\n         AND ")
     : "";
 
+  let wholeFirstOrder = "";
+  if (ftsQueries.whole !== ftsQueries.prefix) {
+    const wholeIdx = idx++;
+    params.push(ftsQueries.whole);
+    wholeFirstOrder = `(c.rowid IN (SELECT rowid FROM cards_fts WHERE cards_fts MATCH $${wholeIdx})) DESC, `;
+  }
+
   // LIMIT is always the last parameter (matches SQL appearance order)
   const limitIdx = idx;
   params.push(filters.limit ?? 20);
@@ -373,23 +306,34 @@ function buildSqliteQuery(filters: SearchFilters, ftsQuery: string): { sql: stri
        FROM cards_fts
        JOIN cards c ON c.rowid = cards_fts.rowid
        WHERE cards_fts MATCH $${matchIdx}${whereExtra}
-       ORDER BY rank
+       ORDER BY ${wholeFirstOrder}rank
        LIMIT $${limitIdx}`;
 
   return { sql, params };
 }
 
 async function searchSqlite(db: Queryable, filters: SearchFilters) {
-  const ftsQuery = toSqliteFtsQuery(filters.query);
-  if (ftsQuery === null) return { rows: [] };
+  const ftsQueries = buildSqliteFtsQueries(filters.query);
+  if (ftsQueries === null) return { rows: [] };
 
-  const { sql, params } = buildSqliteQuery(filters, ftsQuery);
+  const { sql, params } = buildSqliteQuery(filters, ftsQueries);
+  let result;
   try {
-    return await db.query(sql, params);
+    result = await db.query(sql, params);
   } catch (error) {
     if (isSqliteFtsSyntaxError(error)) throw new SearchQueryInputError();
     throw error;
   }
+  return { rows: await withSqliteNodePaths(db, result.rows) };
+}
+
+async function withSqliteNodePaths(db: Queryable, rows: Record<string, unknown>[]) {
+  const nodeIds = rows.map(row => row["node_id"]).filter((id): id is string => typeof id === "string");
+  const breadcrumbs = await getNodeBreadcrumbs(db, nodeIds);
+  return rows.map(row => {
+    const titles = breadcrumbs.get(row["node_id"] as string) ?? [];
+    return { ...row, node_path: titles.slice(0, -1) };
+  });
 }
 
 function isSqliteFtsSyntaxError(error: unknown): boolean {

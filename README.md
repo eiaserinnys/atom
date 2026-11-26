@@ -159,7 +159,7 @@ Keys with the `write` scope can call all 17 tools. For `read` keys, the server r
 | | `move_node` | `write` | Move `node_id` to `parent_node_id` (or keep its current parent) and position it via `before`, `after`, `to`, or the deprecated `position` (an absolute sort key). |
 | | `update_node` | `write` | Set or clear a node's `journal_limit` (`null` or `0` for unlimited, or a positive integer `N` for the latest `N` children by descending `position`). |
 | | `delete_node` | `write` | Permanently delete `node_id`, its descendant nodes, and any cards in that subtree (including the node's own card) that have no remaining tree nodes elsewhere. |
-| **Search & Eval** | `search_cards` | `read` | Search card titles and content via full-text search (SQLite `fts5` or PostgreSQL `tsvector`/`ts_rank`, default `limit` `20`) or Jev (`engine: "jev"`, default `limit` `6`). |
+| **Search & Eval** | `search_cards` | `read` | Search card titles and content via full-text search (SQLite `fts5` or PostgreSQL `tsvector`/`ts_rank`, default `limit` `20`). Plain words match as word prefixes (`소울스트림` finds `소울스트림에서`, but a fragment from the middle of a word does not match), quoted phrases match whole words in order, `-word` excludes, and `OR` joins alternatives. When the query returns 0 cards, the default `strategy: "auto"` retries with a widened query and marks those results with a `fallback` field. Or search with Jev (`engine: "jev"`, default `limit` `6`). |
 | | `get_card_neighbors` | `read` | Return nearest-neighbor cards by OpenAI embedding cosine similarity (default `limit` `20`, max `50`; HTTP MCP only). |
 | | `evaluate_cards` | `read` | Evaluate 1 to 48 candidate `card_ids` against a Jev query and context, returning a relevance `score` (`0` to `1`) for each card. |
 | **Batch** | `batch_op` | `write` | Run multiple card and tree mutations in one database transaction. |
@@ -304,7 +304,7 @@ Browser API access is denied by default:
 
 ## Running with PostgreSQL
 
-Use PostgreSQL in production or when many agents search at the same time. Its full-text search uses the built-in `tsvector`, `websearch_to_tsquery`, and `ts_rank`.
+Use PostgreSQL in production or when many agents search at the same time. Its full-text search uses the built-in `tsvector`, a `to_tsquery` built from websearch-style input (plain words as prefixes, quoted phrases, `-word`, `OR`), and `ts_rank`.
 
 1. Set `DATABASE_URL` in `.env`:
 

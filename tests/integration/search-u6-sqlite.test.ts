@@ -78,7 +78,7 @@ describe("U6 SQLite search query compatibility", () => {
     { query: "what?", titles: ["F2"] },
     { query: "a -b", titles: ["F5"] },
     { query: '"exact phrase"', titles: ["F3"] },
-    { query: "a OR b", titles: ["F5", "F6"] },
+    { query: "a OR b", titles: ["F1", "F5", "F6"] },
     { query: "-only", titles: [] },
     { query: '"unclosed', titles: ["F7"] },
     { query: "c++", titles: ["F8"] },

@@ -2,7 +2,7 @@ import { getDb } from "../db/client.js";
 import { searchByBm25 } from "../db/queries/search.js";
 import { resolveWriteParentNodeId } from "./tree-parent.js";
 import { getNode } from "./tree.service.js";
-import type { SearchResult, SearchFilters } from "../shared/types.js";
+import type { SearchResult, SearchFilters, SearchFallback } from "../shared/types.js";
 
 const RELAXED_QUERY_MIN_TERMS = 4;
 const RELAXED_QUERY_MAX_TERMS = 12;
@@ -61,16 +61,16 @@ export async function searchCards(
     return scopedStrictResults;
   }
 
-  const fallbackQueries = buildSearchFallbackQueries(normalizedFilters.query);
-  for (const fallbackQuery of fallbackQueries) {
+  for (const fallback of buildTaggedFallbackQueries(normalizedFilters.query)) {
     const fallbackResults = await searchByBm25(getDb(), {
       ...normalizedFilters,
-      query: fallbackQuery,
+      query: fallback.query,
       strategy: "strict",
     });
 
     if (fallbackResults.length > 0) {
-      return trimResultsToScope(fallbackResults, rootNode?.card.title);
+      return trimResultsToScope(fallbackResults, rootNode?.card.title)
+        .map(result => ({ ...result, fallback }));
     }
   }
 
@@ -93,18 +93,25 @@ function trimResultsToScope(results: SearchResult[], rootTitle: string | undefin
 }
 
 export function buildSearchFallbackQueries(query: string): string[] {
+  return buildTaggedFallbackQueries(query).map(fallback => fallback.query);
+}
+
+function buildTaggedFallbackQueries(query: string): SearchFallback[] {
   if (hasExplicitWebsearchSyntax(query)) return [];
 
-  const queries: string[] = [];
+  const fallbacks: SearchFallback[] = [];
+  const candidates: SearchFallback[] = [];
   const relaxedQuery = buildRelaxedPlainQuery(query);
   const synonymQuery = buildDomainSynonymQuery(query);
+  if (relaxedQuery) candidates.push({ kind: "relaxed_or", query: relaxedQuery });
+  if (synonymQuery) candidates.push({ kind: "synonym", query: synonymQuery });
 
-  for (const candidate of [relaxedQuery, synonymQuery]) {
-    if (!candidate || candidate === query || queries.includes(candidate)) continue;
-    queries.push(candidate);
+  for (const candidate of candidates) {
+    if (candidate.query === query || fallbacks.some(fallback => fallback.query === candidate.query)) continue;
+    fallbacks.push(candidate);
   }
 
-  return queries;
+  return fallbacks;
 }
 
 export function buildRelaxedPlainQuery(query: string): string | null {
