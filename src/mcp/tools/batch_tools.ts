@@ -85,7 +85,7 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
       "  • temp_id is resolved to the real node_id after the create step.",
       "",
       "symlinks: create symlink nodes pointing to existing cards at new tree positions.",
-      "  • card_id must reference an existing card (FK constraint — rolls back on invalid ID).",
+      "  • card_id must reference an existing card; otherwise the error is `Card not found` and the whole batch rolls back.",
       "  • Useful for placing a card under multiple parents without duplicating content.",
       "",
       "updates: card field updates (title/content/tags/references/source/...). Targets card_id. Omitted fields are kept, but each field you send replaces the whole stored value: content is a full replacement, not a patch. If another session may edit the card, send expected_version from get_card.",
