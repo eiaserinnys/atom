@@ -34,8 +34,8 @@ When `compile_subtree` encounters a symlink node, it expands the children of tha
 
 ### Orphan-Free Deletion Rules
 
-- **Deleting a card** (`delete_card`, `DELETE /cards/:id`, or `batch_op.deletes`) cascades to every `tree_nodes` row referencing that card, including symlinks.
-- **Deleting a tree node** (`delete_node` or `DELETE /tree/:nodeId`) removes the node and its descendants in a single transaction. Cards from that subtree are deleted too, unless a canonical or symlink node in another branch still references them.
+- **Deleting a card** (`delete_card`, `DELETE /cards/:id`, or `batch_op.deletes`) removes every node of that card, symlinks included, together with the whole subtree below each of those nodes. Cards in those subtrees that have no node left elsewhere are permanently deleted as well; cards that still have a canonical or symlink node outside the deleted subtrees are kept. This cannot be undone, so move a card you want to keep out of the subtree first, or give it another node elsewhere with a symlink.
+- **Deleting a tree node** (`delete_node` or `DELETE /tree/:nodeId`) removes the node and its descendant nodes in a single transaction. Cards from that subtree (including the node's own card) are permanently deleted too, unless a canonical or symlink node in another branch still references them.
 
 ## Quick Start
 
@@ -148,21 +148,23 @@ Keys with the `write` scope can call all 17 tools. For `read` keys, the server r
 | :--- | :--- | :--- | :--- |
 | **Card** | `create_card` | `write` | Create a `structure` or `knowledge` card (`title`, `content`, `tags`, `references`, source fields) and place it in the tree (`parent_node_id`, `position`). |
 | | `get_card` | `read` | Fetch a card's fields by `card_id`. |
-| | `update_card` | `write` | Update `title`, `content`, `tags`, `references`, `content_timestamp`, or source fields, with optional `expected_version` for optimistic locking. |
-| | `delete_card` | `write` | Delete a card and cascade-delete all `tree_nodes` pointing to it. |
+| | `update_card` | `write` | Update `title`, `content`, `tags`, `references`, `content_timestamp`, or source fields; omitted fields stay as they are, but `content`, `tags`, and `references` are replaced in full, not patched. Send the card's `version` from `get_card` as `expected_version` for optimistic locking when another session may edit the same card. |
+| | `delete_card` | `write` | Permanently delete a card, every `tree_nodes` row pointing to it (symlinks included), and the subtrees below them. Cards in those subtrees with no node left elsewhere are deleted too. |
 | | `get_backlinks` | `read` | Find all cards whose `references` array contains `card_id`. |
 | **Tree** | `get_tree` | `read` | Return a flat list of root-level tree nodes. |
 | | `get_node` | `read` | Fetch a single `tree_nodes` row and its associated card data. |
 | | `list_children` | `read` | List direct child nodes of `parent_node_id` (or the root nodes if omitted) ordered by `position`. |
 | | `compile_subtree` | `read` | Compile a node and its descendants into a single Markdown document. |
 | | `create_symlink` | `write` | Create a symlink node (`is_symlink = true`) that places an existing card (`card_id`) under `parent_node_id`. |
-| | `move_node` | `write` | Move `node_id` to `parent_node_id` (or keep its current parent) and position it via `before`, `after`, `to`, or the deprecated `position`. |
+| | `move_node` | `write` | Move `node_id` to `parent_node_id` (or keep its current parent) and position it via `before`, `after`, `to`, or the deprecated `position` (an absolute sort key). |
 | | `update_node` | `write` | Set or clear a node's `journal_limit` (`null` or `0` for unlimited, or a positive integer `N` for the latest `N` children by descending `position`). |
-| | `delete_node` | `write` | Delete `node_id`, its descendant nodes, and any cards in that subtree that have no remaining tree nodes elsewhere. |
+| | `delete_node` | `write` | Permanently delete `node_id`, its descendant nodes, and any cards in that subtree (including the node's own card) that have no remaining tree nodes elsewhere. |
 | **Search & Eval** | `search_cards` | `read` | Search card titles and content via full-text search (SQLite `fts5` or PostgreSQL `tsvector`/`ts_rank`, default `limit` `20`) or Jev (`engine: "jev"`, default `limit` `6`). |
 | | `get_card_neighbors` | `read` | Return nearest-neighbor cards by OpenAI embedding cosine similarity (default `limit` `20`, max `50`; HTTP MCP only). |
 | | `evaluate_cards` | `read` | Evaluate 1 to 48 candidate `card_ids` against a Jev query and context, returning a relevance `score` (`0` to `1`) for each card. |
 | **Batch** | `batch_op` | `write` | Run multiple card and tree mutations in one database transaction. |
+
+Tools that take a `parent_node_id` (`create_card`, `create_symlink`, `move_node`, `batch_op`) place the node under the canonical node when that parent is a symlink node, so check the `parent_node_id` in the response (`create_card` and `batch_op` do not return the parent; call `get_node` to confirm). `position` in the creating tools is a sort key (usually in steps of 100), not a 0-based index: omit it to append at the end, and use `move_node` with `before` or `after` to choose a spot. `node_id` is a tree position (`node:` in `compile_subtree` output) and `card_id` is card content (`card:`); each tool takes exactly one of them.
 
 `update_card`, browser `PUT /cards/:id`, and agent `PATCH /api/cards/:cardId` accept optional `expected_version`. A mismatch leaves the card unchanged. HTTP returns `409` with `{ "error": "VERSION_CONFLICT", "current_version": N }`; MCP reports `VersionConflict`, as `batch_op` does. Omitting the version keeps last-write-wins behavior.
 
@@ -195,9 +197,9 @@ Read a branch outline first, then compile full card content only for the nodes y
 4. `node_updates` (`journal_limit` updates on existing nodes by `node_id`)
 5. `moves` (node reparenting and reordering)
 6. `child_orders` (bulk reordering of direct children under `parent_node_id`)
-7. `deletes` (card deletions by `card_id`, removing each card and all of its tree nodes)
+7. `deletes` (card deletions by `card_id`, removing each card, all of its tree nodes, and the subtrees below them; cards in those subtrees with no node left elsewhere are deleted too)
 
-Each item in `creates` requires a caller-assigned `temp_id` string. Other items in `creates`, `symlinks`, and `moves` within the same request can pass that string in `parent_temp_id` to place nodes under the newly created card. `symlinks.card_id` and `child_orders.parent_node_id` do not accept `temp_id` values and require real UUIDs. The call returns `{ created, symlinked, updated, node_updated, moved, child_ordered, deleted }`, where `created` is an array of `{ temp_id, card_id, node_id }` objects. If any step fails, the whole transaction rolls back.
+Each item in `creates` requires a caller-assigned `temp_id` string. Other items in `creates`, `symlinks`, and `moves` within the same request can pass that string in `parent_temp_id` to place nodes under the newly created card. `symlinks.card_id` and `child_orders.parent_node_id` do not accept `temp_id` values and require real UUIDs. In `moves`, omitting `new_parent_node_id` keeps the node under its current parent (`null` means root); position it with `before`, `after`, or `to` (`new_position` is deprecated). A node listed in `child_orders.order` that sits under another parent is moved under that `parent_node_id`. `updates` replaces `content` in full, like `update_card`. The call returns `{ created, symlinked, updated, node_updated, moved, child_ordered, deleted }`, where `created` is an array of `{ temp_id, card_id, node_id }` objects. If any step fails, the whole transaction rolls back.
 
 ## Agent Skills
 
@@ -393,6 +395,9 @@ Empty values stay empty, and `OPENAI_API_KEY` is left out of the response entire
 | `DATABASE_URL` | (unset) | PostgreSQL connection URL. When unset, `atom` uses SQLite at `SQLITE_PATH`. |
 | `SQLITE_PATH` | `./atom.db` | File path for the SQLite database when `DATABASE_URL` is unset. |
 | `API_PORT` | (required; `4200` in `.env.example`) | Port for the Fastify HTTP and MCP server (startup fails if unset). |
+| `API_HOST` | (unset) | Listen host. When unset, the server binds `127.0.0.1` in `AUTH_BYPASS=1` mode and `0.0.0.0` otherwise. |
+| `DASHBOARD_DIR` | (unset) | Built dashboard directory (must contain `index.html`) that the API serves as static files and client routes. |
+| `DASHBOARD_ADMIN_PASSWORD` | (unset) | Installation password for dashboard login. Requires `JWT_SECRET`, cannot be combined with `AUTH_BYPASS=1`, and is ignored when an OAuth provider is configured. |
 | `VITE_API_BASE_URL` | `""` (same origin) | API base URL used by the dashboard when running the Vite dev server on a separate port. |
 | `FRONTEND_URL` | (unset) | Allowed CORS origin and post-OAuth redirect URL (required when Google or Slack OAuth is enabled). |
 | `AUTH_BYPASS` | (unset) | Set to `1` for local unauthenticated `admin` access when no OAuth provider is configured. |
