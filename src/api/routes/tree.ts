@@ -15,6 +15,12 @@ import {
 import { parseCompileLimit } from "./compile-limit.js";
 import { createTreeOutlineHandler } from "./tree-outline.js";
 
+function parseDepthQuery(depthStr: string | undefined): number {
+  if (depthStr === "Infinity") return Infinity;
+  const parsed = depthStr === undefined ? NaN : parseInt(depthStr, 10);
+  return isNaN(parsed) ? 3 : parsed;
+}
+
 export async function treeRoutes(app: FastifyInstance): Promise<void> {
   // GET /tree  — root nodes (parent_node_id = null)
   // depth query param is accepted for forward compatibility but currently returns
@@ -63,12 +69,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     "/tree/:nodeId/compile",
     async (req, reply) => {
       const qs = req.query as Record<string, string>;
-      const depthStr = qs["depth"];
-      const depth = depthStr === "Infinity"
-        ? Infinity
-        : depthStr !== undefined && !isNaN(parseInt(depthStr, 10))
-          ? parseInt(depthStr, 10)
-          : 3;
+      const depth = parseDepthQuery(qs["depth"]);
       // 트리스테이트 보존 (260508): include_ids 미전달 → undefined (디폴트 동작)
       const includeIds: boolean | undefined =
         qs["include_ids"] === undefined ? undefined : qs["include_ids"] === "true";
@@ -123,12 +124,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     "/tree/:nodeId/compile/sections",
     async (req, reply) => {
       const qs = req.query as Record<string, string | undefined>;
-      const depthStr = qs["depth"];
-      const depth = depthStr === "Infinity"
-        ? Infinity
-        : depthStr !== undefined && !isNaN(parseInt(depthStr, 10))
-          ? parseInt(depthStr, 10)
-          : 3;
+      const depth = parseDepthQuery(qs["depth"]);
       const headChars = parseHeadChars(qs["head_chars"]);
       if (headChars === null) {
         return reply.code(400).send({ error: "head_chars must be an integer between 0 and 200000" });
@@ -178,12 +174,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
       if (query.length < 1 || query.length > 200) {
         return reply.code(400).send({ error: "q must contain 1–200 characters" });
       }
-      const depthStr = qs["depth"];
-      const depth = depthStr === "Infinity"
-        ? Infinity
-        : depthStr !== undefined && !isNaN(parseInt(depthStr, 10))
-          ? parseInt(depthStr, 10)
-          : 3;
+      const depth = parseDepthQuery(qs["depth"]);
       return findCompileSubtree(req.params.nodeId, depth, query);
     }
   );
