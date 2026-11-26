@@ -1,5 +1,6 @@
 import { jwtVerify, type JWTPayload } from "jose";
 import type { UserRole } from "../shared/types.js";
+import { sessionBindingMatches } from "./admin-password.js";
 import { isAllowedAccessJwtPayload } from "./routes/auth_helpers.js";
 
 export interface ActiveUserRow {
@@ -15,6 +16,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(process.env["JWT_SECRET"]!));
     if (!isAllowedAccessJwtPayload(payload) || typeof payload["id"] !== "string") return null;
+    if (!sessionBindingMatches(payload["pwf"])) return null;
     return payload as AccessTokenPayload;
   } catch {
     return null;

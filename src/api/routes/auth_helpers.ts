@@ -53,6 +53,7 @@ export async function issueAuthorizationCode(input: {
   codeChallenge: string;
   scope?: string;
   jwtSecret: Uint8Array;
+  sessionBinding?: string;
 }): Promise<string> {
   const now = Date.now();
   for (const [jti, expiresAt] of authorizationCodeExpirations) {
@@ -68,6 +69,7 @@ export async function issueAuthorizationCode(input: {
     redirect_uri: input.redirectUri,
     code_challenge: input.codeChallenge,
     ...(input.scope === undefined ? {} : { scope: input.scope }),
+    ...(input.sessionBinding === undefined ? {} : { pwf: input.sessionBinding }),
     jti,
   };
   return new SignJWT(payload)

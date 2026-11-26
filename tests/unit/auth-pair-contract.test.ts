@@ -7,6 +7,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { SignJWT } from "jose";
 
 import { agentKeyVerifier } from "../../src/api/agent-key-auth.js";
+import { passwordSessionBinding } from "../../src/api/admin-password.js";
 import { authMiddleware } from "../../src/api/middleware/auth.js";
 import { cardApiRoutes } from "../../src/api/routes/card_api.js";
 import { cardRoutes } from "../../src/api/routes/cards.js";
@@ -178,9 +179,12 @@ describe("browser path (authMiddleware): auth modes", () => {
     expect(res.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it("verifies tokens like OAuth mode in password mode", async () => {
+  it("verifies tokens like OAuth mode in password mode, and also requires the password binding", async () => {
     setMode("password");
-    expect((await browser({ cookie: `atom_auth=${await tokenFor(admin)}` })).statusCode).toBe(200);
+    const pwf = passwordSessionBinding("pair-contract-password");
+    expect((await browser({ cookie: `atom_auth=${await tokenFor(admin, { pwf })}` })).statusCode).toBe(200);
+    expect((await browser({ cookie: `atom_auth=${await tokenFor(admin)}` })).statusCode).toBe(401);
+    expect((await browser({ cookie: `atom_auth=${await tokenFor(admin, { pwf: passwordSessionBinding("another-password") })}` })).statusCode).toBe(401);
     expect((await browser()).statusCode).toBe(401);
   });
 

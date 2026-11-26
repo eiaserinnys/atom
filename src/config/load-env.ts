@@ -55,6 +55,10 @@ function describeDatabase(
   return `SQLite ${path.join(cwd, "atom.db")} (default)`;
 }
 
+export function resolveEnvFilePath(env: NodeJS.ProcessEnv = process.env): string {
+  return env["ATOM_ENV_FILE"] ?? ENV_FILE_PATH;
+}
+
 /**
  * Every entry point (API server, stdio MCP, migrate, seed-demo) loads settings here:
  * values in the .env file win over the shell, and the shell is used as-is when there is no .env.
@@ -62,7 +66,7 @@ function describeDatabase(
  */
 export function loadConfig(options: LoadConfigOptions = {}): LoadedConfig {
   const env = options.env ?? process.env;
-  const envFile = options.envFile ?? env["ATOM_ENV_FILE"] ?? ENV_FILE_PATH;
+  const envFile = options.envFile ?? resolveEnvFilePath(env);
   const fromFile = readEnvFile(envFile);
   if (fromFile) Object.assign(env, fromFile);
   const fileKeys = new Set(fromFile ? Object.keys(fromFile) : []);

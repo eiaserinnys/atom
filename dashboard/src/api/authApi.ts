@@ -6,6 +6,10 @@ export const authApi = {
     return request('/api/auth/status');
   },
 
+  getProviders(): Promise<{ google: boolean; slack: boolean; password?: boolean }> {
+    return request('/api/auth/providers');
+  },
+
   logout(): Promise<{ ok: boolean }> {
     return request('/api/auth/logout', { method: 'POST' });
   },

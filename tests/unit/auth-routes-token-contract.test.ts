@@ -3,6 +3,7 @@ import { fileURLToPath } from "url";
 
 import { SignJWT } from "jose";
 
+import { passwordSessionBinding } from "../../src/api/admin-password.js";
 import { SqliteAdapter } from "../../src/db/adapters/sqlite.js";
 import { closeDb, setDb } from "../../src/db/client.js";
 import { insertUser, type User } from "../../src/db/queries/users.js";
@@ -171,9 +172,11 @@ describe("GET /api/auth/status: accepted tokens", () => {
 });
 
 describe("GET /api/auth/status: auth modes", () => {
-  it("verifies tokens the same way in password mode", async () => {
+  it("verifies tokens the same way in password mode, plus the password binding", async () => {
     setMode("password");
-    expect((await status(cookieOf(await tokenFor(named)))).body).toMatchObject({ authenticated: true, id: named.id });
+    const pwf = passwordSessionBinding("token-contract-password");
+    expect((await status(cookieOf(await tokenFor(named, { pwf })))).body).toMatchObject({ authenticated: true, id: named.id });
+    expect((await status(cookieOf(await tokenFor(named)))).body).toEqual(NOT_AUTHENTICATED);
     expect((await status()).body).toEqual(NOT_AUTHENTICATED);
   });
 
@@ -221,10 +224,12 @@ describe("GET /api/auth/oauth/authorize: login cookie check", () => {
   // Current behavior: the cookie is verified in every mode, so a valid cookie gets a code
   // even in unconfigured and password mode.
   it("verifies the cookie in unconfigured and password mode too (current behavior)", async () => {
-    for (const mode of ["unconfigured", "password"] as const) {
-      setMode(mode);
-      expect([mode, await authorize(cookieOf(await tokenFor(named)))]).toEqual([mode, "issued code"]);
-    }
+    setMode("unconfigured");
+    expect(await authorize(cookieOf(await tokenFor(named)))).toBe("issued code");
+    setMode("password");
+    const pwf = passwordSessionBinding("token-contract-password");
+    expect(await authorize(cookieOf(await tokenFor(named, { pwf })))).toBe("issued code");
+    expect(await authorize(cookieOf(await tokenFor(named)))).toBe('503 {"error":"OAuth login provider not configured"}');
   });
 
   it("issues a code for the virtual admin in bypass mode without any cookie", async () => {

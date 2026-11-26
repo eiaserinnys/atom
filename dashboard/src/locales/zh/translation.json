@@ -228,5 +228,21 @@
     "shutdown_now": "停止服务器",
     "shutdown_done": "服务器已停止。请自行重新启动后继续。",
     "reconnecting": "正在连接服务器..."
+  },
+  "auth": {
+    "password_section": "管理员密码",
+    "password_current": "当前密码",
+    "password_new": "新密码",
+    "password_confirm": "确认新密码",
+    "password_submit": "修改密码",
+    "password_changed": "密码已修改。其他设备上的登录已退出。",
+    "password_mismatch": "两次输入的新密码不一致。",
+    "password_too_short": "新密码至少需要 8 个字符。",
+    "password_invalid": "无法使用此密码。请去掉首尾空格，或换一个。",
+    "password_wrong_current": "当前密码不正确。",
+    "password_rate_limited": "尝试次数过多，请稍后再试。",
+    "password_save_failed": "密码保存失败，请重试。",
+    "password_same": "新密码与当前密码相同，请输入其他密码。",
+    "password_session_lost": "登录已失效，请刷新页面后重新登录。"
   }
 }

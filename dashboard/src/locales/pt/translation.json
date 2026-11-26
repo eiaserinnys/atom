@@ -228,5 +228,21 @@
     "shutdown_now": "Parar servidor",
     "shutdown_done": "O servidor foi parado. Inicie-o novamente por conta própria para continuar.",
     "reconnecting": "Conectando ao servidor..."
+  },
+  "auth": {
+    "password_section": "Senha de administrador",
+    "password_current": "Senha atual",
+    "password_new": "Nova senha",
+    "password_confirm": "Confirmar nova senha",
+    "password_submit": "Alterar senha",
+    "password_changed": "Senha alterada. Os outros dispositivos foram desconectados.",
+    "password_mismatch": "As novas senhas não coincidem.",
+    "password_too_short": "A nova senha deve ter pelo menos 8 caracteres.",
+    "password_invalid": "Não é possível usar esta senha. Remova os espaços no início ou no fim, ou escolha outra.",
+    "password_wrong_current": "A senha atual está incorreta.",
+    "password_rate_limited": "Muitas tentativas. Tente novamente em instantes.",
+    "password_save_failed": "Não foi possível salvar a senha. Tente novamente.",
+    "password_same": "A nova senha é igual à atual. Digite uma senha diferente.",
+    "password_session_lost": "A sessão foi encerrada. Recarregue a página e entre novamente."
   }
 }

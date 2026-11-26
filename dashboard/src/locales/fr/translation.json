@@ -228,5 +228,21 @@
     "shutdown_now": "Arrêter le serveur",
     "shutdown_done": "Le serveur est arrêté. Relancez-le vous-même pour continuer.",
     "reconnecting": "Reconnexion au serveur..."
+  },
+  "auth": {
+    "password_section": "Mot de passe administrateur",
+    "password_current": "Mot de passe actuel",
+    "password_new": "Nouveau mot de passe",
+    "password_confirm": "Confirmer le nouveau mot de passe",
+    "password_submit": "Changer le mot de passe",
+    "password_changed": "Mot de passe modifié. Les autres appareils ont été déconnectés.",
+    "password_mismatch": "Les nouveaux mots de passe ne correspondent pas.",
+    "password_too_short": "Le nouveau mot de passe doit contenir au moins 8 caractères.",
+    "password_invalid": "Ce mot de passe ne peut pas être utilisé. Retirez les espaces au début ou à la fin, ou choisissez-en un autre.",
+    "password_wrong_current": "Le mot de passe actuel est incorrect.",
+    "password_rate_limited": "Trop de tentatives. Réessayez dans un instant.",
+    "password_save_failed": "Le mot de passe n'a pas pu être enregistré. Réessayez.",
+    "password_same": "Le nouveau mot de passe est identique à l'actuel. Saisissez un autre mot de passe.",
+    "password_session_lost": "Vous avez été déconnecté. Rechargez la page et reconnectez-vous."
   }
 }
