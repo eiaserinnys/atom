@@ -44,25 +44,49 @@ export function validateNewPassword(value: unknown): string | null {
   }
   if (value.trim() !== value) return 'new_password must not start or end with whitespace';
   if (/[\r\n]/.test(value)) return 'new_password must not contain line breaks';
-  if (envFileValue(value) === null) return 'new_password cannot be stored in the env file; avoid mixing all of \' " ` in it';
   return null;
 }
 
-/** The first quoting that the config loader (dotenv) reads back as exactly this password, or null. */
-function envFileValue(password: string): string | null {
-  return [password, `'${password}'`, `"${password}"`, `\`${password}\``]
-    .find((candidate) => parse(`${ENV_KEY}=${candidate}`)[ENV_KEY] === password) ?? null;
+export const UNSTORABLE_PASSWORD_MESSAGE =
+  'new_password cannot be stored in the env file as written; avoid starting it with a quote or mixing all of \' " ` in it';
+
+export type PasswordSavePlan = { file: string; content: string };
+
+function readEnvFileContent(file: string): string {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+    throw error;
+  }
 }
 
-/** Writes the password where the config loader reads it on the next start, then applies it to this process. */
-export function saveAdminPassword(password: string): void {
+function sameOtherKeys(before: Record<string, string>, after: Record<string, string>): boolean {
+  const keys = (values: Record<string, string>) => Object.keys(values).filter((key) => key !== ENV_KEY).sort();
+  const kept = keys(before);
+  const now = keys(after);
+  return kept.length === now.length && kept.every((key, index) => key === now[index] && before[key] === after[key]);
+}
+
+/**
+ * The whole env file as it would be written, using the first quoting for which the config loader (dotenv)
+ * reads back this password and leaves every other key untouched; null when no quoting does.
+ * The whole file is parsed because dotenv's quoted values run across lines.
+ */
+export function planPasswordSave(password: string): PasswordSavePlan | null {
   const file = resolveEnvFilePath();
-  let content = '';
-  try {
-    content = fs.readFileSync(file, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  const original = readEnvFileContent(file);
+  const before = parse(original);
+  for (const written of [password, `'${password}'`, `"${password}"`, `\`${password}\``]) {
+    const content = updateConfigEnvContent(original, [{ key: ENV_KEY, value: written }]);
+    const after = parse(content);
+    if (after[ENV_KEY] === password && sameOtherKeys(before, after)) return { file, content };
   }
-  fs.writeFileSync(file, updateConfigEnvContent(content, [{ key: ENV_KEY, value: envFileValue(password)! }]), 'utf8');
+  return null;
+}
+
+/** Writes the planned env file where the config loader reads it on the next start, then applies the password to this process. */
+export function saveAdminPassword(password: string, plan: PasswordSavePlan): void {
+  fs.writeFileSync(plan.file, plan.content, 'utf8');
   process.env[ENV_KEY] = password;
 }

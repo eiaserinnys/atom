@@ -427,7 +427,9 @@
     "password_invalid": "This password cannot be used. Remove spaces at the start or end and try another.",
     "password_wrong_current": "The current password is incorrect.",
     "password_rate_limited": "Too many attempts. Try again in a moment.",
-    "password_save_failed": "The password could not be saved. Try again."
+    "password_save_failed": "The password could not be saved. Try again.",
+    "password_same": "The new password is the same as the current one. Enter a different password.",
+    "password_session_lost": "You have been signed out. Reload the page and sign in again."
   },
   "system": {
     "restart_required": "Settings changed. Restart required to apply.",

@@ -278,6 +278,24 @@ async function passwordFlow({ browser, passwordUrl, viewport, width, lang, works
   await layoutProblems(page, lang, `wrong current (${tag})`);
   check(`fields stay editable after a failure (${tag})`, await field(page, lang, 'password_current').isEnabled());
 
+  await field(page, lang, 'password_current').fill(currentPassword);
+  await field(page, lang, 'password_new').fill(currentPassword);
+  await field(page, lang, 'password_confirm').fill(currentPassword);
+  await page.keyboard.press('Enter');
+  await noticeText(page, tr.auth.password_same);
+  const afterSame = await activeName(page);
+  check(`the same password is refused and focus goes to the new field (${tag})`, afterSame === tr.auth.password_new, afterSame);
+  await shot(page, `same-${lang}-${width}`);
+  await layoutProblems(page, lang, `same password (${tag})`);
+  await field(page, lang, 'password_new').fill(next);
+  await field(page, lang, 'password_confirm').fill(next);
+
+  const other = await newPage(browser, viewport, lang);
+  await other.context.route('**/events*', (route) => route.abort());
+  await signIn(other.page, passwordUrl, currentPassword);
+  await openAuthTab(other.page, narrow, lang);
+  await heading(other.page, lang).waitFor({ timeout: 5000 });
+
   let slow = null;
   if (width === 1440 && lang === 'en') {
     await context.route('**/api/auth/password', async (route) => { await new Promise((resolve) => setTimeout(resolve, 900)); await route.continue(); });
@@ -298,6 +316,9 @@ async function passwordFlow({ browser, passwordUrl, viewport, width, lang, works
   await layoutProblems(page, lang, `success (${tag})`);
   const file = readFileSync(envFile, 'utf8');
   check(`only the password line of ATOM_ENV_FILE changed (${tag})`, file === envFileText(currentPassword), file.split('\n').filter((line) => !line.startsWith('DASHBOARD')).join('|'));
+
+  await sessionLostFlow({ other, lang, narrow, tag, width, tr });
+  await other.context.close();
 
   if (width === 1440 && lang === 'ko') {
     operationRows.push(['14 누른 뒤 초점', '통과', `확인 불일치 뒤 ${afterMismatch}, 현재 비밀번호 틀림 뒤 ${afterWrong}, 성공 뒤 ${afterSuccess}에 초점이 있다`]);
@@ -360,6 +381,22 @@ async function resizeWhileTyping({ browser, passwordUrl }) {
     kept ? '1440에서 입력한 새 비밀번호 글이 360과 1440 모두에서 유지됐다'
       : `1440에서 입력한 글은 360(모바일 배치)에서 칸이 없었고 1440으로 되돌려도 칸이 닫혀 있었다. 폭에 따라 설정 창이 모달과 모바일 페이지로 갈리는 기존 구조의 동작이다. 가로 스크롤은 없었다(${overflow}px)`]);
   await context.close();
+}
+
+async function sessionLostFlow({ other, lang, narrow, tag, width, tr }) {
+  const { page } = other;
+  await heading(page, lang).scrollIntoViewIfNeeded();
+  await field(page, lang, 'password_current').fill(currentPassword);
+  await field(page, lang, 'password_new').fill('another-visual-pass');
+  await field(page, lang, 'password_confirm').fill('another-visual-pass');
+  await submitButton(page, lang).click();
+  await noticeText(page, tr.auth.password_session_lost);
+  const focused = await activeName(page);
+  check(`a session ended by a change elsewhere is told to sign in again (${tag})`, focused === tr.auth.password_submit, focused);
+  check(`the signed-out page stays on the settings (${tag})`, await heading(page, lang).isVisible());
+  await shot(page, `session-${lang}-${width}`);
+  await layoutProblems(page, lang, `session lost (${tag})`);
+  if (!narrow && lang === 'ko') operationRows.push(['14 끊긴 세션', '통과', '다른 곳에서 비밀번호를 바꿔 끊긴 세션이 보내면 「로그인이 끊겼습니다」 문구가 뜨고 입력값과 화면이 그대로다']);
 }
 
 async function checkSignInAfterChange({ browser, passwordUrl }) {

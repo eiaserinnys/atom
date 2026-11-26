@@ -10,7 +10,7 @@ type Notice = { key: string; ok: boolean } | null;
 type FocusTarget = 'current_password' | 'new_password' | 'confirm_password' | 'submit';
 
 const RESULT_FOCUS: Record<Exclude<PasswordChangeResult, 'ok'>, FocusTarget> = {
-  wrong_current: 'current_password', invalid: 'new_password', rate_limited: 'submit', save_failed: 'submit',
+  wrong_current: 'current_password', invalid: 'new_password', same: 'new_password', session_lost: 'submit', rate_limited: 'submit', save_failed: 'submit',
 };
 
 export function AdminPasswordSection() {

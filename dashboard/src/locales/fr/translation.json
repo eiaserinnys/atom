@@ -241,6 +241,8 @@
     "password_invalid": "Ce mot de passe ne peut pas être utilisé. Retirez les espaces au début ou à la fin, ou choisissez-en un autre.",
     "password_wrong_current": "Le mot de passe actuel est incorrect.",
     "password_rate_limited": "Trop de tentatives. Réessayez dans un instant.",
-    "password_save_failed": "Le mot de passe n'a pas pu être enregistré. Réessayez."
+    "password_save_failed": "Le mot de passe n'a pas pu être enregistré. Réessayez.",
+    "password_same": "Le nouveau mot de passe est identique à l'actuel. Saisissez un autre mot de passe.",
+    "password_session_lost": "Vous avez été déconnecté. Rechargez la page et reconnectez-vous."
   }
 }

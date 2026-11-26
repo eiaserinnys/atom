@@ -16,7 +16,9 @@ describe('submitPasswordChange', () => {
   });
   it.each([
     [401, { code: 'INVALID_CURRENT_PASSWORD' }, 'wrong_current'],
+    [401, { code: 'SESSION_INVALID' }, 'session_lost'],
     [401, { error: 'Unauthorized' }, 'save_failed'],
+    [400, { code: 'SAME_PASSWORD' }, 'same'],
     [429, undefined, 'rate_limited'],
     [400, { code: 'INVALID_INPUT' }, 'invalid'],
     [500, { code: 'ENV_FILE_WRITE_FAILED' }, 'save_failed'],

@@ -104,6 +104,8 @@ describe('admin password section', () => {
     ['rate_limited', 'auth.password_rate_limited', null],
     ['save_failed', 'auth.password_save_failed', null],
     ['invalid', 'auth.password_invalid', 'auth.password_new'],
+    ['same', 'auth.password_same', 'auth.password_new'],
+    ['session_lost', 'auth.password_session_lost', null],
   ] as const)('tells a %s failure without raw server text, keeps the typed values and returns focus', async (result, key, focusLabel) => {
     submitPasswordChange.mockResolvedValue(result);
     await render();

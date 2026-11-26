@@ -2,7 +2,9 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { SignJWT } from 'jose';
 import { getDb } from '../../db/client.js';
 import { ensurePasswordAdminUser, findUserById, type User } from '../../db/queries/users.js';
-import { matchesAdminPassword, passwordSessionBinding, saveAdminPassword, validateNewPassword } from '../admin-password.js';
+import {
+  UNSTORABLE_PASSWORD_MESSAGE, type PasswordSavePlan, matchesAdminPassword, passwordSessionBinding, planPasswordSave, saveAdminPassword, validateNewPassword,
+} from '../admin-password.js';
 import { resolveAuthMode } from '../auth-mode.js';
 import { verifyAccessToken } from '../access-token.js';
 import { createLoginRateLimiter } from '../login-rate-limit.js';
@@ -36,6 +38,11 @@ async function setSessionCookie(
   });
 }
 
+function failEnvFile(req: FastifyRequest, reply: FastifyReply, error: unknown) {
+  req.log.error({ code: (error as NodeJS.ErrnoException).code }, 'Could not save the admin password');
+  return reply.code(500).send({ error: 'Could not access the env file', code: 'ENV_FILE_WRITE_FAILED' });
+}
+
 export function createPasswordLoginRoutes(
   deps: PasswordLoginDeps = { ...defaultDeps, limiter: createLoginRateLimiter({ now: defaultDeps.now }) },
 ): FastifyPluginAsync {
@@ -64,7 +71,7 @@ export function createPasswordLoginRoutes(
       const token = extractAuthToken(req);
       const payload = token ? await verifyAccessToken(token) : null;
       const user = payload ? await deps.findUserById(deps.getDb(), payload.id) : null;
-      if (!user?.is_active) return reply.code(401).send({ error: 'Unauthorized' });
+      if (!user?.is_active) return reply.code(401).send({ error: 'Unauthorized', code: 'SESSION_INVALID' });
       if (user.role !== 'admin') return reply.code(403).send({ error: 'Forbidden' });
 
       const limit = deps.limiter.check(req.ip);
@@ -79,15 +86,24 @@ export function createPasswordLoginRoutes(
       }
       const invalid = validateNewPassword(next);
       if (invalid) return reply.code(400).send({ error: invalid, code: 'INVALID_INPUT' });
+      let plan: PasswordSavePlan | null;
+      try {
+        plan = planPasswordSave(next as string);
+      } catch (error) {
+        return failEnvFile(req, reply, error);
+      }
+      if (!plan) return reply.code(400).send({ error: UNSTORABLE_PASSWORD_MESSAGE, code: 'INVALID_INPUT' });
       if (!matchesAdminPassword(current)) {
         deps.limiter.recordFailure(req.ip);
         return reply.code(401).send({ error: 'Current password is incorrect', code: 'INVALID_CURRENT_PASSWORD' });
       }
+      if (matchesAdminPassword(next as string)) {
+        return reply.code(400).send({ error: 'new_password is the same as the current password', code: 'SAME_PASSWORD' });
+      }
       try {
-        saveAdminPassword(next as string);
+        saveAdminPassword(next as string, plan);
       } catch (error) {
-        req.log.error({ code: (error as NodeJS.ErrnoException).code }, 'Could not save the admin password');
-        return reply.code(500).send({ error: 'Could not write the env file', code: 'ENV_FILE_WRITE_FAILED' });
+        return failEnvFile(req, reply, error);
       }
       deps.limiter.reset(req.ip);
       closeUserEventConnections(user.id);

@@ -91,7 +91,9 @@ describe('POST /api/auth/password gates', () => {
   });
 
   it('is 401 without a session and 403 for a non-admin session', async () => {
-    expect((await change(undefined, { current_password: OLD, new_password: NEW })).statusCode).toBe(401);
+    const anonymous = await change(undefined, { current_password: OLD, new_password: NEW });
+    expect(anonymous.statusCode).toBe(401);
+    expect(anonymous.json()).toMatchObject({ code: 'SESSION_INVALID' });
     const headers = { cookie: await sessionCookie() };
     await updateUserRole(db, (await findUserByEmail(db, 'owner@local'))!.id, 'editor');
     expect((await change(headers, { current_password: OLD, new_password: NEW })).statusCode).toBe(403);
@@ -135,6 +137,72 @@ describe('POST /api/auth/password gates', () => {
     expect((await change(headers, { current_password: OLD, new_password: 'x'.repeat(256) })).statusCode).toBe(200);
     const next = { cookie: (await login('x'.repeat(256))).headers['set-cookie'] as string };
     expect((await change({ cookie: next.cookie.split(';')[0] }, { current_password: 'x'.repeat(256), new_password: '12345678' })).statusCode).toBe(200);
+  });
+});
+
+describe('a session cut off by another change', () => {
+  it('answers 401 SESSION_INVALID, which differs from a wrong current password', async () => {
+    const stale = { cookie: await sessionCookie() };
+    const other = { cookie: await sessionCookie() };
+    expect((await change(other, { current_password: OLD, new_password: NEW })).statusCode).toBe(200);
+    const response = await change(stale, { current_password: NEW, new_password: 'third-password-3' });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ code: 'SESSION_INVALID' });
+    expect(parse(fs.readFileSync(envFile, 'utf8'))['DASHBOARD_ADMIN_PASSWORD']).toBe(NEW);
+  });
+});
+
+describe('the same password as now', () => {
+  it('is 400 SAME_PASSWORD, writes nothing and keeps other sessions', async () => {
+    const headers = { cookie: await sessionCookie() };
+    const other = { cookie: await sessionCookie() };
+    const response = await change(headers, { current_password: OLD, new_password: OLD });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: expect.any(String), code: 'SAME_PASSWORD' });
+    expect(fs.readFileSync(envFile, 'utf8')).toBe(ENV_FILE_TEXT);
+    expect((await app.inject({ url: '/tree', headers: other })).statusCode).toBe(200);
+  });
+
+  it('does not reveal the password to someone who gave a wrong current password', async () => {
+    const headers = { cookie: await sessionCookie() };
+    const response = await change(headers, { current_password: 'wrong-password', new_password: OLD });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ code: 'INVALID_CURRENT_PASSWORD' });
+  });
+});
+
+describe('the env file round trip', () => {
+  const FILE_WITH_QUOTES = [
+    '# comments stay', 'JWT_SECRET=file-secret', 'DASHBOARD_ADMIN_PASSWORD=old-password-1',
+    "SINGLE=ends with a quote'", 'DOUBLE=ends with a quote"', 'BACKTICK=ends with a quote`', 'KEEP=plain value', '',
+  ].join('\n');
+
+  it.each([
+    ["starting with a single quote", "'abcdefgh"],
+    ['starting with a double quote', '"abcdefgh'],
+    ['starting with a backtick', '`abcdefgh'],
+    ['with a dollar sign', 'pa$word-$1234'],
+    ['with a backslash', 'pa\\ss\\nword-1'],
+    ['with a hash', 'pass#word-1234'],
+    ['with inner spaces', 'pass word with spaces'],
+  ])('reads back the whole file unchanged except the password: %s', async (_name, password) => {
+    fs.writeFileSync(envFile, FILE_WITH_QUOTES);
+    const before = parse(FILE_WITH_QUOTES);
+    const headers = { cookie: await sessionCookie() };
+    const response = await change(headers, { current_password: OLD, new_password: password });
+    expect(response.statusCode).toBe(200);
+    expect(parse(fs.readFileSync(envFile, 'utf8'))).toEqual({ ...before, DASHBOARD_ADMIN_PASSWORD: password });
+    expect((await login(password)).statusCode).toBe(200);
+  });
+
+  it('refuses with 400 and leaves the file alone when the password mixes all three quote kinds', async () => {
+    const text = FILE_WITH_QUOTES;
+    fs.writeFileSync(envFile, text);
+    const headers = { cookie: await sessionCookie() };
+    const response = await change(headers, { current_password: OLD, new_password: 'a#\'b"c`d-1234' });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: 'INVALID_INPUT' });
+    expect(fs.readFileSync(envFile, 'utf8')).toBe(text);
   });
 });
 
