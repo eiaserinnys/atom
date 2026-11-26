@@ -28,7 +28,7 @@ let unnamed: User;
 let inactive: User;
 
 function setMode(mode: Mode): void {
-  for (const key of ["GOOGLE_CLIENT_ID", "SLACK_CLIENT_ID", "DASHBOARD_ADMIN_PASSWORD", "AUTH_BYPASS"]) {
+  for (const key of ["GOOGLE_CLIENT_ID", "SLACK_CLIENT_ID", "DASHBOARD_ADMIN_PASSWORD", "AUTH_BYPASS", "TYPESAFE_API_KEY", "TYPESAFE_BASE_URL"]) {
     delete process.env[key];
   }
   if (mode === "oauth") process.env["GOOGLE_CLIENT_ID"] = "token-contract-client";
@@ -135,14 +135,21 @@ describe("GET /api/auth/status: tokens that are not accepted", () => {
 describe("GET /api/auth/status: accepted tokens", () => {
   it("returns the stored user for a cookie token or a Bearer token", async () => {
     const token = await tokenFor(named);
-    const expected = { status: 200, body: { authenticated: true, id: named.id, email: named.email, name: "Stored Name", role: "editor" } };
+    const expected = { status: 200, body: { authenticated: true, id: named.id, email: named.email, name: "Stored Name", role: "editor", jevConfigured: false } };
     expect(await status(cookieOf(token))).toEqual(expected);
     expect(await status(bearerOf(token))).toEqual(expected);
   });
 
+  it("reports jevConfigured true once the Jev key and address are set, and never answers it to an unauthenticated caller", async () => {
+    process.env["TYPESAFE_API_KEY"] = "token-contract-key";
+    process.env["TYPESAFE_BASE_URL"] = "https://jev.example.test";
+    expect((await status(cookieOf(await tokenFor(named)))).body.jevConfigured).toBe(true);
+    expect(await status()).toEqual({ status: 200, body: NOT_AUTHENTICATED });
+  });
+
   it("falls back to the name claim of the token when the user has no display name", async () => {
     const res = await status(cookieOf(await tokenFor(unnamed)));
-    expect(res).toEqual({ status: 200, body: { authenticated: true, id: unnamed.id, email: unnamed.email, name: "Token Name", role: "viewer" } });
+    expect(res).toEqual({ status: 200, body: { authenticated: true, id: unnamed.id, email: unnamed.email, name: "Token Name", role: "viewer", jevConfigured: false } });
   });
 
   it("accepts a token without a type claim and a token typed access", async () => {
@@ -177,7 +184,7 @@ describe("GET /api/auth/status: auth modes", () => {
 
   it("answers the virtual admin in bypass mode with or without a token", async () => {
     setMode("bypass");
-    const admin = { status: 200, body: { authenticated: true, id: "bypass", email: "bypass@local", name: "Bypass Admin", role: "admin" } };
+    const admin = { status: 200, body: { authenticated: true, id: "bypass", email: "bypass@local", name: "Bypass Admin", role: "admin", jevConfigured: false } };
     expect(await status()).toEqual(admin);
     expect(await status(bearerOf("garbage"))).toEqual(admin);
   });

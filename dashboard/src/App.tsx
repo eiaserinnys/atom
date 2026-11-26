@@ -50,6 +50,7 @@ function AppInner() {
     if (verdict?.sample && !nextVerdict) setSelectedNodeId(null);
   }, [verdict]);
   const isMobile = useMobile();
+  const visualSearch = auth.jevConfigured !== false;
   const handleSelectNode = useCallback((nodeId: string | null) => {
     setSelectedNodeId(nodeId); setSelectionVerdict(null);
     const url = new URL(location.href); url.hash = nodeId ?? '';
@@ -76,7 +77,7 @@ function AppInner() {
     <RestartBanner /><ReconnectOverlay />
     <header className="index-header">
       <div className="index-brand" style={{ width: isMobile ? undefined : widths?.leftPx ?? '25%' }}>atom</div>
-      {!isMobile ? <div className="index-search" data-header-search><SearchBar currentNodeId={actualNodeId} onSelectNode={handleSelectNode} onSubmitJevSearch={submitSearch} /></div> : <div className="flex-1" />}
+      {!isMobile ? <div className="index-search" data-header-search><SearchBar currentNodeId={actualNodeId} onSelectNode={handleSelectNode} onSubmitJevSearch={visualSearch ? submitSearch : undefined} initialQuery={visualSearch ? undefined : request?.query} /></div> : <div className="flex-1" />}
       <div className="index-actions" style={{ width: isMobile ? undefined : widths?.rightPx ?? '30%' }}>
         {!isMobile && showConfigButton && <button className="index-action w-8 h-8 !p-0 text-muted-foreground hover:text-foreground transition-colors shrink-0" onClick={() => setIsConfigOpen(true)} aria-label={t('app.settings')}>
           <Settings className="w-4 h-4" strokeWidth={1.75} />
@@ -86,10 +87,10 @@ function AppInner() {
     </header>
     {!isMobile && showConfigButton && <ConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} />}
     <main className="flex-1 min-h-0 overflow-hidden">
-      {isMobile ? <MobileLayout explorationState={explorationState} selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onSubmitSearch={submitSearch} onResults={handleSearchResults} revealRequest={revealRequest} onOpenInTree={openSearchNodeInTree} /> :
+      {isMobile ? <MobileLayout explorationState={explorationState} selectedNodeId={actualNodeId} onSelectNode={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} request={request} searchResults={searchResults} verdict={verdict} onSearchSelect={selectSearchNode} onSubmitSearch={submitSearch} onResults={handleSearchResults} revealRequest={revealRequest} onOpenInTree={openSearchNodeInTree} visualSearch={visualSearch} /> :
         <ThreePanelLayout onLayoutWidthsChange={setWidths}
           left={<TreeView selectedNodeId={actualNodeId} onSelect={handleSelectNode} initialSelectedNodeId={initialSelectedNodeId} searchResults={searchResults} showLogout={auth.id !== BYPASS_USER_ID} revealRequest={revealRequest} />}
-          center={<CenterWorkspace explorationState={explorationState} nodeId={actualNodeId} mode={centerMode} onModeChange={setCenterMode} request={request} onSelectNode={selectSearchNode} onResults={handleSearchResults} onOpenInTree={openSearchNodeInTree} />}
+          center={<CenterWorkspace explorationState={explorationState} nodeId={actualNodeId} mode={centerMode} onModeChange={setCenterMode} request={request} onSelectNode={selectSearchNode} onResults={handleSearchResults} onOpenInTree={openSearchNodeInTree} visualSearch={visualSearch} />}
           right={<CardDetail nodeId={actualNodeId} verdict={verdict} />} />}
     </main>
   </div></SystemProvider>;

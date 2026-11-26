@@ -21,6 +21,8 @@ export function restoreAuthEnv() {
   delete process.env["FRONTEND_URL"];
   delete process.env["SEARCH_MOTION_PAGE_URL"];
   delete process.env["ALLOWED_EMAIL"];
+  delete process.env["TYPESAFE_API_KEY"];
+  delete process.env["TYPESAFE_BASE_URL"];
   process.env["JWT_SECRET"] = "test-secret-for-auth-route-safety";
 }
 

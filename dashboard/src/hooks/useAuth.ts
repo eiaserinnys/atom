@@ -1,17 +1,13 @@
 import { useState, useEffect } from 'react';
 import { api, type UserRole } from '../api/client';
+import type { AuthStatus as ServerAuthStatus } from '../api/types';
 
 export type { UserRole };
 
 export const BYPASS_USER_ID = 'bypass';
 
-export interface AuthStatus {
+export interface AuthStatus extends ServerAuthStatus {
   loading: boolean;
-  authenticated: boolean;
-  id?: string;
-  email?: string;
-  name?: string;
-  role?: UserRole;
 }
 
 export function useAuth(): AuthStatus {

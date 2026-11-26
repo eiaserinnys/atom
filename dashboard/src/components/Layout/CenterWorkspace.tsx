@@ -14,20 +14,22 @@ interface Props {
   onSelectNode(nodeId: string | null, verdict: MotionNode | null): void;
   onResults(nodes: MotionNode[]): void;
   onOpenInTree?(nodeId: string): void;
+  visualSearch?: boolean;
 }
-export function CenterWorkspace({ nodeId, mode, onModeChange, request, onSelectNode, onResults, onOpenInTree, explorationState }: Props) {
-  const [searchVisited, setSearchVisited] = useState(mode === 'search');
-  if (mode === 'search' && !searchVisited) setSearchVisited(true);
-  const tabs = <CenterTabs mode={mode} onChange={onModeChange} />;
+export function CenterWorkspace({ nodeId, mode, onModeChange, request, onSelectNode, onResults, onOpenInTree, explorationState, visualSearch = true }: Props) {
+  const activeMode = visualSearch ? mode : 'compile';
+  const [searchVisited, setSearchVisited] = useState(activeMode === 'search');
+  if (activeMode === 'search' && !searchVisited) setSearchVisited(true);
+  const tabs = <CenterTabs mode={activeMode} onChange={onModeChange} visualSearch={visualSearch} />;
   return <div className="h-full min-h-0 flex flex-col">
-    <div className="h-full min-h-0" hidden={mode !== 'compile'}>
+    <div className="h-full min-h-0" hidden={activeMode !== 'compile'}>
       <CompileView nodeId={nodeId} headerTabs={tabs} />
     </div>
-    <div className="h-full min-h-0 flex flex-col" hidden={mode !== 'search'}>
+    {visualSearch && <div className="h-full min-h-0 flex flex-col" hidden={activeMode !== 'search'}>
       <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-card shrink-0">
         {tabs}
       </div>
       <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView explorationState={explorationState} request={request} onSelectNode={onSelectNode} onResults={onResults} onOpenInTree={onOpenInTree} />}</div>
-    </div>
+    </div>}
   </div>;
 }

@@ -17,6 +17,8 @@ function resetAuthEnvironment() {
     "SLACK_CLIENT_SECRET",
     "SLACK_CALLBACK_URL",
     "SEARCH_MOTION_PAGE_URL",
+    "TYPESAFE_API_KEY",
+    "TYPESAFE_BASE_URL",
   ]) {
     delete process.env[key];
   }
@@ -67,6 +69,7 @@ describe("browser authentication policy", () => {
       email: "bypass@local",
       name: "Bypass Admin",
       role: "admin",
+      jevConfigured: false,
     });
     await app.close();
   });
