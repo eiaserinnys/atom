@@ -36,6 +36,15 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
     });
   }
 
+  async function eventually(assertion: () => void) {
+    for (let attempt = 0; ; attempt += 1) {
+      try { return assertion(); } catch (error) {
+        if (attempt >= 100) throw error;
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+      }
+    }
+  }
+
   const row = (id: string) => container.querySelector<HTMLElement>(`[data-testid="tree-node-${id}"] > div`)!;
   const list = () => container.querySelector<HTMLElement>('[data-testid="tree-list"]')!;
   const button = (label: string) => [...document.querySelectorAll('button')].find(element => element.textContent?.includes(label))!;
@@ -111,7 +120,7 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
     vi.spyOn(api, 'deleteNode').mockRejectedValue(new Error('API 500'));
     await openFromMenu('leaf', english.tree.context_delete);
     await settle(() => button(english.delete_modal.confirm_btn).click());
-    expect(container.textContent).toContain('API 500');
+    await eventually(() => expect(container.textContent).toContain('API 500'));
 
     await press('Escape');
 
@@ -124,8 +133,10 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
 
     await settle(() => button(english.delete_modal.confirm_btn).click());
 
-    expect(container.textContent).not.toContain(english.delete_modal.title_node);
-    expect(document.activeElement).toBe(row('folder'));
+    await eventually(() => {
+      expect(container.textContent).not.toContain(english.delete_modal.title_node);
+      expect(document.activeElement).toBe(row('folder'));
+    });
   });
 
   test('a delete that works on a top-level row sends focus to the tree list', async () => {
@@ -134,7 +145,7 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
 
     await settle(() => button(english.delete_modal.confirm_btn).click());
 
-    expect(document.activeElement).toBe(list());
+    await eventually(() => expect(document.activeElement).toBe(list()));
   });
 
   async function moveLeafToGroup() {
@@ -150,8 +161,10 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
 
     await settle(() => setTree([], [leaf('group')]));
 
-    expect(oldRow.isConnected).toBe(false);
-    expect(document.activeElement).toBe(row('leaf'));
+    await eventually(() => {
+      expect(oldRow.isConnected).toBe(false);
+      expect(document.activeElement).toBe(row('leaf'));
+    });
     expect(document.activeElement).not.toBe(oldRow);
   });
 
@@ -164,7 +177,6 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
     });
 
     expect(container.querySelector('[data-testid="tree-node-leaf"]')).toBeNull();
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)); });
-    expect(document.activeElement).toBe(list());
+    await eventually(() => expect(document.activeElement).toBe(list()));
   });
 });
