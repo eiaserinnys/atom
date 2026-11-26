@@ -10,7 +10,7 @@ vi.mock('./hooks/useAuth', () => ({ useAuth: () => ({ authenticated: true, role:
 vi.mock('./hooks/useMobile', () => ({ useMobile: () => false }));
 vi.mock('./hooks/useTheme', () => ({ useTheme: () => ({ theme: 'dark', toggle: vi.fn() }) }));
 vi.mock('./hooks/useAtomEvents', () => ({ useAtomEvents() {} }));
-vi.mock('./contexts/SystemContext', () => ({ SystemProvider: ({ children }: { children: ReactNode }) => children }));
+vi.mock('./contexts/SystemProvider', () => ({ SystemProvider: ({ children }: { children: ReactNode }) => children }));
 vi.mock('./components/RestartBanner', () => ({ RestartBanner: () => null }));
 vi.mock('./components/ReconnectOverlay', () => ({ ReconnectOverlay: () => null }));
 vi.mock('./components/Config/ConfigModal', () => ({ ConfigModal: () => null }));

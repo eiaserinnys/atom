@@ -18,7 +18,7 @@ import { ReconnectOverlay } from './components/ReconnectOverlay';
 import { useAuth } from './hooks/useAuth';
 import { useAtomEvents } from './hooks/useAtomEvents';
 import { useMobile } from './hooks/useMobile';
-import { SystemProvider } from './contexts/SystemContext';
+import { SystemProvider } from './contexts/SystemProvider';
 import { LoginPage } from './pages/LoginPage';
 import type { MotionNode } from './components/SearchMotionView/types';
 import type { SearchRequest } from './components/SearchMotionView/stream';
