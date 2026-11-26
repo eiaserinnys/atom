@@ -17,7 +17,7 @@
 
 import path from "path";
 import { fileURLToPath } from "url";
-import { setPool, closePool, runMigrations } from "../../src/db/client.js";
+import { setDb, closeDb, runMigrations } from "../../src/db/client.js";
 import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import { insertNode, selectChildren } from "../../src/db/queries/tree.js";
 import { insertCard } from "../../src/db/queries/cards.js";
@@ -38,12 +38,12 @@ beforeAll(async () => {
     throw new Error(`TEST_DATABASE_URL must contain 'test'. Got: ${databaseUrl}`);
   }
   pool = new PostgresAdapter(databaseUrl);
-  setPool(pool);
+  setDb(pool);
   await runMigrations(MIGRATIONS_DIR);
 }, 30000);
 
 afterAll(async () => {
-  await closePool();
+  await closeDb();
 }, 10000);
 
 afterEach(async () => {

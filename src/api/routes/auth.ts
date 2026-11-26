@@ -16,7 +16,6 @@ import {
   getSearchMotionPageUrl,
   getProviderAvailability,
   getStateCookieOptions,
-  isAllowedAccessJwtPayload,
   isLoopbackRedirectUri,
   isAtomSearchMotionState,
   issueAuthorizationCode,
@@ -24,6 +23,7 @@ import {
   extractAuthToken,
 } from './auth_helpers.js';
 import { isAuthBypassEnabled, resolveAuthMode } from '../auth-mode.js';
+import { verifyAccessToken } from '../access-token.js';
 import type { AuthCallbackDeps } from './auth_callback_handlers.js';
 import { handleGoogleCallback, handleSlackCallback } from './auth_callback_handlers.js';
 
@@ -89,7 +89,7 @@ function buildOAuthRefreshToken(userId: string, clientId: string, jwtSecret: Uin
     .sign(jwtSecret);
 }
 
-async function getAuthorizationUser(req: FastifyRequest, deps: AuthRoutesDeps, jwtSecret: Uint8Array): Promise<User | null> {
+async function getAuthorizationUser(req: FastifyRequest, deps: AuthRoutesDeps): Promise<User | null> {
   if (isAuthBypassEnabled()) {
     return {
       id: 'bypass',
@@ -104,9 +104,9 @@ async function getAuthorizationUser(req: FastifyRequest, deps: AuthRoutesDeps, j
   const token = req.cookies?.[JWT_COOKIE_NAME];
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, jwtSecret);
-    if (!isAllowedAccessJwtPayload(payload) || typeof payload['id'] !== 'string') return null;
-    const user = await deps.findUserById(deps.getDb(), payload['id']);
+    const payload = await verifyAccessToken(token);
+    if (!payload) return null;
+    const user = await deps.findUserById(deps.getDb(), payload.id);
     return user?.is_active ? user : null;
   } catch {
     return null;
@@ -220,7 +220,7 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
           return reply.redirect(oauthErrorRedirect(redirectUri, 'invalid_request', state));
         }
 
-        const user = await getAuthorizationUser(req, deps, jwtSecret);
+        const user = await getAuthorizationUser(req, deps);
         if (user) {
           const code = await issueAuthorizationCode({
             userId: user.id,
@@ -496,13 +496,9 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
       }
 
       try {
-        const { payload } = await jwtVerify(token, jwtSecret);
-        if (!isAllowedAccessJwtPayload(payload)) {
-          return reply.send({ authenticated: false });
-        }
-        const userId = payload['id'];
-        const user = typeof userId === 'string' ? await deps.findUserById(deps.getDb(), userId) : null;
-        if (!user?.is_active) {
+        const payload = await verifyAccessToken(token);
+        const user = payload ? await deps.findUserById(deps.getDb(), payload.id) : null;
+        if (!payload || !user?.is_active) {
           return reply.send({ authenticated: false });
         }
         return reply.send({

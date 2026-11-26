@@ -13,7 +13,7 @@ import {
   setupRelativePositionIntegrationTest,
 } from "./relative-position-fixtures.js";
 
-const getPool = setupRelativePositionIntegrationTest();
+const getDb = setupRelativePositionIntegrationTest();
 
 describe("move_node — relative positioning", () => {
   it("before: places node before a sibling", async () => {
@@ -26,7 +26,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([c, a, b]);
   });
 
@@ -40,7 +40,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([b, a, c]);
   });
 
@@ -54,7 +54,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([c, a, b]);
   });
 
@@ -68,7 +68,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([b, c, a]);
   });
 
@@ -82,7 +82,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([a, b, c]);
     expect(children.find((n) => n.id === b)!.position).toBe(moved!.position);
   });
@@ -91,7 +91,7 @@ describe("move_node — relative positioning", () => {
     const { parentNodeId, childNodeIds } = await createParentWithChildren(1, 250);
     const [only] = childNodeIds;
 
-    const beforeMove = await selectChildren(getPool(), parentNodeId);
+    const beforeMove = await selectChildren(getDb(), parentNodeId);
     expect(beforeMove.map((n) => n.id)).toEqual([only]);
     expect(beforeMove[0].position).toBe(250);
 
@@ -101,7 +101,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([only]);
     expect(moved!.position).toBe(250);
     expect(children[0].position).toBe(250);
@@ -117,7 +117,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([a, b, c]);
     expect(children.find((n) => n.id === b)!.position).toBe(moved!.position);
   });
@@ -126,7 +126,7 @@ describe("move_node — relative positioning", () => {
     const { parentNodeId, childNodeIds } = await createParentWithChildren(1, 250);
     const [only] = childNodeIds;
 
-    const beforeMove = await selectChildren(getPool(), parentNodeId);
+    const beforeMove = await selectChildren(getDb(), parentNodeId);
     expect(beforeMove.map((n) => n.id)).toEqual([only]);
     expect(beforeMove[0].position).toBe(250);
 
@@ -136,7 +136,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([only]);
     expect(moved!.position).toBe(250);
     expect(children[0].position).toBe(250);
@@ -170,7 +170,7 @@ describe("move_node — relative positioning", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children[0].id).toBe(moverNodeId);
     expect(children.some((child) => child.id === firstNodeId)).toBe(true);
     for (const child of children) {
@@ -189,7 +189,7 @@ describe("move_node — parent keep-current (f995e015 fix)", () => {
     expect(moved).not.toBeNull();
     expect(moved!.parent_node_id).toBe(parentNodeId);
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([b, c, a]);
   });
 
@@ -201,7 +201,7 @@ describe("move_node — parent keep-current (f995e015 fix)", () => {
       moves: [{ node_id: a, new_position: 300 }],
     });
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.some((n) => n.id === a)).toBe(true);
     const aNode = children.find((n) => n.id === a)!;
     expect(aNode.parent_node_id).toBe(parentNodeId);
@@ -217,7 +217,7 @@ describe("move_node — parent keep-current (f995e015 fix)", () => {
       })),
     });
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children).toHaveLength(5);
     for (const child of children) {
       expect(child.parent_node_id).toBe(parentNodeId);
@@ -235,7 +235,7 @@ describe("move_node — parent keep-current (f995e015 fix)", () => {
     expect(moved).not.toBeNull();
     expect(moved!.parent_node_id).toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children).toHaveLength(0);
   });
 });

@@ -10,7 +10,7 @@ import * as treeService from "../../src/services/tree.service.js";
 import { selectChildren } from "../../src/db/queries/tree.js";
 import { setupRelativePositionIntegrationTest } from "./relative-position-fixtures.js";
 
-const getPool = setupRelativePositionIntegrationTest();
+const getDb = setupRelativePositionIntegrationTest();
 
 describe("rekey on adjacent positions", () => {
   it("inserts between adjacent siblings by rekeying", async () => {
@@ -48,7 +48,7 @@ describe("rekey on adjacent positions", () => {
     });
     expect(moved).not.toBeNull();
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([aNodeId, moverNodeId, bNodeId]);
     for (const child of children) {
       expect(Number.isInteger(child.position)).toBe(true);

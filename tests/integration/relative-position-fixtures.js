@@ -1,6 +1,6 @@
 import path from "path";
 import { fileURLToPath } from "url";
-import { setPool, closePool, runMigrations } from "../../src/db/client.js";
+import { setDb, closeDb, runMigrations } from "../../src/db/client.js";
 import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 import { executeBatchOp } from "../../src/services/batch.service.js";
 
@@ -10,7 +10,7 @@ const MIGRATIONS_DIR = path.resolve(__dirname, "../../src/db/migrations");
 export function setupRelativePositionIntegrationTest() {
   let pool = null;
 
-  const getPool = () => {
+  const getDb = () => {
     if (!pool) {
       throw new Error("Postgres test pool has not been initialized");
     }
@@ -29,20 +29,20 @@ export function setupRelativePositionIntegrationTest() {
       throw new Error("TEST_DATABASE_URL must contain 'test'. Got: " + databaseUrl);
     }
     pool = new PostgresAdapter(databaseUrl);
-    setPool(pool);
+    setDb(pool);
     await runMigrations(MIGRATIONS_DIR);
   }, 30000);
 
   afterAll(async () => {
-    await closePool();
+    await closeDb();
   }, 10000);
 
   afterEach(async () => {
-    await getPool().query("DELETE FROM tree_nodes");
-    await getPool().query("DELETE FROM cards");
+    await getDb().query("DELETE FROM tree_nodes");
+    await getDb().query("DELETE FROM cards");
   });
 
-  return getPool;
+  return getDb;
 }
 
 export async function createParentWithChildren(childCount, spacing = 100) {

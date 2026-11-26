@@ -5,9 +5,8 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { getDb } from "../db/client.js";
 import { findActiveAgents, type Agent } from "../db/queries/agents.js";
 import { findUserById } from "../db/queries/users.js";
-import { jwtVerify } from "jose";
 import { isAuthBypassEnabled } from "./auth-mode.js";
-import { isAllowedAccessJwtPayload } from "./routes/auth_helpers.js";
+import { toJwtUser, verifyAccessToken } from "./access-token.js";
 
 /**
  * Agent key (x-api-key) verification with a per-process cache of keys that
@@ -99,17 +98,10 @@ export async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyRepl
       : undefined;
     if (!token) return reply.code(401).send({ error: "x-api-key header required" });
 
-    let payload;
-    try {
-      ({ payload } = await jwtVerify(token, new TextEncoder().encode(process.env["JWT_SECRET"]!)));
-    } catch {
-      return reply.code(401).send({ error: "Unauthorized" });
-    }
-    if (!isAllowedAccessJwtPayload(payload) || typeof payload["id"] !== "string") {
-      return reply.code(401).send({ error: "Unauthorized" });
-    }
+    const payload = await verifyAccessToken(token);
+    if (!payload) return reply.code(401).send({ error: "Unauthorized" });
 
-    const user = payload["id"] === "bypass" && isAuthBypassEnabled()
+    const user = payload.id === "bypass" && isAuthBypassEnabled()
       ? {
           id: "bypass",
           email: "bypass@local",
@@ -117,15 +109,10 @@ export async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyRepl
           role: "admin" as const,
           is_active: true,
         }
-      : await findUserById(getDb(), payload["id"]);
+      : await findUserById(getDb(), payload.id);
     if (!user?.is_active) return reply.code(401).send({ error: "Unauthorized" });
 
-    req.jwtUser = {
-      id: user.id,
-      email: user.email,
-      name: user.display_name ?? (typeof payload["name"] === "string" ? payload["name"] : ""),
-      role: user.role,
-    };
+    req.jwtUser = toJwtUser(user, payload);
     req.agentScope = user.role === "admin" || user.role === "editor" ? "write" : "read";
     return;
   }

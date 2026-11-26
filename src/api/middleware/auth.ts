@@ -1,11 +1,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { jwtVerify, type JWTPayload } from 'jose';
-import type { UserRole } from '../../shared/types.js';
 import { resolveAuthMode } from '../auth-mode.js';
 import { isReservedBackendPath } from '../static-dashboard.js';
 import { getDb } from '../../db/client.js';
 import { findUserById } from '../../db/queries/users.js';
-import { extractAuthToken, isAllowedAccessJwtPayload } from '../routes/auth_helpers.js';
+import { extractAuthToken } from '../routes/auth_helpers.js';
+import { toJwtUser, verifyAccessToken } from '../access-token.js';
 
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const READ_ONLY_POST_ROUTES = [
@@ -15,16 +14,6 @@ const READ_ONLY_POST_ROUTES = [
   '/search/evaluate',
   '/search/expand',
 ];
-
-// Module-level lazy init to avoid re-creating on every request
-let _jwtSecret: Uint8Array | null = null;
-
-function getJwtSecret(): Uint8Array {
-  if (!_jwtSecret) {
-    _jwtSecret = new TextEncoder().encode(process.env['JWT_SECRET']!);
-  }
-  return _jwtSecret;
-}
 
 /**
  * Fastify preHandler hook — enforces JWT authentication.
@@ -69,35 +58,18 @@ export async function authMiddleware(
     return;
   }
 
-  let payload: JWTPayload;
-  try {
-    ({ payload } = await jwtVerify(token, getJwtSecret()));
-  } catch {
+  const payload = await verifyAccessToken(token);
+  if (!payload) {
     reply.code(401).send({ error: 'Invalid token' });
     return;
   }
 
-  if (!isAllowedAccessJwtPayload(payload)) {
-    reply.code(401).send({ error: 'Invalid token' });
-    return;
-  }
-
-  const userId = payload['id'];
-  if (typeof userId !== 'string') {
-    reply.code(401).send({ error: 'Invalid token' });
-    return;
-  }
-  const user = await findUserById(getDb(), userId);
+  const user = await findUserById(getDb(), payload.id);
   if (!user || !user.is_active) {
     reply.code(401).send({ error: 'Unauthorized' });
     return;
   }
-  req.jwtUser = {
-    id: user.id,
-    email: user.email,
-    name: user.display_name ?? (typeof payload['name'] === 'string' ? payload['name'] : ''),
-    role: user.role as UserRole,
-  };
+  req.jwtUser = toJwtUser(user, payload);
 
   if (
     user.role === 'viewer' &&

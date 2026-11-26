@@ -11,7 +11,7 @@ import {
   setupRelativePositionIntegrationTest,
 } from "./relative-position-fixtures.js";
 
-const getPool = setupRelativePositionIntegrationTest();
+const getDb = setupRelativePositionIntegrationTest();
 
 describe("batch_op — child_orders", () => {
   it("reorders children", async () => {
@@ -22,7 +22,7 @@ describe("batch_op — child_orders", () => {
       child_orders: [{ parent_node_id: parentNodeId, order: [d, c, b, a] }],
     });
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([d, c, b, a]);
   });
 
@@ -40,10 +40,10 @@ describe("batch_op — child_orders", () => {
       child_orders: [{ parent_node_id: p1, order: [a, c, b] }],
     });
 
-    const childrenP1 = await selectChildren(getPool(), p1);
+    const childrenP1 = await selectChildren(getDb(), p1);
     expect(childrenP1.map((n) => n.id)).toEqual([a, c, b]);
 
-    const childrenP2 = await selectChildren(getPool(), p2);
+    const childrenP2 = await selectChildren(getDb(), p2);
     expect(childrenP2.some((n) => n.id === c)).toBe(false);
   });
 
@@ -56,7 +56,7 @@ describe("batch_op — child_orders", () => {
       child_orders: [{ parent_node_id: parentNodeId, order: [c, b, a] }],
     });
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([c, b, a]);
   });
 
@@ -95,7 +95,7 @@ describe("batch_op — moves with before/after/to", () => {
       moves: [{ node_id: c, new_parent_node_id: parentNodeId, before: a }],
     });
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children.map((n) => n.id)).toEqual([c, a, b]);
   });
 
@@ -107,7 +107,7 @@ describe("batch_op — moves with before/after/to", () => {
       moves: [{ node_id: c, new_parent_node_id: parentNodeId, to: "start" }],
     });
 
-    const children = await selectChildren(getPool(), parentNodeId);
+    const children = await selectChildren(getDb(), parentNodeId);
     expect(children[0].id).toBe(c);
   });
 

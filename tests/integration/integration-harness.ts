@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { closePool, runMigrations, setPool } from "../../src/db/client.js";
+import { closeDb, runMigrations, setDb } from "../../src/db/client.js";
 import { PostgresAdapter } from "../../src/db/adapters/postgres.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -66,7 +66,7 @@ export function setupIntegrationTestDb(): void {
     assertSafeTestDatabaseUrl(databaseUrl);
 
     pool = new PostgresAdapter(databaseUrl);
-    setPool(pool);
+    setDb(pool);
     await runMigrations(MIGRATIONS_DIR);
   }, 30000);
 
@@ -82,7 +82,7 @@ export function setupIntegrationTestDb(): void {
   });
 
   afterAll(async () => {
-    await closePool();
+    await closeDb();
     pool = null;
   }, 10000);
 }
