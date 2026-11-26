@@ -1,7 +1,9 @@
+import { useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { AlertTriangle } from 'lucide-react';
 import { Spinner } from '../Spinner';
+import { useDialogKeyboard } from '../../hooks/useDialogKeyboard';
 
 export type DeletePreviewState =
   | { status: 'loading' }
@@ -53,18 +55,24 @@ export function DeleteConfirmModal({
   const isChecking = !isSymlink && preview?.status === 'loading';
   const notice = isSymlink ? null : renderPermanentNotice(preview, t);
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Escape') onClose();
-  }
+  const titleId = useId();
+  const frameRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useDialogKeyboard({ frameRef, initialFocusRef: cancelRef, onClose, isBusy: isLoading });
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70"
-      onKeyDown={handleKeyDown}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !isLoading) onClose(); }}
     >
-      <div className="bg-card border border-border rounded-none shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4 [&:lang(ko)]:break-keep [overflow-wrap:anywhere]">
-        <h2 className="text-base font-semibold text-foreground">{t(isSymlink ? 'delete_modal.title_link' : 'delete_modal.title_node')}</h2>
+      <div
+        ref={frameRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-card border border-border rounded-none shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4 [&:lang(ko)]:break-keep [overflow-wrap:anywhere]"
+      >
+        <h2 id={titleId} className="text-base font-semibold text-foreground">{t(isSymlink ? 'delete_modal.title_link' : 'delete_modal.title_node')}</h2>
 
         <div className="text-sm text-foreground">
           {t(isSymlink ? 'delete_modal.body_link' : 'delete_modal.body_node', { name: title })}
@@ -78,6 +86,7 @@ export function DeleteConfirmModal({
 
         <div className="flex justify-end gap-2">
           <button
+            ref={cancelRef}
             onClick={onClose}
             className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-none hover:bg-muted transition-colors"
             disabled={isLoading}

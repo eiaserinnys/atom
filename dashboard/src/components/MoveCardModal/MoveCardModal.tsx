@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Folder } from 'lucide-react';
 import { type TreeNodeData } from '../../api/client';
 import { PanelState } from '../PanelState';
 import { Spinner } from '../Spinner';
+import { useDialogKeyboard } from '../../hooks/useDialogKeyboard';
 import { fetchFullStructureTree } from '../../api/treeQueries';
 import { structureTreeQueryKey } from '../../query/queryKeys';
 
@@ -87,18 +88,24 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
 
   const structureRoots = roots ?? [];
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Escape') onClose();
-  }
+  const titleId = useId();
+  const frameRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useDialogKeyboard({ frameRef, initialFocusRef: cancelRef, onClose, isBusy: isLoading });
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70"
-      onKeyDown={handleKeyDown}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !isLoading) onClose(); }}
     >
-      <div className="bg-card border border-border rounded-none shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4 max-h-[70vh]">
-        <h2 className="text-base font-semibold text-foreground">{t('move_modal.title')}</h2>
+      <div
+        ref={frameRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-card border border-border rounded-none shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4 max-h-[70vh]"
+      >
+        <h2 id={titleId} className="text-base font-semibold text-foreground">{t('move_modal.title')}</h2>
 
         <p className="text-[13px] text-muted-foreground">{t('move_modal.select_hint')}</p>
 
@@ -122,6 +129,7 @@ export function MoveCardModal({ nodeToMove, onConfirm, onClose, isLoading = fals
 
         <div className="flex justify-end gap-2">
           <button
+            ref={cancelRef}
             onClick={onClose}
             disabled={isLoading}
             className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-none hover:bg-muted transition-colors"

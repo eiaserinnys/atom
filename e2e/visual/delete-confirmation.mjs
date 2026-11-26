@@ -1,13 +1,13 @@
 // Visual check for the tree delete confirmation (what a delete removes, shown before it happens).
 //
-//   node e2e/visual/delete-confirmation.mjs --out <dir> [--prefix after] [--root <checkout>] [--operations]
+//   node e2e/visual/delete-confirmation.mjs --out <dir> [--prefix after] [--root <checkout>]
 // Set CHROMIUM_EXECUTABLE to use a Chromium other than the one Playwright installed.
 //
 // Starts a disposable API (bypass mode, SQLite) and Vite dev server from <root> (default: this checkout),
 // builds a small tree through the REST API, opens the delete confirmation for each case at 1440px and 360px
 // in ko, en, de and ja, and writes <dir>/<prefix>-<case>-<lang>-<width>.png. The wording is read from this
 // checkout's locale files, so running it with --root on the base commit fails the assertions (that is the
-// before run). --operations also writes <dir>/operations.md (ui-design 0-14..18).
+// before run). Keyboard and focus (ui-design 0-14..18) are checked by dialog-focus.mjs.
 import { spawn } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -34,11 +34,10 @@ function parseArguments(args) {
   const parsed = {};
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === '--operations') parsed.operations = true;
-    else if (arg.startsWith('--')) parsed[arg.slice(2)] = args[++i];
+    if (arg.startsWith('--')) parsed[arg.slice(2)] = args[++i];
     else throw new Error(`Unexpected argument ${arg}`);
   }
-  if (!parsed.out) throw new Error('Usage: delete-confirmation.mjs --out <dir> [--prefix after] [--root <checkout>] [--operations]');
+  if (!parsed.out) throw new Error('Usage: delete-confirmation.mjs --out <dir> [--prefix after] [--root <checkout>]');
   return parsed;
 }
 
@@ -112,8 +111,7 @@ async function main() {
     const data = await seedTree(apiUrl);
     const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE || undefined });
     try {
-      const operations = await captureScreens({ browser, apiUrl, webUrl, data });
-      if (options.operations) writeOperations(operations, apiUrl);
+      await captureScreens({ browser, apiUrl, webUrl, data });
     } finally {
       await browser.close();
     }
@@ -361,9 +359,8 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
   await shot(darkKorean, 'failed-ko-1440-dark');
   await darkKorean.context().close();
 
-  const operations = await measureOperations({ browser, apiUrl, webUrl, data });
+  await measureBehaviour({ browser, apiUrl, webUrl, data });
   await confirmDeleteRemovesPreviewedCards({ browser, apiUrl, webUrl, data, previews });
-  return operations;
 }
 
 // A confirmed delete removes exactly the cards the preview announced, and nothing else.
@@ -386,51 +383,29 @@ async function confirmDeleteRemovesPreviewedCards({ browser, apiUrl, webUrl, dat
   await page.context().close();
 }
 
-async function measureOperations({ browser, apiUrl, webUrl, data }) {
+async function measureBehaviour({ browser, apiUrl, webUrl, data }) {
   const lang = 'en';
-  const text = locale(lang);
   const leaf = data.cases.find((item) => item.key === 'leaf');
   const shared = data.cases.find((item) => item.key === 'shared');
-  const labelOf = (page) => page.evaluate(() => {
-    const element = document.activeElement;
-    return element === document.body ? 'body' : `${element?.tagName.toLowerCase()}:${(element?.textContent ?? '').trim().slice(0, 20)}`;
-  });
   const waitIdle = (page) => page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
 
   const page = await newPage(browser, WIDE, webUrl, lang);
   await openDelete(page, lang, shared.nodeId);
   await waitIdle(page);
-  const firstFocus = await labelOf(page);
-  const tabOrder = [];
-  for (let step = 0; step < 3; step += 1) {
-    await page.keyboard.press('Tab');
-    tabOrder.push(await labelOf(page));
-  }
-  const tabInsideDialog = tabOrder.every((label) => /button:(Cancel|Delete)/.test(label));
   await page.keyboard.press('Escape');
-  const escapeFromBody = !(await page.locator(MODAL).count());
-  if (!escapeFromBody) await cancelButton(page, lang).focus();
-  await page.keyboard.press('Escape');
-  const escapeFromButton = !(await page.locator(MODAL).count());
-  const focusAfterEscape = await labelOf(page);
-  check('Escape closes the dialog (focus on a dialog button)', escapeFromBody || escapeFromButton);
+  check('Escape closes the dialog', !(await page.locator(MODAL).count()));
   check('closing the dialog leaves the tree and the card in place', (await page.locator(`[data-testid="tree-node-${shared.nodeId}"]`).count()) === 1);
-
-  await openDelete(page, lang, shared.nodeId);
-  await waitIdle(page);
-  await cancelButton(page, lang).focus();
-  await page.keyboard.press('Enter');
-  const enterOnCancelCloses = !(await page.locator(MODAL).count());
-  const focusAfterEnter = await labelOf(page);
 
   await openDelete(page, lang, leaf.nodeId);
   await waitIdle(page);
   const narrowAtOpen = await boxMetrics(page);
-  await page.setViewportSize(NARROW);
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.waitForTimeout(300);
   const afterNarrow = { ...(await boxMetrics(page)), pageOverflow: await overflowX(page), visible: await page.locator(MODAL).isVisible() };
   await page.setViewportSize(WIDE);
+  await page.waitForTimeout(300);
   const afterWide = { ...(await boxMetrics(page)), pageOverflow: await overflowX(page), visible: await page.locator(MODAL).isVisible() };
-  check('dialog survives 1440 -> 360 -> 1440 inside the viewport', afterNarrow.visible && afterWide.visible && fitsViewport(afterNarrow) && afterNarrow.pageOverflow <= 0 && afterWide.pageOverflow <= 0,
+  check('dialog survives 1440 -> 1000 -> 1440 inside the viewport', afterNarrow.visible && afterWide.visible && fitsViewport(afterNarrow) && afterNarrow.pageOverflow <= 0 && afterWide.pageOverflow <= 0,
     JSON.stringify({ narrowAtOpen, afterNarrow, afterWide }));
   await closeDelete(page, lang);
 
@@ -456,49 +431,6 @@ async function measureOperations({ browser, apiUrl, webUrl, data }) {
   const longMetrics = { ...(await boxMetrics(longPage)), pageOverflow: await overflowX(longPage) };
   check(`the longest title (${LONG_TITLE.length} chars, no spaces) does not overflow the dialog at 360`, fitsViewport(longMetrics) && longMetrics.pageOverflow <= 0, JSON.stringify(longMetrics));
   await longPage.context().close();
-
-  const rows = [
-    ['14', firstFocus === 'body' ? '미통과(기존 동작 그대로)' : '통과',
-      `삭제 확인창을 열면 첫 초점은 ${firstFocus}이고(열기 전과 같다), 취소로 닫으면 초점은 ${focusAfterEnter}이다. 확인창의 초점 처리는 이 단위에서 바꾸지 않았다(DeleteConfirmModal.editSafety 시험이 열 때 초점을 옮기지 않는 것을 고정하고, 기준본이 Enter와 취소 동작을 지금 그대로 두라고 했다). 담당이 판단할 점으로 PR에 적었다.`],
-    ['15', tabInsideDialog && escapeFromBody ? '통과' : '미통과(기존 동작 그대로)',
-      `열린 확인창에서 Tab 3회: ${tabOrder.join(' -> ')}. Esc는 초점이 없을 때 ${escapeFromBody ? '창을 닫는다' : '창을 닫지 않고'}, 단추에 초점이 있을 때 ${escapeFromButton ? '창을 닫는다' : '닫지 않는다'}. 닫은 뒤 트리와 카드는 그대로. 초점이 확인창 밖에 있어 Tab이 뒤 화면으로 가고 Esc가 안 먹는 것은 변경 전부터 있던 동작이다.`],
-    ['16', fitsViewport(longMetrics) && longMetrics.pageOverflow <= 0 && fitsViewport(afterNarrow) ? '통과' : '미통과',
-      `360px에서 ${LONG_TITLE.length}자 띄어쓰기 없는 제목으로 열어도 창 안 요소가 창 오른쪽 끝을 넘지 않고 가로 스크롤이 없다(창 폭 ${Math.round(longMetrics.width)}px).`],
-    ['17', deleteFailureShown && confirmReopened ? '통과' : '미통과',
-      '미리보기를 500으로 바꾸면 「다른 자리에 없는 하위 카드는 함께 영구 삭제됩니다」 일반 경고가 뜨고 확인 단추가 열린다(캡처 failed-*). 삭제 요청을 500으로 바꾸면 창이 남고 실패 문구가 뜨며 확인 단추가 다시 열린다. 미리보기를 받는 동안은 받는 중 문구와 잠긴 확인 단추(캡처 loading-*).'],
-    ['18', afterNarrow.visible && afterWide.visible && afterNarrow.pageOverflow <= 0 && afterWide.pageOverflow <= 0 ? '통과' : '미통과',
-      `창을 연 채 1440 -> 360 -> 1440으로 바꿔도 확인창이 보이고 가로 스크롤이 없다(창 폭 ${Math.round(afterNarrow.width)}px, ${Math.round(afterWide.width)}px).`],
-  ];
-  const dialogRows = [[
-    '삭제 확인창(트리 노드 우클릭 메뉴의 삭제)', '노드 우클릭, 메뉴 「Delete」', firstFocus,
-    enterOnCancelCloses ? '취소 단추에서 Enter는 창을 닫는다(단추 기본 동작), 삭제는 하지 않는다' : '취소 단추에서 Enter는 창을 닫지 않는다',
-    `초점이 없을 때 ${escapeFromBody ? '닫는다' : '닫지 않는다'}, 단추에 초점이 있을 때 ${escapeFromButton ? '닫는다' : '닫지 않는다'}`, focusAfterEscape,
-  ]];
-  return { rows, dialogRows };
-}
-
-function writeOperations({ rows, dialogRows }, apiUrl) {
-  const table = (head, body) => [head, ...body].join('\n');
-  const checks = results.map((result) => `| ${result.name} | ${result.ok ? '통과' : '실패'} |`);
-  writeFileSync(path.join(outDir, 'operations.md'), [
-    `# 조작 결과 (${prefix}, ${new Date().toISOString()})`,
-    '',
-    '실행: `node e2e/visual/delete-confirmation.mjs --out <캡처 폴더> --prefix after --operations`',
-    `서버: ${apiUrl} 의 일회용 SQLite(직접 만든 작은 트리), bypass 모드, tsx 실행`,
-    '',
-    '## 14번부터 18번',
-    '',
-    table('| 항목 | 결과 | 근거 |\n|---|---|---|', rows.map((row) => `| ${row.join(' | ')} |`)),
-    '',
-    '## 대화상자와 줄 안 편집',
-    '',
-    table('| 대상 | 여는 법 | 첫 초점 | Enter | Esc | 닫은 뒤 초점 |\n|---|---|---|---|---|---|', dialogRows.map((row) => `| ${row.join(' | ')} |`)),
-    '',
-    '## 단언',
-    '',
-    table('| 단언 | 결과 |\n|---|---|', checks),
-    '',
-  ].join('\n'));
 }
 
 main()

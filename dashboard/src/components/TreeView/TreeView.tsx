@@ -23,6 +23,7 @@ import { useTreeDragAndDrop } from './useTreeDragAndDrop';
 import { useTreeMutations } from './useTreeMutations';
 import type { MotionNode } from '../SearchMotionView/types';
 import { resolveNodePath } from './useInitialNodePathRestore';
+import { focusMovedRow, focusParentRow, focusRowOrList } from './treeFocusReturn';
 import { useInitialNodePathRestore } from './useInitialNodePathRestore';
 import { rootTreeQueryKey } from '../../query/queryKeys';
 import { VersionConflictError } from '../../api/request';
@@ -62,6 +63,9 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deletePreview = useDeletePreview(modal.type === 'delete' ? modal.node : null);
   const previousRootIds = useRef<Set<string>>(new Set());
+  const listRef = useRef<HTMLDivElement>(null);
+  const openerRowRef = useRef<HTMLElement | null>(null);
+  const stopWaitingForMove = useRef<() => void>(() => {});
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Keep the callback identity stable for mutation hooks.
   const closeModal = useCallback(() => setModal({ type: 'none' }), []);
 
@@ -139,9 +143,17 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
 
   // 컨텍스트 메뉴 핸들러
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Keep the tree node context-menu handler stable across renders.
-  const handleContextMenu = useCallback((x: number, y: number, node: TreeNodeData) => {
+  const handleContextMenu = useCallback((x: number, y: number, node: TreeNodeData, row: HTMLElement) => {
+    openerRowRef.current = row;
     setContextMenu({ x, y, node });
   }, []);
+
+  useEffect(() => () => stopWaitingForMove.current(), []);
+
+  function closeDialogToOpener() {
+    closeModal();
+    focusRowOrList(listRef.current!, openerRowRef.current);
+  }
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Keep this action callback memoized with resetEditMutation.
   const handleContextMenuAction = useCallback((action: TreeContextMenuAction) => {
@@ -208,7 +220,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
           </div>
 
           {/* 트리 본문 */}
-          <div className="flex-1 overflow-y-auto py-1">
+          <div ref={listRef} tabIndex={-1} data-testid="tree-list" className="flex-1 overflow-y-auto py-1">
             {isLoading ? (
               <PanelState><Spinner label={t('common.loading')} /></PanelState>
             ) : error ? (
@@ -286,10 +298,16 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
               onConfirm={(targetParentNodeId) => {
                 moveNode(
                   buildAppendMovePayload(modal.node.id, targetParentNodeId),
-                  { onSuccess: closeModal }
+                  {
+                    onSuccess: () => {
+                      closeModal();
+                      stopWaitingForMove.current();
+                      stopWaitingForMove.current = focusMovedRow(listRef.current!, modal.node.id, openerRowRef.current);
+                    },
+                  }
                 );
               }}
-              onClose={closeModal}
+              onClose={closeDialogToOpener}
               isLoading={moveMutation.isPending}
             />
           )}
@@ -300,8 +318,10 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
               title={modal.node.card.title}
               isSymlink={modal.node.is_symlink}
               preview={deletePreview}
-              onConfirm={() => deleteNode(modal.node.id)}
-              onClose={() => { closeModal(); setDeleteError(null); }}
+              onConfirm={() => deleteNode(modal.node.id, {
+                onSuccess: () => focusParentRow(listRef.current!, modal.node.parent_node_id),
+              })}
+              onClose={() => { closeDialogToOpener(); setDeleteError(null); }}
               isLoading={deleteMutation.isPending}
               errorMessage={deleteError ?? undefined}
             />

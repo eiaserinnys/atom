@@ -97,14 +97,17 @@ describe('DeleteConfirmModal keyboard safety', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  test('Escape still cancels and mounting preserves the existing focus location', async () => {
+  test('opening focuses Cancel, Enter does not delete, and Escape still cancels', async () => {
     const priorFocus = document.createElement('button');
     document.body.append(priorFocus);
     priorFocus.focus();
+    const onConfirm = vi.fn();
     const onClose = vi.fn();
-    await renderModal(<DeleteConfirmModal title="Card" onConfirm={vi.fn()} onClose={onClose} />);
+    await renderModal(<DeleteConfirmModal title="Card" onConfirm={onConfirm} onClose={onClose} />);
 
-    expect(document.activeElement).toBe(priorFocus);
+    expect(document.activeElement).toBe(button(english.common.cancel));
+    keyDown(document.activeElement!, 'Enter');
+    expect(onConfirm).not.toHaveBeenCalled();
     keyDown(button(english.common.cancel), 'Escape');
 
     expect(onClose).toHaveBeenCalledTimes(1);
