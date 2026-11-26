@@ -17,7 +17,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   server.tool(
     "get_node",
     "Get a single tree node by its node_id, including the associated card data (title, content, tags, references, timestamps). Returns the node's position, parent, and is_symlink flag.",
-    { node_id: z.string().uuid().describe("The tree node UUID to retrieve.") },
+    { node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output). Not a card_id.") },
     async ({ node_id }) => {
       const node = await getNode(node_id);
       if (!node) {
@@ -31,7 +31,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   server.tool(
     "list_children",
     "List direct child nodes of a parent, ordered by position. Pass null or omit parent_node_id to get root-level nodes. Each child includes its card data.",
-    { parent_node_id: z.string().uuid().nullable().optional().describe("Parent node UUID. Null or omitted = root nodes.") },
+    { parent_node_id: z.string().uuid().nullable().optional().describe("node_id (tree position) of the parent. Null or omitted = root nodes.") },
     async ({ parent_node_id }) => {
       const children = await listChildren(parent_node_id ?? null);
       return { content: [{ type: "text", text: JSON.stringify(children) }] };
@@ -68,7 +68,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       "Common combinations: titles_only + max_chars caps large tree overviews while keeping IDs.",
     ].join("\n"),
     {
-      node_id: z.string().uuid().describe("Root node of the subtree to compile."),
+      node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) of the subtree root. Not a card_id."),
       depth: z.number().int().nullable().optional().describe("Max depth to expand (default 3). Pass null to drill the entire tree without limit."),
       include_ids: z.boolean().optional().describe("Tri-state. Omit (default) for ID-annotated output: short [node:X card:Y] label in titles_only, full HTML metadata in heading mode. true = full HTML metadata in titles_only mode as well (no effect in heading mode). false = minimal (no IDs, legacy)."),
       titles_only: z.boolean().optional().describe("Output indented title tree instead of full markdown."),
@@ -95,11 +95,11 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   // create_symlink
   server.tool(
     "create_symlink",
-    "Create a symlink node that references an existing card at a different tree location. The card itself is not duplicated — the new node points to the same card_id, enabling a single card to appear under multiple parents.",
+    "Create a symlink node that references an existing card at a different tree location. The card itself is not duplicated — the new node points to the same card_id, enabling a single card to appear under multiple parents. If parent_node_id is itself a symlink node, the new node is placed under that symlink's canonical node; check parent_node_id in the response.",
     {
-      card_id: z.string().uuid().describe("The existing card UUID to symlink to."),
-      parent_node_id: z.string().uuid().nullable().optional().describe("Parent node for the new symlink. Null = root level."),
-      position: z.number().int().nonnegative().optional().describe("0-based position among siblings. Omit to append at end."),
+      card_id: z.string().uuid().describe("card_id (card content, shown as card: in compile_subtree output) of the existing card to symlink to. Not a node_id."),
+      parent_node_id: z.string().uuid().nullable().optional().describe("node_id (tree position) of the parent for the new symlink. If it is a symlink node, the new node goes under its canonical node. Null = root level."),
+      position: z.number().int().nonnegative().optional().describe("Sort key among siblings (usually in steps of 100), not a 0-based index. Omit to append at the end. To choose a spot, use move_node with before/after."),
     },
     async ({ card_id, parent_node_id, position }) => {
       const node = await createSymlink(card_id, parent_node_id ?? null, position);
@@ -117,21 +117,21 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       "  • before: place immediately before this sibling node_id.",
       "  • after: place immediately after this sibling node_id.",
       "  • to: 'start' = first child, 'end' = last child of the parent.",
-      "  • position (DEPRECATED): absolute 0-based integer. Still works but emits a deprecation warning.",
+      "  • position (DEPRECATED): absolute sort key (not a sibling index). Still works but emits a deprecation warning.",
       "  • Omit all four: append at end (same as to='end').",
       "",
       "Parent (destination):",
-      "  • parent_node_id = UUID: move under that node.",
+      "  • parent_node_id = UUID: move under that node. If it is a symlink node, the node lands under its canonical node; check parent_node_id in the response.",
       "  • parent_node_id = null: move to root level.",
       "  • Omit parent_node_id: KEEP CURRENT PARENT (default). Useful for reordering within the same parent.",
     ].join("\n"),
     {
-      node_id: z.string().uuid().describe("The node to move."),
-      parent_node_id: z.string().uuid().nullable().optional().describe("Destination parent. Null = root. Omit = keep current parent."),
+      node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) of the node to move. Not a card_id."),
+      parent_node_id: z.string().uuid().nullable().optional().describe("node_id of the destination parent (a symlink node resolves to its canonical node). Null = root. Omit = keep current parent."),
       before: z.string().uuid().optional().describe("Place before this sibling node_id."),
       after: z.string().uuid().optional().describe("Place after this sibling node_id."),
       to: z.enum(["start", "end"]).optional().describe("Place at start or end of parent's children."),
-      position: z.number().int().nonnegative().optional().describe("DEPRECATED — use before/after/to instead. Absolute 0-based position."),
+      position: z.number().int().nonnegative().optional().describe("DEPRECATED — use before/after/to instead. Absolute sort key (not a sibling index)."),
     },
     async ({ node_id, parent_node_id, before, after, to, position }) => {
       try {
@@ -172,7 +172,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       "Targets a pre-existing node_id only; temp_id references are not supported.",
     ].join("\n"),
     {
-      node_id: z.string().uuid().describe("The tree node UUID to update."),
+      node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) to update. Not a card_id."),
       journal_limit: z
         .number()
         .int()
@@ -195,8 +195,8 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
   // delete_node
   server.tool(
     "delete_node",
-    "Delete a tree node and all its descendants. Cards with no remaining tree node are deleted with them.",
-    { node_id: z.string().uuid().describe("The tree node UUID to delete (cascades to children).") },
+    "Delete a tree node and all its descendant nodes. Cards in that subtree (including the node's own card) that have no tree node left elsewhere are permanently deleted with them; cards that still have a node outside the deleted subtree are kept. This cannot be undone. To keep such a card, move it out first (move_node) or give it another node elsewhere (create_symlink).",
+    { node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) to delete, with all its descendants. Not a card_id; to delete a card and all its nodes use delete_card.") },
     async ({ node_id }) => {
       const deleted = await deleteNode(node_id);
       return {
