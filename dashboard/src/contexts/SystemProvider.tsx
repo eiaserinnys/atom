@@ -5,7 +5,8 @@ import { SystemContext } from './systemContext';
 export function SystemProvider({ children }: { children: ReactNode }) {
   const [pendingRestart, setPendingRestart] = useState(false);
   const [manualRestartRequired, setManualRestartRequired] = useState(false);
-  const [reconnecting, setReconnecting] = useState(false);
+  const [restartMode, setRestartMode] = useState<'manual' | 'automatic' | null>(null);
+  const reconnecting = restartMode !== null;
 
   // Poll system status every 30s
   useEffect(() => {
@@ -25,21 +26,22 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const triggerRestart = useCallback(() => {
-    setReconnecting(true);
+    setRestartMode(manualRestartRequired ? 'manual' : 'automatic');
     setPendingRestart(false);
-  }, []);
+  }, [manualRestartRequired]);
 
   useEffect(() => {
-    if (!reconnecting) return;
+    if (restartMode === null) return;
     let active = true;
     let poll: ReturnType<typeof setInterval> | undefined;
     const fail = () => {
       if (!active) return;
-      setReconnecting(false);
+      setRestartMode(null);
       setPendingRestart(true);
     };
     // The deadline also applies while the old process keeps returning HTTP 200.
-    const deadline = setTimeout(fail, 30_000);
+    // A manual start has no deadline: the server stays down until the user starts it.
+    const deadline = restartMode === 'manual' ? undefined : setTimeout(fail, 30_000);
     async function restart() {
       let previousBootId: string | undefined;
       try {
@@ -74,7 +76,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       clearInterval(poll);
       clearTimeout(deadline);
     };
-  }, [reconnecting]);
+  }, [restartMode]);
 
   const refreshStatus = useCallback(() => {
     systemApi.getStatus()

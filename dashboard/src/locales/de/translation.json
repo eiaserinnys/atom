@@ -217,6 +217,11 @@
     "tab_search": "Suche"
   },
   "system": {
-    "restart_manual": "Ein Klick beendet den Server. Starte ihn selbst neu."
+    "restart_required": "Einstellungen geändert. Zum Anwenden ist ein Neustart erforderlich.",
+    "restart_now": "Jetzt neu starten",
+    "restart_manual": "Einstellungen geändert. Beende den Server und starte ihn selbst neu, um sie zu übernehmen.",
+    "shutdown_now": "Server beenden",
+    "shutdown_done": "Der Server wurde beendet. Starte ihn selbst neu, dann geht es weiter.",
+    "reconnecting": "Verbindung zum Server wird hergestellt..."
   }
 }

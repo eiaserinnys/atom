@@ -42,15 +42,17 @@ afterEach(() => {
 });
 
 describe('restart notice', () => {
-  test('banner explains that the server stays down only when it needs a manual start', async () => {
+  test('banner replaces the restart wording with a stop-and-start-yourself notice only when it needs a manual start', async () => {
     await render(<RestartBanner />);
     expect(host.textContent).toContain('system.restart_required');
     expect(host.textContent).not.toContain('system.restart_manual');
+    expect(host.querySelector('button')?.textContent).toBe('system.restart_now');
 
     systemState.manualRestartRequired = true;
     await render(<RestartBanner />);
     expect(host.textContent).toContain('system.restart_manual');
-    expect(host.querySelector('button')?.textContent).toBe('system.restart_now');
+    expect(host.textContent).not.toContain('system.restart_required');
+    expect(host.querySelector('button')?.textContent).toBe('system.shutdown_now');
   });
 
   test('settings footer shows the same notice next to the restart button', async () => {
@@ -63,7 +65,10 @@ describe('restart notice', () => {
 
     await render(footer(true));
     expect(host.textContent).toContain('system.restart_manual');
-    expect([...host.querySelectorAll('button')].map(button => button.textContent)).toContain('system.restart_now');
+    expect(host.textContent).not.toContain('system.restart_required');
+    const labels = [...host.querySelectorAll('button')].map(button => button.textContent);
+    expect(labels).toContain('system.shutdown_now');
+    expect(labels).not.toContain('system.restart_now');
   });
 });
 

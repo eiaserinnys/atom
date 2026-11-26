@@ -217,6 +217,11 @@
     "tab_search": "Buscar"
   },
   "system": {
-    "restart_manual": "Ao clicar, o servidor é desligado. Inicie-o novamente por conta própria."
+    "restart_required": "Configurações alteradas. É necessário reiniciar para aplicá-las.",
+    "restart_now": "Reiniciar agora",
+    "restart_manual": "Configurações alteradas. Pare o servidor e inicie-o novamente por conta própria para aplicá-las.",
+    "shutdown_now": "Parar servidor",
+    "shutdown_done": "O servidor foi parado. Inicie-o novamente por conta própria para continuar.",
+    "reconnecting": "Conectando ao servidor..."
   }
 }

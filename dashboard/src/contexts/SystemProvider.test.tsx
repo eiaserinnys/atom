@@ -61,6 +61,21 @@ test('restores the existing restart prompt on timeout even while the old server 
   expect(state.pendingRestart).toBe(true);
 });
 
+test('waits without a deadline for a manual start, then reloads on a new boot', async () => {
+  api.getStatus.mockResolvedValue({ pendingRestart: true, manualRestartRequired: true });
+  await act(async () => state.refreshStatus());
+  await act(async () => state.triggerRestart());
+  api.getHealth.mockRejectedValue(new Error('offline'));
+  api.getStatus.mockRejectedValue(new Error('offline'));
+  await tick(120_000);
+  expect(state.reconnecting).toBe(true);
+  expect(state.pendingRestart).toBe(false);
+  expect(reload).not.toHaveBeenCalled();
+  api.getHealth.mockResolvedValue({ status: 'ok', bootId: 'started-by-user' });
+  await tick(1000);
+  expect(reload).toHaveBeenCalledTimes(1);
+});
+
 test('restores the existing restart prompt when the request fails', async () => {
   api.restart.mockRejectedValue(new Error('forbidden'));
   await act(async () => state.triggerRestart());

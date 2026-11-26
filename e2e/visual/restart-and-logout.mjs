@@ -7,8 +7,10 @@
 // (default: this checkout), captures the changed screens at 1440px and 390px into <dir>/<prefix>-*.png,
 // and exits non-zero when an assertion fails. --operations also writes <dir>/operations.md
 // (ui-design 0-14..18). Run it on a checkout of the base commit with --prefix before to see the old screens.
+// The server runs under tsx, so the restart notice is in manual mode: the button stops the server and the
+// banner, the settings footer and the overlay after the press must read as one language in all 9 languages.
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -162,6 +164,10 @@ async function newPage(browser, viewport, webUrl, language = 'en') {
 const textOf = (locator) => locator.evaluateAll((nodes) => nodes.map((node) => node.textContent?.trim() ?? ''));
 const overflowX = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 const MANUAL_NOTE = /start it again yourself/i;
+const LANGS = ['en', 'ko', 'de', 'es', 'fr', 'ja', 'pt', 'ru', 'zh'];
+const BANNER = '.bg-\\[var\\(--amber-soft\\)\\]';
+const locale = (lang) => JSON.parse(readFileSync(path.join(root, 'dashboard/src/locales', lang, 'translation.json'), 'utf8')).system ?? {};
+const bannerButton = (page) => page.locator(`${BANNER} button`);
 
 async function capture({ apiUrl, webUrl }) {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE || undefined });
@@ -187,10 +193,14 @@ async function capture({ apiUrl, webUrl }) {
   // Restart pending
   await setPendingRestart(apiUrl);
   const wideBanner = await newPage(browser, WIDE, webUrl);
-  await wideBanner.getByRole('button', { name: 'Restart Now' }).waitFor();
+  await bannerButton(wideBanner).waitFor();
   await shot(wideBanner, 'banner-1440');
-  const bannerText = (await textOf(wideBanner.locator('.bg-\\[var\\(--amber-soft\\)\\]')))[0] ?? '';
+  const bannerText = (await textOf(wideBanner.locator(BANNER)))[0] ?? '';
+  const en = locale('en');
   check('restart banner explains the server must be started again (1440)', MANUAL_NOTE.test(bannerText), bannerText);
+  check('manual mode: the button says it stops the server, and the restart wording is gone (1440)',
+    typeof en.shutdown_now === 'string' && (await textOf(bannerButton(wideBanner)))[0] === en.shutdown_now && !bannerText.includes(en.restart_required ?? '\0'),
+    `${(await textOf(bannerButton(wideBanner)))[0]} | ${bannerText}`);
 
   await wideBanner.locator('[aria-label="Settings"]').click();
   const modal = wideBanner.getByRole('dialog');
@@ -200,35 +210,154 @@ async function capture({ apiUrl, webUrl }) {
   check('settings footer explains the server must be started again (1440)', MANUAL_NOTE.test(footerText), footerText);
 
   const narrowBanner = await newPage(browser, NARROW, webUrl);
-  await narrowBanner.getByRole('button', { name: 'Restart Now' }).waitFor();
+  await bannerButton(narrowBanner).waitFor();
   await shot(narrowBanner, 'banner-390');
-  check('restart banner explains the server must be started again (390)', MANUAL_NOTE.test((await textOf(narrowBanner.locator('.bg-\\[var\\(--amber-soft\\)\\]')))[0] ?? ''));
+  check('restart banner explains the server must be started again (390)', MANUAL_NOTE.test((await textOf(narrowBanner.locator(BANNER)))[0] ?? ''));
   check('no horizontal scroll at 390 with the banner', (await overflowX(narrowBanner)) <= 0);
 
-  if (options.operations) await measureOperations({ browser, webUrl, apiUrl, wideBanner, narrowBanner, modal });
+  await checkFooterLayout({ browser, webUrl, shot });
+  await checkBannerWording({ browser, webUrl });
+  const operations = options.operations ? await measureOperations({ browser, webUrl, apiUrl, wideBanner, narrowBanner, modal }) : null;
+  await checkPressedManualRestart({ browser, webUrl, shot });
+  if (operations) writeOperations(operations, apiUrl);
   await browser.close();
 }
 
+async function openSettings(browser, webUrl, viewport, language) {
+  const page = await newPage(browser, viewport, webUrl, language);
+  await bannerButton(page).waitFor();
+  await page.locator('.index-actions button.index-action').first().click();
+  await page.getByRole('dialog').waitFor();
+  return page;
+}
+
+// Desktop widths where the two footer buttons used to wrap away from the notice (ui-design 0-16).
+async function checkFooterLayout({ browser, webUrl, shot }) {
+  for (const width of [768, 820]) {
+    const broken = [];
+    const untranslated = [];
+    for (const lang of LANGS) {
+      const page = await openSettings(browser, webUrl, { width, height: 900 }, lang);
+      const m = await page.evaluate(() => {
+        const footer = document.querySelector('[role="dialog"] footer');
+        const style = getComputedStyle(footer);
+        const text = footer.querySelector('[aria-live]').getBoundingClientRect();
+        const buttons = [...footer.querySelectorAll('button')].map((button) => button.getBoundingClientRect());
+        return {
+          text: footer.querySelector('[aria-live]').textContent.trim(),
+          textTop: text.top, textBottom: text.bottom, textRight: text.right,
+          limit: footer.getBoundingClientRect().right - parseFloat(style.paddingRight),
+          buttons: buttons.map((box) => ({ left: box.left, right: box.right, top: box.top, bottom: box.bottom })),
+          count: buttons.length,
+        };
+      });
+      const onTextLine = m.buttons.every((box) => box.top < m.textBottom && box.bottom > m.textTop);
+      const sameLine = Math.abs(m.buttons[0].top - m.buttons.at(-1).top) < 1;
+      const rightAligned = Math.abs(m.buttons.at(-1).right - m.limit) <= 1;
+      const clear = m.textRight <= m.buttons[0].left;
+      if (m.count !== 2 || !onTextLine || !sameLine || !rightAligned || !clear) broken.push(`${lang}:${JSON.stringify({ onTextLine, sameLine, rightAligned, clear })}`);
+      const expected = locale(lang).restart_manual;
+      if (typeof expected !== 'string' || !m.text.includes(expected) || (lang !== 'en' && [locale('en').restart_manual, locale('en').restart_required].some((english) => m.text.includes(english ?? '\0')))) untranslated.push(lang);
+      if (lang === 'ko' || lang === 'pt') await shot(page, `settings-modal-${lang}-${width}`);
+      await page.context().close();
+    }
+    check(`settings footer: two buttons on one line at the right edge, clear of the notice (${width}, 9 languages)`, broken.length === 0, broken.join(' '));
+    check(`settings footer notice reads as one language (${width}, 9 languages)`, untranslated.length === 0, untranslated.join(' '));
+  }
+}
+
+// Banner wording: one language per screen and no mid-word breaks in Korean.
+async function checkBannerWording({ browser, webUrl }) {
+  const wrong = [];
+  const tall = [];
+  for (const lang of LANGS) {
+    const page = await newPage(browser, NARROW, webUrl, lang);
+    await bannerButton(page).waitFor();
+    const seen = { text: (await textOf(page.locator(`${BANNER} span`)))[0], button: (await textOf(bannerButton(page)))[0] };
+    const mine = locale(lang);
+    const english = locale('en');
+    const asExpected = seen.text === mine.restart_manual && seen.button === mine.shutdown_now;
+    const english_fallback = lang !== 'en' && (seen.text === english.restart_manual || seen.button === english.shutdown_now || seen.text === english.restart_required);
+    if (!asExpected || english_fallback) wrong.push(`${lang}:${seen.text}|${seen.button}`);
+    const lines = await page.locator(`${BANNER} span`).evaluate((node) => Math.round(node.getBoundingClientRect().height / parseFloat(getComputedStyle(node).lineHeight)));
+    if (lines > 4) tall.push(`${lang}:${lines}`);
+    console.log(`banner lines at 390: ${lang} ${lines}`);
+    await page.context().close();
+  }
+  check('restart banner stays within 4 lines in all 9 languages (390)', tall.length === 0, tall.join(' '));
+  check('restart banner reads as one language in all 9 languages (390)', wrong.length === 0, wrong.join(' ; '));
+
+  const korean = await newPage(browser, { width: 360, height: 844 }, webUrl, 'ko');
+  await bannerButton(korean).waitFor();
+  const breaks = await korean.evaluate((selector) => {
+    const node = document.querySelector(`${selector} span`).firstChild;
+    const text = node.textContent;
+    const range = document.createRange();
+    const topOf = (index) => { range.setStart(node, index); range.setEnd(node, index + 1); return range.getBoundingClientRect().top; };
+    const found = [];
+    let previousTop = null;
+    for (let i = 0; i < text.length; i += 1) {
+      if (text[i] === ' ') continue;
+      const top = topOf(i);
+      if (previousTop !== null && top > previousTop + 5 && text[i - 1] !== ' ') found.push(`${text.slice(Math.max(0, i - 3), i)}|${text.slice(i, i + 3)}`);
+      previousTop = top;
+    }
+    return found;
+  }, BANNER);
+  await korean.screenshot({ path: path.join(outDir, `${prefix}-banner-ko-360.png`), clip: { x: 0, y: 0, width: 360, height: 120 } });
+  check('Korean banner never breaks a word in the middle (360)', breaks.length === 0, breaks.join(' '));
+  await korean.context().close();
+}
+
+// ui-design 0-17: what the screen shows after the button is pressed in manual mode. Stops this run's own API.
+async function checkPressedManualRestart({ browser, webUrl, shot }) {
+  const ko = locale('ko');
+  const page = await newPage(browser, WIDE, webUrl, 'ko');
+  await bannerButton(page).waitFor();
+  await bannerButton(page).click();
+  await page.waitForTimeout(2000);
+  await shot(page, 'press-2s-ko-1440');
+  const overlay = async () => (await textOf(page.getByRole('status')))[0] ?? '';
+  const expected = typeof ko.shutdown_done === 'string' ? ko.shutdown_done : '(missing shutdown_done)';
+  const early = await overlay();
+  check('after the press: the overlay says the server stopped and must be started again (2s)', early === expected, early);
+  await page.waitForTimeout(31_000);
+  await shot(page, 'press-33s-ko-1440');
+  const late = await overlay();
+  check('after the press: still waiting with the same notice, no early return to the banner (33s)',
+    late === expected && (await bannerButton(page).count()) === 0, `${late} | banner buttons ${await bannerButton(page).count()}`);
+  await page.context().close();
+}
+
 async function measureOperations({ browser, webUrl, apiUrl, wideBanner, narrowBanner, modal }) {
-  const rows = [];
   const dialogRows = [];
-  const activeLabel = (page) => page.evaluate(() => {
+  const labelOf = () => {
     const el = document.activeElement;
-    return el && el !== document.body ? (el.getAttribute('aria-label') ?? el.textContent?.trim() ?? el.tagName) : 'body';
-  });
+    const box = el?.getBoundingClientRect();
+    return { label: el && el !== document.body ? (el.getAttribute('aria-label') || el.textContent?.trim() || el.tagName) : 'body', inDialog: Boolean(el?.closest('[role="dialog"]')), visible: Boolean(box && box.width > 0 && box.height > 0) };
+  };
+  const activeLabel = async (page) => (await page.evaluate(labelOf)).label;
 
   // 14, 15: the settings dialog (changed footer)
   const firstFocus = await activeLabel(wideBanner);
   const order = [];
   for (let i = 0; i < 6; i += 1) {
     await wideBanner.keyboard.press('Tab');
-    order.push(await wideBanner.evaluate(() => {
-      const el = document.activeElement;
-      const box = el?.getBoundingClientRect();
-      return { label: el?.getAttribute('aria-label') ?? el?.textContent?.trim() ?? el?.tagName, inDialog: Boolean(el?.closest('[role="dialog"]')), visible: Boolean(box && box.width > 0 && box.height > 0) };
-    }));
+    order.push(await wideBanner.evaluate(labelOf));
   }
   const tabOk = order.every((step) => step.visible);
+
+  // The ends of the dialog: Tab after the last footer button, Shift+Tab twice from the first tab.
+  await modal.locator('footer button').last().focus();
+  await wideBanner.keyboard.press('Tab');
+  const afterLastButton = await wideBanner.evaluate(labelOf);
+  await modal.locator('nav button').first().focus();
+  await wideBanner.keyboard.press('Shift+Tab');
+  await wideBanner.keyboard.press('Shift+Tab');
+  const beforeFirstTab = await wideBanner.evaluate(labelOf);
+  const leavesDialog = !afterLastButton.inDialog || !beforeFirstTab.inDialog;
+  const lastButtonLabel = (await textOf(modal.locator('footer button')))[1];
+
   await wideBanner.keyboard.press('Escape');
   const closed = (await modal.count()) === 0;
   const focusAfterClose = await activeLabel(wideBanner);
@@ -238,14 +367,14 @@ async function measureOperations({ browser, webUrl, apiUrl, wideBanner, narrowBa
 
   // 16: narrow widths with the longest translation
   const russian = await newPage(browser, NARROW, webUrl, 'ru');
-  await russian.getByRole('button').filter({ hasText: /Перезапуст|Restart/ }).first().waitFor();
+  await bannerButton(russian).waitFor();
   const overflow = await overflowX(russian);
-  const bannerBox = await russian.evaluate(() => {
-    const banner = document.querySelector('.bg-\\[var\\(--amber-soft\\)\\]');
+  const bannerBox = await russian.evaluate((selector) => {
+    const banner = document.querySelector(selector);
     const button = banner?.querySelector('button')?.getBoundingClientRect();
     const text = banner?.querySelector('span')?.getBoundingClientRect();
-    return { buttonRight: button?.right, textRight: text?.right, textBottom: text?.bottom, buttonTop: button?.top, buttonLeft: button?.left, textLeft: text?.left };
-  });
+    return { buttonRight: button?.right, textRight: text?.right, textBottom: text?.bottom, buttonTop: button?.top, buttonLeft: button?.left, textLeft: text?.left, textLines: Math.round((text?.height ?? 0) / 20) };
+  }, BANNER);
   await russian.screenshot({ path: path.join(outDir, `${prefix}-banner-ru-390.png`) });
   const overlap = bannerBox.textRight > bannerBox.buttonLeft + 0.5;
   check('no horizontal scroll at 390 with the longest translation (ru)', overflow <= 0, `overflow=${overflow}`);
@@ -258,27 +387,36 @@ async function measureOperations({ browser, webUrl, apiUrl, wideBanner, narrowBa
   await failingPage.route('**/api/system/status', (route) => route.fulfill({ status: 500, body: '{"error":"x"}', contentType: 'application/json' }));
   await failingPage.goto(webUrl);
   await failingPage.getByRole('tab', { name: /Settings/ }).last().waitFor();
-  const errorState = { banner: await failingPage.getByRole('button', { name: 'Restart Now' }).count(), overflow: await overflowX(failingPage) };
+  const errorState = { banner: await bannerButton(failingPage).count(), overflow: await overflowX(failingPage) };
   check('status failure leaves the screen intact without a banner (390)', errorState.banner === 0 && errorState.overflow <= 0, JSON.stringify(errorState));
 
   // 18: resize while the banner is open
   await wideBanner.setViewportSize(NARROW);
-  const afterNarrow = { button: await wideBanner.getByRole('button', { name: 'Restart Now' }).isVisible(), text: MANUAL_NOTE.test(await wideBanner.locator('body').innerText()), overflow: await overflowX(wideBanner) };
+  const afterNarrow = { button: await bannerButton(wideBanner).isVisible(), text: MANUAL_NOTE.test(await wideBanner.locator('body').innerText()), overflow: await overflowX(wideBanner) };
   await wideBanner.setViewportSize(WIDE);
-  const afterWide = { button: await wideBanner.getByRole('button', { name: 'Restart Now' }).isVisible(), overflow: await overflowX(wideBanner) };
+  const afterWide = { button: await bannerButton(wideBanner).isVisible(), overflow: await overflowX(wideBanner) };
   check('banner survives 1440 -> 390 -> 1440', afterNarrow.button && afterNarrow.text && afterNarrow.overflow <= 0 && afterWide.button && afterWide.overflow <= 0, JSON.stringify({ afterNarrow, afterWide }));
   check('Tab order stays on visible controls inside the settings dialog', tabOk && order.some((step) => step.inDialog), JSON.stringify(order));
   check('Escape closes the settings dialog and leaves the page', closed && treeStill > 0);
   check('closing the settings dialog returns focus to the Settings button', focusReturned, `focus=${focusAfterClose}`);
 
   const statusBody = await (await fetch(`${apiUrl}/api/system/status`)).json();
-  rows.push(
+  const rows = [
     ['14', firstFocus !== 'body' && focusReturned ? '통과' : '확인 필요', `설정 창을 열면 첫 초점은 ${firstFocus}(선택된 탭), Esc로 닫으면 초점이 연 단추(${focusAfterClose})로 돌아온다. 변경 전에는 body로 떨어졌다.`],
-    ['15', tabOk && closed ? '통과' : '확인 필요', `Tab 6회가 모두 보이는 요소에 머문다: ${order.map((step) => step.label).join(' → ')}. Esc로 닫히고 트리 화면은 그대로.`],
-    ['16', overflow <= 0 && !overlap ? '통과' : '확인 필요', `390px에서 가장 긴 번역(ru)도 가로 스크롤 ${overflow}px, 글 오른쪽 끝 ${bannerBox.textRight}px < 단추 왼쪽 끝 ${bannerBox.buttonLeft}px.`],
-    ['17', errorState.banner === 0 && errorState.overflow <= 0 ? '통과' : '확인 필요', '상태 요청을 500으로 바꿔도 화면이 그대로 서고 배너만 보이지 않는다. 새 데이터 요청은 추가하지 않았다(기존 30초 상태 조회에 필드 하나).'],
+    ['15', tabOk && closed ? (leavesDialog ? '통과(창 끝 이탈은 기존 동작)' : '통과') : '확인 필요',
+      `창 안 Tab 6회는 모두 보이는 요소에 머문다: ${order.map((step) => step.label).join(' → ')}. Esc로 닫히고 트리 화면은 그대로. `
+      + `창 끝 「${lastButtonLabel}」 다음 Tab은 ${afterLastButton.inDialog ? '창 안' : '창 밖'}(${afterLastButton.label}), 첫 탭에서 Shift+Tab 두 번은 ${beforeFirstTab.inDialog ? '창 안' : '창 밖'}(${beforeFirstTab.label})으로 간다. `
+      + '창 밖으로 나가는 것은 변경 전부터 있던 동작이라 이 단위에서 고치지 않았다.'],
+    ['16', overflow <= 0 && !overlap ? '통과' : '확인 필요', `390px에서 가장 긴 번역(ru)도 가로 스크롤 ${overflow}px, 글 오른쪽 끝 ${bannerBox.textRight}px < 단추 왼쪽 끝 ${bannerBox.buttonLeft}px, 글 ${bannerBox.textLines}줄. 설정 창 아래 줄은 768px와 820px에서 9개 언어 모두 두 단추가 한 줄에 오른쪽 끝으로 붙는다.`],
+    ['17', errorState.banner === 0 && errorState.overflow <= 0 ? '통과' : '확인 필요', '상태 요청을 500으로 바꿔도 화면이 그대로 서고 배너만 보이지 않는다. 새 데이터 요청은 추가하지 않았다(기존 30초 상태 조회에 필드 하나). 단추를 누른 뒤 서버가 꺼진 화면은 아래 단언 표의 2초, 33초 항목이다.'],
     ['18', afterNarrow.button && afterWide.button ? '통과' : '확인 필요', `1440 → 390 → 1440으로 바꿔도 배너, 안내, 단추가 다시 서고 가로 스크롤 없음(${afterNarrow.overflow}, ${afterWide.overflow}).`],
-  );
+  ];
+  await russian.context().close();
+  await failing.close();
+  return { rows, dialogRows, statusBody };
+}
+
+function writeOperations({ rows, dialogRows, statusBody }, apiUrl) {
   const table = (head, body) => [head, ...body].join('\n');
   const checks = results.map((result) => `| ${result.name} | ${result.ok ? '통과' : '실패'} |`).join('\n');
   writeFileSync(path.join(outDir, 'operations.md'), [
@@ -302,8 +440,6 @@ async function measureOperations({ browser, webUrl, apiUrl, wideBanner, narrowBa
     table('| 단언 | 결과 |\n|---|---|', [checks]),
     '',
   ].join('\n'));
-  await russian.context().close();
-  await failing.close();
 }
 
 main()
