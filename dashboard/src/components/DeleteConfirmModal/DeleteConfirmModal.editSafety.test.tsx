@@ -12,7 +12,6 @@ function PendingConfirmation({ onConfirm, onClose }: { onConfirm: () => void; on
   return (
     <DeleteConfirmModal
       title="Card"
-      isStructure={false}
       onConfirm={() => { onConfirm(); setIsLoading(true); }}
       onClose={onClose}
       isLoading={isLoading}
@@ -65,7 +64,7 @@ describe('DeleteConfirmModal keyboard safety', () => {
   test('Enter on the focused cancel button does not confirm deletion', async () => {
     const onConfirm = vi.fn();
     const onClose = vi.fn();
-    await renderModal(<DeleteConfirmModal title="Card" isStructure={false} onConfirm={onConfirm} onClose={onClose} />);
+    await renderModal(<DeleteConfirmModal title="Card" onConfirm={onConfirm} onClose={onClose} />);
 
     const cancel = button(english.common.cancel);
     cancel.focus();
@@ -79,7 +78,7 @@ describe('DeleteConfirmModal keyboard safety', () => {
 
   test('clicking the confirm button calls onConfirm once', async () => {
     const onConfirm = vi.fn();
-    await renderModal(<DeleteConfirmModal title="Card" isStructure={false} onConfirm={onConfirm} onClose={vi.fn()} />);
+    await renderModal(<DeleteConfirmModal title="Card" onConfirm={onConfirm} onClose={vi.fn()} />);
 
     click(button(english.delete_modal.confirm_btn));
 
@@ -103,7 +102,7 @@ describe('DeleteConfirmModal keyboard safety', () => {
     document.body.append(priorFocus);
     priorFocus.focus();
     const onClose = vi.fn();
-    await renderModal(<DeleteConfirmModal title="Card" isStructure={false} onConfirm={vi.fn()} onClose={onClose} />);
+    await renderModal(<DeleteConfirmModal title="Card" onConfirm={vi.fn()} onClose={onClose} />);
 
     expect(document.activeElement).toBe(priorFocus);
     keyDown(button(english.common.cancel), 'Escape');

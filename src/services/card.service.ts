@@ -16,7 +16,12 @@ import type {
 import { eventBus } from "../events/eventBus.js";
 import { deserializeArray, deserializeBoolean } from "../db/utils.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
-import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
+import {
+  deleteTreeAndOrphanCards,
+  planTreeDeletion,
+  summarizeDeletion,
+  type DeletionSummary,
+} from "./node-deletion.service.js";
 import { resolveWriteParentNodeId } from "./tree-parent.js";
 import { assertUuidArray, assertValidCardTitle, cardNotFound } from "./service-errors.js";
 
@@ -120,22 +125,29 @@ export async function updateCard(
   return result;
 }
 
-export async function deleteCard(id: string): Promise<boolean> {
+export async function deleteCard(id: string): Promise<DeletionSummary | null> {
   const result = await getDb().transaction((client) =>
     deleteTreeAndOrphanCards(client, { cardId: id })
   );
-  if (result.deleted) {
-    for (const card of result.deletedCards) {
-      eventBus.emit("atom:event", {
-        type: "card:deleted",
-        cardId: card.cardId,
-        nodeIds: card.nodeIds,
-        parentNodeIds: card.parentNodeIds,
-        actor: null,
-      });
-    }
+  if (!result.deleted) return null;
+  for (const card of result.deletedCards) {
+    eventBus.emit("atom:event", {
+      type: "card:deleted",
+      cardId: card.cardId,
+      nodeIds: card.nodeIds,
+      parentNodeIds: card.parentNodeIds,
+      actor: null,
+    });
   }
-  return result.deleted;
+  return {
+    deletedCardIds: result.deletedCards.map((card) => card.cardId),
+    deletedNodeCount: result.deletedNodeCount,
+  };
+}
+
+export async function previewCardDeletion(id: string): Promise<DeletionSummary | null> {
+  const plan = await planTreeDeletion(getDb(), { cardId: id });
+  return plan ? summarizeDeletion(plan) : null;
 }
 
 export async function getBacklinks(cardId: string): Promise<Card[]> {

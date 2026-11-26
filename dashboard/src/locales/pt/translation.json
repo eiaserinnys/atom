@@ -166,12 +166,15 @@
     "empty": "Sem cartões de estrutura"
   },
   "delete_modal": {
-    "title": "Excluir cartão",
-    "desc": "Excluir \"{{name}}\"?",
-    "confirm_text": "Excluir \"{{name}}\"?",
-    "sub_items_warning": "Itens filho também serão excluídos.",
-    "confirm_btn": "Excluir",
-    "deleting": "Excluindo…"
+    "title_node": "Excluir este nó",
+    "title_link": "Excluir este link",
+    "body_node": "\"{{name}}\" e tudo o que está abaixo dele serão excluídos.",
+    "body_link": "Somente o link \"{{name}}\" é excluído. O cartão original permanece.",
+    "checking": "Verificando o que será excluído…",
+    "cards_permanent": "Os cartões que não existem em nenhum outro lugar também serão excluídos permanentemente: {{total}}. Isso não pode ser desfeito.",
+    "cards_none": "Nenhum cartão será excluído permanentemente.",
+    "cards_unknown": "Os cartões filhos que não existem em nenhum outro lugar também serão excluídos permanentemente. Isso não pode ser desfeito.",
+    "confirm_btn": "Excluir"
   },
   "login": {
     "title": "atom",

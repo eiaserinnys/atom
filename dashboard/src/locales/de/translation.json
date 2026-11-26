@@ -166,12 +166,15 @@
     "empty": "Keine Strukturkarten vorhanden"
   },
   "delete_modal": {
-    "title": "Karte löschen",
-    "desc": "\"{{name}}\" löschen?",
-    "confirm_text": "\"{{name}}\" löschen?",
-    "sub_items_warning": "Untergeordnete Elemente werden ebenfalls gelöscht.",
-    "confirm_btn": "Löschen",
-    "deleting": "Löschen…"
+    "title_node": "Diesen Knoten löschen",
+    "title_link": "Diesen Link löschen",
+    "body_node": "\"{{name}}\" und alles darunter wird gelöscht.",
+    "body_link": "Nur der Link \"{{name}}\" wird gelöscht. Die Originalkarte bleibt erhalten.",
+    "checking": "Prüfe, was gelöscht wird…",
+    "cards_permanent": "Karten, die nirgends sonst vorkommen, werden ebenfalls dauerhaft gelöscht: {{total}}. Das lässt sich nicht rückgängig machen.",
+    "cards_none": "Es wird keine Karte dauerhaft gelöscht.",
+    "cards_unknown": "Untergeordnete Karten, die nirgends sonst vorkommen, werden ebenfalls dauerhaft gelöscht. Das lässt sich nicht rückgängig machen.",
+    "confirm_btn": "Löschen"
   },
   "login": {
     "title": "atom",

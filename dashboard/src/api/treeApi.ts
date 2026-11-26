@@ -1,5 +1,5 @@
 import { request, requestVoid } from './request';
-import type { MoveNodePayload, TreeNodeData } from './types';
+import type { DeletePreview, MoveNodePayload, TreeNodeData } from './types';
 
 export const treeApi = {
   getTree(): Promise<TreeNodeData[]> {
@@ -15,6 +15,10 @@ export const treeApi = {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+  },
+
+  getDeletePreview(nodeId: string): Promise<DeletePreview> {
+    return request(`/tree/${nodeId}/delete-preview`);
   },
 
   deleteNode(nodeId: string): Promise<void> {

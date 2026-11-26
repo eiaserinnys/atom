@@ -335,12 +335,15 @@
   },
   "delete_modal": {
     "failed": "삭제하지 못했습니다.",
-    "title": "카드 삭제",
-    "desc": "\"{{name}}\" 항목을 삭제하시겠습니까?",
-    "confirm_text": "\"{{name}}\"을(를) 삭제하시겠습니까?",
-    "sub_items_warning": "하위 항목도 함께 삭제됩니다.",
-    "confirm_btn": "삭제",
-    "deleting": "삭제 중…"
+    "title_node": "이 자리의 노드 삭제",
+    "title_link": "링크 삭제",
+    "body_node": "\"{{name}}\" 항목과 그 아래가 모두 삭제됩니다.",
+    "body_link": "\"{{name}}\" 링크만 삭제되고 원본 카드는 남습니다.",
+    "checking": "삭제 대상을 확인하는 중…",
+    "cards_permanent": "다른 자리에 없는 카드 {{total}}개가 함께 영구 삭제되며 되돌릴 수 없습니다.",
+    "cards_none": "영구 삭제되는 카드는 없습니다.",
+    "cards_unknown": "다른 자리에 없는 하위 카드는 함께 영구 삭제됩니다.",
+    "confirm_btn": "삭제"
   },
   "login": {
     "password_label": "비밀번호",

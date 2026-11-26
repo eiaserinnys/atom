@@ -20,6 +20,7 @@ export const api = {
   updateCard: cardApi.updateCard,
   updateNode: treeApi.updateNode,
   createCard: cardApi.createCard,
+  getDeletePreview: treeApi.getDeletePreview,
   deleteNode: treeApi.deleteNode,
   moveNode: treeApi.moveNode,
   listChildren: treeApi.listChildren,

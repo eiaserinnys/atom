@@ -8,6 +8,7 @@ import {
   getCompileCardContents,
   createSymlink,
   deleteNode,
+  previewNodeDeletion,
   moveNode,
   updateNodeProperties,
   getTreeOutline,
@@ -239,12 +240,26 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // GET /tree/:nodeId/delete-preview — what DELETE /tree/:nodeId would remove
+  app.get<{ Params: { nodeId: string } }>(
+    "/tree/:nodeId/delete-preview",
+    async (req) => {
+      const preview = await previewNodeDeletion(req.params.nodeId);
+      if (!preview) throw await nodeNotFound(req.params.nodeId);
+      return {
+        target: preview.target,
+        deleted_node_count: preview.deletedNodeCount,
+        deleted_card_count: preview.deletedCardIds.length,
+        deleted_card_ids: preview.deletedCardIds,
+      };
+    }
+  );
+
   // DELETE /tree/:nodeId
   app.delete<{ Params: { nodeId: string } }>(
     "/tree/:nodeId",
     async (req, reply) => {
-      const deleted = await deleteNode(req.params.nodeId);
-      if (!deleted) throw await nodeNotFound(req.params.nodeId);
+      if (!(await deleteNode(req.params.nodeId))) throw await nodeNotFound(req.params.nodeId);
       return reply.code(204).send();
     }
   );

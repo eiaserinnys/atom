@@ -166,12 +166,15 @@
     "empty": "No hay tarjetas de estructura"
   },
   "delete_modal": {
-    "title": "Eliminar tarjeta",
-    "desc": "¿Eliminar \"{{name}}\"?",
-    "confirm_text": "¿Eliminar \"{{name}}\"?",
-    "sub_items_warning": "Los elementos hijo también serán eliminados.",
-    "confirm_btn": "Eliminar",
-    "deleting": "Eliminando…"
+    "title_node": "Eliminar este nodo",
+    "title_link": "Eliminar este enlace",
+    "body_node": "\"{{name}}\" y todo lo que hay debajo se eliminarán.",
+    "body_link": "Solo se elimina el enlace \"{{name}}\". La tarjeta original se conserva.",
+    "checking": "Comprobando qué se eliminará…",
+    "cards_permanent": "Las tarjetas que no están en ningún otro lugar también se eliminarán de forma permanente: {{total}}. No se puede deshacer.",
+    "cards_none": "No se eliminará ninguna tarjeta de forma permanente.",
+    "cards_unknown": "Las tarjetas hijas que no están en ningún otro lugar también se eliminarán de forma permanente. No se puede deshacer.",
+    "confirm_btn": "Eliminar"
   },
   "login": {
     "title": "atom",

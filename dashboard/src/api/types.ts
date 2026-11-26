@@ -33,6 +33,13 @@ export interface TreeNodeData {
   canonical_path?: string;
 }
 
+export interface DeletePreview {
+  target: 'node' | 'symlink';
+  deleted_node_count: number;
+  deleted_card_count: number;
+  deleted_card_ids: string[];
+}
+
 export interface CardData {
   id: string;
   card_type: 'structure' | 'knowledge';

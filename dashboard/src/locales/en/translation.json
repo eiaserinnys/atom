@@ -336,12 +336,15 @@
   },
   "delete_modal": {
     "failed": "Couldn't delete.",
-    "title": "Delete Card",
-    "desc": "Delete \"{{name}}\"?",
-    "confirm_text": "Delete \"{{name}}\"?",
-    "sub_items_warning": "Child items will also be deleted.",
-    "confirm_btn": "Delete",
-    "deleting": "Deleting…"
+    "title_node": "Delete this node",
+    "title_link": "Delete this link",
+    "body_node": "\"{{name}}\" and everything below it will be deleted.",
+    "body_link": "Only the link \"{{name}}\" is deleted. The original card stays.",
+    "checking": "Checking what will be deleted…",
+    "cards_permanent": "Cards that exist nowhere else will also be deleted permanently: {{total}}. This cannot be undone.",
+    "cards_none": "No card will be deleted permanently.",
+    "cards_unknown": "Child cards that exist nowhere else will also be deleted permanently. This cannot be undone.",
+    "confirm_btn": "Delete"
   },
   "login": {
     "password_label": "Password",

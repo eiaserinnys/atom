@@ -43,7 +43,10 @@ describe("orphan card deletion on SQLite", () => {
       parent_node_id: parentNodeId,
     });
 
-    expect(await treeService.deleteNode(parentNodeId)).toBe(true);
+    const deleted = await treeService.deleteNode(parentNodeId);
+    expect(deleted?.deletedCardIds[0]).toBe(parent.id);
+    expect([...deleted!.deletedCardIds].sort()).toEqual([parent.id, first.id, second.id].sort());
+    expect(deleted?.deletedNodeCount).toBe(3);
 
     expect(await cardService.getCard(parent.id)).toBeNull();
     expect(await cardService.getCard(first.id)).toBeNull();
@@ -86,7 +89,10 @@ describe("orphan card deletion on SQLite", () => {
       parent_node_id: parentNodeId,
     });
 
-    expect(await cardService.deleteCard(parent.id)).toBe(true);
+    expect(await cardService.deleteCard(parent.id)).toEqual({
+      deletedCardIds: [parent.id, child.id],
+      deletedNodeCount: 2,
+    });
     expect(await cardService.getCard(child.id)).toBeNull();
   });
 

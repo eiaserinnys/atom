@@ -275,6 +275,7 @@ describe('applyAtomEventToCache', () => {
         moved: [],
         child_ordered: [],
         deleted: [],
+        cascade_deleted_card_ids: [],
       },
       patches: [{
         type: 'card:created',
