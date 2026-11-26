@@ -358,7 +358,7 @@
     "desc": "Knowledge Management System",
     "sign_in_google": "Sign in with Google",
     "sign_in_slack": "Sign in with Slack",
-    "sign_in_error": "Authentication is not configured"
+    "sign_in_error": "Could not load the sign-in options. Please refresh the page in a moment."
   },
   "app": {
     "logout": "Logout",

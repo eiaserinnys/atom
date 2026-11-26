@@ -73,7 +73,7 @@ The server does not start without a login method, so run this once before the fi
 
 `.env.example` sets `API_PORT=4200` and leaves `DATABASE_URL` commented out, so the server uses SQLite at `./atom.db`. Set `SQLITE_PATH` to use a different file path.
 
-The password sign-in cookie is only sent to the origin that served the page, so serve the dashboard from the API. Build it once and point `DASHBOARD_DIR` at the result in the env file:
+The dashboard sends its requests with `credentials: 'same-origin'` and the Vite dev server has no `/api` proxy, so the sign-in cookie is not sent to an API on another origin. Serve the dashboard from the API instead. Build it once and point `DASHBOARD_DIR` at the result in the env file:
 
 ```bash
 pnpm --dir dashboard build
@@ -124,7 +124,7 @@ If neither a password, an OAuth provider, nor `AUTH_BYPASS=1` is configured, the
 
 ### Dashboard Development Mode
 
-The Vite dev server runs on its own origin, so the password cookie does not reach it. To work on the dashboard with hot reload, use a separate env file that turns on local development mode:
+The Vite config has no `/api` proxy and the dashboard sends requests with `credentials: 'same-origin'`, so with the dev server (a different origin from the API) the sign-in cookie is not sent to the API. Cookies are scoped by host, not by port, and the cause is the cross-origin request, not the port. To work on the dashboard with hot reload, use a separate env file that turns on local development mode:
 
 ```bash
 cp .env.example .env.dev

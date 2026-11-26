@@ -183,7 +183,7 @@
     "desc": "Système de gestion des connaissances",
     "sign_in_google": "Se connecter avec Google",
     "sign_in_slack": "Se connecter avec Slack",
-    "sign_in_error": "L'authentification n'est pas configurée"
+    "sign_in_error": "Impossible de charger les méthodes de connexion. Veuillez actualiser la page dans un instant."
   },
   "app": {
     "logout": "Se déconnecter",

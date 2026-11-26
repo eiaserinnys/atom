@@ -183,7 +183,7 @@
     "desc": "Sistema de gestão do conhecimento",
     "sign_in_google": "Entrar com o Google",
     "sign_in_slack": "Entrar com o Slack",
-    "sign_in_error": "A autenticação não está configurada"
+    "sign_in_error": "Não foi possível carregar os métodos de login. Atualize a página em instantes."
   },
   "app": {
     "logout": "Sair",

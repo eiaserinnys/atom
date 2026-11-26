@@ -183,7 +183,7 @@
     "desc": "Wissensmanagementsystem",
     "sign_in_google": "Mit Google anmelden",
     "sign_in_slack": "Mit Slack anmelden",
-    "sign_in_error": "Authentifizierung ist nicht konfiguriert"
+    "sign_in_error": "Die Anmeldemethoden konnten nicht geladen werden. Bitte laden Sie die Seite in einem Moment neu."
   },
   "app": {
     "logout": "Abmelden",

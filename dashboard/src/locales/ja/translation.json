@@ -183,7 +183,7 @@
     "desc": "ナレッジ管理システム",
     "sign_in_google": "Google でサインイン",
     "sign_in_slack": "Slack でサインイン",
-    "sign_in_error": "認証が設定されていません"
+    "sign_in_error": "ログイン方法を読み込めませんでした。しばらくしてからページを再読み込みしてください。"
   },
   "app": {
     "logout": "ログアウト",
