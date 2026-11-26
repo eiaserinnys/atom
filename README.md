@@ -305,7 +305,7 @@ Browser API access is denied by default:
     - Database connection testing and SQLite-to-PostgreSQL migration (`/api/config/db-test`, `/api/config/migrate-to-pg`)
     - Server restart (`/api/system/restart`)
   - `editor`: Can create, edit, move, or delete cards and tree nodes. Can also run searches, compile subtrees, read database status (`/api/config/db-info`), and list agent keys. Cannot issue, reissue, or modify agent keys. Cannot manage users or change any other admin setting.
-  - `viewer`: Read-only. Mutating browser requests (`POST`, `PUT`, `PATCH`, `DELETE`) return `403`, except for five read-only `POST` endpoints: `POST /tree/:nodeId/compile`, `POST /tree/:nodeId/compile/sections`, `POST /tree/compile/contents`, `POST /search/evaluate`, and `POST /search/expand`. The `403` body there is `{ "error": "Forbidden" }`, without a `code`.
+  - `viewer`: Read-only. Mutating browser requests (`POST`, `PUT`, `PATCH`, `DELETE`) return `403`, except for five read-only `POST` endpoints: `POST /tree/:nodeId/compile`, `POST /tree/:nodeId/compile/sections`, `POST /tree/compile/contents`, `POST /search/evaluate`, and `POST /search/expand`. Every other mutating request from a viewer gets `403 { "error": "Forbidden" }`, without a `code`.
 - **Immediate enforcement**: Changing a user's role or deactivating a user (`is_active = false`) in **Settings > Users** takes effect on the very next HTTP request.
 - **Agent key scopes (`agents.scope`)**:
   - `write`: Can invoke all 17 MCP tools and call mutating agent REST endpoints (`POST /api/cards`, `PATCH /api/cards/:cardId`). Keys created before scopes existed have `write`, and so does a key issued through the API without a `scope` field.
@@ -426,7 +426,7 @@ Empty values stay empty, and `OPENAI_API_KEY` is left out of the response entire
 | `API_PORT` | (required; `4200` in `.env.example`) | Port for the Fastify HTTP and MCP server (startup fails if unset). |
 | `API_HOST` | (unset) | Listen host. When unset, the server binds `127.0.0.1` in `AUTH_BYPASS=1` mode and `0.0.0.0` otherwise. Setting it overrides both; in bypass mode a host reachable from the network opens unauthenticated `admin` access to that network. |
 | `ATOM_ENV_FILE` | (unset) | Path of the env file to load instead of the repository-root `.env`. Read from the shell only (a value inside `.env` has no effect). `GET` and `PUT /api/config/env` still read and write the repository-root `.env`. |
-| `GIT_COMMIT_SHA`, `BUILD_DATE` | `dev`, `unknown` | Build identifiers that `GET /api/version` returns as `commit` and `buildDate`. `Dockerfile.backend` sets them from build arguments. |
+| `GIT_COMMIT_SHA`, `BUILD_DATE` | `dev`, `unknown` outside Docker; `unknown`, `unknown` in the Docker image | Build identifiers that `GET /api/version` returns as `commit` and `buildDate`. `Dockerfile.backend` bakes them into the image from build arguments whose default is `unknown`; the `dev` fallback applies only when the variable is unset. |
 | `DASHBOARD_DIR` | (unset) | Built dashboard directory (must contain `index.html`) that the API serves as static files and client routes. |
 | `DASHBOARD_ADMIN_PASSWORD` | (unset) | Installation password for dashboard login. Requires `JWT_SECRET`, cannot be combined with `AUTH_BYPASS=1`, and is ignored when an OAuth provider is configured. |
 | `VITE_API_BASE_URL` | `""` (same origin) | API base URL used by the dashboard when running the Vite dev server on a separate port. |
