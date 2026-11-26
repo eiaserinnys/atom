@@ -171,10 +171,10 @@
     "body_node": "\"{{name}}\" et tout ce qui se trouve en dessous seront supprimés.",
     "body_link": "Le lien \"{{name}}\" sera supprimé.",
     "checking": "Vérification de ce qui sera supprimé…",
-    "cards_permanent": "Les cartes qui n'existent nulle part ailleurs seront aussi supprimées définitivement : {{total}}. Cette action est irréversible.",
-    "cards_none": "Aucune carte ne sera supprimée définitivement.",
+    "cards_permanent": "Cartes supprimées définitivement : {{total}}. Cette action est irréversible.",
+    "cards_permanent_links": "Cartes supprimées définitivement : {{total}}. Liens supprimés avec elles dans d'autres emplacements : {{links}}. Cette action est irréversible.",
     "link_card_stays": "La carte d'origine est conservée.",
-    "cards_unknown": "Les cartes enfants qui n'existent nulle part ailleurs seront aussi supprimées définitivement. Cette action est irréversible.",
+    "cards_unknown": "Les cartes de cet élément et de tout ce qui se trouve dessous seront supprimées définitivement, avec leurs liens dans d'autres emplacements. Cette action est irréversible.",
     "cards_unknown_link": "Si ce lien est le dernier emplacement de sa carte, la carte sera aussi supprimée définitivement. Cette action est irréversible.",
     "confirm_btn": "Supprimer"
   },

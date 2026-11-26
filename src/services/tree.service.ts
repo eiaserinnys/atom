@@ -31,6 +31,7 @@ import { loadTreeCompileContext } from "./tree-compile-context.service.js";
 import {
   deleteTreeAndOrphanCards,
   planTreeDeletion,
+  summarizeDeletedTree,
   summarizeDeletion,
   type DeletionSummary,
 } from "./node-deletion.service.js";
@@ -327,10 +328,7 @@ export async function deleteNode(nodeId: string): Promise<DeletionSummary | null
       actor: null,
     });
   }
-  return {
-    deletedCardIds: result.deletedCards.map((card) => card.cardId),
-    deletedNodeCount: result.deletedNodeCount,
-  };
+  return summarizeDeletedTree(result);
 }
 
 export interface NodeDeletionPreview extends DeletionSummary {

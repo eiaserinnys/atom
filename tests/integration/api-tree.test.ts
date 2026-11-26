@@ -4,6 +4,7 @@
  * Requires TEST_DATABASE_URL to point to a test PostgreSQL database.
  */
 
+import { getDb } from "../../src/db/client.js";
 import { setupIntegrationTestDb } from "./integration-harness.js";
 import * as cardService from "../../src/services/card.service.js";
 import * as treeService from "../../src/services/tree.service.js";
@@ -45,7 +46,7 @@ describe("Tree operations", () => {
     });
 
     const deleted = await treeService.deleteNode(node_id);
-    expect(deleted).toEqual({ deletedCardIds: [card.id], deletedNodeCount: 1 });
+    expect(deleted).toEqual({ deletedCardIds: [card.id], deletedNodeCount: 1, deletedLinkCount: 0 });
 
     // A card without another tree node is removed with its node.
     const fetched = await cardService.getCard(card.id);
@@ -85,7 +86,7 @@ describe("Tree operations", () => {
     expect(await cardService.getCard(secondChildCard.id)).toBeNull();
   });
 
-  it("keeps a descendant card that still has a symlink node elsewhere", async () => {
+  it("deletes a descendant card together with its symlink node elsewhere", async () => {
     const { node_id: parentId } = await cardService.createCard({
       card_type: "structure",
       title: "Parent with alias",
@@ -101,11 +102,13 @@ describe("Tree operations", () => {
     });
     const alias = await treeService.createSymlink(childCard.id, otherRootId);
 
-    await treeService.deleteNode(parentId);
+    const deleted = await treeService.deleteNode(parentId);
 
+    expect(deleted?.deletedLinkCount).toBe(1);
+    expect(deleted?.deletedCardIds).toContain(childCard.id);
     expect(await treeService.getNode(childId)).toBeNull();
-    expect(await cardService.getCard(childCard.id)).not.toBeNull();
-    expect(await treeService.getNode(alias.id)).not.toBeNull();
+    expect(await cardService.getCard(childCard.id)).toBeNull();
+    expect(await treeService.getNode(alias.id)).toBeNull();
   });
 
   it("symlink: creates a symlink and compile_subtree detects cycle", async () => {
@@ -222,9 +225,9 @@ describe("Tree operations", () => {
       title: "OrphanParent",
     });
 
-    // 다른 곳에 symlink를 먼저 만들고 canonical 노드를 지워 orphan 상태를 만든다.
+    // 다른 곳에 symlink를 먼저 만들고 canonical 노드 행만 지워(옛 데이터 꼴) orphan 상태를 만든다.
     await treeService.createSymlink(cardX.id, nodeParent, undefined);
-    await treeService.deleteNode(nodeX);
+    await getDb().query("DELETE FROM tree_nodes WHERE id = $1", [nodeX]);
 
     const children = await treeService.listChildren(nodeParent);
     expect(children.length).toBe(1);

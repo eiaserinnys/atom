@@ -82,7 +82,7 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
     client = new QueryClient({
       defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false }, mutations: { gcTime: Infinity, retry: false } },
     });
-    vi.spyOn(api, 'getDeletePreview').mockResolvedValue({ target: 'node', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-leaf'] });
+    vi.spyOn(api, 'getDeletePreview').mockResolvedValue({ target: 'node', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-leaf'], deleted_link_count: 0 });
     vi.spyOn(api, 'getTree').mockResolvedValue([node('folder', 'Folder', 'structure', null), node('group', 'Group', 'structure', null)]);
     vi.spyOn(api, 'listChildren').mockResolvedValue([]);
     setTree([leaf('folder')], []);

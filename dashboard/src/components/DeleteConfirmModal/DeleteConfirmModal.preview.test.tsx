@@ -38,7 +38,13 @@ describe('DeleteConfirmModal wording follows the preview', () => {
 
   const sentence = (key: 'body_node' | 'body_link') => english.delete_modal[key].replace('{{name}}', 'Card');
 
-  const permanent = (total: number) => english.delete_modal.cards_permanent.replace('{{total}}', String(total));
+  const permanent = (total: number, links = 0) =>
+    (links > 0 ? english.delete_modal.cards_permanent_links : english.delete_modal.cards_permanent)
+      .replace('{{total}}', String(total))
+      .replace('{{links}}', String(links));
+
+  const ready = (deletedCardCount: number, deletedLinkCount = 0): DeletePreviewState =>
+    ({ status: 'ready', deletedCardCount, deletedLinkCount });
 
   beforeEach(async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -57,8 +63,7 @@ describe('DeleteConfirmModal wording follows the preview', () => {
 
   test('a symlink says the link is deleted in one sentence in every state', async () => {
     const states: DeletePreviewState[] = [
-      { status: 'loading' }, { status: 'ready', deletedCardCount: 0 },
-      { status: 'ready', deletedCardCount: 1 }, { status: 'error' },
+      { status: 'loading' }, ready(0), ready(1), { status: 'error' },
     ];
     for (const preview of states) {
       await renderModal(modal({ isSymlink: true, preview }));
@@ -72,7 +77,7 @@ describe('DeleteConfirmModal wording follows the preview', () => {
   });
 
   test('a symlink whose card sits elsewhere says the original card stays and nothing is deleted permanently', async () => {
-    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 0 } }));
+    await renderModal(modal({ isSymlink: true, preview: ready(0) }));
 
     expect(container.textContent).toContain(english.delete_modal.link_card_stays);
     expect(container.textContent).not.toContain('permanently');
@@ -81,14 +86,14 @@ describe('DeleteConfirmModal wording follows the preview', () => {
   });
 
   test('a symlink that deletes cards shows the node notice with their number and no card-stays line', async () => {
-    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 1 } }));
+    await renderModal(modal({ isSymlink: true, preview: ready(1) }));
 
     expect(container.textContent).toContain(permanent(1));
     expect(container.textContent).not.toContain(english.delete_modal.link_card_stays);
     expect(container.textContent!.match(/permanently/g)).toHaveLength(1);
     expect(confirmButton().disabled).toBe(false);
 
-    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 3 } }));
+    await renderModal(modal({ isSymlink: true, preview: ready(3) }));
     expect(container.textContent).toContain(permanent(3));
   });
 
@@ -109,22 +114,40 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     expect(confirmButton().disabled).toBe(false);
   });
 
-  test('a node with cards that exist nowhere else shows their number and that it cannot be undone', async () => {
-    await renderModal(modal({ preview: { status: 'ready', deletedCardCount: 3 } }));
+  test('a node whose cards are deleted shows their number and that it cannot be undone', async () => {
+    await renderModal(modal({ preview: ready(3) }));
 
     expect(container.textContent).toContain(english.delete_modal.title_node);
     expect(container.textContent).toContain(sentence('body_node'));
     expect(container.textContent).toContain(permanent(3));
-    expect(container.textContent).not.toContain(english.delete_modal.cards_none);
+    expect(container.textContent).not.toContain('Links in other places');
     expect(confirmButton().disabled).toBe(false);
   });
 
-  test('a node whose cards all sit elsewhere says nothing is deleted permanently', async () => {
-    await renderModal(modal({ preview: { status: 'ready', deletedCardCount: 0 } }));
+  test('a node whose deleted cards have links in other places shows both numbers in one warning', async () => {
+    await renderModal(modal({ preview: ready(2, 3) }));
 
-    expect(container.textContent).toContain(english.delete_modal.cards_none);
-    expect(container.textContent).not.toContain(permanent(0));
-    expect(container.textContent).not.toContain(english.delete_modal.cards_unknown);
+    expect(container.textContent).toContain(permanent(2, 3));
+    expect(container.textContent).toContain('Links in other places deleted with them: 3');
+    expect(container.textContent!.match(/permanently/g)).toHaveLength(1);
+    expect(container.querySelector('svg')).not.toBeNull();
+    expect(confirmButton().disabled).toBe(false);
+  });
+
+  test('a symlink that deletes cards with links in other places shows both numbers too', async () => {
+    await renderModal(modal({ isSymlink: true, preview: ready(1, 2) }));
+
+    expect(container.textContent).toContain(permanent(1, 2));
+    expect(container.textContent).not.toContain(english.delete_modal.link_card_stays);
+  });
+
+  test('a node preview without any card (abnormal data) shows no extra line', async () => {
+    await renderModal(modal({ preview: ready(0) }));
+
+    const dialog = container.querySelector('h2')!.parentElement!;
+    expect([...dialog.children].map(child => child.textContent)).toHaveLength(3);
+    expect(container.textContent).not.toContain('permanently');
+    expect(container.querySelector('svg')).toBeNull();
   });
 
   test('while the preview loads it says so and keeps the confirm button locked', async () => {
@@ -139,11 +162,12 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     await renderModal(modal({ preview: { status: 'error' } }));
 
     expect(container.textContent).toContain(english.delete_modal.cards_unknown);
+    expect(english.delete_modal.cards_unknown).toContain('links in other places');
     expect(confirmButton().disabled).toBe(false);
   });
 
   test('the name sits in the one sentence and nothing asks the question again', async () => {
-    await renderModal(modal({ preview: { status: 'ready', deletedCardCount: 1 } }));
+    await renderModal(modal({ preview: ready(1) }));
 
     const dialog = container.querySelector('h2')!.parentElement!;
     const texts = [...dialog.children].map(child => child.textContent);
@@ -159,9 +183,30 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     for (const text of Object.values(korean.delete_modal)) {
       expect(text).not.toMatch(/[―·]/);
     }
+    expect(korean.delete_modal.title_node).toBe('노드 삭제');
+    expect(korean.delete_modal.title_link).toBe('링크 삭제');
     expect(korean.delete_modal.body_node).toBe('"{{name}}" 항목과 그 아래가 모두 삭제됩니다.');
     expect(korean.delete_modal.body_link).toBe('"{{name}}" 링크가 삭제됩니다.');
     expect(korean.delete_modal.link_card_stays).toBe('원본 카드는 남습니다.');
+    expect(korean.delete_modal.cards_permanent).toBe('카드 {{total}}개가 영구 삭제되며 되돌릴 수 없습니다.');
+    expect(korean.delete_modal.cards_permanent_links)
+      .toBe('카드 {{total}}개가 영구 삭제되고 다른 자리 링크 {{links}}개도 함께 지워집니다. 되돌릴 수 없습니다.');
+    expect(korean.delete_modal.cards_unknown).toBe('이 항목과 그 아래의 카드는 다른 자리 링크까지 함께 영구 삭제됩니다.');
+    for (const text of Object.values(korean.delete_modal)) {
+      expect(text).not.toContain('다른 자리에 없는');
+    }
+  });
+
+  test('every language has both card-count lines with their numbers and no longer carries cards_none', () => {
+    const all = [english, korean, chinese, french, german, japanese, portuguese, russian, spanish];
+    for (const language of all) {
+      const modalText = language.delete_modal as Record<string, string>;
+      expect(modalText.cards_permanent).toContain('{{total}}');
+      expect(modalText.cards_permanent).not.toContain('{{links}}');
+      expect(modalText.cards_permanent_links).toContain('{{total}}');
+      expect(modalText.cards_permanent_links).toContain('{{links}}');
+      expect(modalText).not.toHaveProperty('cards_none');
+    }
   });
 
   test('every language has the card-stays line and no longer carries the retired link sentences', () => {

@@ -314,14 +314,6 @@ export async function selectNodesByCardId(
   return result.rows.map(rowToNode);
 }
 
-export async function deleteNodeById(
-  db: Queryable,
-  id: string
-): Promise<boolean> {
-  const result = await db.query(`DELETE FROM tree_nodes WHERE id = $1`, [id]);
-  return (result.rowCount ?? 0) > 0;
-}
-
 /**
  * Move a node to a new parent and position. This function only executes the
  * UPDATE with pre-resolved values. All position

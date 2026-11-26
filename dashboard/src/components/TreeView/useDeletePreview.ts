@@ -15,6 +15,10 @@ export function useDeletePreview(node: TreeNodeData | null): DeletePreviewState 
 
   if (node === null) return undefined;
   if (query.isError) return { status: 'error' };
-  if (query.data) return { status: 'ready', deletedCardCount: query.data.deleted_card_count };
+  if (query.data) return {
+    status: 'ready',
+    deletedCardCount: query.data.deleted_card_count,
+    deletedLinkCount: query.data.deleted_link_count,
+  };
   return { status: 'loading' };
 }

@@ -55,7 +55,7 @@ describe("orphan card deletion on SQLite", () => {
     expect(await treeService.getNode(secondNodeId)).toBeNull();
   });
 
-  it("keeps a descendant card and symlink when the canonical node is deleted", async () => {
+  it("deletes a descendant card and its symlink elsewhere when the canonical node goes", async () => {
     const { node_id: parentNodeId } = await cardService.createCard({
       card_type: "structure",
       title: "Parent",
@@ -71,11 +71,12 @@ describe("orphan card deletion on SQLite", () => {
     });
     const alias = await treeService.createSymlink(child.id, otherRootId);
 
-    await treeService.deleteNode(parentNodeId);
+    const deleted = await treeService.deleteNode(parentNodeId);
 
+    expect(deleted?.deletedLinkCount).toBe(1);
     expect(await treeService.getNode(childNodeId)).toBeNull();
-    expect(await cardService.getCard(child.id)).not.toBeNull();
-    expect(await treeService.getNode(alias.id)).not.toBeNull();
+    expect(await cardService.getCard(child.id)).toBeNull();
+    expect(await treeService.getNode(alias.id)).toBeNull();
   });
 
   it("delete_card removes orphaned descendants of its canonical node", async () => {
@@ -92,6 +93,7 @@ describe("orphan card deletion on SQLite", () => {
     expect(await cardService.deleteCard(parent.id)).toEqual({
       deletedCardIds: [parent.id, child.id],
       deletedNodeCount: 2,
+      deletedLinkCount: 0,
     });
     expect(await cardService.getCard(child.id)).toBeNull();
   });
