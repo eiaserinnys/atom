@@ -26,17 +26,6 @@ function rowToAgent(row: Record<string, unknown>): Agent {
   };
 }
 
-export async function findAgentByAgentId(
-  db: Queryable, agentId: string
-): Promise<Agent | null> {
-  const result = await db.query(
-    `SELECT * FROM agents WHERE agent_id = $1`,
-    [agentId]
-  );
-  if (result.rows.length === 0) return null;
-  return rowToAgent(result.rows[0]);
-}
-
 export async function insertAgent(
   db: Queryable,
   input: { agent_id: string; secret_hash: string; display_name?: string; created_by?: string; scope?: AgentScope; }
@@ -55,17 +44,6 @@ export async function listAgents(db: Queryable): Promise<Agent[]> {
     `SELECT * FROM agents ORDER BY created_at ASC`
   );
   return result.rows.map(rowToAgent);
-}
-
-export async function updateAgentActive(
-  db: Queryable, id: string, isActive: boolean
-): Promise<Agent | null> {
-  const result = await db.query(
-    `UPDATE agents SET is_active = $1 WHERE id = $2 RETURNING *`,
-    [isActive, id]
-  );
-  if (result.rows.length === 0) return null;
-  return rowToAgent(result.rows[0]);
 }
 
 export async function updateAgentSettings(
@@ -99,9 +77,4 @@ export async function findActiveAgents(db: Queryable): Promise<Agent[]> {
     `SELECT * FROM agents WHERE is_active = true`
   );
   return result.rows.map(rowToAgent);
-}
-
-export async function agentExists(db: Queryable): Promise<boolean> {
-  const result = await db.query(`SELECT 1 FROM agents LIMIT 1`);
-  return (result.rowCount ?? 0) > 0;
 }

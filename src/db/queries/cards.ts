@@ -2,7 +2,15 @@ import type { Card, CreateCardInput, UpdateCardInput } from "../../shared/types.
 import type { Queryable } from "../queryable.js";
 import { serializeArray, deserializeArray } from "../utils.js";
 
-function rowToCard(row: Record<string, unknown>): Card {
+export const CARD_COLUMNS = [
+  "id", "card_type", "title", "content", "\"references\"", "tags", "card_timestamp",
+  "content_timestamp", "source_type", "source_ref", "source_snapshot", "version",
+  "updated_at", "created_by", "updated_by",
+] as const;
+
+export const CARD_COLUMN_LIST = CARD_COLUMNS.join(", ");
+
+export function rowToCard(row: Record<string, unknown>): Card {
   return {
     id: row["id"] as string,
     card_type: row["card_type"] as Card["card_type"],
@@ -31,7 +39,7 @@ export async function insertCard(
   const result = await db.query(
     `INSERT INTO cards (id, card_type, title, content, tags, "references", content_timestamp, source_type, source_ref, created_by, updated_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     RETURNING *`,
+     RETURNING ${CARD_COLUMN_LIST}`,
     [
       id,
       input.card_type,
@@ -53,7 +61,7 @@ export async function selectCardById(
   db: Queryable,
   id: string
 ): Promise<Card | null> {
-  const result = await db.query(`SELECT * FROM cards WHERE id = $1`, [id]);
+  const result = await db.query(`SELECT ${CARD_COLUMN_LIST} FROM cards WHERE id = $1`, [id]);
   if (result.rows.length === 0) return null;
   return rowToCard(result.rows[0]);
 }
@@ -67,7 +75,7 @@ export async function selectCardsByIds(
     const batch = ids.slice(offset, offset + 500);
     const placeholders = batch.map((_, index) => `$${index + 1}`).join(", ");
     const result = await db.query(
-      `SELECT * FROM cards WHERE id IN (${placeholders})`,
+      `SELECT ${CARD_COLUMN_LIST} FROM cards WHERE id IN (${placeholders})`,
       batch
     );
     cards.push(...result.rows.map(rowToCard));
@@ -177,7 +185,7 @@ export async function updateCardById(
   }
 
   const result = await db.query(
-    `UPDATE cards SET ${sets.join(", ")} ${whereClause} RETURNING *`,
+    `UPDATE cards SET ${sets.join(", ")} ${whereClause} RETURNING ${CARD_COLUMN_LIST}`,
     values
   );
 
@@ -227,46 +235,4 @@ export async function updateCardSourceType(
     `UPDATE cards SET source_type = $1 WHERE id = $2`,
     [sourceType, cardId]
   );
-}
-
-export async function searchCards(
-  db: Queryable,
-  query: string,
-  limit: number = 20
-): Promise<Array<{ card_id: string; title: string; card_type: string; snippet: string; rank: number }>> {
-  const { getDb } = await import("../client.js");
-  const dbType = getDb().dbType;
-
-  if (dbType === "sqlite") {
-    const result = await db.query(
-      `SELECT
-         c.id AS card_id,
-         c.title,
-         c.card_type,
-         snippet(cards_fts, -1, '<b>', '</b>', '...', 20) AS snippet,
-         cards_fts.rank AS rank
-       FROM cards_fts
-       JOIN cards c ON c.rowid = cards_fts.rowid
-       WHERE cards_fts MATCH $1
-       ORDER BY rank
-       LIMIT $2`,
-      [query, limit]
-    );
-    return result.rows;
-  }
-
-  const result = await db.query(
-    `SELECT
-       id AS card_id,
-       title,
-       card_type,
-       ts_headline('simple', coalesce(content, title), plainto_tsquery('simple', $1)) AS snippet,
-       ts_rank(fts_vector, plainto_tsquery('simple', $1)) AS rank
-     FROM cards
-     WHERE fts_vector @@ plainto_tsquery('simple', $1)
-     ORDER BY rank DESC
-     LIMIT $2`,
-    [query, limit]
-  );
-  return result.rows;
 }

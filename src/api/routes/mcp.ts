@@ -1,11 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { registerCardTools } from "../../mcp/tools/card_tools.js";
-import { registerTreeTools } from "../../mcp/tools/tree_tools.js";
-import { registerSearchTools } from "../../mcp/tools/search_tools.js";
-import { registerBatchTools } from "../../mcp/tools/batch_tools.js";
-import { registerExpansionTools } from "../../mcp/tools/expansion_tools.js";
-import { runConfiguredJevEvaluation } from "../../services/jev-search/evaluate.js";
+import { registerAllTools } from "../../mcp/register-tools.js";
 import type { NeighborService } from "../../services/embeddings/neighbors.js";
 import { createScopedMcpServer } from "../../mcp/tool-scope.js";
 import { agentKeyVerifier } from "../agent-key-auth.js";
@@ -30,11 +25,7 @@ export const mcpRoutes: FastifyPluginAsync<McpRoutesOptions> = async (app, { nei
 
     const server = new McpServer({ name: "atom", version: "0.1.0" });
     const scopedServer = createScopedMcpServer(server, agent.scope);
-    registerCardTools(scopedServer, agent.agent_id);
-    registerTreeTools(scopedServer, agent.agent_id, agent.scope);
-    registerSearchTools(scopedServer);
-    registerBatchTools(scopedServer, agent.agent_id);
-    registerExpansionTools(scopedServer, { neighbors: neighborService, evaluate: runConfiguredJevEvaluation });
+    registerAllTools(scopedServer, { agentId: agent.agent_id, scope: agent.scope, neighbors: neighborService });
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless — 세션 없이 매 요청 독립 처리

@@ -27,8 +27,3 @@ export interface QueryExpansionResponse {
   query: { text: string; token_count: number; truncated: boolean };
   neighbors: QueryExpansionNeighbor[];
 }
-
-export interface QueryExpansionError {
-  error: { code: string };
-  key_configured?: boolean;
-}

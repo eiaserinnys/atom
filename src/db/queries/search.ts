@@ -99,43 +99,15 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
     )`);
   }
 
-  const occurrenceSelection = filters.root_node_id
-    ? `LEFT JOIN LATERAL (
+  const subtreeOccurrence = (cardIdRef: string) => `LEFT JOIN LATERAL (
       SELECT tn.id AS node_id, tn.is_symlink
       FROM tree_nodes tn
-      WHERE tn.card_id = c.id AND tn.id IN (SELECT id FROM subtree)
+      WHERE tn.card_id = ${cardIdRef} AND tn.id IN (SELECT id FROM subtree)
       ORDER BY tn.is_symlink ASC, tn.id ASC
-      LIMIT 1
-    ) selected_node ON TRUE`
-    : `LEFT JOIN LATERAL (
-      SELECT tn.id AS node_id, tn.is_symlink
-      FROM tree_nodes tn
-      WHERE tn.card_id = c.id AND tn.is_symlink = FALSE
       LIMIT 1
     ) selected_node ON TRUE`;
 
-  // LIMIT is always the last parameter
-  const limitIdx = idx;
-  params.push(filters.limit ?? 20);
-
-  const sql = `WITH RECURSIVE ${subtreeCte}tsq AS (
-    SELECT websearch_to_tsquery('simple', $${queryIdx}) AS q
-  )
-  SELECT
-    c.id AS card_id,
-    selected_node.node_id,
-    c.title,
-    c.card_type,
-    COALESCE(selected_node.is_symlink, FALSE) AS is_symlink,
-    ts_headline('simple',
-      coalesce(c.content, c.title),
-      tsq.q,
-      'MaxWords=20, MinWords=10'
-    ) AS snippet,
-    COALESCE(breadcrumb.path, '{}') AS node_path
-  FROM cards c, tsq
-  ${occurrenceSelection}
-  LEFT JOIN LATERAL (
+  const breadcrumbSelection = `LEFT JOIN LATERAL (
     WITH RECURSIVE anc AS (
       SELECT tn.parent_node_id, ac.title, 1 AS depth, ARRAY[tn.id] AS visited
       FROM tree_nodes tn
@@ -151,7 +123,66 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
     SELECT array_agg(title ORDER BY depth DESC) AS path
     FROM anc
     WHERE depth > 1
-  ) breadcrumb ON selected_node.node_id IS NOT NULL
+  ) breadcrumb ON selected_node.node_id IS NOT NULL`;
+
+  // LIMIT is always the last parameter
+  const limitIdx = idx;
+  params.push(filters.limit ?? 20);
+
+  // Scoped search ranks and cuts to the top cards first so the per-card
+  // occurrence, breadcrumb and headline work runs for `limit` cards only.
+  if (filters.root_node_id) {
+    const sql = `WITH RECURSIVE ${subtreeCte}tsq AS (
+    SELECT websearch_to_tsquery('simple', $${queryIdx}) AS q
+  ), top AS (
+    SELECT c.id, c.title, c.card_type, c.content, ts_rank(c.fts_vector, tsq.q) AS rank
+    FROM cards c, tsq
+    WHERE ${conditions.join("\n      AND ")}
+    ORDER BY rank DESC, c.id ASC
+    LIMIT $${limitIdx}
+  )
+  SELECT
+    top.id AS card_id,
+    selected_node.node_id,
+    top.title,
+    top.card_type,
+    COALESCE(selected_node.is_symlink, FALSE) AS is_symlink,
+    ts_headline('simple',
+      coalesce(top.content, top.title),
+      tsq.q,
+      'MaxWords=20, MinWords=10'
+    ) AS snippet,
+    COALESCE(breadcrumb.path, '{}') AS node_path
+  FROM top, tsq
+  ${subtreeOccurrence("top.id")}
+  ${breadcrumbSelection}
+  ORDER BY top.rank DESC, top.id ASC`;
+    return { sql, params };
+  }
+
+  const sql = `WITH RECURSIVE tsq AS (
+    SELECT websearch_to_tsquery('simple', $${queryIdx}) AS q
+  )
+  SELECT
+    c.id AS card_id,
+    selected_node.node_id,
+    c.title,
+    c.card_type,
+    COALESCE(selected_node.is_symlink, FALSE) AS is_symlink,
+    ts_headline('simple',
+      coalesce(c.content, c.title),
+      tsq.q,
+      'MaxWords=20, MinWords=10'
+    ) AS snippet,
+    COALESCE(breadcrumb.path, '{}') AS node_path
+  FROM cards c, tsq
+  LEFT JOIN LATERAL (
+    SELECT tn.id AS node_id, tn.is_symlink
+    FROM tree_nodes tn
+    WHERE tn.card_id = c.id AND tn.is_symlink = FALSE
+    LIMIT 1
+  ) selected_node ON TRUE
+  ${breadcrumbSelection}
   WHERE ${conditions.join("\n    AND ")}
   ORDER BY ts_rank(c.fts_vector, tsq.q) DESC
   LIMIT $${limitIdx}`;

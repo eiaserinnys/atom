@@ -1,4 +1,5 @@
-import type { TreeNode } from "../../shared/types.js";
+import type { Card, TreeNode } from "../../shared/types.js";
+import { CARD_COLUMNS, rowToCard } from "./cards.js";
 import type { Queryable } from "../queryable.js";
 import { deserializeBoolean } from "../utils.js";
 import {
@@ -134,6 +135,35 @@ export async function selectChildren(
   return result.rows.map(rowToNode);
 }
 
+const CARD_ALIAS_PREFIX = "card__";
+const CARD_ALIASED_COLUMNS = CARD_COLUMNS.map(
+  (column) => `c.${column} AS ${CARD_ALIAS_PREFIX}${column.replaceAll('"', "")}`
+).join(", ");
+
+/** Children of a parent joined with their cards; children without a card are skipped. */
+export async function selectChildrenWithCardRows(
+  db: Queryable,
+  parent_node_id: string | null
+): Promise<Array<{ node: TreeNode; card: Card }>> {
+  const result = await db.query(
+    `SELECT tn.id, tn.card_id, tn.parent_node_id, tn.position, tn.is_symlink,
+            tn.created_at, tn.journal_limit, ${CARD_ALIASED_COLUMNS}
+     FROM tree_nodes tn
+     JOIN cards c ON c.id = tn.card_id
+     WHERE tn.parent_node_id IS NOT DISTINCT FROM $1
+     ORDER BY tn.position ASC, tn.id ASC`,
+    [parent_node_id]
+  );
+  return result.rows.map((row) => {
+    const cardRow: Record<string, unknown> = {};
+    for (const column of CARD_COLUMNS) {
+      const name = column.replaceAll('"', "");
+      cardRow[name] = row[`${CARD_ALIAS_PREFIX}${name}`];
+    }
+    return { node: rowToNode(row), card: rowToCard(cardRow) };
+  });
+}
+
 export async function selectChildrenByParentIds(
   db: Queryable,
   parentNodeIds: string[]
@@ -208,6 +238,44 @@ export async function getNodeBreadcrumb(
     [nodeId]
   );
   return result.rows.map((r: any) => r.title as string);
+}
+
+/** Same result as getNodeBreadcrumb for many nodes at once, keyed by node id. */
+export async function getNodeBreadcrumbs(
+  db: Queryable,
+  nodeIds: string[]
+): Promise<Map<string, string[]>> {
+  const breadcrumbs = new Map<string, string[]>();
+  const uniqueIds = [...new Set(nodeIds)];
+  for (let offset = 0; offset < uniqueIds.length; offset += 500) {
+    const batch = uniqueIds.slice(offset, offset + 500);
+    const placeholders = batch.map((_, index) => `$${index + 1}`).join(", ");
+    const result = await db.query(
+      `WITH RECURSIVE ancestors AS (
+         SELECT tn.id AS root_id, tn.id, tn.parent_node_id, c.title, 0 AS depth,
+                '|' || CAST(tn.id AS TEXT) || '|' AS visited
+         FROM tree_nodes tn
+         JOIN cards c ON c.id = tn.card_id
+         WHERE tn.id IN (${placeholders})
+         UNION ALL
+         SELECT a.root_id, tn.id, tn.parent_node_id, c.title, a.depth + 1,
+                a.visited || CAST(tn.id AS TEXT) || '|'
+         FROM tree_nodes tn
+         JOIN cards c ON c.id = tn.card_id
+         JOIN ancestors a ON tn.id = a.parent_node_id
+         WHERE a.visited NOT LIKE '%|' || CAST(tn.id AS TEXT) || '|%'
+       )
+       SELECT root_id, title FROM ancestors ORDER BY root_id, depth DESC`,
+      batch
+    );
+    for (const row of result.rows) {
+      const rootId = row.root_id as string;
+      const titles = breadcrumbs.get(rootId);
+      if (titles) titles.push(row.title as string);
+      else breadcrumbs.set(rootId, [row.title as string]);
+    }
+  }
+  return breadcrumbs;
 }
 
 export class TreeCycleError extends Error {

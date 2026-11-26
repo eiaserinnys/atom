@@ -1,6 +1,9 @@
 import { getDb } from "../db/client.js";
 import {
+  CARD_COLUMNS,
+  CARD_COLUMN_LIST,
   insertCard,
+  rowToCard,
   selectCardById,
   updateCardById,
 } from "../db/queries/cards.js";
@@ -135,33 +138,17 @@ export async function getBacklinks(cardId: string): Promise<Card[]> {
   let result;
   if (db.dbType === 'sqlite') {
     result = await db.query(
-      `SELECT c.* FROM cards c, json_each(c."references") je
+      `SELECT ${CARD_COLUMNS.map((column) => `c.${column}`).join(", ")} FROM cards c, json_each(c."references") je
        WHERE je.value = $1`,
       [cardId]
     );
   } else {
     result = await db.query(
-      `SELECT * FROM cards WHERE $1 = ANY("references")`,
+      `SELECT ${CARD_COLUMN_LIST} FROM cards WHERE $1 = ANY("references")`,
       [cardId]
     );
   }
-  return result.rows.map((row: Record<string, unknown>) => ({
-    id: row["id"] as string,
-    card_type: row["card_type"] as Card["card_type"],
-    title: row["title"] as string,
-    content: (row["content"] as string | null) ?? null,
-    references: deserializeArray(row["references"]),
-    tags: deserializeArray(row["tags"]),
-    card_timestamp: row["card_timestamp"] as Card["card_timestamp"],
-    content_timestamp: (row["content_timestamp"] as string | null) ?? null,
-    source_type: (row["source_type"] as string | null) ?? null,
-    source_ref: (row["source_ref"] as string | null) ?? null,
-    source_snapshot: (row["source_snapshot"] as string | null) ?? null,
-    version: row["version"] as number,
-    updated_at: row["updated_at"] as string,
-    created_by: (row["created_by"] as string | null) ?? null,
-    updated_by: (row["updated_by"] as string | null) ?? null,
-  }));
+  return result.rows.map(rowToCard);
 }
 
 export async function getCardNodes(cardId: string) {
