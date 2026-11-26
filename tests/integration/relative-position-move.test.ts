@@ -292,6 +292,6 @@ describe("move_node — error cases", () => {
 
     await expect(
       treeService.moveNode(a, { before: "00000000-0000-0000-0000-000000000000" })
-    ).rejects.toThrow(/not found among siblings/);
+    ).rejects.toThrow(/Invalid before: .* is not a child of the target parent/);
   });
 });

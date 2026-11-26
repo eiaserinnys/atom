@@ -1,5 +1,11 @@
 import { updateCardById } from "../db/queries/cards.js";
 import type { Queryable } from "../db/queryable.js";
+import {
+  assertValidCardTitle,
+  cardNotFound,
+  ConflictError,
+  versionConflictMessage,
+} from "./service-errors.js";
 import type {
   AtomPatchEvent,
   BatchOpResult,
@@ -34,6 +40,7 @@ async function updateBatchCard(
   actor: string | null
 ): Promise<void> {
   const { card_id: cardId, expected_version: expectedVersion, ...fields } = item;
+  if (fields.title !== undefined) assertValidCardTitle(fields.title);
   const contentChanged = fields.content !== undefined;
   const updateResult = await updateCardById(
     db,
@@ -44,12 +51,10 @@ async function updateBatchCard(
     expectedVersion
   );
   if (updateResult === null) {
-    throw new Error(`Card not found: ${cardId}`);
+    throw await cardNotFound(cardId, db);
   }
   if (updateResult.conflict) {
-    throw new Error(
-      `VersionConflict: card ${cardId} expected version ${expectedVersion}, actual ${updateResult.actualVersion}`
-    );
+    throw new ConflictError(versionConflictMessage(cardId, expectedVersion, updateResult.actualVersion));
   }
 
   result.updated.push(cardId);

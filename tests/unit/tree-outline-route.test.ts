@@ -18,6 +18,7 @@ function makeApp(result: TreeOutline | null = null) {
   app.get(
     "/api/tree/outline",
     createTreeOutlineHandler({
+      missingNodeMessage: async (nodeId) => `Node not found: ${nodeId}`,
       getTreeOutline: async (nodeId, depth, excerptChars) => {
         calls.push({ nodeId, depth, excerptChars });
         return result === null
@@ -95,7 +96,7 @@ describe("tree outline route boundary", () => {
       url: `/api/tree/outline?node_id=${NODE_ID}`,
     });
     expect(res.statusCode).toBe(404);
-    expect(res.json()).toEqual({ error: "Node not found" });
+    expect(res.json()).toEqual({ error: `Node not found: ${NODE_ID}` });
     expect(calls).toEqual([{ nodeId: NODE_ID, depth: 2, excerptChars: 0 }]);
   });
 

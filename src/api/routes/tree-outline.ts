@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { TreeOutline } from "../../shared/types.js";
+import { nodeNotFound } from "../../services/service-errors.js";
 
 /**
  * GET /api/tree/outline (agent key) and GET /tree/outline (dashboard JWT)
@@ -60,6 +61,7 @@ export function parseTreeOutlineQuery(query: unknown): TreeOutlineQueryParseResu
 
 export interface TreeOutlineHandlerDeps {
   getTreeOutline(nodeId: string | null, depth: number, excerptChars: number): Promise<TreeOutline | null>;
+  missingNodeMessage?(nodeId: string): Promise<string>;
 }
 
 export function createTreeOutlineHandler(deps: TreeOutlineHandlerDeps) {
@@ -70,7 +72,8 @@ export function createTreeOutlineHandler(deps: TreeOutlineHandlerDeps) {
     }
     const outline = await deps.getTreeOutline(parsed.nodeId, parsed.depth, parsed.excerptChars);
     if (!outline) {
-      return reply.code(404).send({ error: "Node not found" });
+      const missing = deps.missingNodeMessage ?? (async (nodeId: string) => (await nodeNotFound(nodeId)).message);
+      return reply.code(404).send({ error: await missing(parsed.nodeId as string) });
     }
     return outline;
   };

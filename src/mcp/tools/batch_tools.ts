@@ -1,11 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { executeBatchOp } from "../../services/batch.service.js";
+import { CARD_TITLE_MAX_CHARS } from "../../shared/card-title.js";
 
 const batchCreateItemSchema = z.object({
   temp_id: z.string(),
   card_type: z.enum(["structure", "knowledge"]),
-  title: z.string().max(50),
+  title: z.string().min(1).max(CARD_TITLE_MAX_CHARS),
   content: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
   references: z.array(z.string().uuid()).optional(),
@@ -26,7 +27,7 @@ const batchSymlinkItemSchema = z.object({
 
 export const batchUpdateItemSchema = z.object({
   card_id: z.string().uuid().describe("card_id (card content, shown as card: in compile_subtree output). Not a node_id."),
-  title: z.string().max(50).optional(),
+  title: z.string().min(1).max(CARD_TITLE_MAX_CHARS).optional(),
   content: z.string().nullable().optional().describe("New content. Replaces the whole body (send the full text). Null clears."),
   tags: z.array(z.string()).optional(),
   references: z.array(z.string().uuid()).optional(),

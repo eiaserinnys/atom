@@ -75,7 +75,7 @@ function neighborError(result: Exclude<NeighborServiceResult, { statusCode: 200 
     ...(body.error.reason ? { reason: body.error.reason } : {}),
     ...(body.key_configured === undefined ? {} : { key_configured: body.key_configured }),
   };
-  const message = body.error.code === "CARD_NOT_FOUND" ? "Card was not found."
+  const message = body.error.code === "CARD_NOT_FOUND" ? (body.error.message ?? "Card was not found.")
     : body.error.code === "CARD_NOT_EMBEDDABLE" ? "Card has no embeddable content."
     : body.error.code === "CARD_NOT_IN_TREE" ? "Card has no canonical tree node."
     : body.error.code === "EMBEDDING_NOT_READY" ? "The card embedding is not ready."

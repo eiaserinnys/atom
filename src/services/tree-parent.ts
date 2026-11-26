@@ -1,5 +1,6 @@
 import type { Queryable } from "../db/queryable.js";
 import { selectCanonicalNodeByCardId, selectNodeById } from "../db/queries/tree.js";
+import { assertNodeExists } from "./service-errors.js";
 
 /** Resolve a node to its canonical parent, preserving missing-node information. */
 export async function resolveParentNodeId(
@@ -14,11 +15,13 @@ export async function resolveParentNodeId(
   return canonical?.id ?? node.id;
 }
 
-/** Resolve a write parent through a symlink, keeping missing IDs writable. */
+/** Resolve a parent through a symlink to its canonical node; a missing node is a NotFoundError. */
 export async function resolveWriteParentNodeId(
   db: Queryable,
-  parentNodeId: string | null
+  parentNodeId: string | null,
+  subject = "Parent node"
 ): Promise<string | null> {
   if (parentNodeId === null) return null;
-  return (await resolveParentNodeId(db, parentNodeId)) ?? parentNodeId;
+  await assertNodeExists(db, parentNodeId, subject);
+  return (await resolveParentNodeId(db, parentNodeId)) as string;
 }

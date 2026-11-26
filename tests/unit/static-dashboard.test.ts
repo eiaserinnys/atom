@@ -82,8 +82,8 @@ it('serves only static routes publicly and keeps registered data routes protecte
   const login = await app.inject({ method: 'POST', url: '/api/auth/password-login', payload: { password: 'password' } });
   const headers = { cookie: (login.headers['set-cookie'] as string).split(';')[0] };
   const links = await app.inject({ url: backlink, headers });
-  expect(links.statusCode).toBe(200);
-  expect(links.json()).toEqual([]);
+  expect(links.statusCode).toBe(404);
+  expect(links.json()).toEqual({ error: 'Card not found: 00000000-0000-4000-8000-000000000001' });
   expect((await app.inject({ url: '/tree', headers })).statusCode).toBe(200);
 });
 

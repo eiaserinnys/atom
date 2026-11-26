@@ -185,6 +185,10 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
         return reply.code(400).send({ error: 'scope must be read or write' });
       }
 
+      if ((await listAgents(getDb())).some((existing) => existing.agent_id === agent_id)) {
+        return reply.code(409).send({ error: `agent_id already exists: ${agent_id}` });
+      }
+
       const plainSecret = randomBytes(32).toString('hex');
       const secretHash = await bcrypt.hash(plainSecret, 10);
       const agent = await insertAgent(getDb(), {

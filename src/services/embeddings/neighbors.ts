@@ -4,13 +4,14 @@ import { countIndexEmbeddings, listCurrentEligibleVersions, listIndexEmbeddings 
 import { getOpenAIKeyMetadata } from "../../db/queries/openai-settings.js";
 import type { CardNeighbor, CardNeighborsResponse, NeighborPathEntry } from "../../shared/embeddings.js";
 import { toOutlineExcerpt } from "../outline-excerpt.js";
+import { cardNotFound } from "../service-errors.js";
 import type { FlatEmbeddingIndex, StoredEmbedding } from "./flat-index.js";
 import { EMBEDDING_POLICY } from "./policy.js";
 
 export type NeighborServiceResult =
   | { statusCode: 200; body: CardNeighborsResponse }
   | { statusCode: 202; body: { status: "loading"; retry_after_ms: 1000 } }
-  | { statusCode: 400 | 404 | 409 | 422 | 503; body: { error: { code: string; reason?: string }; key_configured?: boolean } };
+  | { statusCode: 400 | 404 | 409 | 422 | 503; body: { error: { code: string; message?: string; reason?: string }; key_configured?: boolean } };
 
 export interface NeighborService {
   get(cardId: string, limit: number): Promise<NeighborServiceResult>;
@@ -39,7 +40,7 @@ export function createNeighborService(db: DatabaseAdapter, index: FlatEmbeddingI
       [cardId]
     );
     const card = sourceCard.rows[0];
-    if (!card) return { statusCode: 404, body: { error: { code: "CARD_NOT_FOUND" } } };
+    if (!card) return { statusCode: 404, body: { error: { code: "CARD_NOT_FOUND", message: (await cardNotFound(cardId, db)).message } } };
     if (!Boolean(card["has_content"])) {
       return { statusCode: 422, body: { error: { code: "CARD_NOT_EMBEDDABLE" } } };
     }

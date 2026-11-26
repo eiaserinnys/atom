@@ -3,6 +3,7 @@ import { z } from "zod";
 import { SearchQueryInputError } from "../../db/queries/search.js";
 import { normalizeSearchRootNodeId, searchCards } from "../../services/search.service.js";
 import { runConfiguredJevSearch } from "../../services/jev-search/service.js";
+import { normalizeJevRootNodeId } from "../../services/jev-search/root-scope.js";
 import { JevSearchRequestError } from "../../services/jev-search/config.js";
 import type { JevSearchCompactResponse, JevSearchInput, JevSearchResponse } from "../../shared/jev-search.js";
 import type { SearchFilters, SearchResult } from "../../shared/types.js";
@@ -61,18 +62,22 @@ export function registerSearchTools(server: McpServer, overrides: Partial<Search
       if (unsupported.some((key) => searchFilters[key as keyof typeof searchFilters] !== undefined)) {
         return toolError("JEV_UNSUPPORTED_FILTER", "Jev search does not support BM25 filters.");
       }
-      const input: JevSearchInput = {
-        query: filters.query,
-        root_node_id: (await (deps.normalizeSearchRootNodeId ?? normalizeSearchRootNodeId)(filters.root_node_id)) ?? null,
-        limit: filters.limit,
-        exhaustive,
-        context: {
-          agent: context?.agent,
-          project: context?.project,
-          task: context?.task,
-        },
-      };
       try {
+        const rootNodeId = await normalizeJevRootNodeId(
+          deps.normalizeSearchRootNodeId ?? normalizeSearchRootNodeId,
+          filters.root_node_id
+        );
+        const input: JevSearchInput = {
+          query: filters.query,
+          root_node_id: rootNodeId ?? null,
+          limit: filters.limit,
+          exhaustive,
+          context: {
+            agent: context?.agent,
+            project: context?.project,
+            task: context?.task,
+          },
+        };
         const result = await deps.runJev(input, extra.signal);
         return {
           content: [{ type: "text", text: JSON.stringify(include_trace ? result : compactResponse(result)) }],

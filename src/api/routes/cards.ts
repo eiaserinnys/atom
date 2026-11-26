@@ -6,30 +6,23 @@ import {
   deleteCard,
   getBacklinks,
 } from "../../services/card.service.js";
+import { cardNotFound, versionConflictMessage } from "../../services/service-errors.js";
+import { registerServiceErrors } from "../service-errors-http.js";
+import { parseCreateCardBody } from "./card-body.js";
 
 export async function cardRoutes(app: FastifyInstance): Promise<void> {
+  registerServiceErrors(app);
+
   // GET /cards/:id
   app.get<{ Params: { id: string } }>("/cards/:id", async (req, reply) => {
     const card = await getCard(req.params.id);
-    if (!card) return reply.code(404).send({ error: "Card not found" });
+    if (!card) throw await cardNotFound(req.params.id);
     return card;
   });
 
   // POST /cards
   app.post("/cards", async (req, reply) => {
-    const body = req.body as Record<string, unknown>;
-    const { card, node_id } = await createCard({
-      card_type: body["card_type"] as "structure" | "knowledge",
-      title: body["title"] as string,
-      content: (body["content"] as string | null) ?? null,
-      parent_node_id: (body["parent_node_id"] as string | null) ?? null,
-      position: body["position"] as number | undefined,
-      tags: (body["tags"] as string[]) ?? [],
-      references: (body["references"] as string[]) ?? [],
-      content_timestamp: (body["content_timestamp"] as string | null) ?? null,
-      source_type: (body["source_type"] as string | null) ?? null,
-      source_ref: (body["source_ref"] as string | null) ?? null,
-    });
+    const { card, node_id } = await createCard(parseCreateCardBody(req.body));
     return reply.code(201).send({ ...card, node_id });
   });
 
@@ -45,9 +38,13 @@ export async function cardRoutes(app: FastifyInstance): Promise<void> {
       source_type: body["source_type"] as string | null | undefined,
       source_ref: body["source_ref"] as string | null | undefined,
     }, body["expected_version"] as number | undefined);
-    if (!updated) return reply.code(404).send({ error: "Card not found" });
+    if (!updated) throw await cardNotFound(req.params.id);
     if (updated.conflict) {
-      return reply.code(409).send({ error: "VERSION_CONFLICT", current_version: updated.actualVersion });
+      return reply.code(409).send({
+        error: "VERSION_CONFLICT",
+        current_version: updated.actualVersion,
+        message: versionConflictMessage(req.params.id, body["expected_version"] as number | undefined, updated.actualVersion),
+      });
     }
     return updated;
   });
@@ -55,7 +52,7 @@ export async function cardRoutes(app: FastifyInstance): Promise<void> {
   // DELETE /cards/:id
   app.delete<{ Params: { id: string } }>("/cards/:id", async (req, reply) => {
     const deleted = await deleteCard(req.params.id);
-    if (!deleted) return reply.code(404).send({ error: "Card not found" });
+    if (!deleted) throw await cardNotFound(req.params.id);
     return reply.code(204).send();
   });
 

@@ -1,4 +1,5 @@
 import type { Queryable } from "../db/queryable.js";
+import { InvalidInputError } from "./service-errors.js";
 import {
   keyBetween,
   NORMAL_DIGIT_COUNT,
@@ -69,7 +70,7 @@ function validateSinglePositionSpecifier(opts: PositionSpecifierOptions): void {
     (v) => v !== undefined
   );
   if (specifiers.length > 1) {
-    throw new Error(
+    throw new InvalidInputError(
       "move_node: only one of before, after, to, or position may be specified"
     );
   }
@@ -77,7 +78,7 @@ function validateSinglePositionSpecifier(opts: PositionSpecifierOptions): void {
 
 function resolveDeprecatedAbsolutePosition(position: number): ResolvedPositionKey {
   if (position < 0) {
-    throw new Error(`move_node: position must be non-negative, got ${position}`);
+    throw new InvalidInputError(`move_node: position must be non-negative, got ${position}`);
   }
   return {
     key: posToKey(position),
@@ -96,7 +97,7 @@ async function resolveRelativePositionKey(
   opts: PositionSpecifierOptions
 ): Promise<ResolvedPositionKey> {
   const allSiblings = await selectPositionSiblings(db, parentNodeId);
-  validateRelativeTargets(allSiblings, opts);
+  validateRelativeTargets(allSiblings, parentNodeId, opts);
 
   const siblings = selfNodeId
     ? allSiblings.filter((s) => s.id !== selfNodeId)
@@ -118,21 +119,17 @@ async function resolveRelativePositionKey(
 
 function validateRelativeTargets(
   allSiblings: PositionSibling[],
+  parentNodeId: string | null,
   opts: PositionSpecifierOptions
 ): void {
   // Validate before/after target BEFORE self-exclusion; otherwise a
   // non-existent sibling can be masked by the empty-array shortcut.
-  if (opts.before) {
-    if (!allSiblings.some((s) => s.id === opts.before)) {
-      throw new Error(
-        `move_node: before node '${opts.before}' not found among siblings of parent`
-      );
-    }
-  }
-  if (opts.after) {
-    if (!allSiblings.some((s) => s.id === opts.after)) {
-      throw new Error(
-        `move_node: after node '${opts.after}' not found among siblings of parent`
+  for (const field of ["before", "after"] as const) {
+    const target = opts[field];
+    if (target && !allSiblings.some((s) => s.id === target)) {
+      throw new InvalidInputError(
+        `Invalid ${field}: ${target} is not a child of the target parent `
+        + `(${parentNodeId ?? "root"}). ${field} must be the node_id of an existing child of the parent the node is moved under.`
       );
     }
   }

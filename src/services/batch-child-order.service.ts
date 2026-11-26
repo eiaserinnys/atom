@@ -8,6 +8,7 @@ import type {
   TreeNode,
 } from "../shared/types.js";
 import { selectChildrenWithCards, toTreeNodeWithCard } from "./tree-node-payload.js";
+import { nodeNotFound } from "./service-errors.js";
 import { resolveWriteParentNodeId } from "./tree-parent.js";
 
 interface ProcessBatchChildOrdersContext {
@@ -47,7 +48,7 @@ async function applyChildOrder(
 
     const movedNode = await selectNodeById(db, nodeId);
     if (!movedNode) {
-      throw new Error(`child_orders: node not found: ${nodeId}`);
+      throw await nodeNotFound(nodeId, "child_orders: node", db);
     }
 
     patches.push({
@@ -72,7 +73,7 @@ async function selectOrderedNodes(
   for (const nodeId of childOrder.order) {
     const oldNode = await selectNodeById(db, nodeId);
     if (!oldNode) {
-      throw new Error(`child_orders: node not found: ${nodeId}`);
+      throw await nodeNotFound(nodeId, "child_orders: node", db);
     }
     oldNodes.set(nodeId, oldNode);
   }
@@ -91,6 +92,6 @@ async function updateOrderedNode(
     [parentNodeId, positionKey, nodeId]
   );
   if (updateResult.rows.length === 0) {
-    throw new Error(`child_orders: node not found: ${nodeId}`);
+    throw await nodeNotFound(nodeId, "child_orders: node", db);
   }
 }
