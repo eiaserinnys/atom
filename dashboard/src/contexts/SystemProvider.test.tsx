@@ -20,7 +20,7 @@ beforeEach(async () => {
   vi.useFakeTimers();
   vi.clearAllMocks();
   vi.stubGlobal('window', { location: { reload } });
-  api.getStatus.mockResolvedValue({ pendingRestart: true });
+  api.getStatus.mockResolvedValue({ pendingRestart: true, manualRestartRequired: false });
   api.getHealth.mockResolvedValue({ status: 'ok', bootId: 'old' });
   api.restart.mockResolvedValue({ ok: true });
   host = document.createElement('div');
@@ -31,6 +31,13 @@ afterEach(async () => {
   await act(async () => root.unmount());
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+test('carries the server answer on whether a restart needs a manual start', async () => {
+  expect(state.manualRestartRequired).toBe(false);
+  api.getStatus.mockResolvedValue({ pendingRestart: true, manualRestartRequired: true });
+  await act(async () => state.refreshStatus());
+  expect(state.manualRestartRequired).toBe(true);
 });
 
 test('only reloads after a different boot answers health', async () => {
@@ -52,6 +59,21 @@ test('restores the existing restart prompt on timeout even while the old server 
   expect(reload).not.toHaveBeenCalled();
   expect(state.reconnecting).toBe(false);
   expect(state.pendingRestart).toBe(true);
+});
+
+test('waits without a deadline for a manual start, then reloads on a new boot', async () => {
+  api.getStatus.mockResolvedValue({ pendingRestart: true, manualRestartRequired: true });
+  await act(async () => state.refreshStatus());
+  await act(async () => state.triggerRestart());
+  api.getHealth.mockRejectedValue(new Error('offline'));
+  api.getStatus.mockRejectedValue(new Error('offline'));
+  await tick(120_000);
+  expect(state.reconnecting).toBe(true);
+  expect(state.pendingRestart).toBe(false);
+  expect(reload).not.toHaveBeenCalled();
+  api.getHealth.mockResolvedValue({ status: 'ok', bootId: 'started-by-user' });
+  await tick(1000);
+  expect(reload).toHaveBeenCalledTimes(1);
 });
 
 test('restores the existing restart prompt when the request fails', async () => {

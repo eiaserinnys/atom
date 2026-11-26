@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { getPendingRestart, setPendingRestart } from '../state.js';
 import { getDb } from '../../db/client.js';
 import { randomUUID } from 'node:crypto';
+import { restartNeedsManualStart } from '../../config/restart-mode.js';
 
 function requireAdmin(req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply): boolean {
   const user = req.jwtUser;
@@ -39,12 +40,15 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/system/status — admin only
   app.get('/api/system/status', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return reply.send({ pendingRestart: getPendingRestart() });
+    return reply.send({
+      pendingRestart: getPendingRestart(),
+      manualRestartRequired: restartNeedsManualStart(),
+    });
   });
 
   // POST /api/system/restart — admin only
   // Responds immediately, then exits after a short delay so the response is delivered.
-  // The process manager (pm2) is expected to restart the process.
+  // A process manager is expected to start it again; under tsx watch nothing does (manualRestartRequired).
   app.post('/api/system/restart', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
     setPendingRestart(false);

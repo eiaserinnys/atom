@@ -215,5 +215,13 @@
     "tab_settings": "Ajustes",
     "settings_back": "← Ajustes",
     "tab_search": "Buscar"
+  },
+  "system": {
+    "restart_required": "Configuración modificada. Se requiere reiniciar para aplicarla.",
+    "restart_now": "Reiniciar ahora",
+    "restart_manual": "Configuración modificada. Detén el servidor y vuelve a iniciarlo tú mismo para aplicarla.",
+    "shutdown_now": "Detener servidor",
+    "shutdown_done": "El servidor se ha detenido. Vuelve a iniciarlo tú mismo para continuar.",
+    "reconnecting": "Conectando con el servidor..."
   }
 }

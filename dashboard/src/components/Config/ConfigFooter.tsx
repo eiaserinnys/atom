@@ -8,6 +8,7 @@ interface Props {
   activeTab: ConfigTab | null;
   mobile?: boolean;
   pendingRestart: boolean;
+  manualRestartRequired: boolean;
   triggerRestart: () => void;
   onClose?: () => void;
   authFooter: AuthFooterState | null;
@@ -17,6 +18,7 @@ export function ConfigFooter({
   activeTab,
   mobile = false,
   pendingRestart,
+  manualRestartRequired,
   triggerRestart,
   onClose,
   authFooter,
@@ -28,12 +30,12 @@ export function ConfigFooter({
 
   return (
     <footer className="shrink-0 border-t border-border px-6 py-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="mr-auto flex min-w-0 items-center text-sm text-muted-foreground" aria-live="polite">
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center text-sm text-muted-foreground" aria-live="polite">
           {pendingRestart && !mobile ? (
-            <span className="flex items-center gap-2 text-foreground">
+            <span className="flex items-center gap-2 text-foreground [&:lang(ko)]:break-keep">
               <TriangleAlert className="h-4 w-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
-              {t('system.restart_required')}
+              {manualRestartRequired ? t('system.restart_manual') : t('system.restart_required')}
             </span>
           ) : !pendingRestart && isAuthTab && authFooter?.message ? (
             <span className={authFooter.message.ok ? 'text-muted-foreground' : 'text-node-error'}>
@@ -41,18 +43,22 @@ export function ConfigFooter({
             </span>
           ) : null}
         </div>
-        {!mobile && (
-          <ConfigActionButton tone="secondary" onClick={onClose ?? (() => undefined)}>
-            {t('common.close')}
-          </ConfigActionButton>
-        )}
-        {pendingRestart && !mobile ? (
-          <ConfigActionButton onClick={triggerRestart}>{t('system.restart_now')}</ConfigActionButton>
-        ) : isAuthTab ? (
-          <ConfigActionButton onClick={() => { void authFooter?.onSave(); }} disabled={authFooter?.disabled ?? true}>
-            {authFooter?.saving ? t('common.loading') : t('auth.save')}
-          </ConfigActionButton>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {!mobile && (
+            <ConfigActionButton tone="secondary" onClick={onClose ?? (() => undefined)}>
+              {t('common.close')}
+            </ConfigActionButton>
+          )}
+          {pendingRestart && !mobile ? (
+            <ConfigActionButton onClick={triggerRestart}>
+              {manualRestartRequired ? t('system.shutdown_now') : t('system.restart_now')}
+            </ConfigActionButton>
+          ) : isAuthTab ? (
+            <ConfigActionButton onClick={() => { void authFooter?.onSave(); }} disabled={authFooter?.disabled ?? true}>
+              {authFooter?.saving ? t('common.loading') : t('auth.save')}
+            </ConfigActionButton>
+          ) : null}
+        </div>
       </div>
     </footer>
   );

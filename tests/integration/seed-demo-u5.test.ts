@@ -29,7 +29,11 @@ function writeSeed(entries: unknown[]): void {
 }
 
 function runSeed(args: string[]): SpawnSyncReturns<string> {
-  const env: NodeJS.ProcessEnv = { ...process.env, SQLITE_PATH: sqlitePath };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    SQLITE_PATH: sqlitePath,
+    ATOM_ENV_FILE: path.join(temp, "no-such.env"),
+  };
   delete env.DATABASE_URL;
   delete env.TEST_DATABASE_URL;
   return spawnSync(process.execPath, [tsxEntry, seedScript, ...args], {

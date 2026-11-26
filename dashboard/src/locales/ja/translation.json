@@ -215,5 +215,13 @@
     "tab_settings": "設定",
     "settings_back": "← 設定",
     "tab_search": "検索"
+  },
+  "system": {
+    "restart_required": "設定が変更されました。反映するには再起動が必要です。",
+    "restart_now": "今すぐ再起動",
+    "restart_manual": "設定が変更されました。サーバーを停止し、自分で起動し直すと反映されます。",
+    "shutdown_now": "サーバーを停止",
+    "shutdown_done": "サーバーが停止しました。自分で起動し直すと続きから使えます。",
+    "reconnecting": "サーバーに接続しています..."
   }
 }

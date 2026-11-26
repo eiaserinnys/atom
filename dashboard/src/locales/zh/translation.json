@@ -215,5 +215,13 @@
     "tab_settings": "设置",
     "settings_back": "← 设置",
     "tab_search": "搜索"
+  },
+  "system": {
+    "restart_required": "设置已更改。需要重启才能生效。",
+    "restart_now": "立即重启",
+    "restart_manual": "设置已更改。请先停止服务器，再自行重新启动，设置才会生效。",
+    "shutdown_now": "停止服务器",
+    "shutdown_done": "服务器已停止。请自行重新启动后继续。",
+    "reconnecting": "正在连接服务器..."
   }
 }

@@ -22,10 +22,11 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { createPageAccessCorsOptions } from "./page_access.js";
 import { runMigrations, getDb, closeDb } from "../db/client.js";
-import { config } from "dotenv";
+import { loadConfig } from "../config/load-env.js";
 import { loadAdapters } from "../unfurl/loader.js";
 import { adapterRegistry } from "../unfurl/registry.js";
-import { userExists, insertUser, ensurePasswordAdminUser } from "../db/queries/users.js";
+import { ensurePasswordAdminUser } from "../db/queries/users.js";
+import { seedAllowedAdmin } from "../db/seed-admin.js";
 import { FlatEmbeddingIndex } from "../services/embeddings/flat-index.js";
 import { createEmbeddingSync } from "../services/embeddings/sync.js";
 import { createNeighborService } from "../services/embeddings/neighbors.js";
@@ -36,7 +37,7 @@ import { isAuthBypassEnabled, resolveAuthMode } from "./auth-mode.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-config({ path: path.join(__dirname, "../../.env"), override: true });
+console.log(loadConfig().description);
 
 const db = getDb();
 const embeddingIndex = new FlatEmbeddingIndex();
@@ -92,17 +93,10 @@ async function seedMigration(): Promise<void> {
   const db = getDb();
   if (resolveAuthMode() === "password") await ensurePasswordAdminUser(db);
 
-  // ALLOWED_EMAIL → users 테이블 admin 마이그레이션
-  const allowedEmail = process.env["ALLOWED_EMAIL"];
-  if (allowedEmail && !(await userExists(db))) {
-    if (/^[^@\s]+@[^@\s]+$/.test(allowedEmail)) {
-      await insertUser(db, { email: allowedEmail, display_name: "Admin", role: "admin" });
-      console.log(`[seed] Migrated ALLOWED_EMAIL=${allowedEmail} as admin user`);
-    } else {
-      app.log.warn("Set ALLOWED_EMAIL to a full email address to create the first admin.");
-    }
-  }
-
+  await seedAllowedAdmin(db, process.env["ALLOWED_EMAIL"], {
+    info: (message) => console.log(message),
+    warn: (message) => app.log.warn(message),
+  });
 }
 
 const start = async (): Promise<void> => {

@@ -215,5 +215,13 @@
     "tab_settings": "Paramètres",
     "settings_back": "← Paramètres",
     "tab_search": "Recherche"
+  },
+  "system": {
+    "restart_required": "Paramètres modifiés. Un redémarrage est nécessaire pour les appliquer.",
+    "restart_now": "Redémarrer maintenant",
+    "restart_manual": "Paramètres modifiés. Arrêtez le serveur puis relancez-le vous-même pour les appliquer.",
+    "shutdown_now": "Arrêter le serveur",
+    "shutdown_done": "Le serveur est arrêté. Relancez-le vous-même pour continuer.",
+    "reconnecting": "Reconnexion au serveur..."
   }
 }
