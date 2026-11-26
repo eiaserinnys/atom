@@ -2,8 +2,22 @@ import { getDashboardAdminPassword, resolveAuthMode } from "./auth-mode.js";
 
 export type StartupEnvironment = Record<string, string | undefined>;
 
+export type StartupFailureReason =
+  | "oauth_and_bypass"
+  | "password_and_bypass"
+  | "no_login_method"
+  | "missing_keys";
+
+/** One reason the next start would refuse: the console sentence, the kind of reason, and the key names involved (never values). */
+export type StartupFailure = {
+  reason: StartupFailureReason;
+  keys: string[];
+  message: string;
+};
+
 export type StartupConfigInspection = {
   errors: string[];
+  failures: StartupFailure[];
   warning: string | undefined;
 };
 
@@ -32,22 +46,30 @@ export function inspectStartupConfig(env: StartupEnvironment, source: StartupCon
 
   const hasOAuthProvider = providerRequirements.length > 0;
   const bypassConfigured = env["AUTH_BYPASS"] === "1";
-  const errors: string[] = [];
+  const failures: StartupFailure[] = [];
 
   if (hasOAuthProvider && bypassConfigured) {
-    errors.push("AUTH_BYPASS=1 cannot be combined with an OAuth provider.");
+    failures.push({
+      reason: "oauth_and_bypass",
+      keys: ["AUTH_BYPASS", ...providerRequirements.map(({ clientId }) => clientId)],
+      message: "AUTH_BYPASS=1 cannot be combined with an OAuth provider.",
+    });
   }
 
   const passwordConfigured = Boolean(getDashboardAdminPassword(env));
   if (passwordConfigured && bypassConfigured) {
-    errors.push("AUTH_BYPASS=1 cannot be combined with DASHBOARD_ADMIN_PASSWORD.");
+    failures.push({
+      reason: "password_and_bypass",
+      keys: ["AUTH_BYPASS", "DASHBOARD_ADMIN_PASSWORD"],
+      message: "AUTH_BYPASS=1 cannot be combined with DASHBOARD_ADMIN_PASSWORD.",
+    });
   }
   const mode = resolveAuthMode(env);
   if (mode === undefined) {
-    errors.push(noLoginMethodMessage(source));
+    failures.push({ reason: "no_login_method", keys: [], message: noLoginMethodMessage(source) });
   }
   if (mode === "password" && !env["JWT_SECRET"]?.trim()) {
-    errors.push("Missing required environment variables: JWT_SECRET");
+    failures.push({ reason: "missing_keys", keys: ["JWT_SECRET"], message: "Missing required environment variables: JWT_SECRET" });
   }
 
   if (hasOAuthProvider) {
@@ -58,12 +80,13 @@ export function inspectStartupConfig(env: StartupEnvironment, source: StartupCon
     ];
     const missing = required.filter((name) => !env[name]?.trim());
     if (missing.length > 0) {
-      errors.push("Missing required environment variables: " + missing.join(", "));
+      failures.push({ reason: "missing_keys", keys: missing, message: "Missing required environment variables: " + missing.join(", ") });
     }
   }
 
   return {
-    errors,
+    errors: failures.map(({ message }) => message),
+    failures,
     warning: mode === "oauth" && passwordConfigured
       ? "DASHBOARD_ADMIN_PASSWORD is ignored because an OAuth provider is configured."
       : undefined,

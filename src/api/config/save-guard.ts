@@ -1,10 +1,27 @@
+import fs from "node:fs";
 import path from "node:path";
 import { parseEnvFileContent, resolveEnvFilePath } from "../../config/load-env.js";
-import { inspectStartupConfig } from "../startup-config.js";
+import { inspectStartupConfig, type StartupFailureReason } from "../startup-config.js";
 
 export const STARTUP_WOULD_FAIL = "STARTUP_WOULD_FAIL";
 
-export type SaveVerdict = { ok: true } | { ok: false; reason: string };
+export type SaveVerdict =
+  | { ok: true }
+  | { ok: false; error: string; reason: StartupFailureReason; keys: string[] };
+
+/** The file's real location; a file that does not exist yet is its folder's real location plus its name. */
+function realLocation(file: string): string {
+  const absolute = path.resolve(file);
+  try {
+    return fs.realpathSync(absolute);
+  } catch {
+    try {
+      return path.join(fs.realpathSync(path.dirname(absolute)), path.basename(absolute));
+    } catch {
+      return absolute;
+    }
+  }
+}
 
 /**
  * Whether the server could start again with `nextContent` saved as `savedFile`.
@@ -18,9 +35,10 @@ export function checkSaveKeepsStartupValid(
   shell: NodeJS.ProcessEnv = process.env,
 ): SaveVerdict {
   const loaderFile = resolveEnvFilePath(shell);
-  if (path.resolve(loaderFile) !== path.resolve(savedFile)) return { ok: true };
+  if (realLocation(loaderFile) !== realLocation(savedFile)) return { ok: true };
   const nextStartEnv = { ...shell, ...parseEnvFileContent(nextContent) };
-  const { errors } = inspectStartupConfig(nextStartEnv, { envFile: loaderFile, envFileFound: true });
-  if (errors.length === 0) return { ok: true };
-  return { ok: false, reason: errors[0]!.split("\n")[0]! };
+  const { failures } = inspectStartupConfig(nextStartEnv, { envFile: loaderFile, envFileFound: true });
+  const first = failures[0];
+  if (!first) return { ok: true };
+  return { ok: false, error: first.message.split("\n")[0]!, reason: first.reason, keys: first.keys };
 }

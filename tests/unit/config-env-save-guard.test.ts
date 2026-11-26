@@ -5,6 +5,8 @@ import { jest } from "@jest/globals";
 import Fastify from "fastify";
 import { parse } from "dotenv";
 import { configRoutes } from "../../src/api/routes/config.js";
+import { checkSaveKeepsStartupValid } from "../../src/api/config/save-guard.js";
+import { ENV_FILE_PATH } from "../../src/config/load-env.js";
 import { planPasswordSave } from "../../src/api/admin-password.js";
 import { inspectStartupConfig } from "../../src/api/startup-config.js";
 import { setPendingRestart } from "../../src/api/state.js";
@@ -72,11 +74,13 @@ describe("PUT /api/config/env refuses a save the server could not start with", (
     }
   }
 
-  function expectRefused(result: Awaited<ReturnType<typeof putEnv>>, reasonPart: string) {
+  function expectRefused(result: Awaited<ReturnType<typeof putEnv>>, reasonPart: string, reason: string, keys: string[]) {
     expect(result.response.statusCode).toBe(400);
     const body = result.response.json();
     expect(body.code).toBe("STARTUP_WOULD_FAIL");
     expect(body.error).toContain(reasonPart);
+    expect(body.reason).toBe(reason);
+    expect(body.keys).toEqual(keys);
     expect(result.writeSpy).not.toHaveBeenCalled();
     const visible = result.response.body + logLines.join("");
     SECRET_VALUES.forEach((value) => expect(visible).not.toContain(value));
@@ -85,12 +89,15 @@ describe("PUT /api/config/env refuses a save the server could not start with", (
 
   it("refuses to empty the only login method", async () => {
     const result = await putEnv(OAUTH_FILE, [{ key: "GOOGLE_CLIENT_ID", value: "" }]);
-    expectRefused(result, "No login method");
+    expectRefused(result, "No login method", "no_login_method", []);
   });
 
   it("refuses Google ID alone in password mode", async () => {
     const result = await putEnv(PASSWORD_FILE, [{ key: "GOOGLE_CLIENT_ID", value: "oauth-id-from-form" }]);
-    expectRefused(result, "GOOGLE_CLIENT_SECRET");
+    expectRefused(
+      result, "GOOGLE_CLIENT_SECRET", "missing_keys",
+      ["FRONTEND_URL", "GOOGLE_CLIENT_SECRET", "GOOGLE_CALLBACK_URL"],
+    );
   });
 
   it("refuses an OAuth ID on top of bypass", async () => {
@@ -99,12 +106,24 @@ describe("PUT /api/config/env refuses a save the server could not start with", (
       { key: "GOOGLE_CLIENT_SECRET", value: "google-secret-value" },
       { key: "GOOGLE_CALLBACK_URL", value: "https://atom.example/cb" },
     ]);
-    expectRefused(result, "AUTH_BYPASS=1 cannot be combined");
+    expectRefused(result, "AUTH_BYPASS=1 cannot be combined", "oauth_and_bypass", ["AUTH_BYPASS", "GOOGLE_CLIENT_ID"]);
+  });
+
+  it("refuses a password on top of bypass", async () => {
+    const result = await putEnv("API_PORT=4200\nAUTH_BYPASS=1", [
+      { key: "DASHBOARD_ADMIN_PASSWORD", value: "admin-password-value" },
+    ]);
+    expectRefused(result, "AUTH_BYPASS=1 cannot be combined with DASHBOARD_ADMIN_PASSWORD", "password_and_bypass", ["AUTH_BYPASS", "DASHBOARD_ADMIN_PASSWORD"]);
+  });
+
+  it("refuses a password mode that has no JWT_SECRET", async () => {
+    const result = await putEnv(PASSWORD_FILE, [{ key: "JWT_SECRET", value: "" }]);
+    expectRefused(result, "JWT_SECRET", "missing_keys", ["JWT_SECRET"]);
   });
 
   it("refuses an empty administrator password", async () => {
     const result = await putEnv(PASSWORD_FILE, [{ key: "DASHBOARD_ADMIN_PASSWORD", value: "" }]);
-    expectRefused(result, "No login method");
+    expectRefused(result, "No login method", "no_login_method", []);
   });
 
   it("saves a settings change that keeps the server startable", async () => {
@@ -127,7 +146,19 @@ describe("PUT /api/config/env refuses a save the server could not start with", (
     expect(String(kept.writeSpy.mock.calls[0]?.[1])).not.toContain("GOOGLE_CLIENT_ID");
 
     const blanked = await putEnv("API_PORT=4200", [{ key: "GOOGLE_CLIENT_ID", value: "" }]);
-    expectRefused(blanked, "No login method");
+    expectRefused(blanked, "No login method", "no_login_method", []);
+  });
+
+  it("judges a sensitive key sent as *** by the value already saved", async () => {
+    const kept = await putEnv(PASSWORD_FILE, [
+      { key: "DASHBOARD_ADMIN_PASSWORD", value: "***" },
+      { key: "ALLOWED_EMAIL", value: "admin@example.test" },
+    ]);
+    expect(kept.response.statusCode).toBe(200);
+    expect(String(kept.writeSpy.mock.calls[0]?.[1])).toBe(`${PASSWORD_FILE}\nALLOWED_EMAIL=admin@example.test`);
+
+    const nothingToKeep = await putEnv("API_PORT=4200", [{ key: "DASHBOARD_ADMIN_PASSWORD", value: "***" }]);
+    expectRefused(nothingToKeep, "No login method", "no_login_method", []);
   });
 
   it("does not judge a save the loader never reads (ATOM_ENV_FILE points at another file)", async () => {
@@ -135,6 +166,38 @@ describe("PUT /api/config/env refuses a save the server could not start with", (
     const { response, writeSpy } = await putEnv(OAUTH_FILE, [{ key: "GOOGLE_CLIENT_ID", value: "" }]);
     expect(response.statusCode).toBe(200);
     expect(writeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  describe("judges a save when ATOM_ENV_FILE names the saved file in another spelling", () => {
+    let dir: string;
+
+    beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), "atom-save-guard-link-")); });
+    afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+    it("as a relative path", async () => {
+      process.env["ATOM_ENV_FILE"] = path.relative(process.cwd(), ENV_FILE_PATH);
+      expect(path.isAbsolute(process.env["ATOM_ENV_FILE"])).toBe(false);
+      const result = await putEnv(OAUTH_FILE, [{ key: "GOOGLE_CLIENT_ID", value: "" }]);
+      expectRefused(result, "No login method", "no_login_method", []);
+    });
+
+    it("through a symlink to the folder that holds it", async () => {
+      const link = path.join(dir, "folder-link");
+      fs.symlinkSync(path.dirname(ENV_FILE_PATH), link);
+      process.env["ATOM_ENV_FILE"] = path.join(link, path.basename(ENV_FILE_PATH));
+      const result = await putEnv(OAUTH_FILE, [{ key: "GOOGLE_CLIENT_ID", value: "" }]);
+      expectRefused(result, "No login method", "no_login_method", []);
+    });
+
+    it("through a symlink to the file itself", () => {
+      const real = path.join(dir, "real.env");
+      const link = path.join(dir, "file-link.env");
+      fs.writeFileSync(real, OAUTH_FILE);
+      fs.symlinkSync(real, link);
+      const refused = checkSaveKeepsStartupValid(real, "API_PORT=4200", { ATOM_ENV_FILE: link });
+      expect(refused).toMatchObject({ ok: false, reason: "no_login_method" });
+      expect(checkSaveKeepsStartupValid(real, OAUTH_FILE, { ATOM_ENV_FILE: link })).toEqual({ ok: true });
+    });
   });
 });
 

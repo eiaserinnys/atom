@@ -306,8 +306,8 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       const nextContent = updateConfigEnvContent(content, entries);
       const verdict = checkSaveKeepsStartupValid(envFilePath, nextContent);
       if (!verdict.ok) {
-        req.log.warn({ reason: verdict.reason }, 'env save rejected: the server would not start with these settings');
-        return reply.code(400).send({ error: verdict.reason, code: STARTUP_WOULD_FAIL });
+        req.log.warn({ reason: verdict.reason, keys: verdict.keys }, 'env save rejected: the server would not start with these settings');
+        return reply.code(400).send({ error: verdict.error, code: STARTUP_WOULD_FAIL, reason: verdict.reason, keys: verdict.keys });
       }
       fs.writeFileSync(envFilePath, nextContent, 'utf-8');
       setPendingRestart(true);

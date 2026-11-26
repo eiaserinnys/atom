@@ -28,7 +28,7 @@ async function fetchApi(path: string, options?: RequestInit): Promise<Response> 
     if (res.status === 409 && body.code === 'VERSION_CONFLICT') {
       throw new VersionConflictError(body.fields['current_version'] as number, body.text);
     }
-    throw new ApiError(res.status, body.code, body.text);
+    throw new ApiError(res.status, body.code, body.text, { reason: body.reason, keys: body.keys });
   }
 
   return res;

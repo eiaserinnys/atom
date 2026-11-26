@@ -19,6 +19,12 @@
   },
   "errors": {
     "startup_would_fail": "No se guardó. Con esta configuración el servidor no volvería a arrancar.",
+    "startup_reason": {
+      "no_login_method": "No quedaría ningún método de inicio de sesión. Define una contraseña de administrador o un proveedor OAuth.",
+      "oauth_and_bypass": "La omisión local (AUTH_BYPASS) no se puede combinar con un proveedor OAuth.",
+      "password_and_bypass": "La omisión local (AUTH_BYPASS) no se puede combinar con una contraseña de administrador.",
+      "missing_keys": "Faltan ajustes obligatorios: {{keys}}."
+    },
     "failed": "No se pudo completar. Inténtalo de nuevo en un momento.",
     "forbidden": "No tienes permiso para hacer esto.",
     "not_found": "Ese elemento ya no existe.",

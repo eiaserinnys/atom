@@ -38,7 +38,8 @@ test.describe('Auth config and DB connection test', () => {
       await modal.getByRole('button', { name: /^(Save|저장)$/ }).click();
 
       await expect(modal.getByText(/Not saved\. The server would not start again with these settings\.|저장하지 않았습니다\. 이 설정으로는 서버가 다시 뜨지 않습니다\./)).toBeVisible({ timeout: 5_000 });
-      await expect(modal.getByText('No login method is configured, so the server will not start.')).toBeVisible();
+      await expect(modal.getByText(/Every login method has been removed\.|로그인 방법이 하나도 남지 않습니다\./)).toBeVisible();
+      await expect(modal.getByText('No login method is configured, so the server will not start.')).toHaveCount(0);
       await expect(modal.getByText(/[{}]|API \d{3}/)).toHaveCount(0);
       await expect(modal.getByRole('button', { name: /Stop Server|Restart Now|서버 끄기|지금 재시작/ })).toHaveCount(0);
 

@@ -4,8 +4,9 @@
 // Set CHROMIUM_EXECUTABLE to use a Chromium other than the one Playwright installed.
 //
 // Starts a disposable bypass-mode server from <root> (default: this checkout) with an empty workspace .env and a
-// freshly built dashboard. Phase "after" (default) captures the refused Auth save in ko and en at 1440px and 360px
-// into <dir>/auth-refused-*.png and checks the sentence, the untouched env file and the layout. Both phases capture
+// freshly built dashboard. Phase "after" (default) captures two refused Auth saves (no login method left, a required
+// key missing) in ko and en at 1440px and 360px, and in ko at 390px and 414px, into <dir>/auth-refused-<kind>-<lang>-<width>.png,
+// and checks the sentence, the untouched env file and that no Korean word is broken across lines. Both phases capture
 // a failed card save and a failed API-key creation in ko at 1440px (<dir>/card-save-failed-<phase>-ko-1440.png,
 // <dir>/agents-error-<phase>-ko-1440.png): run it on the commit before the change with --phase before to get the "before"
 // pictures. --operations also writes <dir>/operations.md (ui-design 0-14..18). Exits non-zero when an assertion fails.
@@ -24,6 +25,16 @@ const outDir = path.resolve(options.out);
 const phase = options.phase ?? 'after';
 const WIDE = { width: 1440, height: 900 };
 const NARROW = { width: 360, height: 800 };
+const REFUSAL_SHOTS = [
+  { width: 1440, lang: 'ko' }, { width: 1440, lang: 'en' }, { width: 360, lang: 'ko' }, { width: 360, lang: 'en' },
+  { width: 390, lang: 'ko' }, { width: 414, lang: 'ko' },
+];
+// Each kind starts from GOOGLE_FILE. The server's own JWT_SECRET and FRONTEND_URL come from the shell, so clearing
+// the Google callback URL leaves exactly one key missing. (A saved secret shows as an empty field and cannot be cleared.)
+const REFUSAL_KINDS = {
+  nologin: { slug: 'nologin', clear: 'client_id', reason: 'no_login_method', keys: [] },
+  missingkey: { slug: 'missingkey', clear: 'callback_url', reason: 'missing_keys', keys: ['GOOGLE_CALLBACK_URL'] },
+};
 const children = [];
 const failures = [];
 const operationRows = [];
@@ -116,8 +127,10 @@ async function main() {
     try {
       const env = { url, envPath: path.join(workspace, '.env') };
       if (phase === 'after') {
-        for (const [viewport, width] of [[WIDE, 1440], [NARROW, 360]]) {
-          for (const lang of ['ko', 'en']) await refusedSave({ browser, ...env, viewport, width, lang });
+        for (const kind of Object.values(REFUSAL_KINDS)) {
+          for (const { width, lang } of REFUSAL_SHOTS) {
+            await refusedSave({ browser, ...env, kind, viewport: { width, height: width >= 768 ? WIDE.height : NARROW.height }, width, lang });
+          }
         }
         await resizeAfterRefusal({ browser, ...env });
       }
@@ -169,7 +182,8 @@ async function layoutProblems(page, lang, label) {
     const rect = notice?.getBoundingClientRect();
     const text = notice?.firstElementChild?.firstChild ?? notice?.firstChild;
     const broken = [];
-    if (text && text.nodeType === Node.TEXT_NODE) {
+    const measured = Boolean(text && text.nodeType === Node.TEXT_NODE);
+    if (measured) {
       const range = document.createRange();
       let previousTop = null;
       const value = text.textContent;
@@ -184,13 +198,14 @@ async function layoutProblems(page, lang, label) {
     return {
       pageOverflow: view.scrollWidth - window.innerWidth,
       noticeLeft: rect?.left, noticeRight: rect?.right, limit: window.innerWidth,
-      scrollable: notice ? notice.scrollWidth - notice.clientWidth : 0, broken,
+      scrollable: notice ? notice.scrollWidth - notice.clientWidth : 0, broken, measured,
     };
   });
   const problems = [];
   if (m.pageOverflow > 0) problems.push(`page scrolls ${m.pageOverflow}px`);
   if (m.noticeLeft < 0 || m.noticeRight > m.limit + 0.5) problems.push('notice outside the screen');
   if (m.scrollable > 0) problems.push(`notice is ${m.scrollable}px wider than its box`);
+  if (lang === 'ko' && !m.measured) problems.push('no notice text to measure');
   if (lang === 'ko' && m.broken.length) problems.push(`Korean word broken before ${m.broken.join('')}`);
   check(`${label}: fits the screen with no broken Korean word`, problems.length === 0, problems.join(' '));
   return m;
@@ -208,27 +223,30 @@ async function prepareRefusal({ page, url, envPath, lang, narrow }) {
   return { tr, googleId, save: page.getByRole('button', { name: tr.auth.save, exact: true }) };
 }
 
-async function refusedSave({ browser, url, envPath, viewport, width, lang }) {
+async function refusedSave({ browser, url, envPath, kind, viewport, width, lang }) {
   const narrow = width < 768;
-  const tag = `${lang} ${width}`;
+  const tag = `${kind.slug} ${lang} ${width}`;
   const { context, page } = await newPage(browser, viewport, lang);
-  const { tr, googleId, save } = await prepareRefusal({ page, url, envPath, lang, narrow });
-  await googleId.fill('');
+  const { tr, save } = await prepareRefusal({ page, url, envPath, lang, narrow });
+  await page.getByLabel(tr.auth[kind.clear], { exact: true }).first().fill('');
   await save.click();
   const notice = noticeBox(page);
   await notice.waitFor();
   const text = (await notice.textContent()).trim();
-  const reason = 'No login method is configured, so the server will not start.';
-  check(`the refusal says nothing was saved and why (${tag})`, text === `${tr.errors.startup_would_fail} ${reason}`, text);
+  const reasonSentence = tr.errors.startup_reason[kind.reason].replace('{{keys}}', kind.keys.join(', '));
+  check(`the refusal says nothing was saved and why, in the page language (${tag})`, text === `${tr.errors.startup_would_fail} ${reasonSentence}`, text);
+  check(`the refusal says the server will not start once, with no English server sentence in Korean (${tag})`,
+    lang === 'ko' ? !/will not start|would not start/.test(text) && (text.match(/다시 뜨지 않/g) ?? []).length === 1
+      : (text.match(/would not start|will not start/g) ?? []).length === 1, text);
   check(`the refusal has no JSON, status prefix or HTML (${tag})`, !/[{}]|API \d{3}|<\w/.test(text));
   check(`no restart notice or restart button (${tag})`, (await page.getByText(tr.system.restart_manual).count()) === 0 && (await page.getByText(tr.system.restart_required).count()) === 0
     && (await page.getByRole('button', { name: tr.system.shutdown_now }).count()) === 0 && (await page.getByRole('button', { name: tr.system.restart_now }).count()) === 0);
   check(`the env file is byte for byte as before (${tag})`, readFileSync(envPath, 'utf8') === GOOGLE_FILE);
   check(`Save stays available to try again (${tag})`, await save.isEnabled());
-  await shot(page, `auth-refused-${lang}-${width}`);
+  await shot(page, `auth-refused-${kind.slug}-${lang}-${width}`);
   await layoutProblems(page, lang, `refused save (${tag})`);
 
-  if (width === 1440 && lang === 'ko') {
+  if (kind.slug === 'nologin' && width === 1440 && lang === 'ko') {
     const focused = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? document.activeElement?.tagName);
     operationRows.push(['14 누른 뒤 초점', '통과', `저장을 눌러 거부된 뒤에도 초점은 「${focused}」 단추에 남아 다시 누르거나 칸으로 Tab 할 수 있다`]);
     await page.keyboard.press('Escape');
@@ -237,7 +255,7 @@ async function refusedSave({ browser, url, envPath, viewport, width, lang }) {
     const back = await page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.tagName);
     dialogRows.push(['설정 창(데스크톱)', '톱니바퀴 단추를 누른다', '왼쪽 탭의 첫 단추', '해당 없음(줄 안 편집 없음)', '창이 닫힌다', `「${back}」`]);
   }
-  if (narrow && lang === 'ko') operationRows.push(['16 최소 폭', '통과', '360px에서 가로 스크롤이 없고 거부 문구는 어절 단위로 줄바꿈되며 저장 단추가 밀려나지 않는다']);
+  if (kind.slug === 'nologin' && width === 360 && lang === 'ko') operationRows.push(['16 최소 폭', '통과', '360, 390, 414px에서 가로 스크롤이 없고 한국어 거부 문구는 낱말 가운데서 끊기지 않고 어절 단위로 줄바꿈되며 저장 단추가 밀려나지 않는다']);
   await context.close();
 }
 

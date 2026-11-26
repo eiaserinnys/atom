@@ -71,7 +71,7 @@ describe('authentication mode and startup configuration', () => {
     expect(inspectStartupConfig({ DASHBOARD_ADMIN_PASSWORD: 'x', JWT_SECRET: ' ' }, source).errors)
       .toContain('Missing required environment variables: JWT_SECRET');
     expect(inspectStartupConfig({ DASHBOARD_ADMIN_PASSWORD: 'x', JWT_SECRET: secret }, source))
-      .toEqual({ errors: [], warning: undefined });
+      .toEqual({ errors: [], failures: [], warning: undefined });
     const env = { GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', GOOGLE_CALLBACK_URL: 'http://localhost/cb', FRONTEND_URL: 'http://localhost', JWT_SECRET: secret, DASHBOARD_ADMIN_PASSWORD: 'x' };
     expect(inspectStartupConfig(env, source).warning).toBe('DASHBOARD_ADMIN_PASSWORD is ignored because an OAuth provider is configured.');
   });

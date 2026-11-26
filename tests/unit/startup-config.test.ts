@@ -27,7 +27,25 @@ describe("startup configuration", () => {
     }, source);
 
     expect(result.errors.join(" ")).toContain("AUTH_BYPASS");
+    expect(result.failures).toEqual([{
+      reason: "oauth_and_bypass",
+      keys: ["AUTH_BYPASS", "GOOGLE_CLIENT_ID"],
+      message: "AUTH_BYPASS=1 cannot be combined with an OAuth provider.",
+    }]);
     expect(result.warning).toBeUndefined();
+  });
+
+  it("names the kind of reason and the keys involved, never a value", () => {
+    const kinds = (env: Record<string, string>) =>
+      inspectStartupConfig(env, source).failures.map(({ reason, keys }) => ({ reason, keys }));
+
+    expect(kinds({ JWT_SECRET: "jwt-secret-value" })).toEqual([{ reason: "no_login_method", keys: [] }]);
+    expect(kinds({ AUTH_BYPASS: "1", DASHBOARD_ADMIN_PASSWORD: "admin-password-value", JWT_SECRET: "jwt-secret-value" }))
+      .toEqual([{ reason: "password_and_bypass", keys: ["AUTH_BYPASS", "DASHBOARD_ADMIN_PASSWORD"] }]);
+    expect(kinds({ DASHBOARD_ADMIN_PASSWORD: "admin-password-value" }))
+      .toEqual([{ reason: "missing_keys", keys: ["JWT_SECRET"] }]);
+    expect(kinds({ SLACK_CLIENT_ID: "slack-client", JWT_SECRET: "jwt-secret-value" }))
+      .toEqual([{ reason: "missing_keys", keys: ["FRONTEND_URL", "SLACK_CLIENT_SECRET", "SLACK_CALLBACK_URL"] }]);
   });
 
   it("refuses to start with no login method and names the env file, without any value", () => {
@@ -53,7 +71,7 @@ describe("startup configuration", () => {
     ["a password", { DASHBOARD_ADMIN_PASSWORD: "an-admin-password", JWT_SECRET: "jwt-secret" }],
     ["local bypass", { AUTH_BYPASS: "1" }],
   ])("starts with %s", (_name, env) => {
-    expect(inspectStartupConfig(env, source)).toEqual({ errors: [], warning: undefined });
+    expect(inspectStartupConfig(env, source)).toEqual({ errors: [], failures: [], warning: undefined });
   });
 
   it("starts in OAuth mode with the same complete settings as before, with no notice", () => {
@@ -63,6 +81,6 @@ describe("startup configuration", () => {
       GOOGLE_CALLBACK_URL: "https://atom.example/api/auth/google/callback",
       FRONTEND_URL: "https://dashboard.example",
       JWT_SECRET: "jwt-secret",
-    }, source)).toEqual({ errors: [], warning: undefined });
+    }, source)).toEqual({ errors: [], failures: [], warning: undefined });
   });
 });

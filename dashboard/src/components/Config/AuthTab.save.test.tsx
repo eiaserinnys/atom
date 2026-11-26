@@ -93,15 +93,17 @@ describe('AuthTab saves only what was changed', () => {
 });
 
 describe('AuthTab shows a refused save as one plain sentence', () => {
-  test('the refusal text carries the reason, no JSON and no status prefix, and asks for no restart', async () => {
-    const reason = 'No login method is configured, so the server will not start.';
-    configApi.putEnv.mockRejectedValue(new ApiError(400, 'STARTUP_WOULD_FAIL', reason));
+  test.each([
+    ['no login method', 'no_login_method', [], en.errors.startup_reason.no_login_method],
+    ['missing keys', 'missing_keys', ['GOOGLE_CLIENT_SECRET', 'JWT_SECRET'], 'Missing required settings: GOOGLE_CLIENT_SECRET, JWT_SECRET.'],
+  ])('a refusal for %s carries one reason sentence, no JSON and no status prefix, and asks for no restart', async (_name, reason, keys, sentence) => {
+    configApi.putEnv.mockRejectedValue(new ApiError(400, 'STARTUP_WOULD_FAIL', 'No login method is configured, so the server will not start.', { reason, keys }));
     await render();
     type(field('client_id'), '');
     await save();
 
-    expect(footer.message).toEqual({ ok: false, text: `${en.errors.startup_would_fail} ${reason}` });
-    expect(footer.message!.text).not.toMatch(/[{}]|API \d{3}/);
+    expect(footer.message).toEqual({ ok: false, text: `${en.errors.startup_would_fail} ${sentence}` });
+    expect(footer.message!.text).not.toMatch(/[{}]|API \d{3}|will not start/);
     expect(refreshStatus).not.toHaveBeenCalled();
     expect(footer.disabled).toBe(false);
   });

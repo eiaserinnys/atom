@@ -19,6 +19,12 @@
   },
   "errors": {
     "startup_would_fail": "保存しませんでした。この設定ではサーバーが再び起動しません。",
+    "startup_reason": {
+      "no_login_method": "ログイン方法が一つも残りません。管理者パスワードか OAuth プロバイダーを設定してください。",
+      "oauth_and_bypass": "ローカル用のバイパス(AUTH_BYPASS)は OAuth プロバイダーと併用できません。",
+      "password_and_bypass": "ローカル用のバイパス(AUTH_BYPASS)は管理者パスワードと併用できません。",
+      "missing_keys": "必要な設定が不足しています: {{keys}}。"
+    },
     "failed": "処理できませんでした。しばらくしてからもう一度お試しください。",
     "forbidden": "この操作を行う権限がありません。",
     "not_found": "対象が見つかりません。",

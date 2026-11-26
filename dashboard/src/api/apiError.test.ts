@@ -18,7 +18,13 @@ beforeAll(async () => {
 
 function fromResponse(status: number, raw: string): ApiError {
   const body = parseErrorBody(raw);
-  return new ApiError(status, body.code, body.text);
+  return new ApiError(status, body.code, body.text, { reason: body.reason, keys: body.keys });
+}
+
+function refusedSave(reason: string, keys: string[]): ApiError {
+  return fromResponse(400, JSON.stringify({
+    error: 'No login method is configured, so the server will not start.', code: 'STARTUP_WOULD_FAIL', reason, keys,
+  }));
 }
 
 const RAW_LOOKING = [/[{}]/, /API \d{3}/, /<\/?[a-z]/i];
@@ -65,12 +71,35 @@ describe('describeApiError', () => {
     expect(describeApiError(fromResponse(401, '{"error":"x","code":"SESSION_INVALID"}'), tEn)).toBe(en.auth.password_session_lost);
   });
 
-  test('the refused save names the settings problem the server gave, once', () => {
-    const reason = 'Missing required environment variables: GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL';
-    const error = fromResponse(400, JSON.stringify({ error: reason, code: 'STARTUP_WOULD_FAIL' }));
+  test.each([
+    ['no_login_method', []],
+    ['oauth_and_bypass', ['AUTH_BYPASS', 'GOOGLE_CLIENT_ID']],
+    ['password_and_bypass', ['AUTH_BYPASS', 'DASHBOARD_ADMIN_PASSWORD']],
+  ])('a refused save for %s says the server will not start once, then the reason in the same language', (reason, keys) => {
+    const expectedKo = `${ko.errors.startup_would_fail} ${ko.errors.startup_reason[reason as keyof typeof ko.errors.startup_reason]}`;
+    const expectedEn = `${en.errors.startup_would_fail} ${en.errors.startup_reason[reason as keyof typeof en.errors.startup_reason]}`;
+    expect(describeApiError(refusedSave(reason, keys), tKo)).toBe(expectedKo);
+    expect(describeApiError(refusedSave(reason, keys), tEn)).toBe(expectedEn);
+    expect(expectedKo.match(/다시 뜨지 않/g)).toHaveLength(1);
+    expect(expectedKo).not.toMatch(/will not start|would not start/);
+    expect(expectedEn.match(/would not start|will not start/g)).toHaveLength(1);
+  });
 
-    expect(describeApiError(error, tKo)).toBe(`${ko.errors.startup_would_fail} ${reason}`);
-    expect(describeApiError(error, tEn)).toBe(`${en.errors.startup_would_fail} ${reason}`);
+  test('a refused save for missing keys names them as the server listed them', () => {
+    const error = refusedSave('missing_keys', ['GOOGLE_CLIENT_SECRET', 'GOOGLE_CALLBACK_URL']);
+    expect(describeApiError(error, tKo)).toBe(`${ko.errors.startup_would_fail} GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL 설정이 빠져 있습니다.`);
+    expect(describeApiError(error, tEn))
+      .toBe(`${en.errors.startup_would_fail} Missing required settings: GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL.`);
+  });
+
+  test.each([
+    ['an unknown kind', refusedSave('something_new', ['JWT_SECRET'])],
+    ['no kind', refusedSave('', [])],
+    ['missing keys with no key list', refusedSave('missing_keys', [])],
+    ['a key list that is not key names', refusedSave('missing_keys', ['{"a":1}', 'a secret value']) ],
+  ])('a refused save with %s shows only the first sentence', (_name, error) => {
+    expect(describeApiError(error, tKo)).toBe(ko.errors.startup_would_fail);
+    expect(describeApiError(error, tEn)).toBe(en.errors.startup_would_fail);
   });
 
   test('a missing node or card shows the plain not-found sentence', () => {
@@ -100,6 +129,20 @@ describe('describeApiError', () => {
     expect(describeApiError('nothing', tEn)).toBe(en.errors.failed);
   });
 
+  test.each([
+    [500, '{"statusCode":500,"error":"Internal Server Error","message":"SQLITE_ERROR: no such table: cards"}'],
+    [500, '{"error":"Failed to write .env: EACCES: permission denied, open \'/srv/atom/.env\'"}'],
+    [503, '{"error":"Database is down at 10.0.0.5","code":"DB_DOWN"}'],
+  ])('a %i with a server text never shows that text, only the plain server sentence', (status, raw) => {
+    const text = describeApiError(fromResponse(status, raw), tEn);
+    expect(text).toBe(en.errors.server);
+    expect(text).not.toMatch(/SQLITE|EACCES|\/srv|10\.0/);
+  });
+
+  test('a 5xx that carries a known code still shows that code\'s locale text', () => {
+    expect(describeApiError(fromResponse(500, '{"error":"x","code":"STARTUP_WOULD_FAIL"}'), tEn)).toBe(en.errors.startup_would_fail);
+  });
+
   test('a server text that looks like JSON or HTML is never shown', () => {
     expect(describeApiError(fromResponse(500, '{"error":"{\\"a\\":1}"}'), tEn)).toBe(en.errors.server);
   });
@@ -107,7 +150,7 @@ describe('describeApiError', () => {
 
 describe('locale text', () => {
   test('the Korean sentences are polite and avoid the banned marks', () => {
-    Object.values(ko.errors).forEach((sentence) => {
+    Object.values({ ...ko.errors, ...ko.errors.startup_reason }).filter((value) => typeof value === 'string').forEach((sentence) => {
       expect(sentence).not.toMatch(/[·―]|박/);
       expect(sentence).toMatch(/(니다|세요)\.$/);
     });

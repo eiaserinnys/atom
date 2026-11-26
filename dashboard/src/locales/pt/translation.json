@@ -19,6 +19,12 @@
   },
   "errors": {
     "startup_would_fail": "Não salvo. Com estas configurações o servidor não voltaria a iniciar.",
+    "startup_reason": {
+      "no_login_method": "Nenhum método de login restaria. Defina uma senha de administrador ou um provedor OAuth.",
+      "oauth_and_bypass": "O bypass local (AUTH_BYPASS) não pode ser combinado com um provedor OAuth.",
+      "password_and_bypass": "O bypass local (AUTH_BYPASS) não pode ser combinado com uma senha de administrador.",
+      "missing_keys": "Faltam configurações obrigatórias: {{keys}}."
+    },
     "failed": "Não foi possível concluir. Tente novamente em instantes.",
     "forbidden": "Você não tem permissão para fazer isso.",
     "not_found": "Esse item não existe mais.",

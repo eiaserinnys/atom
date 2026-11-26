@@ -13,18 +13,28 @@ const KNOWN_CODE_TEXT: Record<string, string> = {
   SESSION_INVALID: 'auth.password_session_lost',
 };
 
-const CODES_WITH_SERVER_REASON = new Set(['STARTUP_WOULD_FAIL']);
+const STARTUP_REASONS = new Set(['no_login_method', 'oauth_and_bypass', 'password_and_bypass', 'missing_keys']);
+const KEY_NAME = /^[A-Z][A-Z0-9_]*$/;
+
+export interface ApiErrorDetail {
+  reason?: string;
+  keys?: string[];
+}
 
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | undefined;
   readonly serverText: string | undefined;
+  readonly reason: string | undefined;
+  readonly keys: string[];
 
-  constructor(status: number, code?: string, serverText?: string) {
+  constructor(status: number, code?: string, serverText?: string, detail: ApiErrorDetail = {}) {
     super(code ? `HTTP ${status} ${code}` : `HTTP ${status}`);
     this.status = status;
     this.code = code;
     this.serverText = serverText;
+    this.reason = detail.reason;
+    this.keys = detail.keys ?? [];
   }
 }
 
@@ -37,7 +47,7 @@ export class VersionConflictError extends ApiError {
   }
 }
 
-export interface ErrorBody {
+export interface ErrorBody extends ApiErrorDetail {
   code?: string;
   text?: string;
   fields: Record<string, unknown>;
@@ -69,7 +79,8 @@ export function parseErrorBody(raw: string): ErrorBody {
   const codeFromError = errorText && CODE_LIKE.test(errorText) ? errorText : undefined;
   const resolvedCode = [code, nestedCode, codeFromError].find((value): value is string => typeof value === 'string');
   const text = readableText(message) ?? (errorText === resolvedCode ? undefined : errorText);
-  return { code: resolvedCode, text, fields };
+  const keys = Array.isArray(fields['keys']) ? fields['keys'].filter((key): key is string => typeof key === 'string') : [];
+  return { code: resolvedCode, text, fields, reason: typeof fields['reason'] === 'string' ? fields['reason'] : undefined, keys };
 }
 
 function statusText(status: number, t: TFunction): string {
@@ -80,15 +91,24 @@ function statusText(status: number, t: TFunction): string {
   return t('errors.failed');
 }
 
+/** The one sentence that names why the next start would fail; empty when the kind is unknown or a needed key list is missing. */
+function startupReasonText(error: ApiError, t: TFunction): string {
+  const { reason } = error;
+  if (!reason || !STARTUP_REASONS.has(reason)) return '';
+  if (reason !== 'missing_keys') return t(`errors.startup_reason.${reason}`);
+  const keys = error.keys.filter((key) => KEY_NAME.test(key));
+  return keys.length > 0 ? t('errors.startup_reason.missing_keys', { keys: keys.join(', ') }) : '';
+}
+
 /** The text a person reads for a failed API call: never a JSON body, a status prefix or HTML. */
 export function describeApiError(error: unknown, t: TFunction): string {
   if (!(error instanceof ApiError)) return t('errors.failed');
   const knownKey = error.code ? KNOWN_CODE_TEXT[error.code] : undefined;
   if (knownKey) {
     const known = t(knownKey);
-    return error.code && CODES_WITH_SERVER_REASON.has(error.code) && error.serverText
-      ? `${known} ${error.serverText}`
-      : known;
+    const reasonText = error.code === 'STARTUP_WOULD_FAIL' ? startupReasonText(error, t) : '';
+    return reasonText ? `${known} ${reasonText}` : known;
   }
+  if (error.status >= 500) return statusText(error.status, t);
   return error.serverText ?? statusText(error.status, t);
 }
