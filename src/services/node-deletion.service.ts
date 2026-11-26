@@ -71,12 +71,12 @@ export function summarizeDeletion(
 function subtreeCte(rootCount: number): string {
   const roots = Array.from({ length: rootCount }, (_, index) => `($${index + 1})`).join(", ");
   return `WITH RECURSIVE roots(id) AS (VALUES ${roots}),
-     subtree(id, card_id, parent_node_id, is_symlink, depth) AS (
-       SELECT node.id, node.card_id, node.parent_node_id, node.is_symlink, 0
+     subtree(id, card_id, parent_node_id, is_symlink, created_at, depth) AS (
+       SELECT node.id, node.card_id, node.parent_node_id, node.is_symlink, node.created_at, 0
        FROM tree_nodes node
        JOIN roots root ON root.id = CAST(node.id AS TEXT)
        UNION
-       SELECT child.id, child.card_id, child.parent_node_id, child.is_symlink, parent.depth + 1
+       SELECT child.id, child.card_id, child.parent_node_id, child.is_symlink, child.created_at, parent.depth + 1
        FROM tree_nodes child
        JOIN subtree parent ON child.parent_node_id = parent.id
      )`;
@@ -97,7 +97,7 @@ async function selectSubtreeNodes(
            AND outside.id NOT IN (SELECT id FROM subtree)
        ) THEN 1 ELSE 0 END AS has_outside_node
      FROM subtree s
-     ORDER BY s.depth, s.id`,
+     ORDER BY s.depth, s.created_at, s.id`,
     rootNodeIds
   );
   return result.rows.map((row) => ({
@@ -132,15 +132,22 @@ async function selectRemainingSymlinks(
   }));
 }
 
-function toDeletedCardNodes(
+async function toDeletedCardNodes(
+  db: Queryable,
   cardId: string,
   nodes: SubtreeNodeRow[]
-): DeletedCardNodes {
+): Promise<DeletedCardNodes> {
   const cardNodes = nodes.filter((node) => node.card_id === cardId);
+  // A deleted card has every node inside the subtrees. Several nodes can share
+  // a created_at (SQLite keeps whole seconds), so their order comes from the
+  // query that getCardNodes uses.
+  const ordered = cardNodes.length > 1
+    ? await selectNodesByCardId(db, cardId)
+    : cardNodes;
   return {
     cardId,
-    nodeIds: cardNodes.map((node) => node.id),
-    parentNodeIds: cardNodes.map((node) => node.parent_node_id),
+    nodeIds: ordered.map((node) => node.id),
+    parentNodeIds: ordered.map((node) => node.parent_node_id),
   };
 }
 
@@ -186,11 +193,16 @@ export async function planTreeDeletion(
         ...orphanCardIds.filter((cardId) => cardId !== firstCardId),
       ];
 
+  const deletedCards: DeletedCardNodes[] = [];
+  for (const cardId of deletedCardIds) {
+    deletedCards.push(await toDeletedCardNodes(db, cardId, subtreeNodes));
+  }
+
   return {
     rootNode,
     isCanonicalTarget: rootNode === null || !rootNode.is_symlink,
     nodeIds: subtreeNodes.map((node) => node.id),
-    deletedCards: deletedCardIds.map((cardId) => toDeletedCardNodes(cardId, subtreeNodes)),
+    deletedCards,
     remainingSymlinks,
   };
 }

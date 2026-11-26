@@ -167,6 +167,40 @@ export function defineDeletionScenarios(): void {
       expect(await cardExists(child.cardId)).toBe(false);
     });
 
+    it("lists the places of a card in getCardNodes order, not in id order", async () => {
+      const shared = await make("Placed five times", undefined, "knowledge");
+      for (let index = 0; index < 4; index += 1) {
+        const root = await make(`Place root ${index}`);
+        await treeService.createSymlink(shared.cardId, root.nodeId);
+      }
+      const placesBefore = await cardService.getCardNodes(shared.cardId);
+      expect(placesBefore).toHaveLength(5);
+
+      const planned = await plan({ cardId: shared.cardId });
+      expect(planned.deletedCards).toEqual([{
+        cardId: shared.cardId,
+        nodeIds: placesBefore.map((node) => node.id),
+        parentNodeIds: placesBefore.map((node) => node.parent_node_id),
+      }]);
+
+      const patches: AtomEvent[] = [];
+      const handler = (event: AtomEvent) => {
+        if (event.type === "batch:completed") patches.push(...event.patches);
+      };
+      eventBus.on("atom:event", handler);
+      try {
+        await executeBatchOp({ deletes: [{ card_id: shared.cardId }] });
+      } finally {
+        eventBus.off("atom:event", handler);
+      }
+      expect(patches).toEqual([expect.objectContaining({
+        type: "card:deleted",
+        cardId: shared.cardId,
+        nodeIds: placesBefore.map((node) => node.id),
+        parentNodeIds: placesBefore.map((node) => node.parent_node_id),
+      })]);
+    });
+
     it("unknown targets plan nothing", async () => {
       const unknown = "00000000-0000-4000-8000-000000000123";
       expect(await treeService.previewNodeDeletion(unknown)).toBeNull();

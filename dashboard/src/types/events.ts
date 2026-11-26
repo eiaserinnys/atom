@@ -10,6 +10,7 @@ export type BatchOpResult = {
   moved: string[];
   child_ordered: (string | null)[];
   deleted: string[];
+  cascade_deleted_card_ids: string[];
   _warnings?: string[];
 };
 
