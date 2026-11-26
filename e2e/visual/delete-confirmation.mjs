@@ -4,8 +4,9 @@
 // Set CHROMIUM_EXECUTABLE to use a Chromium other than the one Playwright installed.
 //
 // Starts a disposable API (bypass mode, SQLite) and Vite dev server from <root> (default: this checkout),
-// builds a small tree through the REST API, opens the delete confirmation for each case at 1440px and 360px
-// in ko, en, de and ja, and writes <dir>/<prefix>-<case>-<lang>-<width>.png. The wording is read from this
+// builds a small tree through the REST API, opens the delete confirmation for each case (a symlink that leaves
+// its card elsewhere, a symlink that is the last place of its card, nodes) at 1440px and 360px in ko, en, de
+// and ja, and writes <dir>/<prefix>-<case>-<lang>-<width>.png. The wording is read from this
 // checkout's locale files, so running it with --root on the base commit fails the assertions (that is the
 // before run). Keyboard and focus (ui-design 0-14..18) are checked by dialog-focus.mjs.
 import { spawn } from 'node:child_process';
@@ -85,7 +86,7 @@ function check(name, ok, detail = '') {
 
 const locale = (lang) => JSON.parse(readFileSync(path.join(repo, 'dashboard/src/locales', lang, 'translation.json'), 'utf8'));
 const has = (text, expected) => typeof expected === 'string' && text.includes(expected);
-const fill = (template, values) => Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{{${key}}}`, String(value)), template);
+const fill = (template, values) => (typeof template === 'string' ? Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{{${key}}}`, String(value)), template) : template);
 
 async function main() {
   mkdirSync(outDir, { recursive: true });
@@ -127,6 +128,11 @@ async function post(apiUrl, route, body) {
   return response.json();
 }
 
+async function remove(apiUrl, route) {
+  const response = await fetch(`${apiUrl}${route}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`DELETE ${route} failed: ${response.status} ${await response.text()}`);
+}
+
 // Every delete target is a root node so the tree needs no expanding.
 async function seedTree(apiUrl) {
   const card = (title, parent = null, cardType = 'knowledge') => post(apiUrl, '/cards', { title, card_type: cardType, parent_node_id: parent });
@@ -140,14 +146,20 @@ async function seedTree(apiUrl) {
   const taskThree = await card('Task three', sprint.node_id);
   await post(apiUrl, '/tree/symlink', { card_id: taskThree.id, parent_node_id: null });
 
+  // The canonical node is deleted, so the symlink at the root is the last place of this card.
+  const orphan = await card('Orphan reference', library.node_id);
+  const orphanLink = await post(apiUrl, '/tree/symlink', { card_id: orphan.id, parent_node_id: null });
+  await remove(apiUrl, `/tree/${orphan.node_id}`);
+
   const lonely = await card(LONG_TITLE);
   const shared = await card('Shared note');
   await post(apiUrl, '/tree/symlink', { card_id: shared.id, parent_node_id: library.node_id });
 
   return {
-    cardIds: [library, referenceOriginal, sprint, taskOne, taskTwo, taskThree, lonely, shared].map((created) => created.id),
+    cardIds: [library, referenceOriginal, orphan, sprint, taskOne, taskTwo, taskThree, lonely, shared].map((created) => created.id),
     cases: [
       { key: 'symlink', name: 'Reference card', nodeId: referenceLink.id, expected: { target: 'symlink', cards: 0 } },
+      { key: 'symlinkLast', name: 'Orphan reference', nodeId: orphanLink.id, cardId: orphan.id, expected: { target: 'symlink', cards: 1, ids: [orphan.id] } },
       { key: 'normal', name: 'Sprint plan', nodeId: sprint.node_id, expected: { target: 'node', cards: 3, ids: [sprint.id, taskOne.id, taskTwo.id] } },
       { key: 'leaf', name: LONG_TITLE, nodeId: lonely.node_id, expected: { target: 'node', cards: 1, ids: [lonely.id] } },
       { key: 'shared', name: 'Shared note', nodeId: shared.node_id, expected: { target: 'node', cards: 0 } },
@@ -249,6 +261,14 @@ async function checkKoreanBreaks(page, lang, label) {
   check(`ko dialog text turns over lines only at a space or punctuation, ${label}`, violations.length === 0, violations.join(' '));
 }
 
+const DIALOG_SHAPE = {
+  symlink: { title: 'title_link', body: 'body_link', parts: 3 },
+  symlinkLast: { title: 'title_link', body: 'body_link_last', parts: 4 },
+  normal: { title: 'title_node', body: 'body_node', parts: 4 },
+  leaf: { title: 'title_node', body: 'body_node', parts: 4 },
+  shared: { title: 'title_node', body: 'body_node', parts: 4 },
+};
+
 // The dialog keeps its side margin (mx-4 = 16px) and no text runs past its own box.
 const fitsViewport = (metrics) => metrics.left >= 15.5 && metrics.right <= metrics.innerWidth - 15.5 && metrics.overflowing === 0 && metrics.clipped === 0;
 
@@ -277,9 +297,15 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
         const body = await modalText(page);
         const amber = await page.locator(`${MODAL} ${AMBER}`).count();
         if (item.key === 'symlink') {
-          check(`symlink dialog says only the link goes and has no permanent-deletion wording (${tag})`,
-            has(body, text.title_link) && has(body, fill(text.body_link, { name: item.name })) && !has(body, text.cards_unknown)
+          check(`symlink whose card sits elsewhere says only the link goes and has no permanent-deletion wording (${tag})`,
+            has(body, text.title_link) && has(body, fill(text.body_link, { name: item.name })) && !has(body, text.body_link_last)
+              && !has(body, text.cards_unknown) && !has(body, text.cards_unknown_link)
               && !has(body, fill(text.cards_permanent, { total: '' }).slice(0, 8)) && amber === 0, body.replace(/\n/g, ' | '));
+        } else if (item.key === 'symlinkLast') {
+          const expected = fill(text.cards_permanent, { total: previews.symlinkLast.deleted_card_count });
+          check(`last symlink of a card says the card goes too and shows the server preview count ${previews.symlinkLast.deleted_card_count} (${tag})`,
+            has(body, text.title_link) && has(body, fill(text.body_link_last, { name: item.name })) && has(body, expected)
+              && !has(body, fill(text.body_link, { name: item.name })) && amber === 1, body.replace(/\n/g, ' | '));
         } else if (item.key === 'normal') {
           const expected = fill(text.cards_permanent, { total: previews.normal.deleted_card_count });
           check(`node dialog shows the server preview count ${previews.normal.deleted_card_count} (${tag})`,
@@ -295,42 +321,19 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
         check(`dialog stays inside the viewport without overflowing children, ${item.key} (${tag})`,
           fitsViewport(metrics) && (await overflowX(page)) <= 0, JSON.stringify(metrics));
         const parts = await framePartTexts(page);
-        const sentence = fill(item.key === 'symlink' ? text.body_link : text.body_node, { name: item.name });
-        check(`dialog is title, one sentence${item.key === 'symlink' ? '' : ', notice'}, buttons, and the name appears once, ${item.key} (${tag})`,
-          parts.length === (item.key === 'symlink' ? 3 : 4) && parts[0] === (item.key === 'symlink' ? text.title_link : text.title_node)
+        const shape = DIALOG_SHAPE[item.key];
+        const sentence = fill(text[shape.body], { name: item.name });
+        check(`dialog is title, one sentence${shape.parts === 3 ? '' : ', notice'}, buttons, and the name appears once, ${item.key} (${tag})`,
+          parts.length === shape.parts && parts[0] === text[shape.title]
             && parts[1] === sentence && parts.join('').split(item.name).length === 2, JSON.stringify(parts));
         await checkKoreanBreaks(page, lang, `${item.key} (${tag})`);
         await shot(page, `${item.key}-${lang}-${width}`);
         await closeDelete(page, lang);
       }
 
-      const normal = data.cases.find((item) => item.key === 'normal');
-      let release;
-      const held = new Promise((resolve) => { release = resolve; });
-      await page.route('**/tree/*/delete-preview', async (route) => { await held; await route.continue(); });
-      await openDelete(page, lang, normal.nodeId);
-      await page.locator(MODAL).getByText(text.checking ?? '', { exact: false }).waitFor({ timeout: 3_000 }).catch(() => {});
-      const loadingBody = await modalText(page);
-      const locked = await confirmButton(page, lang).isDisabled();
-      check(`while the preview is received the dialog says so and the confirm button is locked (${tag})`, has(loadingBody, text.checking) && locked, loadingBody.replace(/\n/g, ' | '));
-      await checkKoreanBreaks(page, lang, `loading (${tag})`);
-      await shot(page, `loading-${lang}-${width}`);
-      release();
-      await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
-      check(`the confirm button opens once the preview arrives (${tag})`, !(await confirmButton(page, lang).isDisabled()));
-      await closeDelete(page, lang);
-      await page.unroute('**/tree/*/delete-preview');
-
-      await page.route('**/tree/*/delete-preview', (route) => route.fulfill(json({ error: 'x' }, 500)));
-      await openDelete(page, lang, normal.nodeId);
-      await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
-      const failedBody = await modalText(page);
-      check(`a failed preview shows the general warning and keeps the confirm button open (${tag})`,
-        has(failedBody, text.cards_unknown) && !(await confirmButton(page, lang).isDisabled()), failedBody.replace(/\n/g, ' | '));
-      await checkKoreanBreaks(page, lang, `failed (${tag})`);
-      await shot(page, `failed-${lang}-${width}`);
-      await closeDelete(page, lang);
-      await page.unroute('**/tree/*/delete-preview');
+      for (const item of data.cases.filter((candidate) => candidate.key === 'normal' || candidate.key === 'symlinkLast')) {
+        await captureWaiting({ page, lang, text, tag, item, shot });
+      }
       await page.context().close();
     }
   }
@@ -359,8 +362,49 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
   await shot(darkKorean, 'failed-ko-1440-dark');
   await darkKorean.context().close();
 
+  const darkLast = await newPage(browser, WIDE, webUrl, 'ko', 'dark');
+  await openDelete(darkLast, 'ko', data.cases.find((item) => item.key === 'symlinkLast').nodeId);
+  await darkLast.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
+  await shot(darkLast, 'symlinkLast-ko-1440-dark');
+  await darkLast.context().close();
+
   await measureBehaviour({ browser, apiUrl, webUrl, data });
+  await measureSymlinkKeyboard({ browser, webUrl, data });
   await confirmDeleteRemovesPreviewedCards({ browser, apiUrl, webUrl, data, previews });
+}
+
+// The preview held back (loading) and the preview failing, for one node or symlink.
+async function captureWaiting({ page, lang, text, tag, item, shot }) {
+  const isLink = item.key === 'symlinkLast';
+  const name = isLink ? 'symlinkLast-' : '';
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  await page.route('**/tree/*/delete-preview', async (route) => { await held; await route.continue(); });
+  await openDelete(page, lang, item.nodeId);
+  await page.locator(MODAL).getByText(text.checking ?? '', { exact: false }).waitFor({ timeout: 3_000 }).catch(() => {});
+  const loadingBody = await modalText(page);
+  const locked = await confirmButton(page, lang).isDisabled();
+  check(`while the ${item.key} preview is received the dialog says so, claims nothing and the confirm button is locked (${tag})`,
+    has(loadingBody, text.checking) && locked && !has(loadingBody, fill(text.body_link, { name: item.name })), loadingBody.replace(/\n/g, ' | '));
+  await checkKoreanBreaks(page, lang, `${item.key} loading (${tag})`);
+  await shot(page, `${name}loading-${lang}-${tag.split(' ')[1]}`);
+  release();
+  await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
+  check(`the ${item.key} confirm button opens once the preview arrives (${tag})`, !(await confirmButton(page, lang).isDisabled()));
+  await closeDelete(page, lang);
+  await page.unroute('**/tree/*/delete-preview');
+
+  await page.route('**/tree/*/delete-preview', (route) => route.fulfill(json({ error: 'x' }, 500)));
+  await openDelete(page, lang, item.nodeId);
+  await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
+  const failedBody = await modalText(page);
+  const warning = isLink ? text.cards_unknown_link : text.cards_unknown;
+  check(`a failed ${item.key} preview shows the general warning and keeps the confirm button open (${tag})`,
+    has(failedBody, warning) && !has(failedBody, fill(text.body_link, { name: item.name })) && !(await confirmButton(page, lang).isDisabled()), failedBody.replace(/\n/g, ' | '));
+  await checkKoreanBreaks(page, lang, `${item.key} failed (${tag})`);
+  await shot(page, `${name}failed-${lang}-${tag.split(' ')[1]}`);
+  await closeDelete(page, lang);
+  await page.unroute('**/tree/*/delete-preview');
 }
 
 // A confirmed delete removes exactly the cards the preview announced, and nothing else.
@@ -369,17 +413,58 @@ async function confirmDeleteRemovesPreviewedCards({ browser, apiUrl, webUrl, dat
     const states = await Promise.all(data.cardIds.map(async (id) => (await fetch(`${apiUrl}/cards/${id}`)).ok));
     return states.filter(Boolean).length;
   };
-  const normal = data.cases.find((item) => item.key === 'normal');
-  const before = await alive();
+  for (const key of ['normal', 'symlinkLast']) {
+    const item = data.cases.find((candidate) => candidate.key === key);
+    const before = await alive();
+    const page = await newPage(browser, WIDE, webUrl, 'en');
+    await openDelete(page, 'en', item.nodeId);
+    await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
+    await confirmButton(page, 'en').click();
+    await page.locator(MODAL).waitFor({ state: 'detached' });
+    await page.locator(`[data-testid="tree-node-${item.nodeId}"]`).waitFor({ state: 'detached' });
+    const after = await alive();
+    check(`after confirming ${key}, ${previews[key].deleted_card_count} cards are really gone (preview said so)`,
+      before - after === previews[key].deleted_card_count, `before=${before} after=${after}`);
+    await page.context().close();
+  }
+}
+
+// A symlink dialog behaves like the node dialog while its preview loads: first focus on Cancel, confirm locked
+// (Tab stays on Cancel), Esc closes and focus returns to the row.
+async function measureSymlinkKeyboard({ browser, webUrl, data }) {
+  const item = data.cases.find((candidate) => candidate.key === 'symlinkLast');
   const page = await newPage(browser, WIDE, webUrl, 'en');
-  await openDelete(page, 'en', normal.nodeId);
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  await page.route('**/tree/*/delete-preview', async (route) => { await held; await route.continue(); });
+  await openDelete(page, 'en', item.nodeId);
+  const focused = () => page.evaluate(() => document.activeElement?.textContent?.trim() ?? document.activeElement?.tagName);
+  const cancelLabel = locale('en').common.cancel;
+  const firstFocus = await focused();
+  await page.keyboard.press('Tab');
+  const afterTab = await focused();
+  await page.keyboard.press('Shift+Tab');
+  const afterShiftTab = await focused();
+  const lockedWhileLoading = await confirmButton(page, 'en').isDisabled();
+  check('symlink dialog loading: first focus is Cancel, Tab and Shift+Tab stay on it, confirm is locked',
+    firstFocus === cancelLabel && afterTab === cancelLabel && afterShiftTab === cancelLabel && lockedWhileLoading,
+    JSON.stringify({ firstFocus, afterTab, afterShiftTab, lockedWhileLoading }));
+  release();
   await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
-  await confirmButton(page, 'en').click();
-  await page.locator(MODAL).waitFor({ state: 'detached' });
-  await page.locator(`[data-testid="tree-node-${normal.nodeId}"]`).waitFor({ state: 'detached' });
-  const after = await alive();
-  check(`after confirming, ${previews.normal.deleted_card_count} cards are really gone (preview said so)`,
-    before - after === previews.normal.deleted_card_count, `before=${before} after=${after}`);
+  const focusAfterReady = await focused();
+  await page.keyboard.press('Tab');
+  const confirmFocus = await focused();
+  await page.keyboard.press('Tab');
+  const wrapFocus = await focused();
+  check('symlink dialog ready: first focus stays on Cancel, Tab goes to Delete and wraps back to Cancel',
+    focusAfterReady === cancelLabel && confirmFocus === locale('en').delete_modal.confirm_btn && wrapFocus === cancelLabel,
+    JSON.stringify({ focusAfterReady, confirmFocus, wrapFocus }));
+  await page.keyboard.press('Escape');
+  const closed = (await page.locator(MODAL).count()) === 0;
+  const focusAfterEscape = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.closest('[data-testid]')?.getAttribute('data-testid'));
+  check('symlink dialog: Esc closes it and focus goes back to the row it was opened from',
+    closed && focusAfterEscape === `tree-node-${item.nodeId}`, JSON.stringify({ closed, focusAfterEscape }));
+  await page.unroute('**/tree/*/delete-preview');
   await page.context().close();
 }
 

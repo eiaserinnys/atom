@@ -141,15 +141,53 @@ describe('TreeView delete confirmation safety', () => {
     expect(deleteNode).toHaveBeenCalledWith('node-a');
   });
 
-  test('a symlink node skips the preview request and says only the link is deleted', async () => {
-    const symlink = { ...makeNode(), is_symlink: true };
-    await settle(() => client.setQueryData(rootTreeQueryKey(), [symlink]));
-    const getDeletePreview = vi.spyOn(api, 'getDeletePreview');
-    getDeletePreview.mockClear();
+  async function openSymlinkDeleteConfirmation() {
+    await settle(() => client.setQueryData(rootTreeQueryKey(), [{ ...makeNode(), is_symlink: true }]));
     await openDeleteConfirmation();
+  }
 
-    expect(getDeletePreview).not.toHaveBeenCalled();
+  test('a symlink node asks for the preview too, locks confirm while it loads and keeps focus on cancel', async () => {
+    let finishPreview!: (preview: Awaited<ReturnType<typeof api.getDeletePreview>>) => void;
+    const getDeletePreview = vi.spyOn(api, 'getDeletePreview').mockImplementation(
+      () => new Promise(resolve => { finishPreview = resolve; })
+    );
+    await openSymlinkDeleteConfirmation();
+
+    expect(getDeletePreview).toHaveBeenCalledWith('node-a');
+    expect(container.textContent).toContain(english.delete_modal.checking);
+    expect(button(english.delete_modal.confirm_btn).disabled).toBe(true);
+    expect(document.activeElement).toBe(button(english.common.cancel));
+
+    await settle(() => finishPreview({
+      target: 'symlink', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-a'],
+    }));
+    await settle();
+
     expect(container.textContent).toContain(english.delete_modal.title_link);
+    expect(container.textContent).toContain(english.delete_modal.body_link_last.replace('{{name}}', 'Card to delete'));
+    expect(container.textContent).toContain(english.delete_modal.cards_permanent.replace('{{total}}', '1'));
+    expect(button(english.delete_modal.confirm_btn).disabled).toBe(false);
+  });
+
+  test('a symlink whose card has another place says the card stays and shows no permanent deletion', async () => {
+    vi.spyOn(api, 'getDeletePreview').mockResolvedValue({
+      target: 'symlink', deleted_node_count: 1, deleted_card_count: 0, deleted_card_ids: [],
+    });
+    await openSymlinkDeleteConfirmation();
+
+    expect(container.textContent).toContain(english.delete_modal.body_link.replace('{{name}}', 'Card to delete'));
     expect(container.textContent).not.toContain('permanently');
+    expect(button(english.delete_modal.confirm_btn).disabled).toBe(false);
+  });
+
+  test('a failed symlink preview shows the general warning and still lets the user delete', async () => {
+    vi.spyOn(api, 'getDeletePreview').mockRejectedValue(new Error('API 500'));
+    const deleteNode = vi.spyOn(api, 'deleteNode').mockResolvedValue(undefined);
+    await openSymlinkDeleteConfirmation();
+
+    expect(container.textContent).toContain(english.delete_modal.cards_unknown_link);
+    await settle(() => button(english.delete_modal.confirm_btn).click());
+
+    expect(deleteNode).toHaveBeenCalledWith('node-a');
   });
 });

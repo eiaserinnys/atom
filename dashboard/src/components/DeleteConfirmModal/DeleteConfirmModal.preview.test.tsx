@@ -29,7 +29,7 @@ describe('DeleteConfirmModal wording follows the preview', () => {
       .find(element => element.textContent?.includes(english.delete_modal.confirm_btn))!;
   }
 
-  const sentence = (key: 'body_node' | 'body_link') => english.delete_modal[key].replace('{{name}}', 'Card');
+  const sentence = (key: 'body_node' | 'body_link' | 'body_link_last' | 'body_link_unchecked') => english.delete_modal[key].replace('{{name}}', 'Card');
 
   const permanent = (total: number) => english.delete_modal.cards_permanent.replace('{{total}}', String(total));
 
@@ -48,13 +48,51 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     vi.unstubAllGlobals();
   });
 
-  test('a symlink says only the link goes and never mentions a permanent deletion', async () => {
-    await renderModal(modal({ isSymlink: true }));
+  test('a symlink whose card sits elsewhere says only the link goes and mentions no permanent deletion', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 0 } }));
 
     expect(container.textContent).toContain(english.delete_modal.title_link);
     expect(container.textContent).toContain(sentence('body_link'));
     expect(container.textContent).not.toContain(sentence('body_node'));
     expect(container.textContent).not.toContain('permanently');
+    expect(container.querySelector('svg')).toBeNull();
+    expect(confirmButton().disabled).toBe(false);
+  });
+
+  test('the last place of a card says the card is deleted with the link and shows the number', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 1 } }));
+
+    expect(container.querySelector('h2')!.textContent).toBe(english.delete_modal.title_link);
+    expect(container.textContent).toContain(sentence('body_link_last'));
+    expect(container.textContent).not.toContain(sentence('body_link'));
+    expect(container.textContent).toContain(permanent(1));
+    expect(container.textContent!.match(/"Card"/g)).toHaveLength(1);
+    expect(confirmButton().disabled).toBe(false);
+  });
+
+  test('a link with children reuses the node wording for the number of cards', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'ready', deletedCardCount: 3 } }));
+
+    expect(container.textContent).toContain(sentence('body_link_last'));
+    expect(container.textContent).toContain(permanent(3));
+  });
+
+  test('while a symlink preview loads it says so, claims nothing about the card and locks confirm', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'loading' } }));
+
+    expect(container.textContent).toContain(english.delete_modal.checking);
+    expect(container.textContent).toContain(sentence('body_link_unchecked'));
+    expect(container.textContent).not.toContain(sentence('body_link'));
+    expect(container.textContent).not.toContain('permanently');
+    expect(confirmButton().disabled).toBe(true);
+  });
+
+  test('when a symlink preview failed it warns the card may go with the last link and opens confirm', async () => {
+    await renderModal(modal({ isSymlink: true, preview: { status: 'error' } }));
+
+    expect(container.textContent).toContain(english.delete_modal.cards_unknown_link);
+    expect(container.textContent).toContain(sentence('body_link_unchecked'));
+    expect(container.textContent).not.toContain(sentence('body_link'));
     expect(confirmButton().disabled).toBe(false);
   });
 
@@ -110,5 +148,6 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     }
     expect(korean.delete_modal.body_node).toBe('"{{name}}" 항목과 그 아래가 모두 삭제됩니다.');
     expect(korean.delete_modal.body_link).toBe('"{{name}}" 링크만 삭제되고 원본 카드는 남습니다.');
+    expect(korean.delete_modal.body_link_last).toBe('"{{name}}" 링크는 이 카드가 남은 마지막 자리라서 지우면 카드도 함께 영구 삭제됩니다.');
   });
 });

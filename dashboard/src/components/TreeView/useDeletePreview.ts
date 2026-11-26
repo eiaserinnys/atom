@@ -4,17 +4,16 @@ import { deletePreviewQueryKey } from '../../query/queryKeys';
 import type { DeletePreviewState } from '../DeleteConfirmModal/DeleteConfirmModal';
 
 export function useDeletePreview(node: TreeNodeData | null): DeletePreviewState | undefined {
-  const needsPreview = node !== null && !node.is_symlink;
   const query = useQuery({
     queryKey: deletePreviewQueryKey(node?.id ?? ''),
     queryFn: () => api.getDeletePreview(node!.id),
-    enabled: needsPreview,
+    enabled: node !== null,
     gcTime: 0,
     staleTime: 0,
     retry: false,
   });
 
-  if (!needsPreview) return undefined;
+  if (node === null) return undefined;
   if (query.isError) return { status: 'error' };
   if (query.data) return { status: 'ready', deletedCardCount: query.data.deleted_card_count };
   return { status: 'loading' };

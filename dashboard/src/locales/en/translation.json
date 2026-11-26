@@ -340,10 +340,13 @@
     "title_link": "Delete this link",
     "body_node": "\"{{name}}\" and everything below it will be deleted.",
     "body_link": "Only the link \"{{name}}\" is deleted. The original card stays.",
+    "body_link_unchecked": "The link \"{{name}}\" will be deleted.",
+    "body_link_last": "The link \"{{name}}\" is the last place of this card, so deleting it also deletes the card permanently.",
     "checking": "Checking what will be deleted…",
     "cards_permanent": "Cards that exist nowhere else will also be deleted permanently: {{total}}. This cannot be undone.",
     "cards_none": "No card will be deleted permanently.",
     "cards_unknown": "Child cards that exist nowhere else will also be deleted permanently. This cannot be undone.",
+    "cards_unknown_link": "If this link is the last place of its card, the card will also be deleted permanently. This cannot be undone.",
     "confirm_btn": "Delete"
   },
   "login": {

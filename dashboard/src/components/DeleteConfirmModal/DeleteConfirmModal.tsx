@@ -20,7 +20,7 @@ interface DeleteConfirmModalProps {
   errorMessage?: string;
 }
 
-function renderPermanentNotice(preview: DeletePreviewState | undefined, t: TFunction) {
+function renderPermanentNotice(preview: DeletePreviewState | undefined, isSymlink: boolean, t: TFunction) {
   if (preview?.status === 'loading') {
     return (
       <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
@@ -30,16 +30,25 @@ function renderPermanentNotice(preview: DeletePreviewState | undefined, t: TFunc
     );
   }
   if (preview?.status === 'ready' && preview.deletedCardCount === 0) {
-    return <div className="text-[13px] text-muted-foreground">{t('delete_modal.cards_none')}</div>;
+    return isSymlink
+      ? null
+      : <div className="text-[13px] text-muted-foreground">{t('delete_modal.cards_none')}</div>;
   }
+  const unknownKey = isSymlink ? 'delete_modal.cards_unknown_link' : 'delete_modal.cards_unknown';
   return (
     <div className="flex items-center gap-2 text-[13px] text-foreground bg-[var(--amber-soft)] border border-[var(--amber)]/30 rounded-none px-3 py-2">
       <AlertTriangle className="w-4 h-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
       {preview?.status === 'ready'
         ? t('delete_modal.cards_permanent', { total: preview.deletedCardCount })
-        : t('delete_modal.cards_unknown')}
+        : t(unknownKey)}
     </div>
   );
+}
+
+function bodyKey(isSymlink: boolean, preview: DeletePreviewState | undefined): string {
+  if (!isSymlink) return 'delete_modal.body_node';
+  if (preview?.status !== 'ready') return 'delete_modal.body_link_unchecked';
+  return preview.deletedCardCount === 0 ? 'delete_modal.body_link' : 'delete_modal.body_link_last';
 }
 
 export function DeleteConfirmModal({
@@ -52,8 +61,8 @@ export function DeleteConfirmModal({
   errorMessage,
 }: DeleteConfirmModalProps) {
   const { t } = useTranslation();
-  const isChecking = !isSymlink && preview?.status === 'loading';
-  const notice = isSymlink ? null : renderPermanentNotice(preview, t);
+  const isChecking = preview?.status === 'loading';
+  const notice = renderPermanentNotice(preview, isSymlink, t);
 
   const titleId = useId();
   const frameRef = useRef<HTMLDivElement>(null);
@@ -75,7 +84,7 @@ export function DeleteConfirmModal({
         <h2 id={titleId} className="text-base font-semibold text-foreground">{t(isSymlink ? 'delete_modal.title_link' : 'delete_modal.title_node')}</h2>
 
         <div className="text-sm text-foreground">
-          {t(isSymlink ? 'delete_modal.body_link' : 'delete_modal.body_node', { name: title })}
+          {t(bodyKey(isSymlink, preview), { name: title })}
         </div>
 
         {notice}

@@ -170,10 +170,13 @@
     "title_link": "Excluir este link",
     "body_node": "\"{{name}}\" e tudo o que está abaixo dele serão excluídos.",
     "body_link": "Somente o link \"{{name}}\" é excluído. O cartão original permanece.",
+    "body_link_unchecked": "O link \"{{name}}\" será excluído.",
+    "body_link_last": "O link \"{{name}}\" é o último lugar deste cartão, então excluí-lo também exclui o cartão permanentemente.",
     "checking": "Verificando o que será excluído…",
     "cards_permanent": "Os cartões que não existem em nenhum outro lugar também serão excluídos permanentemente: {{total}}. Isso não pode ser desfeito.",
     "cards_none": "Nenhum cartão será excluído permanentemente.",
     "cards_unknown": "Os cartões filhos que não existem em nenhum outro lugar também serão excluídos permanentemente. Isso não pode ser desfeito.",
+    "cards_unknown_link": "Se este link for o último lugar do seu cartão, o cartão também será excluído permanentemente. Isso não pode ser desfeito.",
     "confirm_btn": "Excluir"
   },
   "login": {
