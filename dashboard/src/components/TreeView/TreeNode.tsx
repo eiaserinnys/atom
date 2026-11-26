@@ -18,7 +18,7 @@ interface TreeNodeProps {
   isExpanded: boolean;
   expandedNodes: Set<string>;
   onToggle: (nodeId: string) => void;
-  onContextMenu?: (x: number, y: number, node: TreeNodeData) => void;
+  onContextMenu?: (x: number, y: number, node: TreeNodeData, row: HTMLElement) => void;
 }
 
 function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, depth = 0, isExpanded, expandedNodes, onToggle, onContextMenu }: TreeNodeProps) {
@@ -93,7 +93,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onContextMenu?.(e.clientX, e.clientY, node);
+    onContextMenu?.(e.clientX, e.clientY, node, e.currentTarget as HTMLElement);
   };
 
   return (
@@ -105,6 +105,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
 
       <div
         ref={combinedRef}
+        data-tree-row=""
         {...attributes}
         {...listeners}
         className={`relative flex items-center gap-1 max-md:gap-2 py-0.5 max-md:py-2 pr-2 max-md:pr-3 cursor-pointer rounded-none mx-1 transition-colors min-h-[26px] max-md:min-h-[42px] touch-pan-y ${
