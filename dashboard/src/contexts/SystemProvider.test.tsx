@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
-import { SystemProvider } from './SystemContext';
+import { SystemProvider } from './SystemProvider';
 import { useSystem, type SystemState } from './systemContext';
 
 const api = vi.hoisted(() => ({ getHealth: vi.fn(), restart: vi.fn(), getStatus: vi.fn() }));

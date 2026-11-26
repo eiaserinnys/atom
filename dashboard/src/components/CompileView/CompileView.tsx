@@ -7,7 +7,7 @@ import { invalidateSelectedCompileQueries } from '../../query/invalidation';
 import { CardFormModal } from '../CardFormModal/CardFormModal';
 import { CompileContent } from './CompileContent';
 import { CompileFindBar } from './CompileFindBar';
-import { CompileToc } from './CompileToc';
+import { CompileToc } from './CompileTocPanel';
 import { CompileToolbar } from './CompileToolbar';
 import type { CompileListHandle } from './CompileVirtualList';
 import type { SectionMap } from './EditableHeading';
