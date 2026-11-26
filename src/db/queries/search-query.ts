@@ -24,9 +24,10 @@ export interface SearchMatchQueries {
   whole: string;
 }
 
-function parseSearchQuery(input: string, caseInsensitiveOr: boolean): ParsedSearchQuery {
+function parseSearchQuery(input: string, websearchOr: boolean): ParsedSearchQuery {
   const groups: SearchTerm[][] = [[]];
   let hasDanglingOr = false;
+  let lastOrText = "OR";
   let cursor = 0;
 
   while (cursor < input.length) {
@@ -66,16 +67,29 @@ function parseSearchQuery(input: string, caseInsensitiveOr: boolean): ParsedSear
     }
 
     if (text.length === 0) continue;
-    const isOr = caseInsensitiveOr ? text.toUpperCase() === "OR" : text === "OR";
+    const isOr = websearchOr ? text.toUpperCase() === "OR" : text === "OR";
     if (!excluded && !quoted && isOr) {
-      if (groups.at(-1)!.length === 0) hasDanglingOr = true;
-      else groups.push([]);
-      continue;
+      if (groups.at(-1)!.length > 0) {
+        groups.push([]);
+        lastOrText = text;
+        continue;
+      }
+      if (!websearchOr) {
+        hasDanglingOr = true;
+        continue;
+      }
     }
     groups.at(-1)!.push({ text, quoted, excluded });
   }
 
-  if (groups.length > 1 && groups.at(-1)!.length === 0) hasDanglingOr = true;
+  if (groups.length > 1 && groups.at(-1)!.length === 0) {
+    if (websearchOr) {
+      groups.pop();
+      groups.at(-1)!.push({ text: lastOrText, quoted: false, excluded: false });
+    } else {
+      hasDanglingOr = true;
+    }
+  }
   return { groups: groups.filter(group => group.length > 0), hasDanglingOr };
 }
 

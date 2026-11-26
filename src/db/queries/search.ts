@@ -40,6 +40,11 @@ export async function searchByBm25(
 // PostgreSQL dynamic query builder
 // ---------------------------------------------------------------------------
 
+const postgresRankExpression = `CASE
+        WHEN c.fts_vector @@ tsq.whole_q THEN ts_rank(c.fts_vector, tsq.whole_q)
+        ELSE ts_rank(c.fts_vector, tsq.q)
+      END`;
+
 function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unknown[] } {
   const params: unknown[] = [];
   let idx = 1;
@@ -138,7 +143,7 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   ), top AS (
     SELECT c.id, c.title, c.card_type, c.content,
       (c.fts_vector @@ tsq.whole_q) AS whole_match,
-      ts_rank(c.fts_vector, tsq.q) AS rank
+      ${postgresRankExpression} AS rank
     FROM cards c, tsq
     WHERE ${conditions.join("\n      AND ")}
     ORDER BY whole_match DESC, rank DESC, c.id ASC
@@ -187,7 +192,7 @@ function buildPostgresQuery(filters: SearchFilters): { sql: string; params: unkn
   ) selected_node ON TRUE
   ${breadcrumbSelection}
   WHERE ${conditions.join("\n    AND ")}
-  ORDER BY (c.fts_vector @@ tsq.whole_q) DESC, ts_rank(c.fts_vector, tsq.q) DESC
+  ORDER BY (c.fts_vector @@ tsq.whole_q) DESC, ${postgresRankExpression} DESC
   LIMIT $${limitIdx}`;
 
   return { sql, params };
@@ -218,6 +223,16 @@ function buildSqliteQuery(filters: SearchFilters, ftsQueries: SearchMatchQueries
        INNER JOIN subtree s ON tn.parent_node_id = s.id
      )
      `;
+  }
+
+  const hasPrefixOnlyMatches = ftsQueries.whole !== ftsQueries.prefix;
+  let wholeRankJoin = "";
+  if (hasPrefixOnlyMatches) {
+    const wholeIdx = idx++;
+    params.push(ftsQueries.whole);
+    wholeRankJoin = `LEFT JOIN (
+         SELECT rowid AS whole_rowid, rank AS whole_rank FROM cards_fts WHERE cards_fts MATCH $${wholeIdx}
+       ) whole_matches ON whole_matches.whole_rowid = c.rowid`;
   }
 
   // FTS query follows the CTE placeholder, when present.
@@ -276,13 +291,6 @@ function buildSqliteQuery(filters: SearchFilters, ftsQueries: SearchMatchQueries
     ? "\n         AND " + extraConditions.join("\n         AND ")
     : "";
 
-  let wholeFirstOrder = "";
-  if (ftsQueries.whole !== ftsQueries.prefix) {
-    const wholeIdx = idx++;
-    params.push(ftsQueries.whole);
-    wholeFirstOrder = `(c.rowid IN (SELECT rowid FROM cards_fts WHERE cards_fts MATCH $${wholeIdx})) DESC, `;
-  }
-
   // LIMIT is always the last parameter (matches SQL appearance order)
   const limitIdx = idx;
   params.push(filters.limit ?? 20);
@@ -296,6 +304,10 @@ function buildSqliteQuery(filters: SearchFilters, ftsQueries: SearchMatchQueries
     ? `(SELECT tn.is_symlink FROM tree_nodes tn WHERE tn.card_id = c.id ${occurrenceFilter} ${occurrenceOrder} LIMIT 1)`
     : "0";
 
+  const orderBy = hasPrefixOnlyMatches
+    ? "(whole_matches.whole_rank IS NULL) ASC, COALESCE(whole_matches.whole_rank, rank) ASC"
+    : "rank";
+
   const sql = `${subtreeCte}SELECT
          c.id AS card_id,
          ${nodeIdSelection} AS node_id,
@@ -305,8 +317,9 @@ function buildSqliteQuery(filters: SearchFilters, ftsQueries: SearchMatchQueries
          snippet(cards_fts, -1, '<b>', '</b>', '...', 20) AS snippet
        FROM cards_fts
        JOIN cards c ON c.rowid = cards_fts.rowid
+       ${wholeRankJoin}
        WHERE cards_fts MATCH $${matchIdx}${whereExtra}
-       ORDER BY ${wholeFirstOrder}rank
+       ORDER BY ${orderBy}
        LIMIT $${limitIdx}`;
 
   return { sql, params };

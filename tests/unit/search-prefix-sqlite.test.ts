@@ -72,6 +72,22 @@ describe("SQLite search prefix matching", () => {
     expect(await titlesFor("quokka")).toEqual(["whole word", "prefix only"]);
   });
 
+  it("keeps the old order among whole-word matches even when a prefix form repeats", async () => {
+    await addCard("prefix heavy", `소울스트림 ${"소울스트림에서 ".repeat(10)}`);
+    await addCard("whole heavy", "소울스트림 소울스트림 소울스트림");
+    await addCard("prefix only", "소울스트림에서 소울스트림은");
+
+    expect(await titlesFor("소울스트림")).toEqual(["whole heavy", "prefix heavy", "prefix only"]);
+  });
+
+  it("keeps that order inside a scoped search", async () => {
+    const top = await addCard("Scope", "container");
+    await addCard("prefix heavy", `소울스트림 ${"소울스트림에서 ".repeat(10)}`, top.node.id, 1);
+    await addCard("whole heavy", "소울스트림 소울스트림 소울스트림", top.node.id, 2);
+
+    expect(await titlesFor("소울스트림", { root_node_id: top.node.id })).toEqual(["whole heavy", "prefix heavy"]);
+  });
+
   it("applies prefix matching to every plain word", async () => {
     await addCard("both", "소울스트림에서 배포를 한다");
     await addCard("one", "소울스트림에서 쉰다");

@@ -85,11 +85,12 @@ describe("PostgreSQL search prefix matching", () => {
     expect((await titlesFor("소울스트림 or haniel")).sort()).toEqual(["alpha", "beta", "gamma"]);
   });
 
-  it("ignores a dangling OR like websearch_to_tsquery does", async () => {
-    await addCard("alpha", "소울스트림에서 deploy guide");
+  it("treats a leading or trailing OR as a word like websearch_to_tsquery does", async () => {
+    await addCard("with or", "소울스트림에서 or 를 쓴다");
+    await addCard("without", "소울스트림에서 배포한다");
 
-    expect(await titlesFor("소울스트림 OR")).toEqual(["alpha"]);
-    expect(await titlesFor("OR 소울스트림")).toEqual(["alpha"]);
+    expect(await titlesFor("소울스트림 OR")).toEqual(["with or"]);
+    expect(await titlesFor("OR 소울스트림")).toEqual(["with or"]);
   });
 
   it("accepts quotes and backslashes inside words without a syntax error", async () => {
@@ -106,6 +107,22 @@ describe("PostgreSQL search prefix matching", () => {
     await addCard("whole word", "quokka");
 
     expect(await titlesFor("quokka")).toEqual(["whole word", "prefix only"]);
+  });
+
+  it("keeps the old order among whole-word matches even when a prefix form repeats", async () => {
+    await addCard("prefix heavy", `소울스트림 ${"소울스트림에서 ".repeat(10)}`);
+    await addCard("whole heavy", "소울스트림 소울스트림 소울스트림");
+    await addCard("prefix only", "소울스트림에서 소울스트림은");
+
+    expect(await titlesFor("소울스트림")).toEqual(["whole heavy", "prefix heavy", "prefix only"]);
+  });
+
+  it("keeps that order inside a scoped search", async () => {
+    const top = await addCard("Scope", "container");
+    await addCard("prefix heavy", `소울스트림 ${"소울스트림에서 ".repeat(10)}`, top.node.id, 1);
+    await addCard("whole heavy", "소울스트림 소울스트림 소울스트림", top.node.id, 2);
+
+    expect(await titlesFor("소울스트림", { root_node_id: top.node.id })).toEqual(["whole heavy", "prefix heavy"]);
   });
 
   it("ranks whole-word matches first inside a scoped search too", async () => {
