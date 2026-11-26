@@ -5,6 +5,7 @@ export function deletionResultContent(summary: DeletionSummary, dryRun: boolean)
     deleted: !dryRun,
     deleted_card_ids: summary.deletedCardIds,
     deleted_node_count: summary.deletedNodeCount,
+    deleted_link_count: summary.deletedLinkCount,
     ...(dryRun ? { dry_run: true } : {}),
   };
   return { content: [{ type: "text" as const, text: JSON.stringify(body) }] };

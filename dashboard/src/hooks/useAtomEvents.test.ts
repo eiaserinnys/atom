@@ -7,7 +7,7 @@ import { applyAtomEventToCache, useAtomEvents } from './useAtomEvents';
 import type { CardData, TreeNodeData } from '../api/client';
 import type { AtomEvent } from '../types/events';
 import {
-  allChildrenQueryKey, allNodeQueryKey, childrenQueryKey, rootTreeQueryKey,
+  allChildrenQueryKey, allNodeQueryKey, childrenQueryKey, nodeQueryKey, rootTreeQueryKey,
   standardCompileNodeQueryKey, structureTreeQueryKey, unfurlCompileNodeQueryKey,
 } from '../query/queryKeys';
 
@@ -253,6 +253,29 @@ describe('applyAtomEventToCache', () => {
     }, null);
 
     expect(queryClient.getQueryData<TreeNodeData[]>(rootTreeQueryKey())?.[0]?.child_count).toBeUndefined();
+  });
+
+  test('card:deleted removes the card link in another place and corrects that parent child count', () => {
+    const queryClient = new QueryClient();
+    const shared = makeNode('shared', 'shared-card', 'section');
+    const link = { ...makeNode('link', 'shared-card', 'elsewhere'), is_symlink: true };
+    const section = { ...makeNode('section', 'section-card', null, 100, [shared]), child_count: 1 };
+    const elsewhere = { ...makeNode('elsewhere', 'elsewhere-card', null, 200, [link]), child_count: 1 };
+    queryClient.setQueryData(rootTreeQueryKey(), [section, elsewhere]);
+    queryClient.setQueryData(childrenQueryKey('elsewhere'), [link]);
+    queryClient.setQueryData(nodeQueryKey('link'), link);
+
+    applyAtomEventToCache(queryClient, {
+      type: 'card:deleted', cardId: 'shared-card', nodeIds: ['shared', 'link'],
+      parentNodeIds: ['section', 'elsewhere'], actor: null,
+    }, null);
+
+    expect(queryClient.getQueryData<TreeNodeData[]>(childrenQueryKey('elsewhere'))).toEqual([]);
+    const roots = queryClient.getQueryData<TreeNodeData[]>(rootTreeQueryKey())!;
+    expect(roots[1]?.children).toEqual([]);
+    expect(roots[1]?.child_count).toBe(0);
+    expect(roots[0]?.children).toEqual([]);
+    expect(queryClient.getQueryData(nodeQueryKey('link'))).toBeUndefined();
   });
 
   test('batch:completed patches tree and children caches without broad invalidation', () => {

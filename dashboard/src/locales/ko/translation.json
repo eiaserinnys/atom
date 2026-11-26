@@ -340,10 +340,10 @@
     "body_node": "\"{{name}}\" 항목과 그 아래가 모두 삭제됩니다.",
     "body_link": "\"{{name}}\" 링크가 삭제됩니다.",
     "checking": "삭제 대상을 확인하는 중…",
-    "cards_permanent": "다른 자리에 없는 카드 {{total}}개가 함께 영구 삭제되며 되돌릴 수 없습니다.",
-    "cards_none": "영구 삭제되는 카드는 없습니다.",
+    "cards_permanent": "카드 {{total}}개가 영구 삭제되며 되돌릴 수 없습니다.",
+    "cards_permanent_links": "카드 {{total}}개가 영구 삭제되고 다른 자리 링크 {{links}}개도 함께 지워집니다. 되돌릴 수 없습니다.",
     "link_card_stays": "원본 카드는 남습니다.",
-    "cards_unknown": "다른 자리에 없는 하위 카드는 함께 영구 삭제됩니다.",
+    "cards_unknown": "이 항목과 그 아래의 카드는 다른 자리 링크까지 함께 영구 삭제됩니다.",
     "cards_unknown_link": "이 링크가 카드의 마지막 자리이면 카드도 함께 영구 삭제됩니다.",
     "confirm_btn": "삭제"
   },

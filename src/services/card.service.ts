@@ -19,6 +19,7 @@ import { toTreeNodeWithCard } from "./tree-node-payload.js";
 import {
   deleteTreeAndOrphanCards,
   planTreeDeletion,
+  summarizeDeletedTree,
   summarizeDeletion,
   type DeletionSummary,
 } from "./node-deletion.service.js";
@@ -139,10 +140,7 @@ export async function deleteCard(id: string): Promise<DeletionSummary | null> {
       actor: null,
     });
   }
-  return {
-    deletedCardIds: result.deletedCards.map((card) => card.cardId),
-    deletedNodeCount: result.deletedNodeCount,
-  };
+  return summarizeDeletedTree(result);
 }
 
 export async function previewCardDeletion(id: string): Promise<DeletionSummary | null> {

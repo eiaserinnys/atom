@@ -38,6 +38,7 @@ export interface DeletePreview {
   deleted_node_count: number;
   deleted_card_count: number;
   deleted_card_ids: string[];
+  deleted_link_count: number;
 }
 
 export interface CardData {

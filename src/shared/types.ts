@@ -282,7 +282,7 @@ export interface BatchOpResult {
   child_ordered: (string | null)[];
   /** Requested card_ids this batch actually deleted. */
   deleted: string[];
-  /** Cards the batch deleted that were not requested: they had no node left outside the deleted subtrees. */
+  /** Cards the batch deleted that were not requested: their canonical node was in the deleted range, or no node of them was left outside it. */
   cascade_deleted_card_ids: string[];
   /** Deprecation warnings (cycle B). Present only when deprecated position input was used. */
   _warnings?: string[];

@@ -251,6 +251,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
         deleted_node_count: preview.deletedNodeCount,
         deleted_card_count: preview.deletedCardIds.length,
         deleted_card_ids: preview.deletedCardIds,
+        deleted_link_count: preview.deletedLinkCount,
       };
     }
   );

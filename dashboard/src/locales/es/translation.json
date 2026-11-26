@@ -171,10 +171,10 @@
     "body_node": "\"{{name}}\" y todo lo que hay debajo se eliminarán.",
     "body_link": "Se eliminará el enlace \"{{name}}\".",
     "checking": "Comprobando qué se eliminará…",
-    "cards_permanent": "Las tarjetas que no están en ningún otro lugar también se eliminarán de forma permanente: {{total}}. No se puede deshacer.",
-    "cards_none": "No se eliminará ninguna tarjeta de forma permanente.",
+    "cards_permanent": "Tarjetas eliminadas de forma permanente: {{total}}. No se puede deshacer.",
+    "cards_permanent_links": "Tarjetas eliminadas de forma permanente: {{total}}. Enlaces eliminados con ellas en otros lugares: {{links}}. No se puede deshacer.",
     "link_card_stays": "La tarjeta original se conserva.",
-    "cards_unknown": "Las tarjetas hijas que no están en ningún otro lugar también se eliminarán de forma permanente. No se puede deshacer.",
+    "cards_unknown": "Las tarjetas de este elemento y de todo lo que hay debajo se eliminarán de forma permanente, junto con sus enlaces en otros lugares. No se puede deshacer.",
     "cards_unknown_link": "Si este enlace es el último lugar de su tarjeta, la tarjeta también se eliminará de forma permanente. No se puede deshacer.",
     "confirm_btn": "Eliminar"
   },

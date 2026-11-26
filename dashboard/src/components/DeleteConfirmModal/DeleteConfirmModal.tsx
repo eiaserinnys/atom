@@ -8,7 +8,7 @@ import { useDialogKeyboard } from '../../hooks/useDialogKeyboard';
 export type DeletePreviewState =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; deletedCardCount: number };
+  | { status: 'ready'; deletedCardCount: number; deletedLinkCount: number };
 
 interface DeleteConfirmModalProps {
   title: string;
@@ -30,14 +30,19 @@ function renderPermanentNotice(preview: DeletePreviewState | undefined, isSymlin
     );
   }
   if (preview?.status === 'ready' && preview.deletedCardCount === 0) {
-    return <div className="text-[13px] text-muted-foreground">{t(isSymlink ? 'delete_modal.link_card_stays' : 'delete_modal.cards_none')}</div>;
+    return isSymlink
+      ? <div className="text-[13px] text-muted-foreground">{t('delete_modal.link_card_stays')}</div>
+      : null;
   }
   const unknownKey = isSymlink ? 'delete_modal.cards_unknown_link' : 'delete_modal.cards_unknown';
   return (
     <div className="flex items-center gap-2 text-[13px] text-foreground bg-[var(--amber-soft)] border border-[var(--amber)]/30 rounded-none px-3 py-2">
       <AlertTriangle className="w-4 h-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
       {preview?.status === 'ready'
-        ? t('delete_modal.cards_permanent', { total: preview.deletedCardCount })
+        ? t(
+            preview.deletedLinkCount > 0 ? 'delete_modal.cards_permanent_links' : 'delete_modal.cards_permanent',
+            { total: preview.deletedCardCount, links: preview.deletedLinkCount },
+          )
         : t(unknownKey)}
     </div>
   );

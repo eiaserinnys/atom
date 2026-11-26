@@ -29,6 +29,12 @@ afterEach(async () => {
   await app.close();
 });
 
+/** Sibling cards created in the same second come back in id order, so only the first (the top) is pinned. */
+function topThenSorted<T extends { deleted_card_ids: string[] }>(body: T): T {
+  const [top, ...rest] = body.deleted_card_ids;
+  return { ...body, deleted_card_ids: [top!, ...rest.sort()] };
+}
+
 async function tree() {
   const top = await makeCard("Top");
   const child = await makeCard("Child", top.nodeId);
@@ -40,17 +46,18 @@ async function tree() {
 
 describe("GET /tree/:nodeId/delete-preview", () => {
   it("counts the nodes and the cards that would be deleted for a node and deletes nothing", async () => {
-    const { top, child, alias } = await tree();
+    const { top, child, shared, alias } = await tree();
 
     const res = await app.inject({ method: "GET", url: `/tree/${top.nodeId}/delete-preview` });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
+    expect(topThenSorted(res.json())).toEqual(topThenSorted({
       target: "node",
-      deleted_node_count: 3,
-      deleted_card_count: 2,
-      deleted_card_ids: [top.cardId, child.cardId],
-    });
+      deleted_node_count: 4,
+      deleted_card_count: 3,
+      deleted_card_ids: [top.cardId, child.cardId, shared.cardId],
+      deleted_link_count: 1,
+    }));
     expect(await getNode(top.nodeId)).not.toBeNull();
     expect(await getNode(alias.id)).not.toBeNull();
   });
@@ -61,7 +68,7 @@ describe("GET /tree/:nodeId/delete-preview", () => {
     const res = await app.inject({ method: "GET", url: `/tree/${alias.id}/delete-preview` });
 
     expect(res.json()).toEqual({
-      target: "symlink", deleted_node_count: 1, deleted_card_count: 0, deleted_card_ids: [],
+      target: "symlink", deleted_node_count: 1, deleted_card_count: 0, deleted_card_ids: [], deleted_link_count: 0,
     });
   });
 
@@ -82,27 +89,43 @@ describe("GET /tree/:nodeId/delete-preview", () => {
 
 describe("delete_card and delete_node answer with JSON", () => {
   it("delete_card names every card it deleted and the nodes it removed", async () => {
-    const { top, child } = await tree();
+    const { top, child, shared, alias } = await tree();
 
     const result = await mcp.call("delete_card", { card_id: top.cardId });
 
     expect(result.isError).toBe(false);
-    expect(JSON.parse(result.text)).toEqual({
+    expect(topThenSorted(JSON.parse(result.text))).toEqual(topThenSorted({
       deleted: true,
-      deleted_card_ids: [top.cardId, child.cardId],
-      deleted_node_count: 3,
-    });
+      deleted_card_ids: [top.cardId, child.cardId, shared.cardId],
+      deleted_node_count: 4,
+      deleted_link_count: 1,
+    }));
+    expect(await getNode(alias.id)).toBeNull();
     expect(await getCard(child.cardId)).toBeNull();
   });
 
-  it("delete_node lists no card when the node's card has another place", async () => {
+  it("delete_node on the canonical node takes the card and its symlink elsewhere", async () => {
     const { shared, alias } = await tree();
 
     const result = await mcp.call("delete_node", { node_id: shared.nodeId });
 
-    expect(JSON.parse(result.text)).toEqual({ deleted: true, deleted_card_ids: [], deleted_node_count: 1 });
+    expect(JSON.parse(result.text)).toEqual({
+      deleted: true, deleted_card_ids: [shared.cardId], deleted_node_count: 2, deleted_link_count: 1,
+    });
+    expect(await getCard(shared.cardId)).toBeNull();
+    expect(await getNode(alias.id)).toBeNull();
+  });
+
+  it("delete_node on a symlink keeps the card while it has another place", async () => {
+    const { shared, alias } = await tree();
+
+    const result = await mcp.call("delete_node", { node_id: alias.id });
+
+    expect(JSON.parse(result.text)).toEqual({
+      deleted: true, deleted_card_ids: [], deleted_node_count: 1, deleted_link_count: 0,
+    });
     expect(await getCard(shared.cardId)).not.toBeNull();
-    expect(await getNode(alias.id)).not.toBeNull();
+    expect(await getNode(shared.nodeId)).not.toBeNull();
   });
 
   it.each([
@@ -114,23 +137,26 @@ describe("delete_card and delete_node answer with JSON", () => {
     const dry = await mcp.call(name, { ...args(t), dry_run: true });
 
     expect(dry.isError).toBe(false);
-    expect(JSON.parse(dry.text)).toEqual({
+    expect(topThenSorted(JSON.parse(dry.text))).toEqual(topThenSorted({
       deleted: false,
-      deleted_card_ids: [t.top.cardId, t.child.cardId],
-      deleted_node_count: 3,
+      deleted_card_ids: [t.top.cardId, t.child.cardId, t.shared.cardId],
+      deleted_node_count: 4,
+      deleted_link_count: 1,
       dry_run: true,
-    });
+    }));
     expect(await getCard(t.top.cardId)).not.toBeNull();
     expect(await getCard(t.child.cardId)).not.toBeNull();
     expect(await getNode(t.top.nodeId)).not.toBeNull();
 
     const real = await mcp.call(name, { ...args(t), dry_run: false });
-    expect(JSON.parse(real.text)).toEqual({
+    expect(topThenSorted(JSON.parse(real.text))).toEqual(topThenSorted({
       deleted: true,
-      deleted_card_ids: [t.top.cardId, t.child.cardId],
-      deleted_node_count: 3,
-    });
+      deleted_card_ids: [t.top.cardId, t.child.cardId, t.shared.cardId],
+      deleted_node_count: 4,
+      deleted_link_count: 1,
+    }));
     expect(await getCard(t.top.cardId)).toBeNull();
+    expect(await getNode(t.alias.id)).toBeNull();
   });
 
   it("keeps the not-found errors for a dry run too", async () => {

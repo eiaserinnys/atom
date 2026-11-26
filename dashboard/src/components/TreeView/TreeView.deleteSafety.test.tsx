@@ -70,7 +70,7 @@ describe('TreeView delete confirmation safety', () => {
     });
     client.setQueryData(rootTreeQueryKey(), [makeNode()]);
     vi.spyOn(api, 'getDeletePreview').mockResolvedValue({
-      target: 'node', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-a'],
+      target: 'node', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-a'], deleted_link_count: 0,
     });
     const i18n = i18next.createInstance();
     await i18n.init({ lng: 'en', resources: { en: { translation: english } }, initAsync: false });
@@ -134,10 +134,22 @@ describe('TreeView delete confirmation safety', () => {
     expect(button(english.delete_modal.confirm_btn).disabled).toBe(true);
 
     await settle(() => finishPreview({
-      target: 'node', deleted_node_count: 3, deleted_card_count: 2, deleted_card_ids: ['card-a', 'card-b'],
+      target: 'node', deleted_node_count: 3, deleted_card_count: 2, deleted_card_ids: ['card-a', 'card-b'], deleted_link_count: 0,
     }));
     await eventually(() => expect(container.textContent).toContain(
       english.delete_modal.cards_permanent.replace('{{total}}', '2')
+    ));
+    expect(button(english.delete_modal.confirm_btn).disabled).toBe(false);
+  });
+
+  test('a node whose cards have links in other places names both numbers before the user confirms', async () => {
+    vi.spyOn(api, 'getDeletePreview').mockResolvedValue({
+      target: 'node', deleted_node_count: 5, deleted_card_count: 2, deleted_card_ids: ['card-a', 'card-b'], deleted_link_count: 2,
+    });
+    await openDeleteConfirmation();
+
+    await eventually(() => expect(container.textContent).toContain(
+      english.delete_modal.cards_permanent_links.replace('{{total}}', '2').replace('{{links}}', '2')
     ));
     expect(button(english.delete_modal.confirm_btn).disabled).toBe(false);
   });
@@ -174,7 +186,7 @@ describe('TreeView delete confirmation safety', () => {
     expect(document.activeElement).toBe(button(english.common.cancel));
 
     await settle(() => finishPreview({
-      target: 'symlink', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-a'],
+      target: 'symlink', deleted_node_count: 1, deleted_card_count: 1, deleted_card_ids: ['card-a'], deleted_link_count: 0,
     }));
 
     await eventually(() => expect(button(english.delete_modal.confirm_btn).disabled).toBe(false));
@@ -185,7 +197,7 @@ describe('TreeView delete confirmation safety', () => {
 
   test('a symlink whose card has another place says the original card stays and shows no permanent deletion', async () => {
     vi.spyOn(api, 'getDeletePreview').mockResolvedValue({
-      target: 'symlink', deleted_node_count: 1, deleted_card_count: 0, deleted_card_ids: [],
+      target: 'symlink', deleted_node_count: 1, deleted_card_count: 0, deleted_card_ids: [], deleted_link_count: 0,
     });
     await openSymlinkDeleteConfirmation();
 
@@ -197,7 +209,7 @@ describe('TreeView delete confirmation safety', () => {
 
   test('a symlink that only deletes cards below it shows the permanent notice and no card-stays line', async () => {
     vi.spyOn(api, 'getDeletePreview').mockResolvedValue({
-      target: 'symlink', deleted_node_count: 2, deleted_card_count: 1, deleted_card_ids: ['card-child'],
+      target: 'symlink', deleted_node_count: 2, deleted_card_count: 1, deleted_card_ids: ['card-child'], deleted_link_count: 0,
     });
     await openSymlinkDeleteConfirmation();
 

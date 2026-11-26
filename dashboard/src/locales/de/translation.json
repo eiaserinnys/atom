@@ -171,10 +171,10 @@
     "body_node": "\"{{name}}\" und alles darunter wird gelöscht.",
     "body_link": "Der Link \"{{name}}\" wird gelöscht.",
     "checking": "Prüfe, was gelöscht wird…",
-    "cards_permanent": "Karten, die nirgends sonst vorkommen, werden ebenfalls dauerhaft gelöscht: {{total}}. Das lässt sich nicht rückgängig machen.",
-    "cards_none": "Es wird keine Karte dauerhaft gelöscht.",
+    "cards_permanent": "Dauerhaft gelöschte Karten: {{total}}. Das lässt sich nicht rückgängig machen.",
+    "cards_permanent_links": "Dauerhaft gelöschte Karten: {{total}}. Dabei gelöschte Links an anderen Orten: {{links}}. Das lässt sich nicht rückgängig machen.",
     "link_card_stays": "Die Originalkarte bleibt erhalten.",
-    "cards_unknown": "Untergeordnete Karten, die nirgends sonst vorkommen, werden ebenfalls dauerhaft gelöscht. Das lässt sich nicht rückgängig machen.",
+    "cards_unknown": "Die Karten dieses Eintrags und alles darunter werden samt ihren Links an anderen Orten dauerhaft gelöscht. Das lässt sich nicht rückgängig machen.",
     "cards_unknown_link": "Wenn dieser Link der letzte Ort seiner Karte ist, wird die Karte ebenfalls dauerhaft gelöscht. Das lässt sich nicht rückgängig machen.",
     "confirm_btn": "Löschen"
   },
