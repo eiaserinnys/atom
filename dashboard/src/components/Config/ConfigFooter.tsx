@@ -33,7 +33,7 @@ export function ConfigFooter({
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center text-sm text-muted-foreground" aria-live="polite">
           {pendingRestart && !mobile ? (
-            <span className="flex items-center gap-2 break-keep text-foreground">
+            <span className="flex items-center gap-2 text-foreground [&:lang(ko)]:break-keep">
               <TriangleAlert className="h-4 w-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
               {manualRestartRequired ? t('system.restart_manual') : t('system.restart_required')}
             </span>

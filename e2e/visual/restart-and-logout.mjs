@@ -153,9 +153,18 @@ async function setPendingRestart(apiUrl) {
   if (!response.ok) throw new Error(`could not mark a restart as pending: ${response.status}`);
 }
 
-async function newPage(browser, viewport, webUrl, language = 'en') {
+const json = (body) => ({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+
+// mock 'automatic': the server reports a pending restart it can do by itself (this run's tsx server cannot).
+// mock 'pressable': manual mode whose server survives the press, so the overlay can be measured in every language.
+async function newPage(browser, viewport, webUrl, language = 'en', mock = null) {
   const context = await browser.newContext({ viewport });
   await context.addInitScript((lang) => localStorage.setItem('language', lang), language);
+  if (mock === 'automatic') await context.route('**/api/system/status', (route) => route.fulfill(json({ pendingRestart: true, manualRestartRequired: false })));
+  if (mock === 'pressable') {
+    await context.route('**/api/health', (route) => route.fulfill(json({ status: 'ok', bootId: 'unchanged' })));
+    await context.route('**/api/system/restart', (route) => route.fulfill(json({ ok: true })));
+  }
   const page = await context.newPage();
   await page.goto(webUrl);
   return page;
@@ -165,12 +174,21 @@ const textOf = (locator) => locator.evaluateAll((nodes) => nodes.map((node) => n
 const overflowX = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 const MANUAL_NOTE = /start it again yourself/i;
 const LANGS = ['en', 'ko', 'de', 'es', 'fr', 'ja', 'pt', 'ru', 'zh'];
+const OVERLAY = '[role="status"]:has(p)';
 const BANNER = '.bg-\\[var\\(--amber-soft\\)\\]';
 const locale = (lang) => JSON.parse(readFileSync(path.join(root, 'dashboard/src/locales', lang, 'translation.json'), 'utf8')).system ?? {};
 const bannerButton = (page) => page.locator(`${BANNER} button`);
 
 async function capture({ apiUrl, webUrl }) {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE || undefined });
+  try {
+    await captureScreens({ browser, apiUrl, webUrl });
+  } finally {
+    await browser.close();
+  }
+}
+
+async function captureScreens({ browser, apiUrl, webUrl }) {
   const shot = (page, name) => page.screenshot({ path: path.join(outDir, `${prefix}-${name}.png`) });
   const logoutIn = (scope) => scope.getByRole('button', { name: 'Logout' });
 
@@ -217,10 +235,11 @@ async function capture({ apiUrl, webUrl }) {
 
   await checkFooterLayout({ browser, webUrl, shot });
   await checkBannerWording({ browser, webUrl });
+  await checkBannerMatrix({ browser, webUrl });
+  await checkOverlayCentering({ browser, webUrl });
   const operations = options.operations ? await measureOperations({ browser, webUrl, apiUrl, wideBanner, narrowBanner, modal }) : null;
   await checkPressedManualRestart({ browser, webUrl, shot });
   if (operations) writeOperations(operations, apiUrl);
-  await browser.close();
 }
 
 async function openSettings(browser, webUrl, viewport, language) {
@@ -267,6 +286,92 @@ async function checkFooterLayout({ browser, webUrl, shot }) {
 }
 
 // Banner wording: one language per screen and no mid-word breaks in Korean.
+const lineStarts = (selector) => {
+    const node = document.querySelector(selector).firstChild;
+    const text = node.textContent;
+    const range = document.createRange();
+    const lines = [];
+    let previousTop = null;
+    for (let i = 0; i < text.length; i += 1) {
+      range.setStart(node, i); range.setEnd(node, i + 1);
+      const rect = range.getBoundingClientRect();
+      if (text[i] === ' ' || rect.height === 0) continue;
+      if (previousTop === null || rect.top > previousTop + 5) lines.push({ char: text[i], afterSpace: i === 0 || text[i - 1] === ' ' });
+      previousTop = rect.top;
+    }
+    return lines;
+};
+
+// ui-design 0-16 for the banner: the button label is one line, clear of the notice, no scroll, and the line breaks are sound.
+async function measureBanner(page, lang) {
+  const m = await page.evaluate(([selector]) => {
+    const banner = document.querySelector(selector);
+    const button = banner.querySelector('button');
+    const text = banner.querySelector('span').getBoundingClientRect();
+    const box = button.getBoundingClientRect();
+    const label = document.createRange();
+    label.selectNodeContents(button);
+    const tops = new Set([...label.getClientRects()].map((rect) => Math.round(rect.top)));
+    return { buttonLines: tops.size, overlap: text.right > box.left + 0.5, overflow: document.documentElement.scrollWidth - window.innerWidth };
+  }, [BANNER]);
+  const starts = await page.evaluate(lineStarts, `${BANNER} span`);
+  const problems = [];
+  if (m.buttonLines !== 1) problems.push(`button ${m.buttonLines} lines`);
+  if (m.overlap) problems.push('button overlaps text');
+  if (m.overflow > 0) problems.push(`scroll ${m.overflow}px`);
+  if (lang === 'ja' && starts.some((line) => '。、'.includes(line.char))) problems.push('line starts with a Japanese full stop or comma');
+  if (lang === 'ko' && starts.some((line) => !line.afterSpace)) problems.push('Korean word broken');
+  return problems;
+}
+
+async function checkBannerMatrix({ browser, webUrl }) {
+  for (const mode of ['manual', 'automatic']) {
+    for (const width of [360, 390]) {
+      const broken = [];
+      for (const lang of LANGS) {
+        const page = await newPage(browser, { width, height: 844 }, webUrl, lang, mode === 'automatic' ? 'automatic' : null);
+        await bannerButton(page).waitFor();
+        const problems = await measureBanner(page, lang);
+        if (problems.length > 0) broken.push(`${lang}: ${problems.join(', ')}`);
+        if (lang === 'ja') await shot_ja(page, mode, width);
+        await page.context().close();
+      }
+      check(`banner button stays on one line, clear of the notice, no scroll, sound line breaks (${mode}, ${width}, 9 languages)`, broken.length === 0, broken.join(' ; '));
+    }
+  }
+}
+
+async function shot_ja(page, mode, width) {
+  await page.screenshot({ path: path.join(outDir, `${prefix}-banner-${mode}-ja-${width}.png`), clip: { x: 0, y: 0, width, height: 140 } });
+}
+
+// ui-design 0-16 for the overlay after the press: every text line sits on the spinner's centre axis.
+async function checkOverlayCentering({ browser, webUrl }) {
+  for (const width of [360, 390]) {
+    const off = [];
+    for (const lang of LANGS) {
+      const page = await newPage(browser, { width, height: 844 }, webUrl, lang, 'pressable');
+      await bannerButton(page).waitFor();
+      await bannerButton(page).click();
+      await page.locator(OVERLAY).waitFor();
+      const m = await page.evaluate((selector) => {
+        const status = document.querySelector(selector);
+        const axis = status.querySelector('svg, [class*="animate-spin"]')?.getBoundingClientRect() ?? status.getBoundingClientRect();
+        const text = status.querySelector('p').firstChild;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        const lines = [...range.getClientRects()].map((rect) => rect.left + rect.width / 2);
+        return { axis: axis.left + axis.width / 2, lines };
+      }, OVERLAY);
+      const worst = Math.max(...m.lines.map((x) => Math.abs(x - m.axis)));
+      if (worst > 2) off.push(`${lang}:${m.lines.length} lines, off by ${worst.toFixed(1)}px`);
+      if (lang === 'en' && width === 360) await page.screenshot({ path: path.join(outDir, `${prefix}-overlay-after-press-en-360.png`) });
+      await page.context().close();
+    }
+    check(`after the press: every overlay text line is centred on the spinner axis (${width}, 9 languages)`, off.length === 0, off.join(' ; '));
+  }
+}
+
 async function checkBannerWording({ browser, webUrl }) {
   const wrong = [];
   const tall = [];
@@ -317,7 +422,7 @@ async function checkPressedManualRestart({ browser, webUrl, shot }) {
   await bannerButton(page).click();
   await page.waitForTimeout(2000);
   await shot(page, 'press-2s-ko-1440');
-  const overlay = async () => (await textOf(page.getByRole('status')))[0] ?? '';
+  const overlay = async () => (await textOf(page.locator(OVERLAY)))[0] ?? '';
   const expected = typeof ko.shutdown_done === 'string' ? ko.shutdown_done : '(missing shutdown_done)';
   const early = await overlay();
   check('after the press: the overlay says the server stopped and must be started again (2s)', early === expected, early);
@@ -407,8 +512,8 @@ async function measureOperations({ browser, webUrl, apiUrl, wideBanner, narrowBa
       `창 안 Tab 6회는 모두 보이는 요소에 머문다: ${order.map((step) => step.label).join(' → ')}. Esc로 닫히고 트리 화면은 그대로. `
       + `창 끝 「${lastButtonLabel}」 다음 Tab은 ${afterLastButton.inDialog ? '창 안' : '창 밖'}(${afterLastButton.label}), 첫 탭에서 Shift+Tab 두 번은 ${beforeFirstTab.inDialog ? '창 안' : '창 밖'}(${beforeFirstTab.label})으로 간다. `
       + '창 밖으로 나가는 것은 변경 전부터 있던 동작이라 이 단위에서 고치지 않았다.'],
-    ['16', overflow <= 0 && !overlap ? '통과' : '확인 필요', `390px에서 가장 긴 번역(ru)도 가로 스크롤 ${overflow}px, 글 오른쪽 끝 ${bannerBox.textRight}px < 단추 왼쪽 끝 ${bannerBox.buttonLeft}px, 글 ${bannerBox.textLines}줄. 설정 창 아래 줄은 768px와 820px에서 9개 언어 모두 두 단추가 한 줄에 오른쪽 끝으로 붙는다.`],
-    ['17', errorState.banner === 0 && errorState.overflow <= 0 ? '통과' : '확인 필요', '상태 요청을 500으로 바꿔도 화면이 그대로 서고 배너만 보이지 않는다. 새 데이터 요청은 추가하지 않았다(기존 30초 상태 조회에 필드 하나). 단추를 누른 뒤 서버가 꺼진 화면은 아래 단언 표의 2초, 33초 항목이다.'],
+    ['16', overflow <= 0 && !overlap ? '통과' : '확인 필요', `390px에서 가장 긴 번역(ru)도 가로 스크롤 ${overflow}px, 글 오른쪽 끝 ${bannerBox.textRight}px < 단추 왼쪽 끝 ${bannerBox.buttonLeft}px, 글 ${bannerBox.textLines}줄. 설정 창 아래 줄은 768px와 820px에서 9개 언어 모두 두 단추가 한 줄에 오른쪽 끝으로 붙는다. 배너는 360px과 390px, 9개 언어, manual과 automatic 모두에서 단추 글이 한 줄이고 글과 겹치지 않으며(ja 포함) 가로 스크롤이 없다. 한국어는 낱말 가운데서, 일본어는 「。」「、」로 줄이 시작하지 않는다.`],
+    ['17', errorState.banner === 0 && errorState.overflow <= 0 ? '통과' : '확인 필요', '상태 요청을 500으로 바꿔도 화면이 그대로 서고 배너만 보이지 않는다. 새 데이터 요청은 추가하지 않았다(기존 30초 상태 조회에 필드 하나). 단추를 누른 뒤 서버가 꺼진 화면은 아래 단언 표의 2초, 33초 항목이다. 누른 뒤 겹친 창 글은 360px과 390px, 9개 언어에서 모든 줄이 돌이표 가운데 축에 놓인다.'],
     ['18', afterNarrow.button && afterWide.button ? '통과' : '확인 필요', `1440 → 390 → 1440으로 바꿔도 배너, 안내, 단추가 다시 서고 가로 스크롤 없음(${afterNarrow.overflow}, ${afterWide.overflow}).`],
   ];
   await russian.context().close();

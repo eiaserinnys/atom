@@ -12,7 +12,7 @@ export function RestartBanner() {
   return (
     <div className="bg-[var(--amber-soft)] border-b border-[var(--amber)]/30 px-4 py-2 flex items-center gap-2 shrink-0">
       <TriangleAlert className="w-4 h-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} aria-hidden="true" />
-      <span className="flex-1 break-keep text-sm text-foreground">
+      <span className="flex-1 text-sm [&:lang(ko)]:break-keep text-foreground">
         {manualRestartRequired ? t('system.restart_manual') : t('system.restart_required')}
       </span>
       <ConfigActionButton onClick={triggerRestart}>

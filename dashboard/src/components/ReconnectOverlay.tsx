@@ -12,7 +12,7 @@ export function ReconnectOverlay() {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 dark:bg-black/70">
       <div role="status" className="bg-card border border-border p-6 flex flex-col items-center gap-3">
         <Spinner />
-        <p className="text-sm text-foreground">{manualRestartRequired ? t('system.shutdown_done') : t('system.reconnecting')}</p>
+        <p className="text-center text-sm text-foreground [&:lang(ko)]:break-keep">{manualRestartRequired ? t('system.shutdown_done') : t('system.reconnecting')}</p>
       </div>
     </div>
   );
