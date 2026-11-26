@@ -29,6 +29,8 @@ describe('DeleteConfirmModal wording follows the preview', () => {
       .find(element => element.textContent?.includes(english.delete_modal.confirm_btn))!;
   }
 
+  const sentence = (key: 'body_node' | 'body_link') => english.delete_modal[key].replace('{{name}}', 'Card');
+
   const permanent = (total: number) => english.delete_modal.cards_permanent.replace('{{total}}', String(total));
 
   beforeEach(async () => {
@@ -50,8 +52,8 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     await renderModal(modal({ isSymlink: true }));
 
     expect(container.textContent).toContain(english.delete_modal.title_link);
-    expect(container.textContent).toContain(english.delete_modal.body_link);
-    expect(container.textContent).not.toContain(english.delete_modal.body_node);
+    expect(container.textContent).toContain(sentence('body_link'));
+    expect(container.textContent).not.toContain(sentence('body_node'));
     expect(container.textContent).not.toContain('permanently');
     expect(confirmButton().disabled).toBe(false);
   });
@@ -60,7 +62,7 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     await renderModal(modal({ preview: { status: 'ready', deletedCardCount: 3 } }));
 
     expect(container.textContent).toContain(english.delete_modal.title_node);
-    expect(container.textContent).toContain(english.delete_modal.body_node);
+    expect(container.textContent).toContain(sentence('body_node'));
     expect(container.textContent).toContain(permanent(3));
     expect(container.textContent).not.toContain(english.delete_modal.cards_none);
     expect(confirmButton().disabled).toBe(false);
@@ -89,10 +91,24 @@ describe('DeleteConfirmModal wording follows the preview', () => {
     expect(confirmButton().disabled).toBe(false);
   });
 
+  test('the name sits in the one sentence and nothing asks the question again', async () => {
+    await renderModal(modal({ preview: { status: 'ready', deletedCardCount: 1 } }));
+
+    const dialog = container.querySelector('h2')!.parentElement!;
+    const texts = [...dialog.children].map(child => child.textContent);
+    expect(texts[0]).toBe(english.delete_modal.title_node);
+    expect(texts[1]).toBe(sentence('body_node'));
+    expect(texts[2]).toBe(permanent(1));
+    expect(texts).toHaveLength(4);
+    expect(container.textContent!.match(/"Card"/g)).toHaveLength(1);
+    expect(Object.keys(english.delete_modal)).not.toContain('desc');
+  });
+
   test('Korean wording is polite and free of the dash and middle dot the style guide bans', () => {
     for (const text of Object.values(korean.delete_modal)) {
       expect(text).not.toMatch(/[―·]/);
     }
-    expect(korean.delete_modal.body_link).toBe('이 링크만 삭제되고 원본 카드는 남습니다.');
+    expect(korean.delete_modal.body_node).toBe('"{{name}}" 항목과 그 아래가 모두 삭제됩니다.');
+    expect(korean.delete_modal.body_link).toBe('"{{name}}" 링크만 삭제되고 원본 카드는 남습니다.');
   });
 });

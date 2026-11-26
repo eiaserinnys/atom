@@ -88,6 +88,7 @@ describe('TreeView delete confirmation safety', () => {
 
     expect(deleteNode).toHaveBeenCalledTimes(0);
     expect(container.textContent).toContain(english.delete_modal.title_node);
+    expect(container.textContent).toContain(english.delete_modal.body_node.replace('{{name}}', 'Card to delete'));
   });
 
   test('confirm click starts one delete and disables a second click while pending', async () => {

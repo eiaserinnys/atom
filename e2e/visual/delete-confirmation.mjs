@@ -149,10 +149,10 @@ async function seedTree(apiUrl) {
   return {
     cardIds: [library, referenceOriginal, sprint, taskOne, taskTwo, taskThree, lonely, shared].map((created) => created.id),
     cases: [
-      { key: 'symlink', nodeId: referenceLink.id, expected: { target: 'symlink', cards: 0 } },
-      { key: 'normal', nodeId: sprint.node_id, expected: { target: 'node', cards: 3, ids: [sprint.id, taskOne.id, taskTwo.id] } },
-      { key: 'leaf', nodeId: lonely.node_id, expected: { target: 'node', cards: 1, ids: [lonely.id] } },
-      { key: 'shared', nodeId: shared.node_id, expected: { target: 'node', cards: 0 } },
+      { key: 'symlink', name: 'Reference card', nodeId: referenceLink.id, expected: { target: 'symlink', cards: 0 } },
+      { key: 'normal', name: 'Sprint plan', nodeId: sprint.node_id, expected: { target: 'node', cards: 3, ids: [sprint.id, taskOne.id, taskTwo.id] } },
+      { key: 'leaf', name: LONG_TITLE, nodeId: lonely.node_id, expected: { target: 'node', cards: 1, ids: [lonely.id] } },
+      { key: 'shared', name: 'Shared note', nodeId: shared.node_id, expected: { target: 'node', cards: 0 } },
     ],
   };
 }
@@ -207,6 +207,50 @@ async function boxMetrics(page) {
   }, MODAL);
 }
 
+async function framePartTexts(page) {
+  return page.evaluate((selector) => [...(document.querySelector(selector)?.firstElementChild?.children ?? [])].map((part) => part.textContent ?? ''), MODAL);
+}
+
+// Korean lines may only turn over at a space or punctuation. Letters of an unbroken Latin name are exempt
+// (a name wider than the dialog has to fold somewhere).
+async function koreanBreakViolations(page) {
+  return page.evaluate((selector) => {
+    const frame = document.querySelector(selector)?.firstElementChild;
+    if (!frame) return ['no dialog'];
+    const walker = document.createTreeWalker(frame, NodeFilter.SHOW_TEXT);
+    const violations = [];
+    let previous = null;
+    let spaceSince = false;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = node.textContent ?? '';
+      for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        if (/\s/.test(char)) { spaceSince = true; continue; }
+        const range = document.createRange();
+        range.setStart(node, index);
+        range.setEnd(node, index + 1);
+        const rect = range.getClientRects()[0];
+        if (!rect) continue;
+        if (previous && rect.top > previous.top + 3 && rect.left < previous.right) {
+          const afterPunctuation = /[.,!?;:)\]"'\u201d\u2019\u3002\u3001\u2026]/.test(previous.char);
+          const insideLatinName = /[A-Za-z0-9]/.test(previous.char) && /[A-Za-z0-9]/.test(char);
+          if (!spaceSince && !afterPunctuation && !insideLatinName) violations.push(`${previous.char}|${char}`);
+        }
+        previous = { char, top: rect.top, right: rect.right };
+        spaceSince = false;
+      }
+      spaceSince = true;
+    }
+    return violations;
+  }, MODAL);
+}
+
+async function checkKoreanBreaks(page, lang, label) {
+  if (lang !== 'ko') return;
+  const violations = await koreanBreakViolations(page);
+  check(`ko dialog text turns over lines only at a space or punctuation, ${label}`, violations.length === 0, violations.join(' '));
+}
+
 // The dialog keeps its side margin (mx-4 = 16px) and no text runs past its own box.
 const fitsViewport = (metrics) => metrics.left >= 15.5 && metrics.right <= metrics.innerWidth - 15.5 && metrics.overflowing === 0 && metrics.clipped === 0;
 
@@ -236,12 +280,12 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
         const amber = await page.locator(`${MODAL} ${AMBER}`).count();
         if (item.key === 'symlink') {
           check(`symlink dialog says only the link goes and has no permanent-deletion wording (${tag})`,
-            has(body, text.title_link) && has(body, text.body_link) && !has(body, text.cards_unknown)
+            has(body, text.title_link) && has(body, fill(text.body_link, { name: item.name })) && !has(body, text.cards_unknown)
               && !has(body, fill(text.cards_permanent, { total: '' }).slice(0, 8)) && amber === 0, body.replace(/\n/g, ' | '));
         } else if (item.key === 'normal') {
           const expected = fill(text.cards_permanent, { total: previews.normal.deleted_card_count });
           check(`node dialog shows the server preview count ${previews.normal.deleted_card_count} (${tag})`,
-            has(body, text.title_node) && has(body, text.body_node) && has(body, expected), body.replace(/\n/g, ' | '));
+            has(body, text.title_node) && has(body, fill(text.body_node, { name: item.name })) && has(body, expected), body.replace(/\n/g, ' | '));
         } else if (item.key === 'leaf') {
           const expected = fill(text.cards_permanent, { total: previews.leaf.deleted_card_count });
           check(`leaf node without another place counts its own card (${tag})`, has(body, expected), body.replace(/\n/g, ' | '));
@@ -252,6 +296,12 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
         const metrics = await boxMetrics(page);
         check(`dialog stays inside the viewport without overflowing children, ${item.key} (${tag})`,
           fitsViewport(metrics) && (await overflowX(page)) <= 0, JSON.stringify(metrics));
+        const parts = await framePartTexts(page);
+        const sentence = fill(item.key === 'symlink' ? text.body_link : text.body_node, { name: item.name });
+        check(`dialog is title, one sentence${item.key === 'symlink' ? '' : ', notice'}, buttons, and the name appears once, ${item.key} (${tag})`,
+          parts.length === (item.key === 'symlink' ? 3 : 4) && parts[0] === (item.key === 'symlink' ? text.title_link : text.title_node)
+            && parts[1] === sentence && parts.join('').split(item.name).length === 2, JSON.stringify(parts));
+        await checkKoreanBreaks(page, lang, `${item.key} (${tag})`);
         await shot(page, `${item.key}-${lang}-${width}`);
         await closeDelete(page, lang);
       }
@@ -265,6 +315,7 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
       const loadingBody = await modalText(page);
       const locked = await confirmButton(page, lang).isDisabled();
       check(`while the preview is received the dialog says so and the confirm button is locked (${tag})`, has(loadingBody, text.checking) && locked, loadingBody.replace(/\n/g, ' | '));
+      await checkKoreanBreaks(page, lang, `loading (${tag})`);
       await shot(page, `loading-${lang}-${width}`);
       release();
       await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
@@ -278,6 +329,7 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
       const failedBody = await modalText(page);
       check(`a failed preview shows the general warning and keeps the confirm button open (${tag})`,
         has(failedBody, text.cards_unknown) && !(await confirmButton(page, lang).isDisabled()), failedBody.replace(/\n/g, ' | '));
+      await checkKoreanBreaks(page, lang, `failed (${tag})`);
       await shot(page, `failed-${lang}-${width}`);
       await closeDelete(page, lang);
       await page.unroute('**/tree/*/delete-preview');
@@ -290,6 +342,24 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
   await dark.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
   await shot(dark, 'normal-en-1440-dark');
   await dark.context().close();
+
+  const darkKorean = await newPage(browser, WIDE, webUrl, 'ko', 'dark');
+  const normalCase = data.cases.find((item) => item.key === 'normal');
+  let releaseDark;
+  const heldDark = new Promise((resolve) => { releaseDark = resolve; });
+  await darkKorean.route('**/tree/*/delete-preview', async (route) => { await heldDark; await route.continue(); });
+  await openDelete(darkKorean, 'ko', normalCase.nodeId);
+  await darkKorean.locator(MODAL).getByText(locale('ko').delete_modal.checking, { exact: false }).waitFor({ timeout: 3_000 });
+  await shot(darkKorean, 'loading-ko-1440-dark');
+  releaseDark();
+  await darkKorean.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
+  await closeDelete(darkKorean, 'ko');
+  await darkKorean.unroute('**/tree/*/delete-preview');
+  await darkKorean.route('**/tree/*/delete-preview', (route) => route.fulfill(json({ error: 'x' }, 500)));
+  await openDelete(darkKorean, 'ko', normalCase.nodeId);
+  await darkKorean.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
+  await shot(darkKorean, 'failed-ko-1440-dark');
+  await darkKorean.context().close();
 
   const operations = await measureOperations({ browser, apiUrl, webUrl, data });
   await confirmDeleteRemovesPreviewedCards({ browser, apiUrl, webUrl, data, previews });

@@ -63,15 +63,11 @@ export function DeleteConfirmModal({
       onKeyDown={handleKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-card border border-border rounded-none shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+      <div className="bg-card border border-border rounded-none shadow-card w-full max-w-sm mx-4 p-6 flex flex-col gap-4 [&:lang(ko)]:break-keep [overflow-wrap:anywhere]">
         <h2 className="text-base font-semibold text-foreground">{t(isSymlink ? 'delete_modal.title_link' : 'delete_modal.title_node')}</h2>
 
-        <div className="text-sm text-foreground [overflow-wrap:anywhere]">
-          {t('delete_modal.desc', { name: title })}
-        </div>
-
         <div className="text-sm text-foreground">
-          {t(isSymlink ? 'delete_modal.body_link' : 'delete_modal.body_node')}
+          {t(isSymlink ? 'delete_modal.body_link' : 'delete_modal.body_node', { name: title })}
         </div>
 
         {notice}

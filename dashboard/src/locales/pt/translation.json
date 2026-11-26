@@ -168,9 +168,8 @@
   "delete_modal": {
     "title_node": "Excluir este nó",
     "title_link": "Excluir este link",
-    "desc": "Excluir \"{{name}}\"?",
-    "body_node": "Este nó e tudo o que está abaixo dele serão excluídos.",
-    "body_link": "Somente este link é excluído. O cartão original permanece.",
+    "body_node": "\"{{name}}\" e tudo o que está abaixo dele serão excluídos.",
+    "body_link": "Somente o link \"{{name}}\" é excluído. O cartão original permanece.",
     "checking": "Verificando o que será excluído…",
     "cards_permanent": "Os cartões que não existem em nenhum outro lugar também serão excluídos permanentemente: {{total}}. Isso não pode ser desfeito.",
     "cards_none": "Nenhum cartão será excluído permanentemente.",

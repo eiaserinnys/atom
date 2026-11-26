@@ -168,9 +168,8 @@
   "delete_modal": {
     "title_node": "Supprimer ce nœud",
     "title_link": "Supprimer ce lien",
-    "desc": "Supprimer \"{{name}}\" ?",
-    "body_node": "Ce nœud et tout ce qui se trouve en dessous seront supprimés.",
-    "body_link": "Seul ce lien est supprimé. La carte d'origine est conservée.",
+    "body_node": "\"{{name}}\" et tout ce qui se trouve en dessous seront supprimés.",
+    "body_link": "Seul le lien \"{{name}}\" est supprimé. La carte d'origine est conservée.",
     "checking": "Vérification de ce qui sera supprimé…",
     "cards_permanent": "Les cartes qui n'existent nulle part ailleurs seront aussi supprimées définitivement : {{total}}. Cette action est irréversible.",
     "cards_none": "Aucune carte ne sera supprimée définitivement.",
