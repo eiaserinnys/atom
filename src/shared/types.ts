@@ -116,6 +116,12 @@ export interface SearchResult {
   is_symlink: boolean;
   snippet: string;
   node_path: string[];  // 조상 타이틀 배열 (루트 → 부모 순서). 고아 카드이면 []
+  fallback?: SearchFallback;
+}
+
+export interface SearchFallback {
+  kind: "relaxed_or" | "synonym";
+  query: string;
 }
 
 // ---------------------------------------------------------------------------
