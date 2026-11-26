@@ -100,7 +100,7 @@ export function registerBatchTools(server: McpServer, agentId: string): void {
       "  • order: array of node_ids in desired sequence. A node that currently sits under another parent is moved under parent_node_id, so list only nodes that should end up there. A symlink parent_node_id resolves to its canonical node.",
       "  • Nodes under the parent but NOT in order keep their existing keys.",
       "",
-      "Parent placement: for creates, symlinks, moves and child_orders, a parent_node_id that is a symlink node resolves to its canonical node, so the new or moved node is placed under the canonical node. The result does not include the parent (created: temp_id, card_id, node_id; moved: node_id), so call get_node to confirm it.",
+      "Parent placement: for creates, symlinks, moves and child_orders, a parent_node_id that is a symlink node resolves to its canonical node, so the new or moved node is placed under the canonical node. The results of creates (temp_id, card_id, node_id), symlinks (node_id) and moves (node_id) do not include the parent, so call get_node to confirm it. child_ordered in the result lists the resolved (canonical) parent node_id of each child_orders item.",
       "",
       "deletes: permanently removes the card, every tree node of that card (symlinks included) and the whole subtree below each of those nodes. Cards in those subtrees that have no tree node left elsewhere are permanently deleted too; cards that still have a node outside the deleted subtrees are kept. This cannot be undone. To keep a card from the subtree, move it out (moves) or give it another node elsewhere (symlinks) in the same batch; deletes run last.",
     ].join("\n"),
