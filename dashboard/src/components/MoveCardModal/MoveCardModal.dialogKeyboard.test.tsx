@@ -100,7 +100,9 @@ describe('MoveCardModal as a keyboard dialog', () => {
 
   test('Tab and Shift+Tab cycle inside the dialog (folder, Cancel, with Move still locked)', async () => {
     await renderModal(modal());
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+    for (let attempt = 0; attempt < 100 && !button('Target'); attempt += 1) {
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+    }
     const target = button('Target');
     const cancel = button(english.common.cancel);
     expect(button(english.move_modal.confirm_btn).disabled).toBe(true);

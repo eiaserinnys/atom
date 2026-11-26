@@ -151,6 +151,7 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
   async function moveLeafToGroup() {
     vi.spyOn(api, 'moveNode').mockResolvedValue(undefined);
     await openFromMenu('leaf', english.tree.context_move);
+    await eventually(() => expect(button('Group')).toBeDefined());
     await settle(() => button('Group').click());
     await settle(() => button(english.move_modal.confirm_btn).click());
   }
