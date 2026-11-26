@@ -10,10 +10,11 @@ import type { AuthFooterState } from './AuthTab';
 interface Props {
   currentUserRole: UserRole;
   currentUserEmail: string;
+  showLogout: boolean;
 }
 
-export function MobileSettingsPage({ currentUserRole, currentUserEmail }: Props) {
-  const { pendingRestart, triggerRestart } = useSystem();
+export function MobileSettingsPage({ currentUserRole, currentUserEmail, showLogout }: Props) {
+  const { pendingRestart, manualRestartRequired, triggerRestart } = useSystem();
   const [activeTab, setActiveTab] = useState<ConfigTab | null>(null);
   const [authFooter, setAuthFooter] = useState<AuthFooterState | null>(null);
 
@@ -34,7 +35,7 @@ export function MobileSettingsPage({ currentUserRole, currentUserEmail }: Props)
         activeTab={activeTab}
         onSelect={handleSelect}
         mobile
-        showLogout
+        showLogout={showLogout}
         hidden={activeTab !== null}
       />
       {activeTab !== null && (
@@ -51,6 +52,7 @@ export function MobileSettingsPage({ currentUserRole, currentUserEmail }: Props)
         activeTab={activeTab}
         mobile
         pendingRestart={pendingRestart}
+        manualRestartRequired={manualRestartRequired}
         triggerRestart={triggerRestart}
         authFooter={authFooter}
       />

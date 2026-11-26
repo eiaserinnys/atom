@@ -5,6 +5,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadConfig } from "../src/config/load-env.js";
 import { closeDb, getDb, runMigrations } from "../src/db/client.js";
 import { executeBatchOp } from "../src/services/batch.service.js";
 import type {
@@ -136,6 +137,7 @@ function validateSeedKeys(
 
 async function main(): Promise<void> {
   const seedPath = getSeedPath(process.argv.slice(2));
+  console.log(loadConfig().description);
   let databaseOpened = false;
 
   try {

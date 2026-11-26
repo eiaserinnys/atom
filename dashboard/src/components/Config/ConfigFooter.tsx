@@ -8,6 +8,7 @@ interface Props {
   activeTab: ConfigTab | null;
   mobile?: boolean;
   pendingRestart: boolean;
+  manualRestartRequired: boolean;
   triggerRestart: () => void;
   onClose?: () => void;
   authFooter: AuthFooterState | null;
@@ -17,6 +18,7 @@ export function ConfigFooter({
   activeTab,
   mobile = false,
   pendingRestart,
+  manualRestartRequired,
   triggerRestart,
   onClose,
   authFooter,
@@ -34,6 +36,7 @@ export function ConfigFooter({
             <span className="flex items-center gap-2 text-foreground">
               <TriangleAlert className="h-4 w-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} />
               {t('system.restart_required')}
+              {manualRestartRequired && ` ${t('system.restart_manual')}`}
             </span>
           ) : !pendingRestart && isAuthTab && authFooter?.message ? (
             <span className={authFooter.message.ok ? 'text-muted-foreground' : 'text-node-error'}>

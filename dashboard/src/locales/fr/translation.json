@@ -215,5 +215,8 @@
     "tab_settings": "Paramètres",
     "settings_back": "← Paramètres",
     "tab_search": "Recherche"
+  },
+  "system": {
+    "restart_manual": "Ce bouton arrête le serveur. Relancez-le vous-même."
   }
 }

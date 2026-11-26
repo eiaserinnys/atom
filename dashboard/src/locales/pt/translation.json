@@ -215,5 +215,8 @@
     "tab_settings": "Configurações",
     "settings_back": "← Configurações",
     "tab_search": "Buscar"
+  },
+  "system": {
+    "restart_manual": "Ao clicar, o servidor é desligado. Inicie-o novamente por conta própria."
   }
 }

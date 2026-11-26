@@ -84,6 +84,25 @@ test('a full email address still seeds the first admin', async () => {
   } finally { db.close(); }
 });
 
+test('the example ALLOWED_EMAIL creates nobody, and a real address on the next start becomes the admin', async () => {
+  const first = await startServer('your-email@gmail.com', false);
+  expect(first.logs()).toMatch(/example value/i);
+  let db = new Database(first.sqlitePath, { readonly: true });
+  try {
+    expect(db.prepare('SELECT COUNT(*) AS count FROM users').get()).toEqual({ count: 0 });
+  } finally { db.close(); }
+  const exited = once(child!, 'exit');
+  child!.kill('SIGTERM');
+  await exited;
+
+  const second = await startServer('me@example.test', false);
+  db = new Database(second.sqlitePath, { readonly: true });
+  try {
+    expect(db.prepare('SELECT email, role FROM users').all())
+      .toEqual([{ email: 'me@example.test', role: 'admin' }]);
+  } finally { db.close(); }
+});
+
 test('bypass binds the actual server only to IPv4 loopback', async () => {
   const server = await startServer('', true);
   expect(new URL(server.address).hostname).toBe('127.0.0.1');

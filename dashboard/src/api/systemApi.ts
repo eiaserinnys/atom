@@ -5,7 +5,7 @@ export const systemApi = {
     return request('/api/health');
   },
 
-  getStatus(): Promise<{ pendingRestart: boolean }> {
+  getStatus(): Promise<{ pendingRestart: boolean; manualRestartRequired: boolean }> {
     return request('/api/system/status');
   },
 

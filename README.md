@@ -61,6 +61,8 @@ cp .env.example .env
 
 In `.env.example`, `DATABASE_URL` is commented out, so the server uses SQLite at `./atom.db`. Set `SQLITE_PATH` to use a different file path. The example file also sets `API_PORT=4200`.
 
+Set `ALLOWED_EMAIL` in `.env` to your own email **before the first start**. The server creates that user as the first admin; an empty value or the `your-email@...` example is skipped with a warning. If you start once without it, set it and restart: the user is created then.
+
 To use the dashboard without setting up Google or Slack OAuth, turn on the local auth bypass in `.env`:
 
 ```dotenv
@@ -79,7 +81,7 @@ npx tsx scripts/seed-demo.ts
 The script runs database migrations, then loads `examples/demo/seed.json` into a sample tree of structure cards, knowledge cards, and a symlink. Pass `--file <path>` to load your own seed file instead. If `tree_nodes` already has rows, the script exits and leaves existing data untouched.
 
 > [!NOTE]
-> `scripts/seed-demo.ts` reads `DATABASE_URL` and `SQLITE_PATH` directly from the process environment without loading `.env`. If you changed `SQLITE_PATH` in `.env`, pass it inline: `SQLITE_PATH=./custom.db npx tsx scripts/seed-demo.ts`.
+> Every entry point (`npm run dev`, `npm start`, `npm run migrate`, the stdio MCP server, `seed-demo`) loads `.env` and gives it priority over the shell. A variable that is in `.env` is ignored when you put it before the command (`AUTH_BYPASS=1 npm run dev`, `SQLITE_PATH=./custom.db npx tsx scripts/seed-demo.ts`); edit `.env` instead. Variables that are not in `.env` still come from the shell. Each entry point prints which database it uses and where that setting came from.
 
 ### 4. Start the API Server and Dashboard
 
@@ -88,6 +90,9 @@ Start the Fastify API and MCP server in one terminal:
 ```bash
 npm run dev
 ```
+
+> [!NOTE]
+> `npm run dev` has no process manager. The dashboard's **Restart Now** button only stops the server there; start `npm run dev` again yourself. The dashboard shows this next to the button.
 
 Start the React dashboard in a second terminal, pointing `VITE_API_BASE_URL` to port `4200`:
 

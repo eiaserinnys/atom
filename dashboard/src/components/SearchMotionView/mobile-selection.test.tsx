@@ -6,7 +6,7 @@ import { MobileLayout } from '../Layout/MobileLayout';
 import type { MotionNode } from './types';
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ role: 'admin', email: '' }) }));
+vi.mock('../../hooks/useAuth', async (importOriginal) => ({ ...await importOriginal<typeof import('../../hooks/useAuth')>(), useAuth: () => ({ role: 'admin', email: '' }) }));
 vi.mock('../TreeView/TreeView', () => ({ TreeView: () => <output data-testid="tree">Tree</output> }));
 vi.mock('../CompileView/CompileView', () => ({ CompileView: () => null }));
 vi.mock('../Config/MobileSettingsPage', () => ({ MobileSettingsPage: () => null }));

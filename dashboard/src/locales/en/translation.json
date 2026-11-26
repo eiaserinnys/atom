@@ -415,6 +415,7 @@
   "system": {
     "restart_required": "Settings changed. Restart required to apply.",
     "restart_now": "Restart Now",
+    "restart_manual": "Pressing the button stops the server. Start it again yourself.",
     "reconnecting": "Reconnecting to server...",
     "reconnect_timeout": "Restart may have failed. Please check manually."
   },

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth, BYPASS_USER_ID } from '../../hooks/useAuth';
 import { TreeView } from '../TreeView/TreeView';
 import { CompileView } from '../CompileView/CompileView';
 import { CardDetail } from '../CardDetail/CardDetail';
@@ -43,7 +43,7 @@ export function MobileLayout({ selectedNodeId, onSelectNode, initialSelectedNode
         <div className="flex-1 min-h-0">{searchVisited && <SearchMotionView explorationState={explorationState} request={request} onResults={onResults} onSelectNode={onSearchSelect} onOpenInTree={id => { onOpenInTree?.(id); setActiveTab('tree'); }} />}</div>
       </div>
       <div hidden={activeTab !== 'detail'} className="h-full"><CardDetail nodeId={selectedNodeId} verdict={verdict} /></div>
-      {activeTab === 'settings' && <div className="h-full flex flex-col"><MobileSettingsPage currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} /></div>}
+      {activeTab === 'settings' && <div className="h-full flex flex-col"><MobileSettingsPage currentUserRole={auth.role!} currentUserEmail={auth.email ?? ''} showLogout={auth.id !== BYPASS_USER_ID} /></div>}
     </div>
     <MobileTabBar activeTab={activeTab} onTabChange={setActiveTab} showSettings={auth.role !== null} />
   </div>;

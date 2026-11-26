@@ -215,5 +215,8 @@
     "tab_settings": "Ajustes",
     "settings_back": "← Ajustes",
     "tab_search": "Buscar"
+  },
+  "system": {
+    "restart_manual": "Al pulsar el botón se detiene el servidor. Vuelve a iniciarlo tú mismo."
   }
 }

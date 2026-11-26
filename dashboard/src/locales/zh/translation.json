@@ -215,5 +215,8 @@
     "tab_settings": "设置",
     "settings_back": "← 设置",
     "tab_search": "搜索"
+  },
+  "system": {
+    "restart_manual": "点击后服务器会关闭，需要自行重新启动。"
   }
 }

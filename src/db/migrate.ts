@@ -1,11 +1,11 @@
 import { fileURLToPath } from "url";
 import path from "path";
 import { runMigrations, getDb, closeDb } from "./client.js";
-import { config } from "dotenv";
+import { loadConfig } from "../config/load-env.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-config({ path: path.join(__dirname, "../../.env") });
+console.log(loadConfig().description);
 
 const db = getDb();
 const migrationsDir = db.dbType === 'sqlite'

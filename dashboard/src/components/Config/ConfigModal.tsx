@@ -18,7 +18,7 @@ interface Props {
 
 export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail }: Props) {
   const { t } = useTranslation();
-  const { pendingRestart, triggerRestart } = useSystem();
+  const { pendingRestart, manualRestartRequired, triggerRestart } = useSystem();
   const [activeTab, setActiveTab] = useState<ConfigTab>(() => getDefaultConfigTab(currentUserRole));
   const [authFooter, setAuthFooter] = useState<AuthFooterState | null>(null);
   const selectedTabRef = useRef<HTMLButtonElement>(null);
@@ -28,6 +28,12 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
     setAuthFooter(null);
     onClose();
   }, [currentUserRole, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement;
+    return () => { if (opener instanceof HTMLElement) opener.focus(); };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -99,6 +105,7 @@ export function ConfigModal({ isOpen, onClose, currentUserRole, currentUserEmail
         <ConfigFooter
           activeTab={activeTab}
           pendingRestart={pendingRestart}
+          manualRestartRequired={manualRestartRequired}
           triggerRestart={triggerRestart}
           onClose={handleClose}
           authFooter={authFooter}

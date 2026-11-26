@@ -4,13 +4,14 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { registerAllTools } from "./register-tools.js";
 import { runMigrations, getDb } from "../db/client.js";
-import { config } from "dotenv";
+import { loadConfig } from "../config/load-env.js";
 import { loadAdapters } from "../unfurl/loader.js";
 import { adapterRegistry } from "../unfurl/registry.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-config({ path: path.join(__dirname, "../../.env") });
+// stdout carries the MCP protocol, so the startup line goes to stderr.
+console.error(loadConfig().description);
 
 async function main(): Promise<void> {
   const db = getDb();

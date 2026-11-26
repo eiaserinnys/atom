@@ -6,7 +6,7 @@ import App from './App';
 import type { MotionNode } from './components/SearchMotionView/types';
 const sample: MotionNode = { nodeId: 'virtual-rose', title: '이전 표본 카드', type: 'knowledge', path: ['식물'], summary: '이전 표본 본문', score: .9, selected: true, rank: 1, hop: 2, reason: '선정 1', sentText: '', sample: true };
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock('./hooks/useAuth', () => ({ useAuth: () => ({ authenticated: true, role: 'admin' }) }));
+vi.mock('./hooks/useAuth', async (importOriginal) => ({ ...await importOriginal<typeof import('./hooks/useAuth')>(), useAuth: () => ({ authenticated: true, role: 'admin' }) }));
 vi.mock('./hooks/useMobile', () => ({ useMobile: () => false }));
 vi.mock('./hooks/useTheme', () => ({ useTheme: () => ({ theme: 'dark', toggle: vi.fn() }) }));
 vi.mock('./hooks/useAtomEvents', () => ({ useAtomEvents() {} }));

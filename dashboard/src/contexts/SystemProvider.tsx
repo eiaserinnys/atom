@@ -4,6 +4,7 @@ import { SystemContext } from './systemContext';
 
 export function SystemProvider({ children }: { children: ReactNode }) {
   const [pendingRestart, setPendingRestart] = useState(false);
+  const [manualRestartRequired, setManualRestartRequired] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
 
   // Poll system status every 30s
@@ -11,7 +12,11 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     const poll = () => {
       systemApi.getStatus()
-        .then((s) => { if (!cancelled) setPendingRestart(s.pendingRestart); })
+        .then((s) => {
+          if (cancelled) return;
+          setPendingRestart(s.pendingRestart);
+          setManualRestartRequired(s.manualRestartRequired);
+        })
         .catch(() => {});
     };
     poll();
@@ -73,12 +78,15 @@ export function SystemProvider({ children }: { children: ReactNode }) {
 
   const refreshStatus = useCallback(() => {
     systemApi.getStatus()
-      .then((s) => setPendingRestart(s.pendingRestart))
+      .then((s) => {
+        setPendingRestart(s.pendingRestart);
+        setManualRestartRequired(s.manualRestartRequired);
+      })
       .catch(() => {});
   }, []);
 
   return (
-    <SystemContext.Provider value={{ pendingRestart, reconnecting, triggerRestart, refreshStatus }}>
+    <SystemContext.Provider value={{ pendingRestart, manualRestartRequired, reconnecting, triggerRestart, refreshStatus }}>
       {children}
     </SystemContext.Provider>
   );

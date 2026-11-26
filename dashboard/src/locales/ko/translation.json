@@ -414,6 +414,7 @@
   "system": {
     "restart_required": "설정이 변경되었습니다. 서버를 재시작해야 적용됩니다.",
     "restart_now": "지금 재시작",
+    "restart_manual": "누르면 서버가 꺼집니다. 직접 다시 띄워야 합니다.",
     "reconnecting": "서버와 연결 중입니다...",
     "reconnect_timeout": "재시작에 실패했을 수 있습니다. 수동으로 확인해주세요."
   },

@@ -3,6 +3,8 @@ import { api, type UserRole } from '../api/client';
 
 export type { UserRole };
 
+export const BYPASS_USER_ID = 'bypass';
+
 export interface AuthStatus {
   loading: boolean;
   authenticated: boolean;

@@ -215,5 +215,8 @@
     "tab_settings": "Einstellungen",
     "settings_back": "← Einstellungen",
     "tab_search": "Suche"
+  },
+  "system": {
+    "restart_manual": "Ein Klick beendet den Server. Starte ihn selbst neu."
   }
 }

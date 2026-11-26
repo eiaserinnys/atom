@@ -5,14 +5,17 @@ import { ConfigActionButton } from './Config/ConfigFields';
 
 export function RestartBanner() {
   const { t } = useTranslation();
-  const { pendingRestart, triggerRestart } = useSystem();
+  const { pendingRestart, manualRestartRequired, triggerRestart } = useSystem();
 
   if (!pendingRestart) return null;
 
   return (
     <div className="bg-[var(--amber-soft)] border-b border-[var(--amber)]/30 px-4 py-2 flex items-center gap-2 shrink-0">
       <TriangleAlert className="w-4 h-4 shrink-0 text-[var(--amber)]" strokeWidth={1.75} aria-hidden="true" />
-      <span className="flex-1 text-sm text-foreground">{t('system.restart_required')}</span>
+      <span className="flex-1 text-sm text-foreground">
+        {t('system.restart_required')}
+        {manualRestartRequired && ` ${t('system.restart_manual')}`}
+      </span>
       <ConfigActionButton onClick={triggerRestart}>{t('system.restart_now')}</ConfigActionButton>
     </div>
   );

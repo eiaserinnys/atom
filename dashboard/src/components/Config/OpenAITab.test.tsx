@@ -117,13 +117,13 @@ describe('OpenAI settings tab', () => {
     await render(<ConfigModal isOpen onClose={vi.fn()} currentUserRole="viewer" currentUserEmail="viewer@example.test" />);
     expect([...host.querySelectorAll('button')].some(button => button.textContent === 'config.tab_openai')).toBe(false);
 
-    await render(<MobileSettingsPage currentUserRole="admin" currentUserEmail="admin@example.test" />);
+    await render(<MobileSettingsPage currentUserRole="admin" currentUserEmail="admin@example.test" showLogout />);
     const mobileTab = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('config.tab_openai'));
     expect(mobileTab).toBeDefined();
     click(mobileTab!);
     expect(host.textContent).toContain('openai.embeddings');
 
-    await render(<MobileSettingsPage currentUserRole="viewer" currentUserEmail="viewer@example.test" />);
+    await render(<MobileSettingsPage currentUserRole="viewer" currentUserEmail="viewer@example.test" showLogout />);
     expect([...host.querySelectorAll('button')].some(button => button.textContent?.includes('config.tab_openai'))).toBe(false);
     expect([...host.querySelectorAll('nav button')].map(button => button.textContent?.trim())).toEqual([
       'config.tab_language', 'config.tab_credentials', 'app.logout',
@@ -377,7 +377,7 @@ describe('settings frame and footer', () => {
 
 describe('mobile settings navigation', () => {
   test('keeps the list mounted and preserves its scroll position after returning from details', async () => {
-    await render(<MobileSettingsPage currentUserRole="admin" currentUserEmail="admin@example.test" />);
+    await render(<MobileSettingsPage currentUserRole="admin" currentUserEmail="admin@example.test" showLogout />);
     const nav = host.querySelector('nav[aria-label="config.settings"]') as HTMLElement;
     nav.scrollTop = 72;
     const database = [...nav.querySelectorAll('button')].find(button => button.textContent?.includes('config.tab_database'))!;

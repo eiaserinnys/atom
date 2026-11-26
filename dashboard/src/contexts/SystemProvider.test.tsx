@@ -20,7 +20,7 @@ beforeEach(async () => {
   vi.useFakeTimers();
   vi.clearAllMocks();
   vi.stubGlobal('window', { location: { reload } });
-  api.getStatus.mockResolvedValue({ pendingRestart: true });
+  api.getStatus.mockResolvedValue({ pendingRestart: true, manualRestartRequired: false });
   api.getHealth.mockResolvedValue({ status: 'ok', bootId: 'old' });
   api.restart.mockResolvedValue({ ok: true });
   host = document.createElement('div');
@@ -31,6 +31,13 @@ afterEach(async () => {
   await act(async () => root.unmount());
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+test('carries the server answer on whether a restart needs a manual start', async () => {
+  expect(state.manualRestartRequired).toBe(false);
+  api.getStatus.mockResolvedValue({ pendingRestart: true, manualRestartRequired: true });
+  await act(async () => state.refreshStatus());
+  expect(state.manualRestartRequired).toBe(true);
 });
 
 test('only reloads after a different boot answers health', async () => {
