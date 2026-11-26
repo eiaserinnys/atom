@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle2, TriangleAlert, XCircle } from 'lucide-react';
 import { configApi } from '../../api/client';
+import { describeApiError } from '../../api/apiError';
 import { useSystem } from '../../contexts/systemContext';
 import { ConfigActionButton, CONFIG_CONTROL_CLASS } from './ConfigFields';
 
@@ -26,6 +27,8 @@ export function DatabaseTab() {
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
   const [savingUrl, setSavingUrl] = useState(false);
   const migrationDialogRef = useRef<HTMLDivElement>(null);
+  const translateRef = useRef(t);
+  translateRef.current = t;
 
   const fetchInfo = useCallback(async () => {
     setLoading(true);
@@ -34,7 +37,7 @@ export function DatabaseTab() {
       const data = await configApi.getDbInfo();
       setInfo(data as DbInfo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(describeApiError(err, translateRef.current));
     } finally {
       setLoading(false);
     }
@@ -52,19 +55,11 @@ export function DatabaseTab() {
     setMigrating(true);
     setMigrateResult(null);
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
-      const response = await fetch(`${baseUrl}/api/config/migrate-to-pg`, {
-        method: 'POST', credentials: 'same-origin',
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setMigrateResult({ ok: false, message: data.error ?? 'Unknown error' });
-      } else {
-        setMigrateResult({ ok: true, message: data.message ?? 'Migration completed.' });
-        void fetchInfo();
-      }
+      const data = await configApi.migrateToPostgres();
+      setMigrateResult({ ok: true, message: data.message ?? 'Migration completed.' });
+      void fetchInfo();
     } catch (err) {
-      setMigrateResult({ ok: false, message: err instanceof Error ? err.message : String(err) });
+      setMigrateResult({ ok: false, message: describeApiError(err, t) });
     } finally {
       setMigrating(false);
     }
@@ -77,7 +72,7 @@ export function DatabaseTab() {
       const result = await configApi.testDbConnection(connUrl);
       setTestResult(result);
     } catch (err) {
-      setTestResult({ ok: false, error: err instanceof Error ? err.message : String(err) });
+      setTestResult({ ok: false, error: describeApiError(err, t) });
     } finally {
       setTesting(false);
     }
@@ -89,7 +84,7 @@ export function DatabaseTab() {
       await configApi.putEnv([{ key: 'DATABASE_URL', value: connUrl }]);
       setTestResult(null);
     } catch (err) {
-      setTestResult({ ok: false, error: err instanceof Error ? err.message : String(err) });
+      setTestResult({ ok: false, error: describeApiError(err, t) });
     } finally {
       setSavingUrl(false);
     }

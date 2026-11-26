@@ -17,6 +17,14 @@
     "revoke": "Révoquer",
     "generating": "Génération en cours..."
   },
+  "errors": {
+    "startup_would_fail": "Non enregistré. Avec ces réglages, le serveur ne redémarrerait pas.",
+    "failed": "L'opération a échoué. Réessayez dans un instant.",
+    "forbidden": "Vous n'avez pas l'autorisation d'effectuer cette action.",
+    "not_found": "Cet élément n'existe plus.",
+    "busy": "Trop de requêtes. Réessayez dans un instant.",
+    "server": "Le serveur n'a pas pu traiter la demande. Réessayez dans un instant."
+  },
   "config": {
     "settings": "Paramètres",
     "tab_users": "Utilisateurs",

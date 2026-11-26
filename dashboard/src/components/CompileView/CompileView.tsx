@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
-import { VersionConflictError } from '../../api/request';
+import { VersionConflictError } from '../../api/apiError';
 import { invalidateSelectedCompileQueries } from '../../query/invalidation';
 import { CardFormModal } from '../CardFormModal/CardFormModal';
 import { CompileContent } from './CompileContent';

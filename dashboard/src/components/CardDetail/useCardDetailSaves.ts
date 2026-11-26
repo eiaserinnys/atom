@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, type CardData } from '../../api/client';
 import { parseJournalLimitDraft } from './cardDetailLogic';
 import { nodeQueryKey } from '../../query/queryKeys';
-import { VersionConflictError } from '../../api/request';
+import { VersionConflictError, describeApiError } from '../../api/apiError';
 
 interface UseCardDetailSavesArgs {
   nodeId: string | null;
@@ -16,10 +17,6 @@ interface UseCardDetailSavesArgs {
   onContentSaved: (card: CardData, savedContent: string) => void;
   onJournalLimitSaved: () => void;
   onJournalLimitIgnored: () => void;
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function useCardDetailSaves({
@@ -35,6 +32,7 @@ export function useCardDetailSaves({
   onJournalLimitIgnored,
 }: UseCardDetailSavesArgs) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const invalidateNode = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: nodeQueryKey(nodeId) });
@@ -45,8 +43,8 @@ export function useCardDetailSaves({
       onVersionConflict(error.currentVersion);
       return;
     }
-    onSaveError(field, `${saveFailedLabel}: ${getErrorMessage(error)}`);
-  }, [onSaveError, onVersionConflict, saveFailedLabel]);
+    onSaveError(field, `${saveFailedLabel}: ${describeApiError(error, t)}`);
+  }, [onSaveError, onVersionConflict, saveFailedLabel, t]);
 
   const saveTitle = useCallback(async (cardId: string | undefined, titleDraft: string) => {
     if (!cardId) return;

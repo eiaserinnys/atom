@@ -11,6 +11,7 @@ const envContent = [
   "UNKNOWN_VALUE=surprise",
   "GOOGLE_CLIENT_SECRET=google-secret",
   "OPENAI_API_KEY=openai-db-key",
+  "AUTH_BYPASS=1",
 ].join("\n");
 
 describe("/api/config/env masking", () => {
@@ -39,6 +40,7 @@ describe("/api/config/env masking", () => {
       expect(get.statusCode).toBe(200);
       expect(get.json()).toEqual({
         API_PORT: "4200",
+        AUTH_BYPASS: "1",
         DATABASE_URL: "***",
         TYPESAFE_API_KEY: "***",
         UNKNOWN_VALUE: "***",
@@ -65,6 +67,7 @@ describe("/api/config/env masking", () => {
         "UNKNOWN_VALUE=surprise",
         "GOOGLE_CLIENT_SECRET=google-secret",
         "OPENAI_API_KEY=openai-db-key",
+        "AUTH_BYPASS=1",
       ].join("\n"));
       expect(existsSpy).toHaveBeenCalled();
       expect(readSpy).toHaveBeenCalled();

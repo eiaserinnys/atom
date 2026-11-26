@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { describeApiError } from '../../api/apiError';
 import { useConfig } from '../../hooks/useConfig';
 import type { AgentScope } from '../../api/client';
 import type { UserRole } from '../../hooks/useAuth';
@@ -53,7 +54,7 @@ export function AgentManagementTab({ currentUserRole }: Props) {
       setNewDisplayName('');
       setNewScope('read');
     } catch (e: unknown) {
-      setCreateError(e instanceof Error ? e.message : String(e));
+      setCreateError(describeApiError(e, t));
     } finally {
       setCreating(false);
     }
@@ -66,7 +67,7 @@ export function AgentManagementTab({ currentUserRole }: Props) {
     } catch (e: unknown) {
       setReissueErrors((prev) => ({
         ...prev,
-        [id]: e instanceof Error ? e.message : String(e),
+        [id]: describeApiError(e, t),
       }));
     }
   };
@@ -78,7 +79,7 @@ export function AgentManagementTab({ currentUserRole }: Props) {
     } catch (e: unknown) {
       setUpdateErrors((prev) => ({
         ...prev,
-        [id]: e instanceof Error ? e.message : String(e),
+        [id]: describeApiError(e, t),
       }));
     }
   };

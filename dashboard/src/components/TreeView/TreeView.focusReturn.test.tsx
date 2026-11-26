@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import i18next from 'i18next';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ApiError } from '../../api/apiError';
 import { api, type TreeNodeData } from '../../api/client';
 import english from '../../locales/en/translation.json';
 import { childrenQueryKey, rootTreeQueryKey } from '../../query/queryKeys';
@@ -126,10 +127,10 @@ describe('TreeView gives focus back after the delete and move dialogs', () => {
   });
 
   test('closing the delete dialog after a failed delete returns focus to the row', async () => {
-    vi.spyOn(api, 'deleteNode').mockRejectedValue(new Error('API 500'));
+    vi.spyOn(api, 'deleteNode').mockRejectedValue(new ApiError(500));
     await openFromMenu('leaf', english.tree.context_delete);
     await clickWhenReady(english.delete_modal.confirm_btn);
-    await eventually(() => expect(container.textContent).toContain('API 500'));
+    await eventually(() => expect(container.textContent).toContain(english.errors.server));
 
     await press('Escape');
 

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ApiError } from './apiError';
 import { api } from './client';
 import { compileApi } from './compileApi';
 
@@ -103,10 +104,26 @@ describe('dashboard API client transport contracts', () => {
     expect(window.location.href).toBe('unchanged');
   });
 
-  test('preserves non-ok error messages', async () => {
-    fetchMock.mockResolvedValueOnce(responseWithText(500, 'broken'));
+  test('turns a non-ok response into an ApiError that carries no raw body', async () => {
+    fetchMock.mockResolvedValueOnce(responseWithText(500, '<html>broken</html>'));
 
-    await expect(api.getTree()).rejects.toThrow('API 500: broken');
+    const error = await api.getTree().catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 500, code: undefined, serverText: undefined });
+    expect((error as Error).message).not.toContain('broken');
+  });
+
+  test('reads the code and text out of a JSON error body', async () => {
+    fetchMock.mockResolvedValueOnce(responseWithText(400, JSON.stringify({ error: 'No login method', code: 'STARTUP_WOULD_FAIL' })));
+
+    await expect(api.getTree()).rejects.toMatchObject({ status: 400, code: 'STARTUP_WOULD_FAIL', serverText: 'No login method' });
+  });
+
+  test('a 409 whose body is not JSON is an ordinary ApiError, not a crash', async () => {
+    fetchMock.mockResolvedValueOnce(responseWithText(409, 'conflict'));
+
+    await expect(api.getTree()).rejects.toMatchObject({ status: 409 });
   });
 
   test('unwraps the card from the PUT update response envelope', async () => {

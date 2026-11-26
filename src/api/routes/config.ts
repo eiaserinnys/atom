@@ -12,6 +12,7 @@ import { setPendingRestart } from '../state.js';
 import { agentKeyVerifier } from '../agent-key-auth.js';
 import { mapPostgresConnectionError } from '../config/db-test.js';
 import { isDbOwnedConfigEnvKey, parseConfigEnvContent, updateConfigEnvContent } from '../config/env-file.js';
+import { checkSaveKeepsStartupValid, STARTUP_WOULD_FAIL } from '../config/save-guard.js';
 import {
   migrateSqliteToPostgres,
   type ConfigMigrationServiceDeps,
@@ -302,7 +303,13 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
 
     try {
       const content = fs.existsSync(envFilePath) ? fs.readFileSync(envFilePath, 'utf-8') : '';
-      fs.writeFileSync(envFilePath, updateConfigEnvContent(content, entries), 'utf-8');
+      const nextContent = updateConfigEnvContent(content, entries);
+      const verdict = checkSaveKeepsStartupValid(envFilePath, nextContent);
+      if (!verdict.ok) {
+        req.log.warn({ reason: verdict.reason }, 'env save rejected: the server would not start with these settings');
+        return reply.code(400).send({ error: verdict.reason, code: STARTUP_WOULD_FAIL });
+      }
+      fs.writeFileSync(envFilePath, nextContent, 'utf-8');
       setPendingRestart(true);
       return reply.send({ ok: true });
     } catch (err) {

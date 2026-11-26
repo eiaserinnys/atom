@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import i18next from 'i18next';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ApiError } from '../../api/apiError';
 import { api, type TreeNodeData } from '../../api/client';
 import english from '../../locales/en/translation.json';
 import { rootTreeQueryKey } from '../../query/queryKeys';
@@ -155,7 +156,7 @@ describe('TreeView delete confirmation safety', () => {
   });
 
   test('a failed preview shows the general warning and still lets the user delete', async () => {
-    vi.spyOn(api, 'getDeletePreview').mockRejectedValue(new Error('API 500'));
+    vi.spyOn(api, 'getDeletePreview').mockRejectedValue(new ApiError(500));
     const deleteNode = vi.spyOn(api, 'deleteNode').mockResolvedValue(undefined);
     await openDeleteConfirmation();
 
@@ -221,7 +222,7 @@ describe('TreeView delete confirmation safety', () => {
   });
 
   test('a failed symlink preview shows the general warning and still lets the user delete', async () => {
-    vi.spyOn(api, 'getDeletePreview').mockRejectedValue(new Error('API 500'));
+    vi.spyOn(api, 'getDeletePreview').mockRejectedValue(new ApiError(500));
     const deleteNode = vi.spyOn(api, 'deleteNode').mockResolvedValue(undefined);
     await openSymlinkDeleteConfirmation();
 

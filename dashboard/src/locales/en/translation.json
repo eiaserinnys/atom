@@ -144,6 +144,14 @@
     "revoke": "Revoke",
     "generating": "Generating..."
   },
+  "errors": {
+    "startup_would_fail": "Not saved. The server would not start again with these settings.",
+    "failed": "Something went wrong. Please try again in a moment.",
+    "forbidden": "You don't have permission to do this.",
+    "not_found": "That item no longer exists.",
+    "busy": "Too many requests. Please try again in a moment.",
+    "server": "The server could not handle this. Please try again in a moment."
+  },
   "config": {
     "settings": "Settings",
     "tab_users": "Users",
@@ -335,7 +343,6 @@
     "empty": "No structure cards available"
   },
   "delete_modal": {
-    "failed": "Couldn't delete.",
     "title_node": "Delete this node",
     "title_link": "Delete this link",
     "body_node": "\"{{name}}\" and everything below it will be deleted.",

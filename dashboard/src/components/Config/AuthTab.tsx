@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, configApi } from '../../api/client';
+import { describeApiError } from '../../api/apiError';
 import { useSystem } from '../../contexts/systemContext';
 import { AdminPasswordSection } from './AdminPasswordSection';
 import { ConfigField } from './ConfigFields';
@@ -12,6 +13,11 @@ const ENV_KEYS = {
 };
 
 const SENSITIVE = new Set(['GOOGLE_CLIENT_SECRET', 'SLACK_CLIENT_SECRET']);
+const AUTH_ENV_KEYS = [...ENV_KEYS.google, ...ENV_KEYS.slack, ...ENV_KEYS.admin];
+
+function changedKeys(values: Record<string, string>, initialValues: Record<string, string>): string[] {
+  return AUTH_ENV_KEYS.filter((key) => (values[key] ?? '') !== (initialValues[key] ?? ''));
+}
 
 export interface AuthFooterState {
   disabled: boolean;
@@ -34,8 +40,10 @@ export function AuthTab({ onFooterChange }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const valuesRef = useRef(values);
+  const initialValuesRef = useRef(initialValues);
   const translateRef = useRef(t);
   valuesRef.current = values;
+  initialValuesRef.current = initialValues;
   translateRef.current = t;
 
   useEffect(() => {
@@ -48,7 +56,7 @@ export function AuthTab({ onFooterChange }: Props) {
         setInitialValues(loadedValues);
         setPasswordMode(isPasswordMode);
       })
-      .catch((err) => setMessage({ ok: false, text: err.message }))
+      .catch((err) => setMessage({ ok: false, text: describeApiError(err, translateRef.current) }))
       .finally(() => setLoading(false));
   }, []);
 
@@ -59,26 +67,23 @@ export function AuthTab({ onFooterChange }: Props) {
 
   const handleSave = useCallback(async () => {
     const currentValues = valuesRef.current;
+    const entries = changedKeys(currentValues, initialValuesRef.current)
+      .map((key) => ({ key, value: currentValues[key] ?? '' }));
     setSaving(true);
     setMessage(null);
     try {
-      const entries = [
-        ...ENV_KEYS.google.map((key) => ({ key, value: currentValues[key] ?? '' })),
-        ...ENV_KEYS.slack.map((key) => ({ key, value: currentValues[key] ?? '' })),
-        ...ENV_KEYS.admin.map((key) => ({ key, value: currentValues[key] ?? '' })),
-      ];
       await configApi.putEnv(entries);
       setInitialValues(currentValues);
       setMessage({ ok: true, text: translateRef.current('auth.save_success') });
       refreshStatus();
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof Error ? err.message : String(err) });
+      setMessage({ ok: false, text: describeApiError(err, translateRef.current) });
     } finally {
       setSaving(false);
     }
   }, [refreshStatus]);
 
-  const isDirty = Object.keys(values).some((key) => values[key] !== initialValues[key]);
+  const isDirty = changedKeys(values, initialValues).length > 0;
 
   useEffect(() => {
     onFooterChange?.({

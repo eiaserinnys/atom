@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import i18next from 'i18next';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ApiError } from '../../api/apiError';
 import { api, type CardData, type TreeNodeData } from '../../api/client';
 import english from '../../locales/en/translation.json';
 import { nodeQueryKey } from '../../query/queryKeys';
@@ -364,7 +365,7 @@ describe('CardDetail edit version tracking', () => {
     });
     vi.mocked(api.getNode).mockImplementation(async id => id === 'node-2' ? aliasNode : currentNode);
     const updateNode = vi.spyOn(api, 'updateNode')
-      .mockRejectedValueOnce(new Error('A update failed'))
+      .mockRejectedValueOnce(new ApiError(400, 'INVALID_INPUT', 'A update failed'))
       .mockResolvedValueOnce(aliasNode)
       .mockResolvedValueOnce({ ...currentNode, journal_limit: 7 });
 

@@ -17,6 +17,14 @@
     "revoke": "Widerrufen",
     "generating": "Wird generiert..."
   },
+  "errors": {
+    "startup_would_fail": "Nicht gespeichert. Mit diesen Einstellungen würde der Server nicht mehr starten.",
+    "failed": "Das hat nicht geklappt. Bitte versuchen Sie es gleich noch einmal.",
+    "forbidden": "Dafür fehlt die Berechtigung.",
+    "not_found": "Dieses Element existiert nicht mehr.",
+    "busy": "Zu viele Anfragen. Bitte versuchen Sie es gleich noch einmal.",
+    "server": "Der Server konnte das nicht verarbeiten. Bitte versuchen Sie es gleich noch einmal."
+  },
   "config": {
     "settings": "Einstellungen",
     "tab_users": "Benutzerverwaltung",

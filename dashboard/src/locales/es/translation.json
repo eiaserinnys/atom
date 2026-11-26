@@ -17,6 +17,14 @@
     "revoke": "Revocar",
     "generating": "Generando..."
   },
+  "errors": {
+    "startup_would_fail": "No se guardó. Con esta configuración el servidor no volvería a arrancar.",
+    "failed": "No se pudo completar. Inténtalo de nuevo en un momento.",
+    "forbidden": "No tienes permiso para hacer esto.",
+    "not_found": "Ese elemento ya no existe.",
+    "busy": "Demasiadas solicitudes. Inténtalo de nuevo en un momento.",
+    "server": "El servidor no pudo procesarlo. Inténtalo de nuevo en un momento."
+  },
   "config": {
     "settings": "Configuración",
     "tab_users": "Usuarios",

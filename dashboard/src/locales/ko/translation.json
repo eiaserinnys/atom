@@ -144,6 +144,14 @@
     "revoke": "폐기",
     "generating": "생성 중..."
   },
+  "errors": {
+    "startup_would_fail": "저장하지 않았습니다. 이 설정으로는 서버가 다시 뜨지 않습니다.",
+    "failed": "처리하지 못했습니다. 잠시 뒤 다시 해 주세요.",
+    "forbidden": "권한이 없습니다.",
+    "not_found": "대상을 찾을 수 없습니다.",
+    "busy": "요청이 너무 많습니다. 잠시 뒤 다시 해 주세요.",
+    "server": "서버에서 처리하지 못했습니다. 잠시 뒤 다시 해 주세요."
+  },
   "config": {
     "settings": "설정",
     "tab_users": "사용자 관리",
@@ -334,7 +342,6 @@
     "empty": "이동 가능한 구조 카드 없음"
   },
   "delete_modal": {
-    "failed": "삭제하지 못했습니다.",
     "title_node": "노드 삭제",
     "title_link": "링크 삭제",
     "body_node": "\"{{name}}\" 항목과 그 아래가 모두 삭제됩니다.",
