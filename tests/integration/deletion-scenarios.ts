@@ -110,6 +110,31 @@ export function defineDeletionScenarios(): void {
       expect(await cardExists(original.cardId)).toBe(true);
     });
 
+    it("a symlink with a child card, whose own card keeps another symlink, plans only the child card", async () => {
+      const original = await make("Original");
+      const firstRoot = await make("First root");
+      const secondRoot = await make("Second root");
+      const first = await treeService.createSymlink(original.cardId, firstRoot.nodeId);
+      const second = await treeService.createSymlink(original.cardId, secondRoot.nodeId);
+      await treeService.deleteNode(original.nodeId);
+      const child = await make("Child", first.id, "knowledge");
+
+      const planned = await plan({ nodeId: first.id });
+      expect(sorted(planned.nodeIds)).toEqual(sorted([first.id, child.nodeId]));
+      expect(planned.deletedCards.map((card) => card.cardId)).toEqual([child.cardId]);
+      const preview = await treeService.previewNodeDeletion(first.id);
+      expect(preview).toEqual({ target: "symlink", deletedCardIds: [child.cardId], deletedNodeCount: 2 });
+
+      expect(await treeService.deleteNode(first.id)).toEqual({
+        deletedCardIds: preview!.deletedCardIds,
+        deletedNodeCount: preview!.deletedNodeCount,
+      });
+      expect(await cardExists(child.cardId)).toBe(false);
+      expect(await nodeExists(child.nodeId)).toBe(false);
+      expect(await cardExists(original.cardId)).toBe(true);
+      expect(await nodeExists(second.id)).toBe(true);
+    });
+
     it("a node with nested descendants plans every node and orphan card, parents first", async () => {
       const top = await make("Top");
       const middle = await make("Middle", top.nodeId);

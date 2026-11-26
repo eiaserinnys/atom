@@ -262,12 +262,23 @@ async function checkKoreanBreaks(page, lang, label) {
 }
 
 const DIALOG_SHAPE = {
-  symlink: { title: 'title_link', body: 'body_link', parts: 3 },
-  symlinkLast: { title: 'title_link', body: 'body_link_last', parts: 4 },
-  normal: { title: 'title_node', body: 'body_node', parts: 4 },
-  leaf: { title: 'title_node', body: 'body_node', parts: 4 },
-  shared: { title: 'title_node', body: 'body_node', parts: 4 },
+  symlink: { title: 'title_link', body: 'body_link' },
+  symlinkLast: { title: 'title_link', body: 'body_link' },
+  normal: { title: 'title_node', body: 'body_node' },
+  leaf: { title: 'title_node', body: 'body_node' },
+  shared: { title: 'title_node', body: 'body_node' },
 };
+
+// The word that says "permanently" in each checked language; a dialog says it once or not at all.
+const PERMANENT_WORD = { ko: '영구 삭제', en: 'permanently', de: 'dauerhaft', ja: '完全に' };
+const countOf = (text, word) => text.split(word).length - 1;
+
+async function frameBox(page) {
+  return page.evaluate((selector) => {
+    const box = document.querySelector(selector)?.firstElementChild?.getBoundingClientRect();
+    return { top: box?.top, height: box?.height };
+  }, MODAL);
+}
 
 // The dialog keeps its side margin (mx-4 = 16px) and no text runs past its own box.
 const fitsViewport = (metrics) => metrics.left >= 15.5 && metrics.right <= metrics.innerWidth - 15.5 && metrics.overflowing === 0 && metrics.clipped === 0;
@@ -296,16 +307,18 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
         await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 }).catch(() => {});
         const body = await modalText(page);
         const amber = await page.locator(`${MODAL} ${AMBER}`).count();
+        const permanentWords = countOf(body, PERMANENT_WORD[lang]);
         if (item.key === 'symlink') {
-          check(`symlink whose card sits elsewhere says only the link goes and has no permanent-deletion wording (${tag})`,
-            has(body, text.title_link) && has(body, fill(text.body_link, { name: item.name })) && !has(body, text.body_link_last)
-              && !has(body, text.cards_unknown) && !has(body, text.cards_unknown_link)
+          check(`symlink whose card sits elsewhere says the link is deleted and the original card stays, with no permanent-deletion wording (${tag})`,
+            has(body, text.title_link) && has(body, fill(text.body_link, { name: item.name })) && has(body, text.link_card_stays)
+              && permanentWords === 0 && !has(body, text.cards_unknown_link)
               && !has(body, fill(text.cards_permanent, { total: '' }).slice(0, 8)) && amber === 0, body.replace(/\n/g, ' | '));
         } else if (item.key === 'symlinkLast') {
           const expected = fill(text.cards_permanent, { total: previews.symlinkLast.deleted_card_count });
-          check(`last symlink of a card says the card goes too and shows the server preview count ${previews.symlinkLast.deleted_card_count} (${tag})`,
-            has(body, text.title_link) && has(body, fill(text.body_link_last, { name: item.name })) && has(body, expected)
-              && !has(body, fill(text.body_link, { name: item.name })) && amber === 1, body.replace(/\n/g, ' | '));
+          check(`symlink that deletes a card says the link is deleted and shows the server preview count ${previews.symlinkLast.deleted_card_count} (${tag})`,
+            has(body, text.title_link) && has(body, fill(text.body_link, { name: item.name })) && has(body, expected)
+              && !has(body, text.link_card_stays) && amber === 1, body.replace(/\n/g, ' | '));
+          check(`permanent deletion is said once, in the notice line only, symlinkLast (${tag})`, permanentWords === 1, body.replace(/\n/g, ' | '));
         } else if (item.key === 'normal') {
           const expected = fill(text.cards_permanent, { total: previews.normal.deleted_card_count });
           check(`node dialog shows the server preview count ${previews.normal.deleted_card_count} (${tag})`,
@@ -323,17 +336,24 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
         const parts = await framePartTexts(page);
         const shape = DIALOG_SHAPE[item.key];
         const sentence = fill(text[shape.body], { name: item.name });
-        check(`dialog is title, one sentence${shape.parts === 3 ? '' : ', notice'}, buttons, and the name appears once, ${item.key} (${tag})`,
-          parts.length === shape.parts && parts[0] === text[shape.title]
+        check(`dialog is title, one sentence, notice, buttons, and the name appears once, ${item.key} (${tag})`,
+          parts.length === 4 && parts[0] === text[shape.title]
             && parts[1] === sentence && parts.join('').split(item.name).length === 2, JSON.stringify(parts));
         await checkKoreanBreaks(page, lang, `${item.key} (${tag})`);
         await shot(page, `${item.key}-${lang}-${width}`);
         await closeDelete(page, lang);
       }
 
-      for (const item of data.cases.filter((candidate) => candidate.key === 'normal' || candidate.key === 'symlinkLast')) {
-        await captureWaiting({ page, lang, text, tag, item, shot });
+      const waits = {};
+      for (const key of ['normal', 'symlink', 'symlinkLast']) {
+        const item = data.cases.find((candidate) => candidate.key === key);
+        waits[key] = await captureWaiting({ page, lang, text, tag, item, shot, withFailure: key !== 'symlink' });
       }
+      const shift = (key) => waits[key].ready.height - waits[key].loading.height;
+      check(`symlink whose card stays keeps its top edge and height from loading to loaded (${tag})`,
+        Math.abs(waits.symlink.ready.top - waits.symlink.loading.top) <= 0.5 && Math.abs(shift('symlink')) <= 0.5, JSON.stringify(waits.symlink));
+      check(`symlink that deletes a card changes height from loading to loaded by as much as the node dialog does (${tag})`,
+        Math.abs(shift('symlinkLast') - shift('normal')) <= 1, `node ${shift('normal')}px, symlink ${shift('symlinkLast')}px`);
       await page.context().close();
     }
   }
@@ -368,15 +388,25 @@ async function captureScreens({ browser, apiUrl, webUrl, data }) {
   await shot(darkLast, 'symlinkLast-ko-1440-dark');
   await darkLast.context().close();
 
+  const darkStays = await newPage(browser, WIDE, webUrl, 'ko', 'dark');
+  let releaseStays;
+  const heldStays = new Promise((resolve) => { releaseStays = resolve; });
+  await darkStays.route('**/tree/*/delete-preview', async (route) => { await heldStays; await route.continue(); });
+  await openDelete(darkStays, 'ko', data.cases.find((item) => item.key === 'symlink').nodeId);
+  await darkStays.locator(MODAL).getByText(locale('ko').delete_modal.checking, { exact: false }).waitFor({ timeout: 3_000 });
+  await shot(darkStays, 'symlink-loading-ko-1440-dark');
+  releaseStays();
+  await darkStays.context().close();
+
   await measureBehaviour({ browser, apiUrl, webUrl, data });
   await measureSymlinkKeyboard({ browser, webUrl, data });
   await confirmDeleteRemovesPreviewedCards({ browser, apiUrl, webUrl, data, previews });
 }
 
 // The preview held back (loading) and the preview failing, for one node or symlink.
-async function captureWaiting({ page, lang, text, tag, item, shot }) {
-  const isLink = item.key === 'symlinkLast';
-  const name = isLink ? 'symlinkLast-' : '';
+async function captureWaiting({ page, lang, text, tag, item, shot, withFailure }) {
+  const isLink = item.key !== 'normal';
+  const name = item.key === 'normal' ? '' : `${item.key}-`;
   let release;
   const held = new Promise((resolve) => { release = resolve; });
   await page.route('**/tree/*/delete-preview', async (route) => { await held; await route.continue(); });
@@ -384,15 +414,19 @@ async function captureWaiting({ page, lang, text, tag, item, shot }) {
   await page.locator(MODAL).getByText(text.checking ?? '', { exact: false }).waitFor({ timeout: 3_000 }).catch(() => {});
   const loadingBody = await modalText(page);
   const locked = await confirmButton(page, lang).isDisabled();
-  check(`while the ${item.key} preview is received the dialog says so, claims nothing and the confirm button is locked (${tag})`,
-    has(loadingBody, text.checking) && locked && !has(loadingBody, fill(text.body_link, { name: item.name })), loadingBody.replace(/\n/g, ' | '));
+  check(`while the ${item.key} preview is received the dialog says so, claims nothing about the card and the confirm button is locked (${tag})`,
+    has(loadingBody, text.checking) && locked && !has(loadingBody, text.link_card_stays) && countOf(loadingBody, PERMANENT_WORD[lang]) === 0
+      && (!isLink || has(loadingBody, fill(text.body_link, { name: item.name }))), loadingBody.replace(/\n/g, ' | '));
+  const loading = await frameBox(page);
   await checkKoreanBreaks(page, lang, `${item.key} loading (${tag})`);
   await shot(page, `${name}loading-${lang}-${tag.split(' ')[1]}`);
   release();
   await page.waitForFunction((selector) => !document.querySelector(selector)?.querySelector('.animate-spin'), MODAL, { timeout: 10_000 });
   check(`the ${item.key} confirm button opens once the preview arrives (${tag})`, !(await confirmButton(page, lang).isDisabled()));
+  const ready = await frameBox(page);
   await closeDelete(page, lang);
   await page.unroute('**/tree/*/delete-preview');
+  if (!withFailure) return { loading, ready };
 
   await page.route('**/tree/*/delete-preview', (route) => route.fulfill(json({ error: 'x' }, 500)));
   await openDelete(page, lang, item.nodeId);
@@ -400,11 +434,13 @@ async function captureWaiting({ page, lang, text, tag, item, shot }) {
   const failedBody = await modalText(page);
   const warning = isLink ? text.cards_unknown_link : text.cards_unknown;
   check(`a failed ${item.key} preview shows the general warning and keeps the confirm button open (${tag})`,
-    has(failedBody, warning) && !has(failedBody, fill(text.body_link, { name: item.name })) && !(await confirmButton(page, lang).isDisabled()), failedBody.replace(/\n/g, ' | '));
+    has(failedBody, warning) && (!isLink || has(failedBody, fill(text.body_link, { name: item.name }))) && !has(failedBody, text.link_card_stays)
+      && !(await confirmButton(page, lang).isDisabled()), failedBody.replace(/\n/g, ' | '));
   await checkKoreanBreaks(page, lang, `${item.key} failed (${tag})`);
   await shot(page, `${name}failed-${lang}-${tag.split(' ')[1]}`);
   await closeDelete(page, lang);
   await page.unroute('**/tree/*/delete-preview');
+  return { loading, ready };
 }
 
 // A confirmed delete removes exactly the cards the preview announced, and nothing else.

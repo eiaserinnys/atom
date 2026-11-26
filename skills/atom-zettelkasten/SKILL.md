@@ -157,7 +157,7 @@ Prefer correcting a card to deleting it.
 - If the history matters, keep the card and start the content with `[Invalidated YYYY-MM-DD] <why, and which card replaces it>`.
 - Check `get_backlinks(card_id)` first. Deleting a referenced card leaves other cards pointing at a card that no longer exists.
 
-Deletion is destructive and reaches beyond the card: `delete_card` removes the card from every placement and also deletes the subtree under it, including descendant cards that are not placed anywhere else. To remove only one placement (for example a symlink), use `delete_node` on that node; if it is the card's last node (the canonical node was already deleted) the card is permanently deleted too, so check with `dry_run` first. The `atom-tree-cleanup` skill covers deleting sections safely.
+Deletion is destructive and reaches beyond the card: `delete_card` removes the card from every placement and also deletes the subtree under it, including descendant cards that are not placed anywhere else. To remove only one placement (for example a symlink), use `delete_node` on that node; the node and any nodes below it are removed, and the card is permanently deleted only if no other node of it is left (for example the canonical node was already deleted), so check with `dry_run` first. The `atom-tree-cleanup` skill covers deleting sections safely.
 
 ## Workflow summary
 

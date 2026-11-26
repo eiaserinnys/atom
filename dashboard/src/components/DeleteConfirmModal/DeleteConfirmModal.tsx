@@ -30,9 +30,7 @@ function renderPermanentNotice(preview: DeletePreviewState | undefined, isSymlin
     );
   }
   if (preview?.status === 'ready' && preview.deletedCardCount === 0) {
-    return isSymlink
-      ? null
-      : <div className="text-[13px] text-muted-foreground">{t('delete_modal.cards_none')}</div>;
+    return <div className="text-[13px] text-muted-foreground">{t(isSymlink ? 'delete_modal.link_card_stays' : 'delete_modal.cards_none')}</div>;
   }
   const unknownKey = isSymlink ? 'delete_modal.cards_unknown_link' : 'delete_modal.cards_unknown';
   return (
@@ -43,12 +41,6 @@ function renderPermanentNotice(preview: DeletePreviewState | undefined, isSymlin
         : t(unknownKey)}
     </div>
   );
-}
-
-function bodyKey(isSymlink: boolean, preview: DeletePreviewState | undefined): string {
-  if (!isSymlink) return 'delete_modal.body_node';
-  if (preview?.status !== 'ready') return 'delete_modal.body_link_unchecked';
-  return preview.deletedCardCount === 0 ? 'delete_modal.body_link' : 'delete_modal.body_link_last';
 }
 
 export function DeleteConfirmModal({
@@ -84,7 +76,7 @@ export function DeleteConfirmModal({
         <h2 id={titleId} className="text-base font-semibold text-foreground">{t(isSymlink ? 'delete_modal.title_link' : 'delete_modal.title_node')}</h2>
 
         <div className="text-sm text-foreground">
-          {t(bodyKey(isSymlink, preview), { name: title })}
+          {t(isSymlink ? 'delete_modal.body_link' : 'delete_modal.body_node', { name: title })}
         </div>
 
         {notice}
