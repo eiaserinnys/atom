@@ -61,13 +61,13 @@ npm run setup
 
 The server does not start without a login method, so run this once before the first start. It asks for the administrator password twice (nothing you type is shown) and writes it as `DASHBOARD_ADMIN_PASSWORD` into the env file the server loads: the repository-root `.env`, or the file named by `ATOM_ENV_FILE` in the shell. A missing file is created from `.env.example` and readable only by you. A `JWT_SECRET` is generated when the file has none and kept when it has one; every other line and comment stays as it was. The password and the secret are never printed. The same rules as the settings window apply: 8 to 256 characters, no leading or trailing whitespace, no line breaks. The command asks again on a rule violation or a mismatch, and after three failures it writes nothing and exits with a nonzero code.
 
-- **No terminal (Docker build, CI).** Pipe one line to `--password-stdin`; the password is never accepted as a command-line argument. Without a terminal and without the option the command explains this and exits with a nonzero code.
+- **No terminal (Docker build, CI).** Pipe or redirect one line to `--password-stdin`; the password is never accepted as a command-line argument. When standard input is a terminal, `--password-stdin` is not used: the command prints a note to standard error and asks for the password twice with echo off, exactly as it does without the option. Without a terminal and without the option the command explains this and exits with a nonzero code.
 
   ```bash
   printf '%s\n' "$ATOM_PASSWORD" | npm run setup -- --password-stdin
   ```
 
-- **A password is already set.** The command asks whether to change it (the default is no). With `--password-stdin` it changes it.
+- **A password is already set.** The command asks whether to change it (the default is no). With `--password-stdin` on a pipe or a file it changes it without asking; on a terminal it asks as it does without the option.
 - **OAuth is configured** (`GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`). The password is not used, so the command changes nothing and exits with `0`.
 - **`AUTH_BYPASS=1` is set.** The server does not accept a password together with it, so the command stops and asks you to remove that line first.
 

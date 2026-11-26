@@ -73,7 +73,7 @@ describe('npm run setup: a missing env file', () => {
     expect(fake.text()).not.toContain(GOOD);
     expect(fake.text()).not.toContain(readEnv()['JWT_SECRET']);
 
-    const stdin = fakeIo({ stdin: 'another-good-password-2' });
+    const stdin = fakeIo({ interactive: false, stdin: 'another-good-password-2' });
     fs.rmSync(envFile);
     await runSetup(stdin.io, { passwordStdin: true });
     expect(stdin.text()).not.toContain('another-good-password-2');
@@ -174,6 +174,55 @@ describe('npm run setup --password-stdin', () => {
 
     expect(fs.existsSync(envFile)).toBe(false);
     expect(fake.err.join('\n')).toContain('--password-stdin');
+  });
+});
+
+describe('npm run setup --password-stdin on a terminal', () => {
+  const WITH_PASSWORD = 'DASHBOARD_ADMIN_PASSWORD=old-password-1\nJWT_SECRET=kept-secret\n';
+
+  it('asks twice with echo off instead of reading a visible line, and says so on standard error', async () => {
+    const fake = fakeIo({ interactive: true, hidden: [GOOD, GOOD], stdin: 'must-not-be-read-1' });
+
+    expect(await runSetup(fake.io, { passwordStdin: true })).toBe(0);
+
+    expect(fake.asked).toEqual(['New administrator password: ', 'Confirm the password: ']);
+    expect(fake.err.join('\n')).toContain('Standard input is a terminal');
+    expect(readEnv()['DASHBOARD_ADMIN_PASSWORD']).toBe(GOOD);
+    expect(fake.text()).not.toContain(GOOD);
+    expect(fake.text()).not.toContain(readEnv()['JWT_SECRET']);
+  });
+
+  it('asks again when the confirmation differs and gives up after three failures', async () => {
+    const again = fakeIo({ interactive: true, hidden: [GOOD, 'a-different-password', 'second-password-2', 'second-password-2'] });
+    expect(await runSetup(again.io, { passwordStdin: true })).toBe(0);
+    expect(again.err.join('\n')).toContain('do not match');
+    expect(readEnv()['DASHBOARD_ADMIN_PASSWORD']).toBe('second-password-2');
+
+    fs.rmSync(envFile);
+    const giveUp = fakeIo({ interactive: true, hidden: ['bad', 'bad2', 'bad3'] });
+    expect(await runSetup(giveUp.io, { passwordStdin: true })).toBe(1);
+    expect(fs.existsSync(envFile)).toBe(false);
+  });
+
+  it('asks whether to change an existing password, as it does without the option', async () => {
+    fs.writeFileSync(envFile, WITH_PASSWORD);
+    const declined = fakeIo({ interactive: true, lines: [''] });
+    expect(await runSetup(declined.io, { passwordStdin: true })).toBe(0);
+    expect(fs.readFileSync(envFile, 'utf8')).toBe(WITH_PASSWORD);
+
+    const accepted = fakeIo({ interactive: true, lines: ['y'], hidden: [GOOD, GOOD] });
+    expect(await runSetup(accepted.io, { passwordStdin: true })).toBe(0);
+    expect(readEnv()['DASHBOARD_ADMIN_PASSWORD']).toBe(GOOD);
+  });
+
+  it('still reads one line from a pipe or a file without asking', async () => {
+    const fake = fakeIo({ interactive: false, stdin: GOOD });
+
+    expect(await runSetup(fake.io, { passwordStdin: true })).toBe(0);
+
+    expect(fake.asked).toEqual([]);
+    expect(fake.err).toEqual([]);
+    expect(readEnv()['DASHBOARD_ADMIN_PASSWORD']).toBe(GOOD);
   });
 });
 

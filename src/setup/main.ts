@@ -5,7 +5,8 @@ import { runSetup, type SetupIo } from './run-setup.js';
 const USAGE = [
   'Usage: npm run setup [-- --password-stdin]',
   '  Chooses the dashboard administrator password and writes it, with a JWT_SECRET, into the env file the server reads.',
-  '  --password-stdin  read the password from one line of standard input (for Docker and CI)',
+  '  --password-stdin  read the password from one line of piped or redirected standard input (for Docker and CI);',
+  '                    when standard input is a terminal the password is asked for with echo off, as without the option',
   '  The password is never taken from a command-line argument.',
 ].join('\n');
 
