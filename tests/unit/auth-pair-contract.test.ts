@@ -245,7 +245,10 @@ describe("agent path (agentKeyPreHandler): scope by key or by database role", ()
     expect((await agentCreate({ "x-api-key": AGENT_WRITE_KEY })).statusCode).toBe(201);
     const denied = await agentCreate({ "x-api-key": AGENT_READ_KEY });
     expect(denied.statusCode).toBe(403);
-    expect(denied.json()).toEqual({ error: "Forbidden" });
+    expect(denied.json()).toEqual({
+      error: "This API key has read scope, so the write route POST /api/cards is disabled. Use an API key with write scope.",
+      code: "INSUFFICIENT_SCOPE",
+    });
     expect((await agent({ "x-api-key": AGENT_READ_KEY })).statusCode).toBe(200);
   });
 
@@ -256,7 +259,10 @@ describe("agent path (agentKeyPreHandler): scope by key or by database role", ()
     const viewerHeaders = { authorization: `Bearer ${await tokenFor(viewer)}` };
     const denied = await agentCreate(viewerHeaders);
     expect(denied.statusCode).toBe(403);
-    expect(denied.json()).toEqual({ error: "Forbidden" });
+    expect(denied.json()).toEqual({
+      error: "This account is viewer, so the write route POST /api/cards is disabled. Use an account with the editor or admin role.",
+      code: "INSUFFICIENT_SCOPE",
+    });
     expect((await agent(viewerHeaders)).statusCode).toBe(200);
   });
 

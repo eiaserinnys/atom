@@ -186,7 +186,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       }
 
       if ((await listAgents(getDb())).some((existing) => existing.agent_id === agent_id)) {
-        return reply.code(409).send({ error: `agent_id already exists: ${agent_id}` });
+        return reply.code(409).send({ error: `agent_id already exists: ${agent_id}`, code: "ALREADY_EXISTS" });
       }
 
       const plainSecret = randomBytes(32).toString('hex');

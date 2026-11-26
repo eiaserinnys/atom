@@ -125,7 +125,10 @@ export async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyRepl
 }
 
 export async function requireAgentWriteScope(req: FastifyRequest, reply: FastifyReply): Promise<unknown> {
-  if (req.agentScope !== 'write') {
-    return reply.code(403).send({ error: "Forbidden" });
-  }
+  if (req.agentScope === "write") return;
+  const route = `${req.method} ${req.routeOptions.url}`;
+  const error = req.jwtUser
+    ? `This account is ${req.jwtUser.role}, so the write route ${route} is disabled. Use an account with the editor or admin role.`
+    : `This API key has read scope, so the write route ${route} is disabled. Use an API key with write scope.`;
+  return reply.code(403).send({ error, code: "INSUFFICIENT_SCOPE" });
 }

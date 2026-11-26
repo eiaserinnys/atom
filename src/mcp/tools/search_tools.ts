@@ -7,6 +7,7 @@ import { normalizeJevRootNodeId } from "../../services/jev-search/root-scope.js"
 import { JevSearchRequestError } from "../../services/jev-search/config.js";
 import type { JevSearchCompactResponse, JevSearchInput, JevSearchResponse } from "../../shared/jev-search.js";
 import type { SearchFilters, SearchResult } from "../../shared/types.js";
+import { uuidSchema } from "../uuid-schema.js";
 
 export interface SearchToolDependencies {
   searchCards(filters: SearchFilters): Promise<SearchResult[]>;
@@ -28,7 +29,7 @@ export function registerSearchTools(server: McpServer, overrides: Partial<Search
     {
       query: z.string().min(1).describe("Search query (required, non-empty). Plain words match as word prefixes, \"quoted phrases\" match whole words in order, -word excludes, OR joins alternatives."),
       limit: z.number().int().positive().optional().describe("Max results to return (default 20 for text search, 6 for Jev)."),
-      root_node_id: z.string().uuid().optional().describe("Restrict search to this node's subtree."),
+      root_node_id: uuidSchema.optional().describe("Restrict search to this node's subtree."),
       tags: z.array(z.string().min(1)).optional().describe("Filter: cards containing ALL specified tags."),
       card_type: z.enum(["structure", "knowledge"]).optional().describe("Filter: card type."),
       updated_after: z.string().datetime({ offset: true }).optional().describe("Filter: updated_at >= this ISO 8601 timestamp."),

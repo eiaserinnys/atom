@@ -25,6 +25,13 @@ export interface CompileOptions {
   /** Limit depth-1 children (direct children of the root node) to the latest n items.
    *  Sorted by card_timestamp descending. Does not affect deeper levels. */
   limit?: number;
+  /** Children the node's journal_limit left out, so the output can say so. */
+  getJournalOmission?: (nodeId: string) => JournalOmission | null;
+}
+
+export interface JournalOmission {
+  count: number;
+  journalLimit: number;
 }
 
 export interface CompileSection {
@@ -41,6 +48,51 @@ export interface CompileSection {
   headings: MarkdownHeading[];
   content?: string | null;
   unfurl_text?: string | null;
+}
+
+function omissionNote(count: number, children: string, cause: string): string {
+  return `<!-- omitted: ${count} ${children} (${cause}) -->`;
+}
+
+/**
+ * The children to expand under a node, with one note line for each way they were cut:
+ * the node's journal_limit, and the compile `limit` on the root's direct children.
+ */
+function selectChildren(
+  nodeId: string,
+  headingLevel: number,
+  getNodeCard: (nodeId: string) => { card_id: string; is_symlink: boolean },
+  getChildren: (nodeId: string) => TreeNode[],
+  getCard: (cardId: string) => Card,
+  options: CompileOptions
+): { children: TreeNode[]; notes: string[] } {
+  let children = getChildren(nodeId);
+  const notes: string[] = [];
+
+  const journal = options.getJournalOmission?.(nodeId);
+  if (journal) {
+    notes.push(omissionNote(
+      journal.count,
+      journal.count === 1 ? "older child" : "older children",
+      `journal_limit ${journal.journalLimit}`
+    ));
+  }
+
+  // The limit applies only to the root's direct children, newest card_timestamp first.
+  const limit = headingLevel === 1 ? options.limit : undefined;
+  if (limit !== undefined) {
+    const omitted = children.length - limit;
+    if (omitted > 0) {
+      notes.push(omissionNote(omitted, omitted === 1 ? "child" : "children", `limit ${limit}`));
+    }
+    children = [...children]
+      .sort((a, b) => compareCardTimestampDescending(
+        getCard(getNodeCard(a.id).card_id),
+        getCard(getNodeCard(b.id).card_id)
+      ))
+      .slice(0, limit);
+  }
+  return { children, notes };
 }
 
 function buildIdLabel(nodeId: string, cardId: string): string {
@@ -134,7 +186,8 @@ export function compileNode(
       options,
       visited,
       headingLevel,
-      numberPrefix
+      numberPrefix,
+      true
     ));
   }
 
@@ -187,20 +240,9 @@ export function compileNode(
   const newVisited = new Set(visited);
   newVisited.add(card_id);
 
-  let children = getChildren(nodeId);
-
-  // Apply limit only to depth-1 children (direct children of the root node)
-  // headingLevel === 1 means we are at the root, so its direct children are at headingLevel === 2
-  if (headingLevel === 1 && options.limit !== undefined) {
-    // Sort by card_timestamp descending (most recent first), then take top n
-    children = [...children]
-      .sort((a, b) => {
-        const cardA = getCard(getNodeCard(a.id).card_id);
-        const cardB = getCard(getNodeCard(b.id).card_id);
-        return compareCardTimestampDescending(cardA, cardB);
-      })
-      .slice(0, options.limit);
-  }
+  const { children, notes } = selectChildren(nodeId, headingLevel, getNodeCard, getChildren, getCard, options);
+  const childIndent = "  ".repeat(currentDepth + 1);
+  for (const note of notes) lines.push(`${childIndent}${note}`);
 
   children.forEach((child, idx) => {
     const childNumber = options.numbering
@@ -235,7 +277,7 @@ export function compileSections(
   options: CompileOptions = {}
 ): CompileSection[] {
   return collectCompileSections(
-    nodeId, getNodeCard, getChildren, getCard, depth, options, new Set(), 1, ""
+    nodeId, getNodeCard, getChildren, getCard, depth, options, new Set(), 1, "", false
   ).map((section, index) => ({ ...section, index }));
 }
 
@@ -248,7 +290,8 @@ function collectCompileSections(
   options: CompileOptions,
   visited: ReadonlySet<string>,
   headingLevel: number,
-  numberPrefix: string
+  numberPrefix: string,
+  withOmissionNotes: boolean
 ): CompileSection[] {
   if (options.excludeNodes?.has(nodeId)) return [];
 
@@ -314,17 +357,11 @@ function collectCompileSections(
   const nextVisited = new Set(visited);
   nextVisited.add(card_id);
 
-  let children = getChildren(nodeId);
-  if (headingLevel === 1 && options.limit !== undefined) {
-    children = [...children]
-      .sort((a, b) => compareCardTimestampDescending(
-        getCard(getNodeCard(a.id).card_id),
-        getCard(getNodeCard(b.id).card_id)
-      ))
-      .slice(0, options.limit);
-  }
-
+  const { children, notes } = selectChildren(nodeId, headingLevel, getNodeCard, getChildren, getCard, options);
   const sections = [section];
+  if (withOmissionNotes) {
+    for (const note of notes) sections.push(omissionSection(section, note));
+  }
   children.forEach((child, index) => {
     const childNumber = options.numbering
       ? numberPrefix ? `${numberPrefix}.${index + 1}` : `${index + 1}`
@@ -338,11 +375,30 @@ function collectCompileSections(
       options,
       nextVisited,
       headingLevel + 1,
-      childNumber
+      childNumber,
+      withOmissionNotes
     ));
   });
 
   return sections;
+}
+
+/** A note line in the compiled text; it is not a card, so it is never part of the sections API. */
+function omissionSection(parent: CompileSection, note: string): CompileSection {
+  return {
+    index: -1,
+    node_id: parent.node_id,
+    card_id: parent.card_id,
+    card_version: parent.card_version,
+    depth: parent.depth + 1,
+    level: Math.min(parent.level + 1, 6),
+    heading: note,
+    title: note,
+    cycle: false,
+    chars: 0,
+    headings: [],
+    content: null,
+  };
 }
 
 function renderSections(sections: CompileSection[]): string {

@@ -34,18 +34,18 @@ function firstInvalidId(values: unknown, labels: Record<string, string>, optiona
 export async function validateRequestIds(req: FastifyRequest, reply: FastifyReply): Promise<unknown> {
   const invalid = firstInvalidId(req.params, PATH_ID_LABELS, "none")
     ?? firstInvalidId(req.body, BODY_ID_LABELS, "null");
-  if (invalid) return reply.code(400).send({ error: invalid });
+  if (invalid) return reply.code(400).send({ error: invalid, code: "INVALID_ID" });
 }
 
 /**
  * Registers the shared REST error mapping for a route plugin:
- * ServiceError -> its status with `{ error: message }`, and the ID check for
+ * ServiceError -> its status with `{ error: message, code }`, and the ID check for
  * requests already authenticated by the dashboard auth hook (`req.jwtUser`).
  */
 export function registerServiceErrors(app: FastifyInstance): void {
   app.setErrorHandler((error, _req: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof ServiceError) {
-      return reply.code(error.statusCode).send({ error: error.message });
+      return reply.code(error.statusCode).send({ error: error.message, code: error.code });
     }
     return reply.send(error);
   });

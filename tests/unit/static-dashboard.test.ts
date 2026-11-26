@@ -83,7 +83,7 @@ it('serves only static routes publicly and keeps registered data routes protecte
   const headers = { cookie: (login.headers['set-cookie'] as string).split(';')[0] };
   const links = await app.inject({ url: backlink, headers });
   expect(links.statusCode).toBe(404);
-  expect(links.json()).toEqual({ error: 'Card not found: 00000000-0000-4000-8000-000000000001' });
+  expect(links.json()).toEqual({ error: 'Card not found: 00000000-0000-4000-8000-000000000001', code: 'CARD_NOT_FOUND' });
   expect((await app.inject({ url: '/tree', headers })).statusCode).toBe(200);
 });
 

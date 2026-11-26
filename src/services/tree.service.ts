@@ -122,21 +122,26 @@ export async function compileSubtree(
     depth,
     new Set(),
     1,
-    options
+    { ...options, getJournalOmission: compileContext.getJournalOmission }
   );
 
-  // max_chars post-processing
-  if (options.maxChars && options.maxChars > 0 && markdown.length > options.maxChars) {
-    const truncated = markdown.slice(0, options.maxChars);
-    const lastNewline = truncated.lastIndexOf("\n");
-    const cleanCut = lastNewline > 0 ? truncated.slice(0, lastNewline) : truncated;
-    const omittedChars = markdown.length - cleanCut.length;
-    markdown = cleanCut + `\n<!-- truncated: ${omittedChars} chars omitted -->`;
-  }
+  markdown = truncateMarkdown(markdown, options.maxChars);
 
   const unfurls = buildCompileUnfurls(resolvedRefsMap);
 
   return { markdown, ...(unfurls ? { unfurls } : {}) };
+}
+
+/**
+ * Cut at most `maxChars` characters on a line boundary and say how much was left out.
+ * The first line is always kept whole, so a small limit never leaves a heading comment open.
+ */
+function truncateMarkdown(markdown: string, maxChars: number | undefined): string {
+  if (!maxChars || maxChars <= 0 || markdown.length <= maxChars) return markdown;
+  const lastNewline = markdown.lastIndexOf("\n", maxChars - 1);
+  const cutAt = lastNewline > 0 ? lastNewline : markdown.indexOf("\n");
+  if (cutAt < 0) return markdown;
+  return `${markdown.slice(0, cutAt)}\n<!-- truncated: ${markdown.length - cutAt} chars omitted -->`;
 }
 
 export async function compileSubtreeSections(
