@@ -9,6 +9,7 @@ import type {
   BatchSymlinkItem,
 } from "../shared/types.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
+import { assertCardExists, assertValidCardTitle } from "./service-errors.js";
 import { resolveWriteParentNodeId } from "./tree-parent.js";
 
 interface ProcessBatchCreatesContext {
@@ -98,6 +99,7 @@ export async function processBatchCreates({
   patches,
   actor,
 }: ProcessBatchCreatesContext): Promise<void> {
+  for (const item of creates) assertValidCardTitle(item.title);
   const sorted = topologicalSortCreates(creates);
   const tempIdToNodeId = new Map<string, string>();
 
@@ -159,6 +161,7 @@ export async function processBatchSymlinks({
   const tempIdToNodeId = createTempIdToNodeId(created);
 
   for (const item of symlinks) {
+    await assertCardExists(db, item.card_id);
     const parentNodeId = resolveParentNodeId(
       item,
       tempIdToNodeId,

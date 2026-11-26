@@ -312,6 +312,8 @@ export type AgentScope = 'read' | 'write';
 declare module 'fastify' {
   interface FastifyRequest {
     agentScope?: AgentScope;
+    /** agent_id of the x-api-key that authenticated the request (unset for JWT and OAuth bearer requests). */
+    agentId?: string;
     jwtUser?: {
       id: string;
       email: string;

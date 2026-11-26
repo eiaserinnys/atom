@@ -18,6 +18,7 @@ import { deserializeArray, deserializeBoolean } from "../db/utils.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
 import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
 import { resolveWriteParentNodeId } from "./tree-parent.js";
+import { assertValidCardTitle, cardNotFound } from "./service-errors.js";
 
 export async function createCard(
   agentIdOrInput: string | null | CreateCardInput,
@@ -34,6 +35,7 @@ export async function createCard(
     input = agentIdOrInput;
   }
 
+  assertValidCardTitle(input.title);
   const { card, node } = await getDb().transaction(async (client) => {
     const parentNodeId = await resolveWriteParentNodeId(
       client,
@@ -98,6 +100,7 @@ export async function updateCard(
     expectedVersion = inputOrExpected as number | undefined;
   }
 
+  if (input.title !== undefined) assertValidCardTitle(input.title);
   const contentChanged = input.content !== undefined;
   const result = await updateCardById(
     getDb(), id, input, contentChanged, agentId ?? undefined, expectedVersion
@@ -135,6 +138,7 @@ export async function deleteCard(id: string): Promise<boolean> {
 
 export async function getBacklinks(cardId: string): Promise<Card[]> {
   const db = getDb();
+  if (!(await selectCardById(db, cardId))) throw await cardNotFound(cardId, db);
   let result;
   if (db.dbType === 'sqlite') {
     result = await db.query(

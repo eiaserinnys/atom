@@ -81,7 +81,7 @@ export async function normalizeSearchRootNodeId(
   rootNodeId: string | null | undefined
 ): Promise<string | null | undefined> {
   if (rootNodeId == null) return rootNodeId;
-  return resolveWriteParentNodeId(getDb(), rootNodeId);
+  return resolveWriteParentNodeId(getDb(), rootNodeId, "Node");
 }
 
 function trimResultsToScope(results: SearchResult[], rootTitle: string | undefined): SearchResult[] {

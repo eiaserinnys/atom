@@ -31,6 +31,7 @@ import { loadTreeCompileContext } from "./tree-compile-context.service.js";
 import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
 import { resolveParentNodeId, resolveWriteParentNodeId } from "./tree-parent.js";
 import { lockTreeStructure } from "../db/queries/tree-lock.js";
+import { assertCardExists } from "./service-errors.js";
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
   const db = getDb();
@@ -47,11 +48,10 @@ export async function listChildren(
   const db = getDb();
 
   // symlink 해석: 부모가 symlink이면 canonical node의 자식을 반환
-  // (부모 노드가 없으면 요청 id 그대로 조회 → 빈 목록)
   const effectiveParentId =
     parentNodeId === null
       ? null
-      : await resolveWriteParentNodeId(db, parentNodeId);
+      : await resolveWriteParentNodeId(db, parentNodeId, "Node");
 
   return selectChildrenWithCards(db, effectiveParentId);
 }
@@ -280,6 +280,7 @@ export async function createSymlink(
   position?: number
 ): Promise<TreeNode> {
   const db = getDb();
+  await assertCardExists(db, card_id);
   const effectiveParentNodeId = await resolveWriteParentNodeId(db, parent_node_id);
   const node = await insertNode(db, card_id, effectiveParentNodeId, position, true);
   eventBus.emit("atom:event", {

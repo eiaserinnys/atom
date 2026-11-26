@@ -6,6 +6,7 @@ import {
 import { selectCardsByIds } from "../db/queries/cards.js";
 import type { Queryable } from "../db/queryable.js";
 import type { Card, TreeNode } from "../shared/types.js";
+import { nodeNotFound } from "./service-errors.js";
 
 export interface TreeCompileContext {
   readonly cardCache: ReadonlyMap<string, Card>;
@@ -43,12 +44,11 @@ export async function loadTreeCompileContext(
   }
 
   const root = await selectNodeById(db, nodeId);
-  if (root) {
-    cacheNodes([root]);
-    await cacheMissingCards([root.card_id]);
-  }
+  if (!root) throw await nodeNotFound(nodeId, "Node", db);
+  cacheNodes([root]);
+  await cacheMissingCards([root.card_id]);
 
-  let levelNodes = root ? [root] : [];
+  let levelNodes = [root];
   let level = 0;
 
   // Match the compiler's remaining-depth check, including NaN from agent REST.

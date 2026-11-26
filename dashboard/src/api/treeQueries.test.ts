@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { TreeNodeData } from './client';
 import { api } from './client';
 import { treeApi } from './treeApi';
-import { fetchChildrenWithCounts } from './treeQueries';
+import { fetchChildrenWithCounts, fetchFullStructureTree, fetchRootsWithChildren } from './treeQueries';
 
 vi.mock('./client', () => ({
   api: {
+    getTree: vi.fn(),
     listChildren: vi.fn(),
   },
 }));
@@ -70,5 +71,35 @@ describe('fetchChildrenWithCounts', () => {
     vi.mocked(treeApi.getOutlineChildCounts).mockRejectedValue(new Error('outline unavailable'));
 
     await expect(fetchChildrenWithCounts('parent')).resolves.toBe(children);
+  });
+});
+
+describe('a children listing that now answers 404 for a deleted node', () => {
+  const notFound = new Error('API 404: {"error":"Node not found: gone"}');
+
+  beforeEach(() => vi.clearAllMocks());
+
+  test('keeps the root tree loading with an empty child list for that node', async () => {
+    const gone = node('gone');
+    vi.mocked(api.getTree).mockResolvedValue([gone]);
+    vi.mocked(api.listChildren).mockRejectedValue(notFound);
+    vi.mocked(treeApi.getOutlineChildCounts).mockRejectedValue(notFound);
+
+    await expect(fetchRootsWithChildren()).resolves.toEqual([{ ...gone, children: [] }]);
+  });
+
+  test('keeps the structure tree loading with an empty child list for that node', async () => {
+    const gone = { ...node('gone'), card: { ...node('gone').card, card_type: 'structure' as const } };
+    vi.mocked(api.getTree).mockResolvedValue([gone]);
+    vi.mocked(api.listChildren).mockRejectedValue(notFound);
+
+    await expect(fetchFullStructureTree()).resolves.toEqual([{ ...gone, children: [] }]);
+  });
+
+  test('lets a lazily expanded node see the error so its error icon shows', async () => {
+    vi.mocked(api.listChildren).mockRejectedValue(notFound);
+    vi.mocked(treeApi.getOutlineChildCounts).mockRejectedValue(notFound);
+
+    await expect(fetchChildrenWithCounts('gone')).rejects.toBe(notFound);
   });
 });

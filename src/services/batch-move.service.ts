@@ -8,6 +8,7 @@ import type {
 } from "../shared/types.js";
 import { resolvePositionKey } from "./tree-position.service.js";
 import { selectChildrenWithCards, toTreeNodeWithCard } from "./tree-node-payload.js";
+import { nodeNotFound } from "./service-errors.js";
 import { resolveWriteParentNodeId } from "./tree-parent.js";
 
 interface ProcessBatchMovesContext {
@@ -36,7 +37,7 @@ export async function processBatchMoves({
   for (const item of moves) {
     const oldNode = await selectNodeById(db, item.node_id);
     if (!oldNode) {
-      throw new Error(`Node not found: ${item.node_id}`);
+      throw await nodeNotFound(item.node_id, "Node", db);
     }
 
     const requestedParent = resolveMoveParent(item, oldNode.parent_node_id, tempIdToNodeId);
@@ -58,7 +59,7 @@ export async function processBatchMoves({
 
     const movedNode = await moveNode(db, item.node_id, effectiveParent, key);
     if (!movedNode) {
-      throw new Error(`Node not found: ${item.node_id}`);
+      throw await nodeNotFound(item.node_id, "Node", db);
     }
 
     result.moved.push(item.node_id);

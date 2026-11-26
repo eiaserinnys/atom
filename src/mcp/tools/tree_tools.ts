@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TreeCycleError } from "../../db/queries/tree.js";
+import { nodeNotFound } from "../../services/service-errors.js";
 import type { AgentScope } from "../../shared/types.js";
 import {
   getNode,
@@ -20,9 +21,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
     { node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output). Not a card_id.") },
     async ({ node_id }) => {
       const node = await getNode(node_id);
-      if (!node) {
-        return { content: [{ type: "text", text: `Node not found: ${node_id}` }], isError: true };
-      }
+      if (!node) throw await nodeNotFound(node_id);
       return { content: [{ type: "text", text: JSON.stringify(node) }] };
     }
   );
@@ -142,9 +141,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
           to,
           position,
         });
-        if (!moved) {
-          return { content: [{ type: "text", text: `Node not found: ${node_id}` }], isError: true };
-        }
+        if (!moved) throw await nodeNotFound(node_id);
         const response = warnings.length > 0
           ? { ...moved, _warnings: warnings }
           : moved;
@@ -185,9 +182,7 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
       const props: { journal_limit?: number | null } = {};
       if (journal_limit !== undefined) props.journal_limit = journal_limit;
       const node = await updateNodeProperties(node_id, props);
-      if (!node) {
-        return { content: [{ type: "text", text: `Node not found: ${node_id}` }], isError: true };
-      }
+      if (!node) throw await nodeNotFound(node_id);
       return { content: [{ type: "text", text: JSON.stringify(node) }] };
     }
   );
@@ -198,11 +193,8 @@ export function registerTreeTools(server: McpServer, scope: AgentScope = "write"
     "Delete a tree node and all its descendant nodes. Cards in that subtree (including the node's own card) that have no tree node left elsewhere are permanently deleted with them; cards that still have a node outside the deleted subtree are kept. This cannot be undone. To keep such a card, move it out first (move_node) or give it another node elsewhere (create_symlink).",
     { node_id: z.string().uuid().describe("node_id (tree position, shown as node: in compile_subtree output) to delete, with all its descendants. Not a card_id; to delete a card and all its nodes use delete_card.") },
     async ({ node_id }) => {
-      const deleted = await deleteNode(node_id);
-      return {
-        content: [{ type: "text", text: deleted ? "Deleted" : "Not found" }],
-        isError: !deleted,
-      };
+      if (!(await deleteNode(node_id))) throw await nodeNotFound(node_id);
+      return { content: [{ type: "text", text: "Deleted" }] };
     }
   );
 }

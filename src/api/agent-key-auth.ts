@@ -121,6 +121,7 @@ export async function agentKeyPreHandler(req: FastifyRequest, reply: FastifyRepl
     return reply.code(401).send({ error: "Unauthorized" });
   }
   req.agentScope = agent.scope;
+  req.agentId = agent.agent_id;
 }
 
 export async function requireAgentWriteScope(req: FastifyRequest, reply: FastifyReply): Promise<unknown> {

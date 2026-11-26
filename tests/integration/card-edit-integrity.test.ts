@@ -17,6 +17,8 @@ let app: FastifyInstance;
 let client: Client;
 let server: McpServer;
 const secret = "card-edit-integrity-test-key";
+const conflictMessage = (cardId: string) =>
+  `VersionConflict: card ${cardId} expected version 1, actual 2. Re-read the card with get_card, merge your change into the latest content, and retry with its version as expected_version.`;
 
 beforeEach(async () => {
   agentKeyVerifier.clear();
@@ -63,10 +65,10 @@ describe.each(["browser PUT", "agent PATCH", "MCP update_card"])("%s edit versio
     const stale = await update("stale", 1);
     if (stale.kind === "http") {
       expect(stale.result.statusCode).toBe(409);
-      expect(stale.result.json()).toEqual({ error: "VERSION_CONFLICT", current_version: 2 });
+      expect(stale.result.json()).toEqual({ error: "VERSION_CONFLICT", current_version: 2, message: conflictMessage(card.id) });
     } else {
       expect(stale.result.isError).toBe(true);
-      expect(stale.result.content).toEqual([{ type: "text", text: `VersionConflict: card ${card.id} expected version 1, actual 2` }]);
+      expect(stale.result.content).toEqual([{ type: "text", text: conflictMessage(card.id) }]);
     }
     expect(await getCard(card.id)).toMatchObject({ content: "fresh", version: 2 });
 

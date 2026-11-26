@@ -118,9 +118,10 @@ describe("read pairs that answer identically", () => {
     expect(agentKids).toEqual(browserKids);
   });
 
-  it("answers an unknown parent with an empty list on both", async () => {
-    expect(outcome(await browserGet(`/tree/${UNKNOWN_ID}/children`))).toEqual({ status: 200, body: [] });
-    expect(outcome(await agentGet(`/tree/${UNKNOWN_ID}/children`))).toEqual({ status: 200, body: [] });
+  it("answers an unknown parent with the same 404 on both", async () => {
+    const notFound = { status: 404, body: { error: `Node not found: ${UNKNOWN_ID}` } };
+    expect(outcome(await browserGet(`/tree/${UNKNOWN_ID}/children`))).toEqual(notFound);
+    expect(outcome(await agentGet(`/tree/${UNKNOWN_ID}/children`))).toEqual(notFound);
   });
 
   it("serves the same outline and the same boundary error", async () => {
@@ -177,9 +178,10 @@ describe("compile pair: same result", () => {
       browserGet(`/tree/${UNKNOWN_ID}/compile`),
       agentGet(`/tree/${UNKNOWN_ID}/compile`),
     ]);
-    expect(missingBrowser.statusCode).toBe(500);
-    expect(missingAgent.statusCode).toBe(500);
-    expect(missingBrowser.json()).toEqual(missingAgent.json());
+    expect(missingBrowser.statusCode).toBe(404);
+    expect(missingAgent.statusCode).toBe(404);
+    expect(missingBrowser.json()).toEqual({ error: `Node not found: ${UNKNOWN_ID}` });
+    expect(missingAgent.json()).toEqual(missingBrowser.json());
   });
 });
 
@@ -230,10 +232,11 @@ describe("card create pair (POST /cards, POST /api/cards)", () => {
   });
 
   it("validates the title and defaults card_type to knowledge on the agent route", async () => {
+    const required = { status: 400, body: { error: "title is required (a string of 1-50 characters)" } };
     const missing = await app.inject({ method: "POST", url: "/api/cards", headers: KEY_HEADERS, payload: { card_type: "knowledge" } });
-    expect(outcome(missing)).toEqual({ status: 400, body: { error: "title is required" } });
+    expect(outcome(missing)).toEqual(required);
     const numeric = await app.inject({ method: "POST", url: "/api/cards", headers: KEY_HEADERS, payload: { title: 5 } });
-    expect(outcome(numeric)).toEqual({ status: 400, body: { error: "title is required" } });
+    expect(outcome(numeric)).toEqual(required);
     const defaulted = await app.inject({ method: "POST", url: "/api/cards", headers: KEY_HEADERS, payload: { title: "defaulted type" } });
     expect(defaulted.statusCode).toBe(201);
     expect(defaulted.json()).toMatchObject({ card_type: "knowledge", title: "defaulted type" });
@@ -263,11 +266,15 @@ describe("card update pair (PUT /cards/:id, PATCH /api/cards/:id)", () => {
     const stale = { content: "stale", expected_version: 1 };
     const put = await app.inject({ method: "PUT", url: `/cards/${card.id}`, payload: stale });
     const patch = await app.inject({ method: "PATCH", url: `/api/cards/${card.id}`, headers: KEY_HEADERS, payload: stale });
-    expect(outcome(put)).toEqual({ status: 409, body: { error: "VERSION_CONFLICT", current_version: 2 } });
+    expect(outcome(put)).toEqual({ status: 409, body: {
+      error: "VERSION_CONFLICT",
+      current_version: 2,
+      message: `VersionConflict: card ${card.id} expected version 1, actual 2. Re-read the card with get_card, merge your change into the latest content, and retry with its version as expected_version.`,
+    } });
     expect(outcome(patch)).toEqual(outcome(put));
     const missingPut = await app.inject({ method: "PUT", url: `/cards/${UNKNOWN_ID}`, payload: { title: "x" } });
     const missingPatch = await app.inject({ method: "PATCH", url: `/api/cards/${UNKNOWN_ID}`, headers: KEY_HEADERS, payload: { title: "x" } });
-    expect(outcome(missingPut)).toEqual({ status: 404, body: { error: "Card not found" } });
+    expect(outcome(missingPut)).toEqual({ status: 404, body: { error: `Card not found: ${UNKNOWN_ID}` } });
     expect(outcome(missingPatch)).toEqual(outcome(missingPut));
   });
 

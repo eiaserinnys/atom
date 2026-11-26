@@ -14,6 +14,8 @@ import {
 } from "../../services/tree.service.js";
 import { parseCompileLimit } from "./compile-limit.js";
 import { createTreeOutlineHandler } from "./tree-outline.js";
+import { nodeNotFound } from "../../services/service-errors.js";
+import { registerServiceErrors } from "../service-errors-http.js";
 
 function parseDepthQuery(depthStr: string | undefined): number {
   if (depthStr === "Infinity") return Infinity;
@@ -22,6 +24,8 @@ function parseDepthQuery(depthStr: string | undefined): number {
 }
 
 export async function treeRoutes(app: FastifyInstance): Promise<void> {
+  registerServiceErrors(app);
+
   // GET /tree  — root nodes (parent_node_id = null)
   // depth query param is accepted for forward compatibility but currently returns
   // the flat root list (not a compiled tree). Depth-based tree compilation is
@@ -50,7 +54,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     "/tree/:nodeId",
     async (req, reply) => {
       const node = await getNode(req.params.nodeId);
-      if (!node) return reply.code(404).send({ error: "Node not found" });
+      if (!node) throw await nodeNotFound(req.params.nodeId);
       return node;
     }
   );
@@ -209,7 +213,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
         after: body["after"] as string | undefined,
         to: body["to"] as "start" | "end" | undefined,
       });
-      if (!moved) return reply.code(404).send({ error: "Node not found" });
+      if (!moved) throw await nodeNotFound(req.params.nodeId);
       if (warnings.length > 0) return { ...moved, _warnings: warnings };
       return moved;
     }
@@ -230,7 +234,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
         }
       }
       const node = await updateNodeProperties(req.params.nodeId, props);
-      if (!node) return reply.code(404).send({ error: "Node not found" });
+      if (!node) throw await nodeNotFound(req.params.nodeId);
       return node;
     }
   );
@@ -240,7 +244,7 @@ export async function treeRoutes(app: FastifyInstance): Promise<void> {
     "/tree/:nodeId",
     async (req, reply) => {
       const deleted = await deleteNode(req.params.nodeId);
-      if (!deleted) return reply.code(404).send({ error: "Node not found" });
+      if (!deleted) throw await nodeNotFound(req.params.nodeId);
       return reply.code(204).send();
     }
   );

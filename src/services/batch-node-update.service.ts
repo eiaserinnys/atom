@@ -6,6 +6,7 @@ import type {
   BatchOpResult,
   TreeNode,
 } from "../shared/types.js";
+import { nodeNotFound } from "./service-errors.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
 
 interface ProcessBatchNodeUpdatesContext {
@@ -38,7 +39,7 @@ async function applyNodeUpdate(
   const { node_id, ...props } = item;
   const { node, updated } = await updateNodeProperties(db, node_id, props);
   if (node === null) {
-    throw new Error(`Node not found: ${node_id}`);
+    throw await nodeNotFound(node_id, "Node", db);
   }
   if (!updated) return;
 

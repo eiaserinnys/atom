@@ -4,6 +4,7 @@ import { runConfiguredJevSearch } from "../../services/jev-search/service.js";
 import { JevSearchRequestError } from "../../services/jev-search/config.js";
 import type { JevSearchInput, JevSearchObserver, JevSearchResponse } from "../../shared/jev-search.js";
 import type { SearchFilters, SearchResult, CardType } from "../../shared/types.js";
+import { registerServiceErrors } from "../service-errors-http.js";
 
 export interface SearchHandlerDependencies {
   searchCards(filters: SearchFilters): Promise<SearchResult[]>;
@@ -12,6 +13,8 @@ export interface SearchHandlerDependencies {
 }
 
 export async function searchRoutes(app: FastifyInstance): Promise<void> {
+  registerServiceErrors(app);
+
   app.get("/search", createSearchHandler());
 }
 

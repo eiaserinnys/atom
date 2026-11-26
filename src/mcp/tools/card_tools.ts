@@ -7,6 +7,8 @@ import {
   deleteCard,
   getBacklinks,
 } from "../../services/card.service.js";
+import { CARD_TITLE_MAX_CHARS } from "../../shared/card-title.js";
+import { cardNotFound, ConflictError, versionConflictMessage } from "../../services/service-errors.js";
 
 export function registerCardTools(server: McpServer, agentId: string): void {
   // create_card
@@ -15,7 +17,7 @@ export function registerCardTools(server: McpServer, agentId: string): void {
     "Create a new card and its tree node. Returns the card object with node_id (the new tree position). A 'structure' card organizes hierarchy (folder-like); a 'knowledge' card holds atomic content. If parent_node_id is a symlink node, the card is placed under that symlink's canonical node; the response has no parent_node_id, so call get_node with the returned node_id to confirm the parent.",
     {
       card_type: z.enum(["structure", "knowledge"]).describe("'structure' for hierarchy/folder nodes, 'knowledge' for content-bearing cards."),
-      title: z.string().max(50).describe("Card title (max 50 chars)."),
+      title: z.string().min(1).max(CARD_TITLE_MAX_CHARS).describe("Card title (1-50 chars, not blank)."),
       content: z.string().optional().describe("Card body text (markdown). Null for structure cards."),
       parent_node_id: z.string().uuid().optional().describe("node_id (tree position, shown as node: in compile_subtree output) of the parent. If it is a symlink node, the card goes under its canonical node. Omit to create at root level."),
       position: z.number().int().nonnegative().optional().describe("Sort key among siblings (usually in steps of 100), not a 0-based index. Omit to append at the end. To choose a spot, use move_node with before/after."),
@@ -51,9 +53,7 @@ export function registerCardTools(server: McpServer, agentId: string): void {
     { card_id: z.string().uuid().describe("card_id (card content, shown as card: in compile_subtree output). Not a node_id.") },
     async ({ card_id }) => {
       const card = await getCard(card_id);
-      if (!card) {
-        return { content: [{ type: "text", text: `Card not found: ${card_id}` }], isError: true };
-      }
+      if (!card) throw await cardNotFound(card_id);
       return { content: [{ type: "text", text: JSON.stringify(card) }] };
     }
   );
@@ -64,7 +64,7 @@ export function registerCardTools(server: McpServer, agentId: string): void {
     "Update card fields. Partial means per field: omitted fields are left unchanged, but every field you send replaces the whole stored value. content is a full replacement, not a patch — send the entire new body, because any part you leave out is lost (the same holds for tags and references arrays). When content is modified, content_timestamp is automatically set to now. If another session may edit the same card, read it with get_card and send its version as expected_version: if the card's current version differs, the update is rejected with a VersionConflict error. Without expected_version the last write wins.",
     {
       card_id: z.string().uuid().describe("card_id (card content, shown as card: in compile_subtree output). Not a node_id."),
-      title: z.string().max(50).optional().describe("New title (max 50 chars)."),
+      title: z.string().min(1).max(CARD_TITLE_MAX_CHARS).optional().describe("New title (1-50 chars, not blank)."),
       content: z.string().nullable().optional().describe("New content. Replaces the whole body (send the full text). Pass null to clear."),
       tags: z.array(z.string()).optional().describe("Replace all tags with this array."),
       references: z.array(z.string().uuid()).optional().describe("Replace all references with these card UUIDs."),
@@ -76,11 +76,9 @@ export function registerCardTools(server: McpServer, agentId: string): void {
     async (args) => {
       const { card_id, expected_version, ...input } = args;
       const result = await updateCard(agentId, card_id, input, expected_version);
-      if (!result) {
-        return { content: [{ type: "text", text: `Card not found: ${card_id}` }], isError: true };
-      }
+      if (!result) throw await cardNotFound(card_id);
       if (result.conflict) {
-        throw new Error(`VersionConflict: card ${card_id} expected version ${expected_version}, actual ${result.actualVersion}`);
+        throw new ConflictError(versionConflictMessage(card_id, expected_version, result.actualVersion));
       }
       return { content: [{ type: "text", text: JSON.stringify(result.card) }] };
     }
@@ -92,11 +90,8 @@ export function registerCardTools(server: McpServer, agentId: string): void {
     "Delete a card permanently. Every tree node of this card (symlinks included) is removed together with the whole subtree below each of them. Cards in those subtrees that have no tree node left elsewhere are permanently deleted too; cards that still have a node outside the deleted subtrees are kept. This cannot be undone. To keep a card that sits in the subtree, move it out first (move_node) or give it another node elsewhere (create_symlink) before deleting.",
     { card_id: z.string().uuid().describe("card_id (card content, shown as card: in compile_subtree output) to delete permanently. Not a node_id; to delete one tree node use delete_node.") },
     async ({ card_id }) => {
-      const deleted = await deleteCard(card_id);
-      return {
-        content: [{ type: "text", text: deleted ? "Deleted" : "Not found" }],
-        isError: !deleted,
-      };
+      if (!(await deleteCard(card_id))) throw await cardNotFound(card_id);
+      return { content: [{ type: "text", text: "Deleted" }] };
     }
   );
 
