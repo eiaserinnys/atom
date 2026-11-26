@@ -43,10 +43,6 @@ export async function authMiddleware(
   if (req.url.startsWith('/api/auth/') || req.url === '/api/version' || req.url.startsWith('/mcp') || req.url.startsWith('/.well-known/') || req.url === '/register' || req.url.startsWith('/api/cards') || req.url.startsWith('/api/tree') || req.url === '/api/health') return;
 
   const mode = resolveAuthMode();
-  if (mode === 'unconfigured') {
-    reply.code(401).send({ error: 'Unauthorized' });
-    return;
-  }
   if (mode === 'bypass') {
     req.jwtUser = { id: 'bypass', email: 'bypass@local', name: 'Bypass Admin', role: 'admin' };
     return;

@@ -82,7 +82,6 @@ describe('POST /api/auth/password gates', () => {
   it.each([
     ['oauth', { GOOGLE_CLIENT_ID: 'google' }],
     ['bypass', { DASHBOARD_ADMIN_PASSWORD: '', AUTH_BYPASS: '1' }],
-    ['unconfigured', { DASHBOARD_ADMIN_PASSWORD: '' }],
   ])('is 404 in %s mode', async (_mode, env) => {
     Object.assign(process.env, env);
     const response = await change(undefined, { current_password: OLD, new_password: NEW });

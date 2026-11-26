@@ -37,50 +37,69 @@ export function sessionBindingMatches(claim: unknown): boolean {
   return given.length === wanted.length && timingSafeEqual(given, wanted);
 }
 
-export function validateNewPassword(value: unknown): string | null {
-  if (typeof value !== 'string') return 'new_password must be a string';
+export function validateNewPassword(value: unknown, label = 'new_password'): string | null {
+  if (typeof value !== 'string') return `${label} must be a string`;
   if (value.length < PASSWORD_MIN_LENGTH || value.length > PASSWORD_MAX_LENGTH) {
-    return `new_password must be ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`;
+    return `${label} must be ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`;
   }
-  if (value.trim() !== value) return 'new_password must not start or end with whitespace';
-  if (/[\r\n]/.test(value)) return 'new_password must not contain line breaks';
+  if (value.trim() !== value) return `${label} must not start or end with whitespace`;
+  if (/[\r\n]/.test(value)) return `${label} must not contain line breaks`;
   return null;
 }
 
-export const UNSTORABLE_PASSWORD_MESSAGE =
-  'new_password cannot be stored in the env file as written; avoid starting it with a quote or mixing all of \' " ` in it';
+export const unstorablePasswordMessage = (label = 'new_password') =>
+  `${label} cannot be stored in the env file as written; avoid starting it with a quote or mixing all of ' " \` in it`;
+
+export const UNSTORABLE_PASSWORD_MESSAGE = unstorablePasswordMessage();
 
 export type PasswordSavePlan = { file: string; content: string };
 
-function readEnvFileContent(file: string): string {
+/** The file's text, or undefined when it does not exist. */
+export function readEnvFileContent(file: string): string | undefined {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw error;
   }
 }
 
-function sameOtherKeys(before: Record<string, string>, after: Record<string, string>): boolean {
-  const keys = (values: Record<string, string>) => Object.keys(values).filter((key) => key !== ENV_KEY).sort();
+function sameOtherKeys(before: Record<string, string>, after: Record<string, string>, owned: string[]): boolean {
+  const keys = (values: Record<string, string>) => Object.keys(values).filter((key) => !owned.includes(key)).sort();
   const kept = keys(before);
   const now = keys(after);
   return kept.length === now.length && kept.every((key, index) => key === now[index] && before[key] === after[key]);
 }
+
+export type PasswordSaveOptions = {
+  /** Other values that must read back exactly as given (unquoted), e.g. a generated JWT_SECRET. */
+  alsoSet?: Record<string, string>;
+  /** Starting content when the env file does not exist yet. */
+  templateIfMissing?: string;
+};
 
 /**
  * The whole env file as it would be written, using the first quoting for which the config loader (dotenv)
  * reads back this password and leaves every other key untouched; null when no quoting does.
  * The whole file is parsed because dotenv's quoted values run across lines.
  */
-export function planPasswordSave(password: string): PasswordSavePlan | null {
+export function planPasswordSave(password: string, options: PasswordSaveOptions = {}): PasswordSavePlan | null {
   const file = resolveEnvFilePath();
-  const original = readEnvFileContent(file);
+  const original = readEnvFileContent(file) ?? options.templateIfMissing ?? '';
   const before = parse(original);
+  const alsoSet = Object.entries(options.alsoSet ?? {});
+  const owned = [ENV_KEY, ...alsoSet.map(([key]) => key)];
   for (const written of [password, `'${password}'`, `"${password}"`, `\`${password}\``]) {
-    const content = updateConfigEnvContent(original, [{ key: ENV_KEY, value: written }]);
+    const content = updateConfigEnvContent(original, [
+      { key: ENV_KEY, value: written },
+      ...alsoSet.map(([key, value]) => ({ key, value })),
+    ]);
     const after = parse(content);
-    if (after[ENV_KEY] === password && sameOtherKeys(before, after)) return { file, content };
+    if (
+      after[ENV_KEY] === password &&
+      alsoSet.every(([key, value]) => after[key] === value) &&
+      sameOtherKeys(before, after, owned)
+    ) return { file, content };
   }
   return null;
 }

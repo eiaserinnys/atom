@@ -22,7 +22,7 @@ const OTHER_SECRET = "some-other-signing-secret";
 const REDIRECT_URI = "http://127.0.0.1:43127/oauth/callback";
 const originalEnv = { ...process.env };
 
-type Mode = "oauth" | "password" | "bypass" | "unconfigured";
+type Mode = "oauth" | "password" | "bypass";
 let db: SqliteAdapter;
 let named: User;
 let unnamed: User;
@@ -180,11 +180,6 @@ describe("GET /api/auth/status: auth modes", () => {
     expect((await status()).body).toEqual(NOT_AUTHENTICATED);
   });
 
-  it("answers authenticated:false in unconfigured mode even for a valid token", async () => {
-    setMode("unconfigured");
-    expect(await status(cookieOf(await tokenFor(named)))).toEqual({ status: 200, body: NOT_AUTHENTICATED });
-  });
-
   it("answers the virtual admin in bypass mode with or without a token", async () => {
     setMode("bypass");
     const admin = { status: 200, body: { authenticated: true, id: "bypass", email: "bypass@local", name: "Bypass Admin", role: "admin", jevConfigured: false } };
@@ -217,15 +212,12 @@ describe("GET /api/auth/oauth/authorize: login cookie check", () => {
   });
 
   it("answers 503 when no login provider is configured and the user is not recognised", async () => {
-    setMode("unconfigured");
+    setMode("password");
     expect(await authorize()).toBe('503 {"error":"OAuth login provider not configured"}');
   });
 
-  // Current behavior: the cookie is verified in every mode, so a valid cookie gets a code
-  // even in unconfigured and password mode.
-  it("verifies the cookie in unconfigured and password mode too (current behavior)", async () => {
-    setMode("unconfigured");
-    expect(await authorize(cookieOf(await tokenFor(named)))).toBe("issued code");
+  // Current behavior: the cookie is verified in every mode, so a valid password-mode cookie gets a code.
+  it("verifies the cookie in password mode too (current behavior)", async () => {
     setMode("password");
     const pwf = passwordSessionBinding("token-contract-password");
     expect(await authorize(cookieOf(await tokenFor(named, { pwf })))).toBe("issued code");

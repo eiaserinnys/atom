@@ -1,29 +1,34 @@
 import { test, expect } from '@playwright/test';
-import { assertBypassAuthStatus, resetTestDb } from './helpers';
-import fs from 'fs';
-import path from 'path';
-const envPath = path.join(process.env.ATOM_E2E_DIR!, '.env');
 
-test.describe('Fresh install — bypass mode API key issuance', () => {
-  test.beforeAll(async () => {
-    await resetTestDb();
-    await assertBypassAuthStatus();
-    // Ensure clean .env (no pendingRestart state from other tests)
-    if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
-  });
+// The server for this spec runs on the env file that `npm run setup -- --password-stdin` wrote (playwright.config.ts).
+const password = process.env.ATOM_E2E_FRESH_PASSWORD!;
 
-  test('can access dashboard without login in bypass mode', async ({ page }) => {
+test.use({ baseURL: 'http://127.0.0.1:14201' });
+
+test.describe('Fresh install — password written by npm run setup', () => {
+  test('shows the login form, rejects a wrong password, and the setup password reaches the first screen', async ({ page }) => {
     await page.goto('/');
+    const input = page.getByTestId('password-login-input');
+    await expect(input).toBeVisible({ timeout: 15_000 });
+
+    await input.fill('not-the-setup-password');
+    await page.getByTestId('password-login-button').click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('button[aria-label="Settings"]')).toHaveCount(0);
+
+    await input.fill(password);
+    await page.getByTestId('password-login-button').click();
     await expect(page.locator('button[aria-label="Settings"]')).toBeVisible({ timeout: 15_000 });
   });
 
   test('can open Config and create an agent API key', async ({ page }) => {
     await page.goto('/');
+    await page.getByTestId('password-login-input').fill(password);
+    await page.getByTestId('password-login-button').click();
     await expect(page.locator('button[aria-label="Settings"]')).toBeVisible({ timeout: 15_000 });
 
     await page.locator('button[aria-label="Settings"]').click();
 
-    // Wait for modal header specifically
     const modal = page.locator('.fixed.inset-0');
     await expect(modal.getByText('Settings', { exact: true })).toBeVisible();
 
@@ -34,7 +39,6 @@ test.describe('Fresh install — bypass mode API key issuance', () => {
 
     await modal.getByRole('button', { name: /Generate/i }).click();
 
-    // API secret should appear
     await expect(modal.locator('text=API Secret')).toBeVisible({ timeout: 10_000 });
 
     const gotItBtn = modal.getByRole('button', { name: /Got it/i });

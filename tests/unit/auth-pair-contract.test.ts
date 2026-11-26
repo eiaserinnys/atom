@@ -29,7 +29,7 @@ const JWT_SECRET = "auth-pair-contract-secret";
 const OTHER_SECRET = "some-other-signing-secret";
 const originalEnv = { ...process.env };
 
-type Mode = "oauth" | "password" | "bypass" | "unconfigured";
+type Mode = "oauth" | "password" | "bypass";
 let db: SqliteAdapter;
 let app: FastifyInstance;
 let admin: User;
@@ -172,13 +172,6 @@ describe("browser path (authMiddleware): accepted credentials", () => {
 });
 
 describe("browser path (authMiddleware): auth modes", () => {
-  it("answers 401 in unconfigured mode even for a valid token", async () => {
-    setMode("unconfigured");
-    const res = await browser({ cookie: `atom_auth=${await tokenFor(admin)}` });
-    expect(res.statusCode).toBe(401);
-    expect(res.json()).toEqual({ error: "Unauthorized" });
-  });
-
   it("verifies tokens like OAuth mode in password mode, and also requires the password binding", async () => {
     setMode("password");
     const pwf = passwordSessionBinding("pair-contract-password");
@@ -196,7 +189,7 @@ describe("browser path (authMiddleware): auth modes", () => {
   });
 
   it("does not exempt anything but the listed prefixes", async () => {
-    setMode("unconfigured");
+    setMode("password");
     expect((await app.inject({ method: "GET", url: "/cards/00000000-0000-4000-8000-000000000001" })).statusCode).toBe(401);
     const agentRoute = await agent();
     expect(agentRoute.statusCode).toBe(401);
@@ -283,7 +276,7 @@ describe("agent path (agentKeyPreHandler): bypass", () => {
     const headers = { authorization: `Bearer ${await sign({ id: "bypass", email: "bypass@local", name: "Bypass Admin", role: "admin" })}` };
     setMode("bypass");
     expect((await agentCreate(headers)).statusCode).toBe(201);
-    for (const mode of ["oauth", "password", "unconfigured"] as const) {
+    for (const mode of ["oauth", "password"] as const) {
       setMode(mode);
       const res = await agent(headers);
       expect([mode, res.statusCode]).toEqual([mode, 401]);

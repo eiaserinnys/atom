@@ -496,10 +496,6 @@ export function createAuthRoutes(deps: AuthRoutesDeps = defaultAuthRoutesDeps): 
         return reply.send(buildBypassAuthStatus(isJevConfigured()));
       }
 
-      if (resolveAuthMode() === 'unconfigured') {
-        return reply.send({ authenticated: false });
-      }
-
       const token = extractAuthToken(req);
       if (!token) {
         return reply.send({ authenticated: false });

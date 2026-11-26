@@ -1,5 +1,6 @@
 import { defineConfig } from '@playwright/test';
-import { cpSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +35,33 @@ if (!testDir.startsWith(path.join(tempRoot, 'atom-e2e-')) ||
 const TEST_API_PORT = '14200';
 const TEST_API_HOST = '127.0.0.1';
 const TEST_FRONTEND_PORT = 15173;
+// A second, password-mode server for the fresh-install spec. It serves a built dashboard on its own origin
+// (the login cookie needs the dashboard and API on one origin) and runs on the env file `npm run setup` wrote.
+const FRESH_PORT = '14201';
+const FRESH_PASSWORD = 'e2e-fresh-install-password';
+process.env.ATOM_E2E_FRESH_PASSWORD = FRESH_PASSWORD;
+const freshEnvFile = path.join(testDir, 'fresh.env');
+const freshDashboardDir = path.join(testDir, 'fresh-dashboard');
+if (!existsSync(freshEnvFile)) {
+  execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--outDir', freshDashboardDir, '--emptyOutDir'], {
+    cwd: path.join(repoDir, 'dashboard'),
+    env: { PATH: process.env.PATH },
+    stdio: ['ignore', 'ignore', 'inherit'],
+  });
+  writeFileSync(freshEnvFile, [
+    `API_PORT=${FRESH_PORT}`,
+    `DASHBOARD_DIR=${freshDashboardDir}`,
+    `SQLITE_PATH=${path.join(testDir, 'fresh.db')}`,
+    'NODE_ENV=test',
+    '',
+  ].join('\n'));
+  execFileSync(process.execPath, ['--import', 'tsx', 'src/setup/main.ts', '--password-stdin'], {
+    cwd: repoDir,
+    env: { PATH: process.env.PATH, ATOM_ENV_FILE: freshEnvFile },
+    input: `${FRESH_PASSWORD}\n`,
+    stdio: ['pipe', 'ignore', 'inherit'],
+  });
+}
 
 export default defineConfig({
   testDir: './e2e',
@@ -67,6 +95,16 @@ export default defineConfig({
         GOOGLE_CLIENT_ID: '',
         SLACK_CLIENT_ID: '',
       },
+    },
+    {
+      command: 'node --import tsx src/api/index.ts',
+      cwd: testDir,
+      url: `http://${TEST_API_HOST}:${FRESH_PORT}/api/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ATOM_ENV_FILE: freshEnvFile },
     },
     {
       command: `node node_modules/vite/bin/vite.js --port ${TEST_FRONTEND_PORT} --host ${TEST_API_HOST}`,

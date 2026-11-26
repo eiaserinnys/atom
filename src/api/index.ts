@@ -37,7 +37,14 @@ import { isAuthBypassEnabled, resolveAuthMode } from "./auth-mode.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-console.log(loadConfig().description);
+const loadedConfig = loadConfig();
+console.log(loadedConfig.description);
+
+const startupConfig = inspectStartupConfig(process.env, loadedConfig);
+if (startupConfig.errors.length > 0) {
+  console.error(startupConfig.errors.join("\n"));
+  process.exit(1);
+}
 
 const db = getDb();
 const embeddingIndex = new FlatEmbeddingIndex();
@@ -100,10 +107,6 @@ async function seedMigration(): Promise<void> {
 }
 
 const start = async (): Promise<void> => {
-  const startupConfig = inspectStartupConfig(process.env);
-  if (startupConfig.errors.length > 0) {
-    throw new Error(startupConfig.errors.join(" "));
-  }
   if (startupConfig.warning) {
     app.log.warn(startupConfig.warning);
   }

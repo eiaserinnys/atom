@@ -49,28 +49,41 @@ When `compile_subtree` encounters a symlink node, it expands the children of tha
 ### 1. Install Dependencies
 
 ```bash
-npm install
-pnpm --dir dashboard install
+npm ci
+pnpm --dir dashboard install --frozen-lockfile
 ```
 
-### 2. Create Your Local `.env`
+### 2. Set the Administrator Password
 
 ```bash
-cp .env.example .env
+npm run setup
 ```
 
-In `.env.example`, `DATABASE_URL` is commented out, so the server uses SQLite at `./atom.db`. Set `SQLITE_PATH` to use a different file path. The example file also sets `API_PORT=4200`.
+The server does not start without a login method, so run this once before the first start. It asks for the administrator password twice (nothing you type is shown) and writes it as `DASHBOARD_ADMIN_PASSWORD` into the env file the server loads: the repository-root `.env`, or the file named by `ATOM_ENV_FILE` in the shell. A missing file is created from `.env.example` and readable only by you. A `JWT_SECRET` is generated when the file has none and kept when it has one; every other line and comment stays as it was. The password and the secret are never printed. The same rules as the settings window apply: 8 to 256 characters, no leading or trailing whitespace, no line breaks. The command asks again on a rule violation or a mismatch, and after three failures it writes nothing and exits with a nonzero code.
 
-Set `ALLOWED_EMAIL` in `.env` to your own email **before the first start**. The server creates that user as the first admin; an empty value or the `your-email@...` example is skipped with a warning. If you start once without it, set it and restart: the user is created then.
+- **No terminal (Docker build, CI).** Pipe one line to `--password-stdin`; the password is never accepted as a command-line argument. Without a terminal and without the option the command explains this and exits with a nonzero code.
 
-To use the dashboard without setting up Google or Slack OAuth, turn on the local auth bypass in `.env`:
+  ```bash
+  printf '%s\n' "$ATOM_PASSWORD" | npm run setup -- --password-stdin
+  ```
+
+- **A password is already set.** The command asks whether to change it (the default is no). With `--password-stdin` it changes it.
+- **OAuth is configured** (`GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`). The password is not used, so the command changes nothing and exits with `0`.
+- **`AUTH_BYPASS=1` is set.** The server does not accept a password together with it, so the command stops and asks you to remove that line first.
+
+`.env.example` sets `API_PORT=4200` and leaves `DATABASE_URL` commented out, so the server uses SQLite at `./atom.db`. Set `SQLITE_PATH` to use a different file path.
+
+The password sign-in cookie is only sent to the origin that served the page, so serve the dashboard from the API. Build it once and point `DASHBOARD_DIR` at the result in the env file:
+
+```bash
+pnpm --dir dashboard build
+```
 
 ```dotenv
-AUTH_BYPASS=1
+DASHBOARD_DIR=./dashboard/dist
 ```
 
-> [!WARNING]
-> `AUTH_BYPASS=1` turns off browser sign-in: every request that would otherwise need a session cookie runs with `admin` access. In this mode the server binds only to `127.0.0.1` by default; setting `API_HOST` changes the listen address, and a host reachable from the network gives everyone who can reach it `admin` access. The server refuses to start if `AUTH_BYPASS=1` is set together with `GOOGLE_CLIENT_ID`, `SLACK_CLIENT_ID`, or `DASHBOARD_ADMIN_PASSWORD`.
+If you plan to sign in with Google, set `ALLOWED_EMAIL` to your own email **before the first start**. The server creates that user as the first admin; an empty value or the `your-email@...` example is skipped with a warning, and setting it later and restarting creates the user then. Password mode needs no `ALLOWED_EMAIL`: it creates the administrator `owner@local` itself.
 
 ### 3. Seed Synthetic Demo Data
 
@@ -81,26 +94,50 @@ npx tsx scripts/seed-demo.ts
 The script runs database migrations, then loads `examples/demo/seed.json` into a sample tree of structure cards, knowledge cards, and a symlink. Pass `--file <path>` to load your own seed file instead. If `tree_nodes` already has rows, the script exits and leaves existing data untouched.
 
 > [!NOTE]
-> Every entry point (`npm run dev`, `npm start`, `npm run migrate`, the stdio MCP server, `seed-demo`) loads `.env` and gives it priority over the shell. A variable that is in `.env` is ignored when you put it before the command (`AUTH_BYPASS=1 npm run dev`, `SQLITE_PATH=./custom.db npx tsx scripts/seed-demo.ts`); edit `.env` instead. Variables that are not in `.env` still come from the shell. Each entry point prints which database it uses and where that setting came from. To read a different file instead of the repository-root `.env`, set `ATOM_ENV_FILE` in the shell (see the environment variable table); the settings window still edits the repository-root `.env`.
+> Every entry point (`npm run dev`, `npm start`, `npm run migrate`, the stdio MCP server, `seed-demo`) loads `.env` and gives it priority over the shell. A variable that is in `.env` is ignored when you put it before the command (`API_PORT=4300 npm run dev`, `SQLITE_PATH=./custom.db npx tsx scripts/seed-demo.ts`); edit `.env` instead. Variables that are not in `.env` still come from the shell. Each entry point prints which database it uses and where that setting came from. To read a different file instead of the repository-root `.env`, set `ATOM_ENV_FILE` in the shell (see the environment variable table); the settings window still edits the repository-root `.env`.
 
-### 4. Start the API Server and Dashboard
-
-Start the Fastify API and MCP server in one terminal:
+### 4. Start the Server
 
 ```bash
 npm run dev
 ```
 
+Open `http://localhost:4200` and enter the password you chose. No user name is needed.
+
 > [!NOTE]
 > `npm run dev` has no process manager. The dashboard's **Restart Now** button only stops the server there; start `npm run dev` again yourself. The dashboard shows this next to the button.
 
-Start the React dashboard in a second terminal, pointing `VITE_API_BASE_URL` to port `4200`:
+If neither a password, an OAuth provider, nor `AUTH_BYPASS=1` is configured, the server stops at startup with a nonzero exit code and tells you to run `npm run setup`; it names the env file it read and never prints a value. A container stops the same way.
+
+### Running in Docker
+
+`Dockerfile.backend` builds the API server. The container stops at startup unless a login method is configured, in one of two ways:
+
+- **Environment variables.** Give the container `DASHBOARD_ADMIN_PASSWORD` and `JWT_SECRET` (or an OAuth provider's settings) as environment variables.
+- **An env file that survives recreating the container.** Mount a volume, point `ATOM_ENV_FILE` at a file on it in the container's environment, and write the password once with `--password-stdin`:
+
+  ```bash
+  printf '%s\n' "$ATOM_PASSWORD" | docker run --rm -i -v atom-config:/data -e ATOM_ENV_FILE=/data/atom.env <image> npm run setup -- --password-stdin
+  ```
+
+  Start the server with the same volume and `ATOM_ENV_FILE`. Settings in that file win over the container's other environment variables, and so does a later password change in the settings window.
+
+### Dashboard Development Mode
+
+The Vite dev server runs on its own origin, so the password cookie does not reach it. To work on the dashboard with hot reload, use a separate env file that turns on local development mode:
 
 ```bash
+cp .env.example .env.dev
+```
+
+Set `AUTH_BYPASS=1` in `.env.dev`, then start both servers:
+
+```bash
+ATOM_ENV_FILE=.env.dev npm run dev
 VITE_API_BASE_URL=http://localhost:4200 pnpm --dir dashboard dev
 ```
 
-Open `http://localhost:5173` in your browser.
+Open `http://localhost:5173`. In this mode there is no sign-in and every request runs with `admin` access. The server accepts connections from this computer only (`127.0.0.1`). Do not use it for real work, and never set `API_HOST` to an address other machines can reach.
 
 ## Connecting Agents via MCP
 
@@ -275,8 +312,9 @@ Authentication modes are resolved in this order:
 | --- | --- | --- |
 | 1 | OAuth | `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID` is set; the installation password is ignored. |
 | 2 | Password | `DASHBOARD_ADMIN_PASSWORD` is nonblank after trimming; requires `JWT_SECRET`. |
-| 3 | Bypass | `AUTH_BYPASS=1` for local development only. |
-| 4 | Unconfigured | No login method; protected browser APIs return 401. |
+| 3 | Bypass | `AUTH_BYPASS=1`: development on this computer only; the server listens on `127.0.0.1` and gives every request `admin` access. Not for real use. |
+
+The server refuses to start when none of the three is configured. `npm run setup` chooses the administrator password.
 
 Password and bypass cannot be enabled together. Password mode creates the first administrator as `owner@local` and preserves an existing account's role and active state. Login is limited to ten failed attempts per IP in a 60-second window. Session cookies are marked `Secure` when the first `X-Forwarded-Proto` value is `https`, or the request itself uses HTTPS when that header is absent. Set `DASHBOARD_DIR` to a built dashboard directory to have the API serve its static files and client routes; `API_HOST` optionally overrides the listen host.
 
@@ -294,8 +332,9 @@ The same operation is available as `POST /api/auth/password` with `{ "current_pa
 
 Browser API access is denied by default:
 
-- **Default 401 when unconfigured**: If neither OAuth nor a dashboard password is configured and `AUTH_BYPASS` is not `1`, browser API routes that need a session cookie return `401`. This rule does not cover public routes such as `/api/health` and `/api/auth/*`. Agent routes (`/mcp`, `/api/cards`, `/api/tree`) authenticate with an API key instead.
+- **Browser routes need a session**: Browser API routes that need a session cookie return `401` without one. This rule does not cover public routes such as `/api/health` and `/api/auth/*`. Agent routes (`/mcp`, `/api/cards`, `/api/tree`) authenticate with an API key instead.
 - **Startup configuration validation**: At startup, `src/api/startup-config.ts` refuses to start (and names what is wrong) in these cases:
+  - No login method is configured: no OAuth provider, no `DASHBOARD_ADMIN_PASSWORD`, and no `AUTH_BYPASS=1`. The notice points to `npm run setup` and names the env file that was read.
   - `AUTH_BYPASS=1` is set together with `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
   - `AUTH_BYPASS=1` is set together with `DASHBOARD_ADMIN_PASSWORD`.
   - `GOOGLE_CLIENT_ID` is set but `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `JWT_SECRET`, or `FRONTEND_URL` is missing.
@@ -440,11 +479,11 @@ Empty values stay empty, and `OPENAI_API_KEY` is left out of the response entire
 | `ATOM_ENV_FILE` | (unset) | Path of the env file to load instead of the repository-root `.env`. Read from the shell only (a value inside `.env` has no effect). `GET` and `PUT /api/config/env` still read and write the repository-root `.env`; changing the administrator password writes the file this variable names. |
 | `GIT_COMMIT_SHA`, `BUILD_DATE` | `dev`, `unknown` outside Docker; `unknown`, `unknown` in the Docker image | Build identifiers that `GET /api/version` returns as `commit` and `buildDate`. `Dockerfile.backend` bakes them into the image from build arguments whose default is `unknown`; the `dev` fallback applies only when the variable is unset. |
 | `DASHBOARD_DIR` | (unset) | Built dashboard directory (must contain `index.html`) that the API serves as static files and client routes. |
-| `DASHBOARD_ADMIN_PASSWORD` | (unset) | Installation password for dashboard login. Requires `JWT_SECRET`, cannot be combined with `AUTH_BYPASS=1`, and is ignored when an OAuth provider is configured. An administrator can change it in the settings window, which rewrites this line in the loaded env file (see Changing the administrator password). |
+| `DASHBOARD_ADMIN_PASSWORD` | (unset) | Installation password for dashboard login, written by `npm run setup`. Requires `JWT_SECRET`, cannot be combined with `AUTH_BYPASS=1`, and is ignored when an OAuth provider is configured. An administrator can change it in the settings window, which rewrites this line in the loaded env file (see Changing the administrator password). |
 | `VITE_API_BASE_URL` | `""` (same origin) | API base URL used by the dashboard when running the Vite dev server on a separate port. |
 | `FRONTEND_URL` | (unset) | Allowed CORS origin and post-OAuth redirect URL (required when Google or Slack OAuth is enabled). |
-| `AUTH_BYPASS` | (unset) | Set to `1` for local unauthenticated `admin` access when neither an OAuth provider nor `DASHBOARD_ADMIN_PASSWORD` is configured (combining them stops startup). |
-| `JWT_SECRET` | (required with OAuth or password mode) | Secret used to sign and verify browser session JWT cookies. |
+| `AUTH_BYPASS` | (unset) | Set to `1` for development on this computer only: the server listens on `127.0.0.1` and every request runs with `admin` access. Not for real use. Combining it with an OAuth provider or `DASHBOARD_ADMIN_PASSWORD` stops startup. |
+| `JWT_SECRET` | (required with OAuth or password mode) | Secret used to sign and verify browser session JWT cookies. `npm run setup` generates it when the env file has none. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` | (unset) | Google OAuth 2.0 credentials. |
 | `ALLOWED_EMAIL` | (unset) | Email (`user@example.com`) or domain (`@example.com`) allowed to sign in via Google OAuth; at startup it creates that user as `admin` when it is a full email and no user has it yet (an existing user keeps its role). |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_CALLBACK_URL` | (unset) | Slack OAuth credentials. |

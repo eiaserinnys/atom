@@ -10,6 +10,7 @@ function resetAuthEnvironment() {
   process.env = { ...savedEnv };
   for (const key of [
     "AUTH_BYPASS",
+    "DASHBOARD_ADMIN_PASSWORD",
     "GOOGLE_CLIENT_ID",
     "GOOGLE_CLIENT_SECRET",
     "GOOGLE_CALLBACK_URL",
@@ -41,7 +42,8 @@ describe("browser authentication policy", () => {
     process.env = { ...savedEnv };
   });
 
-  it("returns 401 without a provider or explicit bypass while public health remains available", async () => {
+  it("returns 401 without a session in password mode while public health remains available", async () => {
+    process.env["DASHBOARD_ADMIN_PASSWORD"] = "auth-policy-password";
     const app = await makeApp();
     const tree = await app.inject({ method: "GET", url: "/tree" });
     const health = await app.inject({ method: "GET", url: "/api/health" });
@@ -52,7 +54,7 @@ describe("browser authentication policy", () => {
     expect(tree.json()).toEqual({ error: "Unauthorized" });
     expect(health.statusCode).toBe(200);
     expect(status.json()).toEqual({ authenticated: false });
-    expect(providers.json()).toEqual({ google: false, slack: false });
+    expect(providers.json()).toEqual({ google: false, slack: false, password: true });
     await app.close();
   });
 
