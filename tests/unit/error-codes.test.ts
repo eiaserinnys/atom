@@ -279,4 +279,11 @@ describe("batch_op tells what moves and child_orders do, and does so", () => {
     expect(description).toContain("choose at most one of before, after, to");
     expect(description).toContain("including a node that currently sits under another parent: it is moved there, silently");
   });
+
+  it("names the Card not found error for symlinks, not an FK constraint", async () => {
+    const batch = (await mcp.client.listTools()).tools.find((tool) => tool.name === "batch_op");
+    const description = batch?.description ?? "";
+    expect(description).toContain("Card not found");
+    expect(description).not.toContain("FK constraint");
+  });
 });

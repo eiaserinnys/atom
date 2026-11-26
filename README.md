@@ -70,7 +70,7 @@ AUTH_BYPASS=1
 ```
 
 > [!WARNING]
-> `AUTH_BYPASS=1` turns off browser sign-in: every request that would otherwise need a session cookie runs with `admin` access. In this mode the server binds only to `127.0.0.1` for local use. The server refuses to start if `AUTH_BYPASS=1` is set together with `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
+> `AUTH_BYPASS=1` turns off browser sign-in: every request that would otherwise need a session cookie runs with `admin` access. In this mode the server binds only to `127.0.0.1` by default; setting `API_HOST` changes the listen address, and a host reachable from the network gives everyone who can reach it `admin` access. The server refuses to start if `AUTH_BYPASS=1` is set together with `GOOGLE_CLIENT_ID`, `SLACK_CLIENT_ID`, or `DASHBOARD_ADMIN_PASSWORD`.
 
 ### 3. Seed Synthetic Demo Data
 
@@ -81,7 +81,7 @@ npx tsx scripts/seed-demo.ts
 The script runs database migrations, then loads `examples/demo/seed.json` into a sample tree of structure cards, knowledge cards, and a symlink. Pass `--file <path>` to load your own seed file instead. If `tree_nodes` already has rows, the script exits and leaves existing data untouched.
 
 > [!NOTE]
-> Every entry point (`npm run dev`, `npm start`, `npm run migrate`, the stdio MCP server, `seed-demo`) loads `.env` and gives it priority over the shell. A variable that is in `.env` is ignored when you put it before the command (`AUTH_BYPASS=1 npm run dev`, `SQLITE_PATH=./custom.db npx tsx scripts/seed-demo.ts`); edit `.env` instead. Variables that are not in `.env` still come from the shell. Each entry point prints which database it uses and where that setting came from.
+> Every entry point (`npm run dev`, `npm start`, `npm run migrate`, the stdio MCP server, `seed-demo`) loads `.env` and gives it priority over the shell. A variable that is in `.env` is ignored when you put it before the command (`AUTH_BYPASS=1 npm run dev`, `SQLITE_PATH=./custom.db npx tsx scripts/seed-demo.ts`); edit `.env` instead. Variables that are not in `.env` still come from the shell. Each entry point prints which database it uses and where that setting came from. To read a different file instead of the repository-root `.env`, set `ATOM_ENV_FILE` in the shell (see the environment variable table); the settings window still edits the repository-root `.env`.
 
 ### 4. Start the API Server and Dashboard
 
@@ -283,12 +283,13 @@ Password and bypass cannot be enabled together. Password mode creates the first 
 Browser API access is denied by default:
 
 - **Default 401 when unconfigured**: If neither OAuth nor a dashboard password is configured and `AUTH_BYPASS` is not `1`, browser API routes that need a session cookie return `401`. This rule does not cover public routes such as `/api/health` and `/api/auth/*`. Agent routes (`/mcp`, `/api/cards`, `/api/tree`) authenticate with an API key instead.
-- **Startup configuration validation**: At startup, `src/api/startup-config.ts` checks these settings:
-  - `AUTH_BYPASS=1` is never set at the same time as `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
-  - When `GOOGLE_CLIENT_ID` is set, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `JWT_SECRET`, and `FRONTEND_URL` are also present.
-  - When `SLACK_CLIENT_ID` is set, `SLACK_CLIENT_SECRET`, `SLACK_CALLBACK_URL`, `JWT_SECRET`, and `FRONTEND_URL` are also present.
-- **Google OAuth admission (`ALLOWED_EMAIL`)**: A new Google user can sign in only if their email matches `ALLOWED_EMAIL`. The value can be a single address (`alice@example.com`) or a domain suffix (`@example.com`). If the `users` table is empty at startup and `ALLOWED_EMAIL` is a full address, `seedMigration()` creates that user as the first `admin`. Users who sign in through Google after that are created as `editor`.
-  With an empty `users` table, a domain-only value leaves it empty and logs a warning to set a full address for the first admin.
+- **Startup configuration validation**: At startup, `src/api/startup-config.ts` refuses to start (and names what is wrong) in these cases:
+  - `AUTH_BYPASS=1` is set together with `GOOGLE_CLIENT_ID` or `SLACK_CLIENT_ID`.
+  - `AUTH_BYPASS=1` is set together with `DASHBOARD_ADMIN_PASSWORD`.
+  - `GOOGLE_CLIENT_ID` is set but `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `JWT_SECRET`, or `FRONTEND_URL` is missing.
+  - `SLACK_CLIENT_ID` is set but `SLACK_CLIENT_SECRET`, `SLACK_CALLBACK_URL`, `JWT_SECRET`, or `FRONTEND_URL` is missing.
+  - Password mode (`DASHBOARD_ADMIN_PASSWORD` without an OAuth provider) has no `JWT_SECRET`.
+- **Google OAuth admission (`ALLOWED_EMAIL`)**: A new Google user can sign in only if their email matches `ALLOWED_EMAIL`. The value can be a single address (`alice@example.com`) or a domain suffix (`@example.com`). At startup, if `ALLOWED_EMAIL` is a full address and no user has that email, `seedMigration()` creates that user as `admin`, even when other users already exist. An empty value, a domain-only value, or the `your-email@...` example is skipped with a warning; set a full address and restart. A user that already exists keeps its role. Users who sign in through Google after that are created as `editor`.
 - **Slack OAuth admission (`SLACK_ALLOWED_TEAM_ID`)**: Creating a new user via Slack sign-in requires `SLACK_ALLOWED_TEAM_ID` to be set and to match the user's Slack workspace team ID. If the variable is empty, new Slack users are rejected. Admitted Slack users are created with the `editor` role.
 
 ### Permissions Model
@@ -304,7 +305,7 @@ Browser API access is denied by default:
     - Database connection testing and SQLite-to-PostgreSQL migration (`/api/config/db-test`, `/api/config/migrate-to-pg`)
     - Server restart (`/api/system/restart`)
   - `editor`: Can create, edit, move, or delete cards and tree nodes. Can also run searches, compile subtrees, read database status (`/api/config/db-info`), and list agent keys. Cannot issue, reissue, or modify agent keys. Cannot manage users or change any other admin setting.
-  - `viewer`: Read-only. Mutating browser requests (`POST`, `PUT`, `PATCH`, `DELETE`) return `403`, except for two read-only `POST` endpoints: `POST /tree/:nodeId/compile` and `POST /search/evaluate`.
+  - `viewer`: Read-only. Mutating browser requests (`POST`, `PUT`, `PATCH`, `DELETE`) return `403`, except for five read-only `POST` endpoints: `POST /tree/:nodeId/compile`, `POST /tree/:nodeId/compile/sections`, `POST /tree/compile/contents`, `POST /search/evaluate`, and `POST /search/expand`. Every other mutating request from a viewer gets `403 { "error": "Forbidden" }`, without a `code`.
 - **Immediate enforcement**: Changing a user's role or deactivating a user (`is_active = false`) in **Settings > Users** takes effect on the very next HTTP request.
 - **Agent key scopes (`agents.scope`)**:
   - `write`: Can invoke all 17 MCP tools and call mutating agent REST endpoints (`POST /api/cards`, `PATCH /api/cards/:cardId`). Keys created before scopes existed have `write`, and so does a key issued through the API without a `scope` field.
@@ -383,7 +384,13 @@ To link a card to an external resource, set `source_ref` to the URL and `source_
 
 See `src/api/routes/` for route definitions and request schemas.
 
-Errors caused by the caller come back as `{ "error": "<what is wrong and what to do>", "code": "<CODE>" }`. `error` is always a string; branch on `code`. Some responses keep their own shape and are not covered here: Jev search errors and neighbors answer with `{ "error": { "code", "message" } }`, and a move that would make a cycle answers in Fastify's standard shape with a top-level `code` of `TREE_CYCLE`. MCP errors are plain text.
+Errors from the service layer (a node or card that does not exist, a malformed ID, invalid input, a version conflict) and the `403` for a read-scope key come back as `{ "error": "<what is wrong and what to do>", "code": "<CODE>" }`. There `error` is a string; branch on `code`. Some responses have another shape and carry no `code` from this table:
+
+- Authentication failures (`401`) and query-parameter errors (a bad `limit` on compile, a bad `depth` or `excerpt_chars` on `/tree/outline`, a missing node on outline) answer with `{ "error": "<message>" }` only.
+- Jev search errors answer with `{ "error": { "code", "message" } }`; neighbors and search-expand answer with `{ "error": { "code" } }`.
+- A move that would make a cycle answers in Fastify's standard shape with a top-level `code` of `TREE_CYCLE`.
+
+MCP errors are plain text.
 
 | `code` | Status | Meaning |
 | :--- | :--- | :--- |
@@ -394,7 +401,7 @@ Errors caused by the caller come back as `{ "error": "<what is wrong and what to
 | `INVALID_INPUT` | `400` | Another input problem, such as an empty title, an unknown field, or a negative `depth`. |
 | `VERSION_CONFLICT` | `409` | `expected_version` differs from the card's version. |
 | `ALREADY_EXISTS` | `409` | The `agent_id` is already registered (`POST /api/config/agents`). |
-| `INSUFFICIENT_SCOPE` | `403` | A read-scope key (or a viewer) called a write route. |
+| `INSUFFICIENT_SCOPE` | `403` | A read-scope key, or a `viewer` account, called a write route of the agent REST API (`POST /api/cards`, `PATCH /api/cards/:cardId`). A viewer on a browser route gets `{ "error": "Forbidden" }` without a `code`. |
 
 ## Operational Notes
 
@@ -404,9 +411,9 @@ When an `admin` saves `.env` changes in the dashboard and clicks the restart ban
 
 ### `.env` Secret Masking in Settings
 
-`GET /api/config/env` never sends raw secrets to the browser. It masks every non-empty `.env` value as `***` unless its key is on this 15-key allowlist:
+`GET /api/config/env` never sends raw secrets to the browser. It masks every non-empty `.env` value as `***` unless its key is on this 17-key allowlist:
 
-`API_PORT`, `NODE_ENV`, `FRONTEND_URL`, `AUTH_BYPASS`, `ALLOWED_EMAIL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CALLBACK_URL`, `SLACK_CLIENT_ID`, `SLACK_CALLBACK_URL`, `SLACK_ALLOWED_TEAM_ID`, `ADAPTER_PACKAGES`, `TYPESAFE_BASE_URL`, `SQLITE_PATH`, `SEARCH_MOTION_PAGE_URL`, `MCP_AGENT_ID`.
+`API_PORT`, `API_HOST`, `DASHBOARD_DIR`, `NODE_ENV`, `FRONTEND_URL`, `AUTH_BYPASS`, `ALLOWED_EMAIL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CALLBACK_URL`, `SLACK_CLIENT_ID`, `SLACK_CALLBACK_URL`, `SLACK_ALLOWED_TEAM_ID`, `ADAPTER_PACKAGES`, `TYPESAFE_BASE_URL`, `SQLITE_PATH`, `SEARCH_MOTION_PAGE_URL`, `MCP_AGENT_ID`.
 
 Empty values stay empty, and `OPENAI_API_KEY` is left out of the response entirely. When `PUT /api/config/env` receives `***` for a masked key, it preserves the existing value in `.env` on disk.
 
@@ -417,15 +424,17 @@ Empty values stay empty, and `OPENAI_API_KEY` is left out of the response entire
 | `DATABASE_URL` | (unset) | PostgreSQL connection URL. When unset, `atom` uses SQLite at `SQLITE_PATH`. |
 | `SQLITE_PATH` | `./atom.db` | File path for the SQLite database when `DATABASE_URL` is unset. |
 | `API_PORT` | (required; `4200` in `.env.example`) | Port for the Fastify HTTP and MCP server (startup fails if unset). |
-| `API_HOST` | (unset) | Listen host. When unset, the server binds `127.0.0.1` in `AUTH_BYPASS=1` mode and `0.0.0.0` otherwise. |
+| `API_HOST` | (unset) | Listen host. When unset, the server binds `127.0.0.1` in `AUTH_BYPASS=1` mode and `0.0.0.0` otherwise. Setting it overrides both; in bypass mode a host reachable from the network opens unauthenticated `admin` access to that network. |
+| `ATOM_ENV_FILE` | (unset) | Path of the env file to load instead of the repository-root `.env`. Read from the shell only (a value inside `.env` has no effect). `GET` and `PUT /api/config/env` still read and write the repository-root `.env`. |
+| `GIT_COMMIT_SHA`, `BUILD_DATE` | `dev`, `unknown` outside Docker; `unknown`, `unknown` in the Docker image | Build identifiers that `GET /api/version` returns as `commit` and `buildDate`. `Dockerfile.backend` bakes them into the image from build arguments whose default is `unknown`; the `dev` fallback applies only when the variable is unset. |
 | `DASHBOARD_DIR` | (unset) | Built dashboard directory (must contain `index.html`) that the API serves as static files and client routes. |
 | `DASHBOARD_ADMIN_PASSWORD` | (unset) | Installation password for dashboard login. Requires `JWT_SECRET`, cannot be combined with `AUTH_BYPASS=1`, and is ignored when an OAuth provider is configured. |
 | `VITE_API_BASE_URL` | `""` (same origin) | API base URL used by the dashboard when running the Vite dev server on a separate port. |
 | `FRONTEND_URL` | (unset) | Allowed CORS origin and post-OAuth redirect URL (required when Google or Slack OAuth is enabled). |
-| `AUTH_BYPASS` | (unset) | Set to `1` for local unauthenticated `admin` access when no OAuth provider is configured. |
-| `JWT_SECRET` | (required with OAuth) | Secret used to sign and verify browser session JWT cookies. |
+| `AUTH_BYPASS` | (unset) | Set to `1` for local unauthenticated `admin` access when neither an OAuth provider nor `DASHBOARD_ADMIN_PASSWORD` is configured (combining them stops startup). |
+| `JWT_SECRET` | (required with OAuth or password mode) | Secret used to sign and verify browser session JWT cookies. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` | (unset) | Google OAuth 2.0 credentials. |
-| `ALLOWED_EMAIL` | (unset) | Email (`user@example.com`) or domain (`@example.com`) allowed to sign in via Google OAuth; seeds the first `admin` when set to a full email on an empty `users` table. |
+| `ALLOWED_EMAIL` | (unset) | Email (`user@example.com`) or domain (`@example.com`) allowed to sign in via Google OAuth; at startup it creates that user as `admin` when it is a full email and no user has it yet (an existing user keeps its role). |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_CALLBACK_URL` | (unset) | Slack OAuth credentials. |
 | `SLACK_ALLOWED_TEAM_ID` | (unset) | Slack workspace Team ID required to admit new Slack OAuth users. |
 | `MCP_AGENT_ID` | `stdio-agent` | Attribution ID recorded in `created_by` and `updated_by` for `stdio` MCP mutations. |
