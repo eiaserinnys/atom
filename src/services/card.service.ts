@@ -18,7 +18,7 @@ import { deserializeArray, deserializeBoolean } from "../db/utils.js";
 import { toTreeNodeWithCard } from "./tree-node-payload.js";
 import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
 import { resolveWriteParentNodeId } from "./tree-parent.js";
-import { assertValidCardTitle, cardNotFound } from "./service-errors.js";
+import { assertUuidArray, assertValidCardTitle, cardNotFound } from "./service-errors.js";
 
 export async function createCard(
   agentIdOrInput: string | null | CreateCardInput,
@@ -36,6 +36,7 @@ export async function createCard(
   }
 
   assertValidCardTitle(input.title);
+  assertUuidArray("references", input.references);
   const { card, node } = await getDb().transaction(async (client) => {
     const parentNodeId = await resolveWriteParentNodeId(
       client,
@@ -101,6 +102,7 @@ export async function updateCard(
   }
 
   if (input.title !== undefined) assertValidCardTitle(input.title);
+  assertUuidArray("references", input.references);
   const contentChanged = input.content !== undefined;
   const result = await updateCardById(
     getDb(), id, input, contentChanged, agentId ?? undefined, expectedVersion

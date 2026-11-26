@@ -77,6 +77,17 @@ export async function assertCardExists(db: Queryable, cardId: string): Promise<v
   if (!(await selectCardById(db, cardId))) throw await cardNotFound(cardId, db);
 }
 
+export function assertUuid(label: string, value: unknown): void {
+  if (!isUuid(value)) throw new InvalidInputError(invalidIdMessage(label, value));
+}
+
+/** `values` may be absent; when present it must be an array of UUID strings. */
+export function assertUuidArray(label: string, values: unknown): void {
+  if (values === undefined || values === null) return;
+  if (!Array.isArray(values)) throw new InvalidInputError(`${label} must be an array of UUIDs`);
+  values.forEach((value, index) => assertUuid(`${label}[${index}]`, value));
+}
+
 export function assertValidCardTitle(title: unknown): void {
   const problem = cardTitleProblem(title);
   if (problem) throw new InvalidInputError(problem);

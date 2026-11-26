@@ -31,7 +31,7 @@ import { loadTreeCompileContext } from "./tree-compile-context.service.js";
 import { deleteTreeAndOrphanCards } from "./node-deletion.service.js";
 import { resolveParentNodeId, resolveWriteParentNodeId } from "./tree-parent.js";
 import { lockTreeStructure } from "../db/queries/tree-lock.js";
-import { assertCardExists } from "./service-errors.js";
+import { assertCardExists, assertUuidArray } from "./service-errors.js";
 
 export async function getNode(nodeId: string): Promise<TreeNodeWithCard | null> {
   const db = getDb();
@@ -241,6 +241,7 @@ export async function findCompileSubtree(
 export async function getCompileCardContents(cardIds: string[]): Promise<{
   contents: Record<string, { version: number; content: string | null }>;
 }> {
+  assertUuidArray("card_ids", cardIds);
   const cards = await selectCardsByIds(getDb(), Array.from(new Set(cardIds)));
   return {
     contents: Object.fromEntries(cards.map((card) => [card.id, {

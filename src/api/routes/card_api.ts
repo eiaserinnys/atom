@@ -7,7 +7,7 @@ import { parseCompileLimit } from "./compile-limit.js";
 import { createTreeOutlineHandler } from "./tree-outline.js";
 import { parseCreateCardBody } from "./card-body.js";
 import { cardNotFound, versionConflictMessage } from "../../services/service-errors.js";
-import { registerServiceErrors } from "../service-errors-http.js";
+import { registerServiceErrors, validateRequestIds } from "../service-errors-http.js";
 
 interface AgentCompileHandlerDeps {
   compileSubtree: typeof compileSubtree;
@@ -46,7 +46,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/cards — create a card (agent key auth)
   app.post(
     "/api/cards",
-    { preHandler: [agentKeyPreHandler, requireAgentWriteScope] },
+    { preHandler: [agentKeyPreHandler, requireAgentWriteScope, validateRequestIds] },
     async (req, reply) => {
       const { card, node_id } = await createCard(req.agentId ?? null, parseCreateCardBody(req.body));
       return reply.code(201).send({ ...card, node_id });
@@ -56,7 +56,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
   // PATCH /api/cards/:cardId — update a card (agent key auth)
   app.patch<{ Params: { cardId: string } }>(
     "/api/cards/:cardId",
-    { preHandler: [agentKeyPreHandler, requireAgentWriteScope] },
+    { preHandler: [agentKeyPreHandler, requireAgentWriteScope, validateRequestIds] },
     async (req, reply) => {
       const body = req.body as Record<string, unknown>;
       const allowedFields = new Set(["content", "title", "tags", "source_ref", "expected_version"]);
@@ -87,7 +87,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/tree — list root nodes (agent key auth)
   app.get(
     "/api/tree",
-    { preHandler: agentKeyPreHandler },
+    { preHandler: [agentKeyPreHandler, validateRequestIds] },
     async (_req, _reply) => {
       return listChildren(null);
     }
@@ -96,14 +96,14 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/tree/outline — body-free structural outline (agent key auth)
   app.get(
     "/api/tree/outline",
-    { preHandler: agentKeyPreHandler },
+    { preHandler: [agentKeyPreHandler, validateRequestIds] },
     createTreeOutlineHandler({ getTreeOutline })
   );
 
   // GET /api/tree/:nodeId/children — list children of a node (agent key auth)
   app.get<{ Params: { nodeId: string } }>(
     "/api/tree/:nodeId/children",
-    { preHandler: agentKeyPreHandler },
+    { preHandler: [agentKeyPreHandler, validateRequestIds] },
     async (req, reply) => {
       const children = await listChildren(req.params.nodeId);
       return children;
@@ -113,7 +113,7 @@ export async function cardApiRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/tree/:nodeId/compile — compile subtree (agent key auth, query params)
   app.get<{ Params: { nodeId: string } }>(
     "/api/tree/:nodeId/compile",
-    { preHandler: agentKeyPreHandler },
+    { preHandler: [agentKeyPreHandler, validateRequestIds] },
     createAgentCompileHandler({ compileSubtree })
   );
 

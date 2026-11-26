@@ -1,6 +1,7 @@
 import { getDb } from "../db/client.js";
 import { searchByBm25 } from "../db/queries/search.js";
 import { resolveWriteParentNodeId } from "./tree-parent.js";
+import { assertUuid } from "./service-errors.js";
 import { getNode } from "./tree.service.js";
 import type { SearchResult, SearchFilters, SearchFallback } from "../shared/types.js";
 
@@ -81,6 +82,7 @@ export async function normalizeSearchRootNodeId(
   rootNodeId: string | null | undefined
 ): Promise<string | null | undefined> {
   if (rootNodeId == null) return rootNodeId;
+  assertUuid("root_node_id", rootNodeId);
   return resolveWriteParentNodeId(getDb(), rootNodeId, "Node");
 }
 
