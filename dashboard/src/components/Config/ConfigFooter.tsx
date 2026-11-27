@@ -38,7 +38,7 @@ export function ConfigFooter({
               {manualRestartRequired ? t('system.restart_manual') : t('system.restart_required')}
             </span>
           ) : !pendingRestart && isAuthTab && authFooter?.message ? (
-            <span className={authFooter.message.ok ? 'text-muted-foreground' : 'text-node-error'}>
+            <span className={`[&:lang(ko)]:break-keep [overflow-wrap:anywhere] ${authFooter.message.ok ? 'text-muted-foreground' : 'text-node-error'}`}>
               {authFooter.message.text}
             </span>
           ) : null}

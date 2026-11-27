@@ -1,3 +1,6 @@
+import type { TFunction } from 'i18next';
+import { describeApiError } from '../../api/apiError';
+
 export interface TreeMutationSideEffects {
   expandParent: (nodeId: string) => void;
   selectNode: (nodeId: string | null) => void;
@@ -42,12 +45,8 @@ export function applyDeleteSuccess(
   effects.clearDeleteError();
 }
 
-export function getDeleteErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
-}
-
-export function applyDeleteError(error: unknown, effects: TreeMutationSideEffects, fallback: string): void {
-  effects.setDeleteError(getDeleteErrorMessage(error, fallback));
+export function applyDeleteError(error: unknown, effects: TreeMutationSideEffects, t: TFunction): void {
+  effects.setDeleteError(describeApiError(error, t));
 }
 
 export function applyMoveSuccess(): void {

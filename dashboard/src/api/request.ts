@@ -1,13 +1,6 @@
+import { ApiError, VersionConflictError, parseErrorBody } from './apiError';
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
-
-export class VersionConflictError extends Error {
-  readonly currentVersion: number;
-
-  constructor(currentVersion: number) {
-    super('VERSION_CONFLICT');
-    this.currentVersion = currentVersion;
-  }
-}
 
 function buildHeaders(options?: RequestInit): HeadersInit {
   return {
@@ -31,12 +24,11 @@ async function fetchApi(path: string, options?: RequestInit): Promise<Response> 
   }
 
   if (!res.ok) {
-    const text = await res.text();
-    if (res.status === 409) {
-      const body = JSON.parse(text);
-      if (body.error === 'VERSION_CONFLICT') throw new VersionConflictError(body.current_version);
+    const body = parseErrorBody(await res.text());
+    if (res.status === 409 && body.code === 'VERSION_CONFLICT') {
+      throw new VersionConflictError(body.fields['current_version'] as number, body.text);
     }
-    throw new Error(`API ${res.status}: ${text}`);
+    throw new ApiError(res.status, body.code, body.text, { reason: body.reason, keys: body.keys });
   }
 
   return res;

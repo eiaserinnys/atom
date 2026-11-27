@@ -1,5 +1,6 @@
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { describeApiError } from '../../api/apiError';
 import { useQuery } from '@tanstack/react-query';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -157,7 +158,7 @@ function TreeNodeComponent({ node, selectedNodeId, onSelect, searchRanks = {}, d
         )}
         {searchRanks[node.id] && <span className="font-mono text-[13px] font-semibold bg-brand text-brand-foreground px-1">#{searchRanks[node.id]}</span>}
         {isError && (
-          <span className="ml-1 inline-flex items-center cursor-help shrink-0 text-[var(--amber)]" title={error?.message ?? t('common.error')}>
+          <span className="ml-1 inline-flex items-center cursor-help shrink-0 text-[var(--amber)]" title={error ? describeApiError(error, t) : t('common.error')}>
             <AlertTriangle className="w-3.5 h-3.5" strokeWidth={1.75} />
           </span>
         )}

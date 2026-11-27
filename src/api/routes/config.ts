@@ -12,6 +12,7 @@ import { setPendingRestart } from '../state.js';
 import { agentKeyVerifier } from '../agent-key-auth.js';
 import { mapPostgresConnectionError } from '../config/db-test.js';
 import { isDbOwnedConfigEnvKey, parseConfigEnvContent, updateConfigEnvContent } from '../config/env-file.js';
+import { checkSaveKeepsStartupValid, STARTUP_WOULD_FAIL } from '../config/save-guard.js';
 import {
   migrateSqliteToPostgres,
   type ConfigMigrationServiceDeps,
@@ -80,6 +81,7 @@ export function createMigrateToPgHandler(
     if (result.ok) {
       return reply.send({ ok: true, message: 'Migration completed. SQLite file renamed to .deprecated.' });
     }
+    if (result.statusCode >= 500) req.log.error({ error: result.error }, 'config migration to PostgreSQL failed');
     return reply.code(result.statusCode).send({ error: result.error });
   };
 }
@@ -284,6 +286,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       return reply.send(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ err }, 'Failed to read .env');
       return reply.code(500).send({ error: `Failed to read .env: ${message}` });
     }
   });
@@ -302,11 +305,18 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
 
     try {
       const content = fs.existsSync(envFilePath) ? fs.readFileSync(envFilePath, 'utf-8') : '';
-      fs.writeFileSync(envFilePath, updateConfigEnvContent(content, entries), 'utf-8');
+      const nextContent = updateConfigEnvContent(content, entries);
+      const verdict = checkSaveKeepsStartupValid(envFilePath, nextContent);
+      if (!verdict.ok) {
+        req.log.warn({ reason: verdict.reason, keys: verdict.keys }, 'env save rejected: the server would not start with these settings');
+        return reply.code(400).send({ error: verdict.error, code: STARTUP_WOULD_FAIL, reason: verdict.reason, keys: verdict.keys });
+      }
+      fs.writeFileSync(envFilePath, nextContent, 'utf-8');
       setPendingRestart(true);
       return reply.send({ ok: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ err }, 'Failed to write .env');
       return reply.code(500).send({ error: `Failed to write .env: ${message}` });
     }
   });

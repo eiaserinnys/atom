@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Components } from 'react-markdown';
 import type { CompileSection, UnfurlEntry } from '../../api/client';
+import { describeApiError } from '../../api/apiError';
 import { UnfurlSectionList } from '../UnfurlSection';
 import { PanelState } from '../PanelState';
 import { Spinner } from '../Spinner';
@@ -31,7 +32,7 @@ export function CompileContent({
   return (
     <div className={isLoading || error ? 'h-full p-4 flex' : 'p-4'}>
       {isLoading && <PanelState><Spinner label={t('common.loading')} /></PanelState>}
-      {error && <PanelState><p className="text-sm text-node-error">{t('common.error')}: {error.message}</p></PanelState>}
+      {error && <PanelState><p className="text-sm text-node-error">{t('common.error')}: {describeApiError(error, t)}</p></PanelState>}
       {sections && !isLoading && (
         <div className="markdown-content">
           <CompileVirtualList ref={listRef} sections={sections} scrollRef={scrollRef} headingComponents={headingComponents} />

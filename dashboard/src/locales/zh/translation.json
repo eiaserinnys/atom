@@ -17,6 +17,20 @@
     "revoke": "撤销",
     "generating": "生成中..."
   },
+  "errors": {
+    "startup_would_fail": "未保存。使用这些设置，服务器将无法再次启动。",
+    "startup_reason": {
+      "no_login_method": "没有留下任何登录方式。请设置管理员密码或 OAuth 提供方。",
+      "oauth_and_bypass": "本地绕过登录(AUTH_BYPASS)不能与 OAuth 提供方同时使用。",
+      "password_and_bypass": "本地绕过登录(AUTH_BYPASS)不能与管理员密码同时使用。",
+      "missing_keys": "缺少必需的设置：{{keys}}。"
+    },
+    "failed": "操作未能完成，请稍后再试。",
+    "forbidden": "你没有执行此操作的权限。",
+    "not_found": "找不到该项目。",
+    "busy": "请求过多，请稍后再试。",
+    "server": "服务器无法处理，请稍后再试。"
+  },
   "config": {
     "settings": "设置",
     "tab_users": "用户管理",

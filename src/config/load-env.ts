@@ -20,6 +20,10 @@ export type LoadConfigOptions = {
   cwd?: string;
 };
 
+export function parseEnvFileContent(content: string): Record<string, string> {
+  return parse(content);
+}
+
 function readEnvFile(envFile: string): Record<string, string> | null {
   let content: string;
   try {
@@ -28,7 +32,7 @@ function readEnvFile(envFile: string): Record<string, string> | null {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
   }
-  return parse(content);
+  return parseEnvFileContent(content);
 }
 
 function describePostgres(databaseUrl: string): string {

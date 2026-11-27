@@ -144,6 +144,20 @@
     "revoke": "Revoke",
     "generating": "Generating..."
   },
+  "errors": {
+    "startup_would_fail": "Not saved. The server would not start again with these settings.",
+    "startup_reason": {
+      "no_login_method": "Every login method has been removed. Set an admin password or an OAuth provider.",
+      "oauth_and_bypass": "Local bypass (AUTH_BYPASS) cannot be combined with an OAuth provider.",
+      "password_and_bypass": "Local bypass (AUTH_BYPASS) cannot be combined with an admin password.",
+      "missing_keys": "Missing required settings: {{keys}}."
+    },
+    "failed": "Something went wrong. Please try again in a moment.",
+    "forbidden": "You don't have permission to do this.",
+    "not_found": "That item no longer exists.",
+    "busy": "Too many requests. Please try again in a moment.",
+    "server": "The server could not handle this. Please try again in a moment."
+  },
   "config": {
     "settings": "Settings",
     "tab_users": "Users",
@@ -335,7 +349,6 @@
     "empty": "No structure cards available"
   },
   "delete_modal": {
-    "failed": "Couldn't delete.",
     "title_node": "Delete this node",
     "title_link": "Delete this link",
     "body_node": "\"{{name}}\" and everything below it will be deleted.",

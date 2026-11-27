@@ -17,6 +17,20 @@
     "revoke": "Révoquer",
     "generating": "Génération en cours..."
   },
+  "errors": {
+    "startup_would_fail": "Non enregistré. Avec ces réglages, le serveur ne redémarrerait pas.",
+    "startup_reason": {
+      "no_login_method": "Aucune méthode de connexion ne resterait. Définissez un mot de passe administrateur ou un fournisseur OAuth.",
+      "oauth_and_bypass": "Le contournement local (AUTH_BYPASS) ne peut pas être combiné avec un fournisseur OAuth.",
+      "password_and_bypass": "Le contournement local (AUTH_BYPASS) ne peut pas être combiné avec un mot de passe administrateur.",
+      "missing_keys": "Réglages obligatoires manquants : {{keys}}."
+    },
+    "failed": "L'opération a échoué. Réessayez dans un instant.",
+    "forbidden": "Vous n'avez pas l'autorisation d'effectuer cette action.",
+    "not_found": "Cet élément n'existe plus.",
+    "busy": "Trop de requêtes. Réessayez dans un instant.",
+    "server": "Le serveur n'a pas pu traiter la demande. Réessayez dans un instant."
+  },
   "config": {
     "settings": "Paramètres",
     "tab_users": "Utilisateurs",

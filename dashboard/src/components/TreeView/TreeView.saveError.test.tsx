@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import i18next from 'i18next';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ApiError } from '../../api/apiError';
 import { api, type TreeNodeData } from '../../api/client';
 import english from '../../locales/en/translation.json';
 import { rootTreeQueryKey } from '../../query/queryKeys';
@@ -93,7 +94,7 @@ describe('TreeView Rename save errors', () => {
   });
 
   test('reports a rejected save, preserves the draft and clears the error during retry', async () => {
-    const update = vi.spyOn(api, 'updateCard').mockRejectedValueOnce(new Error('Card not found'));
+    const update = vi.spyOn(api, 'updateCard').mockRejectedValueOnce(new ApiError(400, 'INVALID_INPUT', 'Card not found'));
     await rename('a');
     expect(alert()).toBeNull();
     await enterDraft();
@@ -123,11 +124,24 @@ describe('TreeView Rename save errors', () => {
     expect(update).toHaveBeenCalledTimes(2);
   });
 
-  test('uses the fallback and clears failed edits before same or different card reentry', async () => {
-    const update = vi.spyOn(api, 'updateCard').mockRejectedValueOnce(new Error(''));
+  test.each([
+    ['an HTML gateway page', 502, '<html><body>502 Bad Gateway</body></html>', english.errors.server],
+    ['a JSON body with no readable text', 500, '{"statusCode":500}', english.errors.server],
+    ['a JSON body with a server sentence', 400, '{"error":"Title must not be empty","code":"INVALID_INPUT"}', 'Title must not be empty'],
+  ])('shows %s as one sentence, never as raw JSON or an "API 500:" prefix', async (_name, status, body, sentence) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status, text: async () => body }));
+    await rename('a');
+    await enterDraft();
+    await settle(() => button(english.common.save).click());
+
+    expect(alert()?.textContent).toBe(`${english.card.save_failed}: ${sentence}`);
+  });
+
+  test('uses the plain sentence and clears failed edits before same or different card reentry', async () => {
+    const update = vi.spyOn(api, 'updateCard').mockRejectedValueOnce(new Error('Failed to fetch'));
     await rename('a');
     await settle(() => button(english.common.save).click());
-    expect(alert()?.textContent).toBe(english.card.save_failed);
+    expect(alert()?.textContent).toBe(`${english.card.save_failed}: ${english.errors.failed}`);
     await settle(() => button(english.common.cancel).click());
 
     // A create modal must not inherit a failed edit.
@@ -138,7 +152,7 @@ describe('TreeView Rename save errors', () => {
     expect(alert()).toBeNull();
     expect(input().value).toBe('a title');
 
-    update.mockRejectedValueOnce(new Error('Save rejected'));
+    update.mockRejectedValueOnce(new ApiError(400, 'INVALID_INPUT', 'Save rejected'));
     await settle(() => button(english.common.save).click());
     expect(alert()?.textContent).toBe(`${english.card.save_failed}: Save rejected`);
     await settle(() => button(english.common.cancel).click());

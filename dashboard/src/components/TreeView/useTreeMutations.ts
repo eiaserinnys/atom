@@ -79,7 +79,7 @@ export function useTreeMutations({
       }, mutationEffects);
     },
     onError: (err) => {
-      applyDeleteError(err, mutationEffects, t('delete_modal.failed'));
+      applyDeleteError(err, mutationEffects, t);
     },
   });
 

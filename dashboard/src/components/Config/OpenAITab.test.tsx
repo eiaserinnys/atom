@@ -15,6 +15,7 @@ const configApi = vi.hoisted(() => ({
   getEnv: vi.fn<() => Promise<Record<string, string>>>(),
   putEnv: vi.fn<() => Promise<unknown>>(),
   getDbInfo: vi.fn(),
+  migrateToPostgres: vi.fn(),
   testDbConnection: vi.fn(),
 }));
 const api = vi.hoisted(() => ({ logout: vi.fn(), getAuthProviders: vi.fn() }));
@@ -408,10 +409,7 @@ describe('database migration confirmation', () => {
   });
 
   test('does not migrate when Enter is pressed on Cancel', async () => {
-    const fetchRequest = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({}),
-    } as Response);
+    configApi.migrateToPostgres.mockResolvedValue({ ok: true });
     await render(<DatabaseTab />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
@@ -422,7 +420,7 @@ describe('database migration confirmation', () => {
     act(() => cancel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })));
     await act(async () => { await Promise.resolve(); });
 
-    expect(fetchRequest).not.toHaveBeenCalled();
+    expect(configApi.migrateToPostgres).not.toHaveBeenCalled();
   });
 
   test('focuses Cancel and keeps settings open when Escape dismisses confirmation', async () => {

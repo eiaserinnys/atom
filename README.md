@@ -453,6 +453,7 @@ MCP errors are plain text.
 | `VERSION_CONFLICT` | `409` | `expected_version` differs from the card's version. |
 | `ALREADY_EXISTS` | `409` | The `agent_id` is already registered (`POST /api/config/agents`). |
 | `INSUFFICIENT_SCOPE` | `403` | A read-scope key, or a `viewer` account, called a write route of the agent REST API (`POST /api/cards`, `PATCH /api/cards/:cardId`). A viewer on a browser route gets `{ "error": "Forbidden" }` without a `code`. |
+| `STARTUP_WOULD_FAIL` | `400` | `PUT /api/config/env` refused a save because the server would not start again with the resulting settings. `error` is the first line of the startup message, `reason` is the kind (`no_login_method`, `oauth_and_bypass`, `password_and_bypass` or `missing_keys`) and `keys` lists the key names involved, never a value; the file is left as it was. |
 
 ## Operational Notes
 
@@ -467,6 +468,13 @@ When an `admin` saves `.env` changes in the dashboard and clicks the restart ban
 `API_PORT`, `API_HOST`, `DASHBOARD_DIR`, `NODE_ENV`, `FRONTEND_URL`, `AUTH_BYPASS`, `ALLOWED_EMAIL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CALLBACK_URL`, `SLACK_CLIENT_ID`, `SLACK_CALLBACK_URL`, `SLACK_ALLOWED_TEAM_ID`, `ADAPTER_PACKAGES`, `TYPESAFE_BASE_URL`, `SQLITE_PATH`, `SEARCH_MOTION_PAGE_URL`, `MCP_AGENT_ID`.
 
 Empty values stay empty, and `OPENAI_API_KEY` is left out of the response entirely. When `PUT /api/config/env` receives `***` for a masked key, it preserves the existing value in `.env` on disk.
+
+### What the Settings Window Saves
+
+The settings window writes the repository-root `.env` through `PUT /api/config/env`.
+
+- **Settings that would stop the server are not saved.** Before writing, the server takes the settings the next start will see (the shell environment with the `.env` values on top, as the loader does) and runs the same startup check the server runs when it boots. If that check would refuse to start, for example no login method left, a Google client ID without its secret and callback URL, or `AUTH_BYPASS=1` next to an OAuth provider or a password, nothing is written. The answer is `400` with the `code` `STARTUP_WOULD_FAIL`, the settings window shows that the save did not happen, and no restart notice appears. The body carries the `reason` kind and the `keys` involved, never a value, and the settings window turns them into one sentence in the page language. When `ATOM_ENV_FILE` points the loader at another file, the next start never reads the repository-root `.env`, so that save is not checked. Whether it is the same file is decided on real paths, so a relative path or a symlink to the repository-root `.env` is checked.
+- **Only the fields you changed are saved.** The Auth tab sends the fields you edited, and an emptied field is sent as an empty value. A field you did not touch is left out, so a value that comes only from the shell or the container environment is not replaced by an empty line in `.env`.
 
 ### Environment Variables Summary
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { describeApiError } from '../../api/apiError';
 import { useConfig } from '../../hooks/useConfig';
 import type { UserRole } from '../../api/client';
 import { ConfigActionButton, ConfigField, CONFIG_CONTROL_CLASS } from './ConfigFields';
@@ -45,7 +46,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
       setNewDisplayName('');
       setNewRole('editor');
     } catch (e: unknown) {
-      setAddError(e instanceof Error ? e.message : String(e));
+      setAddError(describeApiError(e, t));
     } finally {
       setAdding(false);
     }
@@ -58,7 +59,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
     } catch (e: unknown) {
       setUpdateErrors((prev) => ({
         ...prev,
-        [id]: e instanceof Error ? e.message : String(e),
+        [id]: describeApiError(e, t),
       }));
     }
   };
@@ -70,7 +71,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
     } catch (e: unknown) {
       setUpdateErrors((prev) => ({
         ...prev,
-        [id]: e instanceof Error ? e.message : String(e),
+        [id]: describeApiError(e, t),
       }));
     }
   };

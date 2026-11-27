@@ -81,8 +81,8 @@ function makeDeps(db: DatabaseAdapter): MigrationRouteDeps {
   };
 }
 
-async function injectMigrateToPg(db: DatabaseAdapter) {
-  const app = Fastify({ logger: false });
+async function injectMigrateToPg(db: DatabaseAdapter, logLines?: string[]) {
+  const app = Fastify({ logger: logLines ? { level: "error", stream: { write: (line: string) => { logLines.push(line); } } } : false });
   app.addHook("preHandler", async (req) => {
     req.jwtUser = {
       id: "test-admin",
@@ -176,6 +176,35 @@ describe("POST /api/config/migrate-to-pg route safety harness", () => {
       operationLog.indexOf(`sqlite.open:${deprecatedPath}:readonly`),
     );
     expect(operationLog.filter((entry) => entry.startsWith("sqlite.all:SELECT COUNT(*)")).length).toBe(4);
+  });
+
+  it("logs the error text on the server when it answers 500, with the same text the caller gets", async () => {
+    existingPaths.add(sqlitePath);
+    const logLines: string[] = [];
+    const db = makeFakeDb();
+    const deps = makeDeps(db);
+    deps.checkpointSqlite = () => { throw new Error("disk I/O error at /data/atom.db"); };
+    const app = Fastify({ logger: { level: "error", stream: { write: (line: string) => { logLines.push(line); } } } });
+    app.addHook("preHandler", async (req) => {
+      req.jwtUser = { id: "test-admin", email: "admin@example.test", name: "Test Admin", role: "admin" };
+    });
+    app.post("/api/config/migrate-to-pg", createMigrateToPgHandler(deps));
+    const response = await app.inject({ method: "POST", url: "/api/config/migrate-to-pg" });
+    await app.close();
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json().error).toBe("Migration failed: disk I/O error at /data/atom.db");
+    const logged = logLines.map((line) => JSON.parse(line));
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 50, msg: "config migration to PostgreSQL failed", error: "Migration failed: disk I/O error at /data/atom.db" });
+  });
+
+  it("does not log a 4xx answer as an error", async () => {
+    const logLines: string[] = [];
+    const response = await injectMigrateToPg(makeFakeDb("sqlite"), logLines);
+
+    expect(response.statusCode).toBe(400);
+    expect(logLines).toEqual([]);
   });
 
   it("returns 409 before opening SQLite when its checkpoint is busy", async () => {

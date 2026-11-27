@@ -17,6 +17,20 @@
     "revoke": "Widerrufen",
     "generating": "Wird generiert..."
   },
+  "errors": {
+    "startup_would_fail": "Nicht gespeichert. Mit diesen Einstellungen würde der Server nicht mehr starten.",
+    "startup_reason": {
+      "no_login_method": "Es bliebe keine Anmeldemethode übrig. Legen Sie ein Administratorpasswort oder einen OAuth-Anbieter fest.",
+      "oauth_and_bypass": "Der lokale Bypass (AUTH_BYPASS) lässt sich nicht mit einem OAuth-Anbieter kombinieren.",
+      "password_and_bypass": "Der lokale Bypass (AUTH_BYPASS) lässt sich nicht mit einem Administratorpasswort kombinieren.",
+      "missing_keys": "Erforderliche Einstellungen fehlen: {{keys}}."
+    },
+    "failed": "Das hat nicht geklappt. Bitte versuchen Sie es gleich noch einmal.",
+    "forbidden": "Dafür fehlt die Berechtigung.",
+    "not_found": "Dieses Element existiert nicht mehr.",
+    "busy": "Zu viele Anfragen. Bitte versuchen Sie es gleich noch einmal.",
+    "server": "Der Server konnte das nicht verarbeiten. Bitte versuchen Sie es gleich noch einmal."
+  },
   "config": {
     "settings": "Einstellungen",
     "tab_users": "Benutzerverwaltung",

@@ -1,11 +1,12 @@
+import type { TFunction } from 'i18next';
 import { describe, expect, test } from 'vitest';
+import { ApiError } from '../../api/apiError';
 import {
   applyCreateSuccess,
   applyDeleteError,
   applyDeleteSuccess,
   applyEditSuccess,
   applyMoveSuccess,
-  getDeleteErrorMessage,
   type TreeMutationSideEffects,
 } from './treeMutationEffects';
 
@@ -76,14 +77,14 @@ describe('tree mutation side effects', () => {
     ]);
   });
 
-  test('delete error preserves Error messages and falls back for non-Error values', () => {
-    expect(getDeleteErrorMessage(new Error('cannot delete'), 'Delete failed')).toBe('cannot delete');
-    expect(getDeleteErrorMessage({ message: 'plain object' }, 'Delete failed')).toBe('Delete failed');
-
+  test('delete error shows the server text of an API error and a plain sentence for anything else', () => {
+    const t = ((key: string) => key) as unknown as TFunction;
     const { calls, effects } = recordEffects();
-    applyDeleteError(new Error('cannot delete'), effects, 'Delete failed');
 
-    expect(calls).toEqual(['setDeleteError:cannot delete']);
+    applyDeleteError(new ApiError(409, 'CONFLICT_THING', 'cannot delete'), effects, t);
+    applyDeleteError(new Error('Failed to fetch'), effects, t);
+
+    expect(calls).toEqual(['setDeleteError:cannot delete', 'setDeleteError:errors.failed']);
   });
 
   test('move success leaves data updates to SSE; modal close remains a caller onSuccess concern', () => {

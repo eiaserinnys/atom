@@ -26,7 +26,7 @@ import { resolveNodePath } from './useInitialNodePathRestore';
 import { focusMovedRow, focusParentRow, focusRowOrList } from './treeFocusReturn';
 import { useInitialNodePathRestore } from './useInitialNodePathRestore';
 import { rootTreeQueryKey } from '../../query/queryKeys';
-import { VersionConflictError } from '../../api/request';
+import { VersionConflictError, describeApiError } from '../../api/apiError';
 import {
   buildContextMenuActionDescriptors,
   buildModalConfirmAction,
@@ -224,7 +224,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
             {isLoading ? (
               <PanelState><Spinner label={t('common.loading')} /></PanelState>
             ) : error ? (
-              <PanelState><p className="text-sm text-node-error">{t('common.error')}: {error.message}</p></PanelState>
+              <PanelState><p className="text-sm text-node-error">{t('common.error')}: {describeApiError(error, t)}</p></PanelState>
             ) : !roots || roots.length === 0 ? (
               <PanelState>
                 <ConfigActionButton onClick={() => setModal({ type: 'create-root', cardType: 'knowledge' })}>
@@ -284,9 +284,7 @@ export function TreeView({ selectedNodeId, onSelect, initialSelectedNodeId, sear
               errorMessage={modal.type === 'edit' && editMutation.isError
                 ? editMutation.error instanceof VersionConflictError
                   ? t('card.unsaved_changes')
-                  : editMutation.error?.message
-                  ? `${t('card.save_failed')}: ${editMutation.error.message}`
-                  : t('card.save_failed')
+                  : `${t('card.save_failed')}: ${describeApiError(editMutation.error, t)}`
                 : undefined}
             />
           )}

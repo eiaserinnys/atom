@@ -51,6 +51,10 @@ export const configApi = {
     return request('/api/config/env', { method: 'PUT', body: JSON.stringify(entries) });
   },
 
+  migrateToPostgres(): Promise<{ ok: boolean; message?: string }> {
+    return request('/api/config/migrate-to-pg', { method: 'POST' });
+  },
+
   testDbConnection(connectionString: string): Promise<{ ok: boolean; error?: string }> {
     return request('/api/config/db-test', {
       method: 'POST',
