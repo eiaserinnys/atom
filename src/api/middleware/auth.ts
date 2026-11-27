@@ -22,7 +22,9 @@ const READ_ONLY_POST_ROUTES = [
  * It applies to ALL Fastify routes regardless of how nginx routes requests.
  * Auth routes (/api/auth/*) are explicitly exempted below.
  *
- * Bypass mode requires AUTH_BYPASS=1 and no configured OAuth provider.
+ * Bypass mode applies only when AUTH_BYPASS=1 and neither an OAuth provider nor
+ * DASHBOARD_ADMIN_PASSWORD is configured. Combining AUTH_BYPASS=1 with either makes
+ * the server refuse to start. It is for local development and e2e only.
  */
 export async function authMiddleware(
   req: FastifyRequest,
