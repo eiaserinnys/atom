@@ -81,6 +81,7 @@ export function createMigrateToPgHandler(
     if (result.ok) {
       return reply.send({ ok: true, message: 'Migration completed. SQLite file renamed to .deprecated.' });
     }
+    if (result.statusCode >= 500) req.log.error({ error: result.error }, 'config migration to PostgreSQL failed');
     return reply.code(result.statusCode).send({ error: result.error });
   };
 }
@@ -285,6 +286,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       return reply.send(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ err }, 'Failed to read .env');
       return reply.code(500).send({ error: `Failed to read .env: ${message}` });
     }
   });
@@ -314,6 +316,7 @@ export const configRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ ok: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ err }, 'Failed to write .env');
       return reply.code(500).send({ error: `Failed to write .env: ${message}` });
     }
   });

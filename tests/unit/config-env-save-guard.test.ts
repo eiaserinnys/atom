@@ -126,6 +126,48 @@ describe("PUT /api/config/env refuses a save the server could not start with", (
     expectRefused(result, "No login method", "no_login_method", []);
   });
 
+  it("logs a failed write on the server with the error text, and keeps secret values out of the log", async () => {
+    jest.restoreAllMocks();
+    logLines = [];
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
+    jest.spyOn(fs, "readFileSync").mockReturnValue(OAUTH_FILE);
+    jest.spyOn(fs, "writeFileSync").mockImplementation(() => { throw new Error("EACCES: permission denied, open '/srv/atom/.env'"); });
+    const app = Fastify({ logger: { level: "error", stream: { write: (line: string) => { logLines.push(line); } } } });
+    app.addHook("preHandler", async (request) => {
+      request.jwtUser = { id: "test-admin", email: "admin@example.test", name: "Test Admin", role: "admin" };
+    });
+    await app.register(configRoutes);
+    const response = await app.inject({ method: "PUT", url: "/api/config/env", payload: [{ key: "ALLOWED_EMAIL", value: "admin@example.test" }] });
+    await app.close();
+
+    expect(response.statusCode).toBe(500);
+    const logged = logLines.map((line) => JSON.parse(line));
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 50, msg: "Failed to write .env" });
+    expect(logged[0].err.message).toContain("EACCES: permission denied");
+    SECRET_VALUES.forEach((value) => expect(logLines.join("")).not.toContain(value));
+  });
+
+  it("logs a failed read of the env file on the server", async () => {
+    jest.restoreAllMocks();
+    logLines = [];
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
+    jest.spyOn(fs, "readFileSync").mockImplementation(() => { throw new Error("EIO: i/o error, read"); });
+    const app = Fastify({ logger: { level: "error", stream: { write: (line: string) => { logLines.push(line); } } } });
+    app.addHook("preHandler", async (request) => {
+      request.jwtUser = { id: "test-admin", email: "admin@example.test", name: "Test Admin", role: "admin" };
+    });
+    await app.register(configRoutes);
+    const response = await app.inject({ method: "GET", url: "/api/config/env" });
+    await app.close();
+
+    expect(response.statusCode).toBe(500);
+    const logged = logLines.map((line) => JSON.parse(line));
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 50, msg: "Failed to read .env" });
+    expect(logged[0].err.message).toContain("EIO");
+  });
+
   it("saves a settings change that keeps the server startable", async () => {
     const { response, writeSpy } = await putEnv(OAUTH_FILE, [{ key: "ALLOWED_EMAIL", value: "admin@example.test" }]);
     expect(response.statusCode).toBe(200);
