@@ -110,7 +110,7 @@ create_card(
 
 - **Omit `position`.** The card is appended as the last child. `position` is an internal sort key, not "insert as the Nth child", and a guessed value can collide with existing siblings. To put the card somewhere specific, create it first, then `move_node(node_id=..., before=<sibling node_id>)` or `after=`/`to="start"`.
 - `create_card` returns the new card together with its `node_id`. Keep both: card tools take `card_id`, tree tools take `node_id`.
-- Creating under a symlink node writes the card under that card's canonical node.
+- Creating under a symlink node writes the card under the canonical node of that symlink's card (one of them if there are several, the symlink node itself if there is none).
 - To create a section and its cards in one step, use `batch_op` with `temp_id`/`parent_temp_id`; if any item fails, nothing is written:
 
 ```text
@@ -157,7 +157,7 @@ Prefer correcting a card to deleting it.
 - If the history matters, keep the card and start the content with `[Invalidated YYYY-MM-DD] <why, and which card replaces it>`.
 - Check `get_backlinks(card_id)` first. Deleting a referenced card leaves other cards pointing at a card that no longer exists.
 
-Deletion is destructive and reaches beyond the card: `delete_card` removes the card from every placement and also deletes the subtree under it. Any card in that range whose canonical node is in it is deleted permanently too, together with every symlink of it in other places. To remove only one placement (for example a symlink), use `delete_node` on that node; the node and any nodes below it are removed, and the card is permanently deleted only if that was its last node. Check with `dry_run` first (`deleted_card_ids`, `deleted_link_count`). The `atom-tree-cleanup` skill covers deleting sections safely.
+Deletion is destructive and reaches beyond the card: `delete_card` removes the card from every placement and also deletes the subtree under it. Any card in that range whose only canonical node is in it is deleted permanently too, together with every symlink of it in other places. A card with two or more canonical nodes does not follow its symlinks elsewhere, and a card with only symlink nodes has no canonical node to follow; either one stays as long as one of its nodes remains outside the range. To remove only one placement (for example a symlink), use `delete_node` on that node; the node and any nodes below it are removed, and the card is permanently deleted only if that was its last node. Check with `dry_run` first (`deleted_card_ids`, `deleted_link_count`). The `atom-tree-cleanup` skill covers deleting sections safely.
 
 ## Workflow summary
 

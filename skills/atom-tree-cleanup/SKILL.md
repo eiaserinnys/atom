@@ -149,10 +149,10 @@ batch_op(
 
 Deletion removes whole subtrees:
 
-- `delete_node(node_id)` deletes the node and everything under it. Any card in that range whose canonical node is in it is deleted permanently, together with every symlink of it in other places.
+- `delete_node(node_id)` deletes the node and everything under it. Any card in that range whose only canonical node is in it is deleted permanently, together with every symlink of it in other places. A card with two or more canonical nodes does not follow its symlinks elsewhere, and a card with only symlink nodes has no canonical node to follow; either one stays as long as one of its nodes remains outside the range.
 - `delete_card(card_id)` and `batch_op` `deletes` remove the card from every placement and delete the subtrees under those placements the same way.
 
-So to remove a section, first move the cards you want to keep (their canonical nodes) out of it to their new homes, confirm the section holds nothing else with `list_children`, and only then delete it. A symlink left in another place does not keep a card alive. To remove one symlink placement, call `delete_node` on the symlink node; that node and any nodes below it are removed, and the card is permanently deleted only if that was its last node. Check with `dry_run` first: it lists `deleted_card_ids` and `deleted_link_count`. Check `get_backlinks(card_id)` before deleting any card that others may reference.
+So to remove a section, first move the cards you want to keep (their canonical nodes) out of it to their new homes, confirm the section holds nothing else with `list_children`, and only then delete it. When a card has a single canonical node in the range, a symlink left in another place does not keep it alive (the symlink goes with it); when it has several canonical nodes or none, any node left outside the range keeps the card. To remove one symlink placement, call `delete_node` on the symlink node; that node and any nodes below it are removed, and the card is permanently deleted only if that was its last node. Check with `dry_run` first: it lists `deleted_card_ids` and `deleted_link_count`. Check `get_backlinks(card_id)` before deleting any card that others may reference.
 
 #### Log sections: `journal_limit`
 
