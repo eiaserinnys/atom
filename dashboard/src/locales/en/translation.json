@@ -147,9 +147,9 @@
   "errors": {
     "startup_would_fail": "Not saved. The server would not start again with these settings.",
     "startup_reason": {
-      "no_login_method": "Every login method has been removed. Set an administrator password or an OAuth provider.",
+      "no_login_method": "Every login method has been removed. Set an admin password or an OAuth provider.",
       "oauth_and_bypass": "Local bypass (AUTH_BYPASS) cannot be combined with an OAuth provider.",
-      "password_and_bypass": "Local bypass (AUTH_BYPASS) cannot be combined with an administrator password.",
+      "password_and_bypass": "Local bypass (AUTH_BYPASS) cannot be combined with an admin password.",
       "missing_keys": "Missing required settings: {{keys}}."
     },
     "failed": "Something went wrong. Please try again in a moment.",
