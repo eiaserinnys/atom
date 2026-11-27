@@ -53,12 +53,17 @@ export async function runSetup(io: SetupIo, options: SetupOptions): Promise<numb
     io.err('This is not a terminal, so the password cannot be asked for. Run `npm run setup` in a terminal, or pipe one line to `npm run setup -- --password-stdin`. Nothing was changed.');
     return 1;
   }
-  if (getDashboardAdminPassword(effective) && !options.passwordStdin) {
+  const readsOneLine = options.passwordStdin && !io.interactive;
+  if (getDashboardAdminPassword(effective) && !readsOneLine) {
     const answer = (await io.askLine('DASHBOARD_ADMIN_PASSWORD is already set. Change it? [y/N] ')).trim().toLowerCase();
     if (answer !== 'y' && answer !== 'yes') {
       io.out('The administrator password was left unchanged.');
       return 0;
     }
+  }
+
+  if (options.passwordStdin && io.interactive) {
+    io.err('Standard input is a terminal, so the password is asked for with echo off, as it is without --password-stdin.');
   }
 
   const keepsJwtSecret = Boolean(effective['JWT_SECRET']?.trim());
@@ -71,7 +76,7 @@ export async function runSetup(io: SetupIo, options: SetupOptions): Promise<numb
     return plan ? { plan } : { message: unstorablePasswordMessage('password') };
   };
 
-  const plan = options.passwordStdin ? await planFromStdin(io, check) : await planFromPrompts(io, check);
+  const plan = readsOneLine ? await planFromStdin(io, check) : await planFromPrompts(io, check);
   if (!plan) return 1;
 
   try {
