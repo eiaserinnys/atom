@@ -75,7 +75,13 @@
     "acknowledged": "已知晓",
     "copy_hint": "复制密钥",
     "revoke_confirm": "撤销 API 密钥 \"{{name}}\"？",
-    "new_key_warning": "API 密钥 — 仅显示一次，请妥善保存。"
+    "new_key_warning": "API 密钥 — 仅显示一次，请妥善保存。",
+    "agent_id_required": "请输入代理 ID。",
+    "display_name_label": "显示名称",
+    "name_label": "代理 ID",
+    "scope_label": "权限范围",
+    "scope_read": "读取",
+    "scope_write": "写入"
   },
   "credentials": {
     "title": "外部认证",
