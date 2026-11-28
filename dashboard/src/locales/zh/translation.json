@@ -165,7 +165,10 @@
     "no_selection": "选择节点以查看编译后的文档。",
     "loading": "编译中...",
     "toc_title": "文档大纲",
-    "depth_label": "编译深度: {{depth}}"
+    "depth_label": "编译深度: {{depth}}",
+    "depth_all": "所有层级",
+    "depth_option_one": "{{count}} 层",
+    "depth_option_other": "{{count}} 层"
   },
   "unfurl": {
     "failure": "外部引用查询失败",
