@@ -250,7 +250,12 @@
     "migration_confirm": "SQLiteデータをPostgreSQLにマイグレーションします。\n\nこの操作は取り消せません。続行しますか？",
     "migration_running": "マイグレーション中...",
     "migration_btn": "SQLite → PostgreSQL マイグレーション",
-    "file_status": "状態"
+    "file_status": "状態",
+    "connection_string": "PostgreSQL 接続文字列",
+    "save_url": "URL を保存",
+    "test_connection": "接続テスト",
+    "test_failed": "接続に失敗しました",
+    "test_success": "接続しました"
   },
   "mobile": {
     "tab_tree": "ツリー",
