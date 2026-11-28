@@ -207,7 +207,18 @@
   },
   "searchbar": {
     "placeholder": "検索...",
-    "no_results": "結果なし"
+    "no_results": "結果なし",
+    "card_type": "カードの種類",
+    "filters": "フィルター",
+    "no_results_hint": "OR 検索やフィルターをお試しください。",
+    "scope_current": "現在のノード",
+    "source_type": "ソース",
+    "tags": "タグ",
+    "type_all": "すべて",
+    "type_knowledge": "知識",
+    "type_structure": "構造",
+    "updated_after": "更新日以降",
+    "updated_before": "更新日以前"
   },
   "database": {
     "title": "データベース",
