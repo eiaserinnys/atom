@@ -257,7 +257,18 @@
     "password_rate_limited": "試行回数が多すぎます。しばらくしてからもう一度お試しください。",
     "password_save_failed": "パスワードを保存できませんでした。もう一度お試しください。",
     "password_same": "新しいパスワードが現在のパスワードと同じです。別のパスワードを入力してください。",
-    "password_session_lost": "ログインが切れました。ページを再読み込みして、もう一度ログインしてください。"
+    "password_session_lost": "ログインが切れました。ページを再読み込みして、もう一度ログインしてください。",
+    "allowed_email": "初期管理者のメールアドレス",
+    "allowed_team_id": "許可するチーム ID",
+    "callback_url": "コールバック URL",
+    "client_id": "クライアント ID",
+    "client_secret": "クライアントシークレット",
+    "google_section": "Google OAuth",
+    "save": "保存",
+    "save_success": "設定を保存しました",
+    "secret_not_set": "未設定",
+    "secret_set": "設定済み",
+    "slack_section": "Slack OAuth"
   },
   "visual_search": {
     "actions": "選択したカードの操作",
