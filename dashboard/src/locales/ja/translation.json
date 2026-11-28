@@ -385,5 +385,29 @@
     "zoom": "ズーム",
     "zoom_in": "拡大",
     "zoom_out": "縮小"
+  },
+  "openai": {
+    "configured": "設定済み",
+    "deleted": "削除しました",
+    "embeddings": "埋め込み",
+    "error_EMBEDDING_STORAGE": "ストレージエラー",
+    "error_OPENAI_AUTH": "認証エラー",
+    "error_OPENAI_BAD_RESPONSE": "無効な応答",
+    "error_OPENAI_NETWORK": "接続エラー",
+    "error_OPENAI_RATE_LIMIT": "利用制限",
+    "error_OPENAI_REQUEST": "リクエストエラー",
+    "error_OPENAI_UPSTREAM": "OpenAI エラー",
+    "idle": "待機中",
+    "key": "API キー",
+    "load_failed": "状態を読み込めませんでした。",
+    "not_configured": "未設定",
+    "paused_auth": "API キーを確認",
+    "paused_no_key": "キーが必要です",
+    "paused_rate_limited": "利用制限中",
+    "progress": "{{completed}} / {{total}}",
+    "request_failed": "設定を更新できませんでした。",
+    "running": "生成中",
+    "saved": "保存しました",
+    "saved_at": "保存日時"
   }
 }
