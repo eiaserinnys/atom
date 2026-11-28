@@ -257,7 +257,18 @@
     "password_rate_limited": "尝试次数过多，请稍后再试。",
     "password_save_failed": "密码保存失败，请重试。",
     "password_same": "新密码与当前密码相同，请输入其他密码。",
-    "password_session_lost": "登录已失效，请刷新页面后重新登录。"
+    "password_session_lost": "登录已失效，请刷新页面后重新登录。",
+    "allowed_email": "初始管理员邮箱",
+    "allowed_team_id": "允许的团队 ID",
+    "callback_url": "回调 URL",
+    "client_id": "客户端 ID",
+    "client_secret": "客户端密钥",
+    "google_section": "Google OAuth",
+    "save": "保存",
+    "save_success": "设置已保存",
+    "secret_not_set": "未设置",
+    "secret_set": "已设置",
+    "slack_section": "Slack OAuth"
   },
   "visual_search": {
     "actions": "所选卡片操作",
