@@ -57,7 +57,11 @@
     "self_role_tooltip": "无法更改自己的角色",
     "self_account_tooltip": "无法修改自己的账户",
     "remove_confirm": "删除用户 \"{{email}}\"？",
-    "role_change_confirm": "将 \"{{email}}\" 的角色更改为 {{role}}？"
+    "role_change_confirm": "将 \"{{email}}\" 的角色更改为 {{role}}？",
+    "display_name_label": "显示名称",
+    "email_label": "邮箱",
+    "email_required": "请输入邮箱地址。",
+    "role_label": "角色"
   },
   "agents": {
     "title": "API 密钥管理",
