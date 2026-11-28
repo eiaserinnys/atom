@@ -207,7 +207,18 @@
   },
   "searchbar": {
     "placeholder": "搜索...",
-    "no_results": "无结果"
+    "no_results": "无结果",
+    "card_type": "卡片类型",
+    "filters": "筛选",
+    "no_results_hint": "请尝试 OR 搜索或筛选条件。",
+    "scope_current": "当前节点",
+    "source_type": "来源",
+    "tags": "标签",
+    "type_all": "全部",
+    "type_knowledge": "知识",
+    "type_structure": "结构",
+    "updated_after": "更新日期起",
+    "updated_before": "更新日期止"
   },
   "database": {
     "title": "数据库",
