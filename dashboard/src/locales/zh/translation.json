@@ -385,5 +385,29 @@
     "zoom": "缩放",
     "zoom_in": "放大",
     "zoom_out": "缩小"
+  },
+  "openai": {
+    "configured": "已配置",
+    "deleted": "已删除",
+    "embeddings": "嵌入向量",
+    "error_EMBEDDING_STORAGE": "存储错误",
+    "error_OPENAI_AUTH": "身份验证错误",
+    "error_OPENAI_BAD_RESPONSE": "响应无效",
+    "error_OPENAI_NETWORK": "连接错误",
+    "error_OPENAI_RATE_LIMIT": "请求频率受限",
+    "error_OPENAI_REQUEST": "请求错误",
+    "error_OPENAI_UPSTREAM": "OpenAI 错误",
+    "idle": "空闲",
+    "key": "API 密钥",
+    "load_failed": "无法加载状态。",
+    "not_configured": "未配置",
+    "paused_auth": "检查 API 密钥",
+    "paused_no_key": "需要密钥",
+    "paused_rate_limited": "请求频率受限",
+    "progress": "{{completed}} / {{total}}",
+    "request_failed": "无法更新设置。",
+    "running": "生成中",
+    "saved": "已保存",
+    "saved_at": "保存时间"
   }
 }
