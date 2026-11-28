@@ -37,7 +37,9 @@
     "tab_agents": "API 密钥",
     "tab_credentials": "外部认证",
     "tab_language": "语言",
-    "tab_database": "数据库"
+    "tab_database": "数据库",
+    "tab_auth": "身份验证",
+    "tab_openai": "OpenAI"
   },
   "users": {
     "title": "用户管理",
