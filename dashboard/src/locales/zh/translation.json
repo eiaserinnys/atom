@@ -276,7 +276,8 @@
     "restart_manual": "设置已更改。请先停止服务器，再自行重新启动，设置才会生效。",
     "shutdown_now": "停止服务器",
     "shutdown_done": "服务器已停止。请自行重新启动后继续。",
-    "reconnecting": "正在连接服务器..."
+    "reconnecting": "正在连接服务器...",
+    "reconnect_timeout": "重启可能失败，请手动检查。"
   },
   "auth": {
     "password_section": "管理员密码",
