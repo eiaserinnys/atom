@@ -145,7 +145,10 @@
     "source": "来源",
     "edit_title": "编辑标题",
     "edit_content": "编辑内容",
-    "compile_view": "编译文档"
+    "compile_view": "编译文档",
+    "journal_limit_all": "全部",
+    "journal_limit_label": "显示的子卡片",
+    "journal_limit_latest": "最近 {{count}} 项"
   },
   "compile": {
     "copy_document": "复制文档",
