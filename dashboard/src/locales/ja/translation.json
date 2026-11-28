@@ -145,7 +145,10 @@
     "source": "出典",
     "edit_title": "タイトルを編集",
     "edit_content": "内容を編集",
-    "compile_view": "コンパイル文書"
+    "compile_view": "コンパイル文書",
+    "journal_limit_all": "すべて",
+    "journal_limit_label": "表示する子カード",
+    "journal_limit_latest": "最新 {{count}}件"
   },
   "compile": {
     "copy_document": "文書をコピー",
