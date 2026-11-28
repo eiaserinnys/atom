@@ -212,7 +212,10 @@
     "self_role_tooltip": "자신의 역할은 변경할 수 없습니다",
     "self_account_tooltip": "자신의 계정은 변경할 수 없습니다",
     "remove_confirm": "\"{{email}}\" 사용자를 삭제하시겠습니까?",
-    "role_change_confirm": "\"{{email}}\" 사용자의 역할을 {{role}}으로 변경하시겠습니까?"
+    "role_change_confirm": "\"{{email}}\" 사용자의 역할을 {{role}}으로 변경하시겠습니까?",
+    "role_admin": "관리자",
+    "role_editor": "편집자",
+    "role_viewer": "열람자"
   },
   "agents": {
     "title": "API 키 관리",
@@ -324,7 +327,8 @@
     "toc_title": "문서 개요",
     "depth_label": "컴파일 깊이: {{depth}}",
     "depth_option_other": "{{count}}단계",
-    "depth_all": "전체 단계"
+    "depth_all": "전체 단계",
+    "depth_option_one": "{{count}}단계"
   },
   "unfurl": {
     "failure": "외부 참조 조회 실패",

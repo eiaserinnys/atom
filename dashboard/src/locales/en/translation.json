@@ -212,7 +212,10 @@
     "self_role_tooltip": "You cannot change your own role",
     "self_account_tooltip": "You cannot modify your own account",
     "remove_confirm": "Remove user \"{{email}}\"?",
-    "role_change_confirm": "Change role of \"{{email}}\" to {{role}}?"
+    "role_change_confirm": "Change role of \"{{email}}\" to {{role}}?",
+    "role_admin": "admin",
+    "role_editor": "editor",
+    "role_viewer": "viewer"
   },
   "agents": {
     "title": "API Keys",
