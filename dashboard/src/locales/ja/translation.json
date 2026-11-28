@@ -211,7 +211,12 @@
     "desc": "ナレッジ管理システム",
     "sign_in_google": "Google でサインイン",
     "sign_in_slack": "Slack でサインイン",
-    "sign_in_error": "ログイン方法を読み込めませんでした。しばらくしてからページを再読み込みしてください。"
+    "sign_in_error": "ログイン方法を読み込めませんでした。しばらくしてからページを再読み込みしてください。",
+    "password_error": "ログインできませんでした。もう一度お試しください。",
+    "password_invalid": "パスワードが正しくありません。",
+    "password_label": "パスワード",
+    "password_rate_limited": "試行回数が多すぎます。しばらくしてからお試しください。",
+    "password_submit": "ログイン"
   },
   "app": {
     "logout": "ログアウト",
