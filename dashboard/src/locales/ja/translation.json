@@ -276,7 +276,8 @@
     "restart_manual": "設定が変更されました。サーバーを停止し、自分で起動し直すと反映されます。",
     "shutdown_now": "サーバーを停止",
     "shutdown_done": "サーバーが停止しました。自分で起動し直すと続きから使えます。",
-    "reconnecting": "サーバーに接続しています..."
+    "reconnecting": "サーバーに接続しています...",
+    "reconnect_timeout": "再起動に失敗した可能性があります。手動で確認してください。"
   },
   "auth": {
     "password_section": "管理者パスワード",
