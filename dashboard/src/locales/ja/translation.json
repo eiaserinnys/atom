@@ -37,7 +37,9 @@
     "tab_agents": "API キー",
     "tab_credentials": "外部認証",
     "tab_language": "言語",
-    "tab_database": "データベース"
+    "tab_database": "データベース",
+    "tab_auth": "認証",
+    "tab_openai": "OpenAI"
   },
   "users": {
     "title": "ユーザー管理",
