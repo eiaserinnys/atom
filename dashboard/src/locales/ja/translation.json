@@ -57,7 +57,11 @@
     "self_role_tooltip": "自分の役割は変更できません",
     "self_account_tooltip": "自分のアカウントは変更できません",
     "remove_confirm": "ユーザー \"{{email}}\" を削除しますか？",
-    "role_change_confirm": "\"{{email}}\" の役割を {{role}} に変更しますか？"
+    "role_change_confirm": "\"{{email}}\" の役割を {{role}} に変更しますか？",
+    "display_name_label": "表示名",
+    "email_label": "メールアドレス",
+    "email_required": "メールアドレスを入力してください。",
+    "role_label": "役割"
   },
   "agents": {
     "title": "API キー管理",
