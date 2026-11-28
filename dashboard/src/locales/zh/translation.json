@@ -250,7 +250,12 @@
     "migration_confirm": "将SQLite数据迁移到PostgreSQL。\n\n此操作无法撤消。是否继续？",
     "migration_running": "迁移中...",
     "migration_btn": "SQLite → PostgreSQL 迁移",
-    "file_status": "状态"
+    "file_status": "状态",
+    "connection_string": "PostgreSQL 连接字符串",
+    "save_url": "保存 URL",
+    "test_connection": "测试连接",
+    "test_failed": "连接失败",
+    "test_success": "连接成功"
   },
   "mobile": {
     "tab_tree": "树",
