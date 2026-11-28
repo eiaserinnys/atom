@@ -165,7 +165,10 @@
     "no_selection": "ノードを選択するとコンパイルされた文書が表示されます。",
     "loading": "コンパイル中...",
     "toc_title": "文書アウトライン",
-    "depth_label": "コンパイル深度: {{depth}}"
+    "depth_label": "コンパイル深度: {{depth}}",
+    "depth_all": "すべての階層",
+    "depth_option_one": "{{count}}階層",
+    "depth_option_other": "{{count}}階層"
   },
   "unfurl": {
     "failure": "外部参照照会失敗",
