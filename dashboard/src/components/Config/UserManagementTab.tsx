@@ -9,11 +9,7 @@ interface Props {
   currentUserEmail: string;
 }
 
-const ROLE_LABELS: Record<UserRole, string> = {
-  admin: 'admin',
-  editor: 'editor',
-  viewer: 'viewer',
-};
+const ROLES: UserRole[] = ['admin', 'editor', 'viewer'];
 
 export function UserManagementTab({ currentUserEmail }: Props) {
   const { t } = useTranslation();
@@ -105,9 +101,7 @@ export function UserManagementTab({ currentUserEmail }: Props) {
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as UserRole)}
             >
-              <option value="admin">admin</option>
-              <option value="editor">editor</option>
-              <option value="viewer">viewer</option>
+              {ROLES.map((role) => <option key={role} value={role}>{t(`users.role_${role}`)}</option>)}
             </select>
           </div>
           <ConfigActionButton onClick={handleAdd} disabled={adding}>
@@ -160,9 +154,9 @@ export function UserManagementTab({ currentUserEmail }: Props) {
                     title={isSelf ? t('users.self_role_tooltip') : undefined}
                     onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
                   >
-                    {Object.entries(ROLE_LABELS).map(([r, label]) => (
+                    {ROLES.map((r) => (
                       <option key={r} value={r}>
-                        {label}
+                        {t(`users.role_${r}`)}
                       </option>
                     ))}
                   </select>

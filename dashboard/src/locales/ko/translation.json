@@ -212,7 +212,10 @@
     "self_role_tooltip": "자신의 역할은 변경할 수 없습니다",
     "self_account_tooltip": "자신의 계정은 변경할 수 없습니다",
     "remove_confirm": "\"{{email}}\" 사용자를 삭제하시겠습니까?",
-    "role_change_confirm": "\"{{email}}\" 사용자의 역할을 {{role}}으로 변경하시겠습니까?"
+    "role_change_confirm": "\"{{email}}\" 사용자의 역할을 {{role}}으로 변경하시겠습니까?",
+    "role_admin": "관리자",
+    "role_editor": "편집자",
+    "role_viewer": "열람자"
   },
   "agents": {
     "title": "API 키 관리",
