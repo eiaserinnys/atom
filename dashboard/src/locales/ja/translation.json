@@ -75,7 +75,13 @@
     "acknowledged": "確認しました",
     "copy_hint": "シークレットをコピー",
     "revoke_confirm": "API キー \"{{name}}\" を失効させますか？",
-    "new_key_warning": "API シークレット — 一度だけ表示されます。安全な場所に保存してください。"
+    "new_key_warning": "API シークレット — 一度だけ表示されます。安全な場所に保存してください。",
+    "agent_id_required": "エージェント ID を入力してください。",
+    "display_name_label": "表示名",
+    "name_label": "エージェント ID",
+    "scope_label": "権限",
+    "scope_read": "読み取り",
+    "scope_write": "書き込み"
   },
   "credentials": {
     "title": "外部認証",
